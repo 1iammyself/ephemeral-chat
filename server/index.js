@@ -25,7 +25,7 @@ const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production'
-      ? ['https://ephemeral-chat-7j66.onrender.com', /\.onrender\.com$/]
+      ? ['https://ephemeral-chat-7j66.onrender.com', /\.onrender\.com$/, '*']
       : "http://localhost:5173",
     methods: ["GET", "POST"],
     credentials: true
@@ -37,7 +37,7 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
-    ? ['https://ephemeral-chat-7j66.onrender.com', /\.onrender\.com$/]
+    ? ['https://ephemeral-chat-7j66.onrender.com', /\.onrender\.com$/, '*']
     : 'http://localhost:5173',
   credentials: true
 }));

@@ -4,14 +4,15 @@
 
 import { io } from 'socket.io-client';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL ||
-  (import.meta.env.PROD ? window.location.origin : 'http://localhost:3001');
+const SERVER_URL = 'https://ephemeral-chat-7j66.onrender.com';
 
 class SocketManager {
   constructor() {
     this.socket = null;
     this.isConnected = false;
     this.listeners = new Map();
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 5;
   }
 
   connect() {
@@ -21,21 +22,49 @@ class SocketManager {
 
     this.socket = io(SERVER_URL, {
       transports: ['websocket', 'polling'],
-      timeout: 5000,
+      timeout: 10000,
+      forceNew: true,
+      reconnection: true,
+      reconnectionAttempts: this.maxReconnectAttempts,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      maxReconnectionAttempts: this.maxReconnectAttempts,
+      autoConnect: true
     });
 
     this.socket.on('connect', () => {
       this.isConnected = true;
+      this.reconnectAttempts = 0;
       console.log('✅ Connected to server');
     });
 
     this.socket.on('disconnect', (reason) => {
       this.isConnected = false;
       console.log('❌ Disconnected from server:', reason);
+      
+      if (reason === 'io server disconnect') {
+        // Server disconnected us, try to reconnect
+        this.socket.connect();
+      }
     });
 
     this.socket.on('connect_error', (error) => {
+      this.reconnectAttempts++;
       console.error('❌ Connection error:', error);
+      console.log(`Reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
+    });
+
+    this.socket.on('reconnect', (attemptNumber) => {
+      console.log(`✅ Reconnected after ${attemptNumber} attempts`);
+      this.isConnected = true;
+    });
+
+    this.socket.on('reconnect_error', (error) => {
+      console.error('❌ Reconnection error:', error);
+    });
+
+    this.socket.on('reconnect_failed', () => {
+      console.error('❌ Failed to reconnect after all attempts');
     });
 
     return this.socket;
