@@ -3,12 +3,17 @@
   "version": "1.0.0",
   "description": "Anonymous, temporary chat rooms with real-time messaging",
   "main": "server/index.js",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "node server/index.js",
     "client": "cd client && npm run dev",
     "build": "cd client && npm run build",
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "test": "echo \"No tests specified\" && exit 0"
   },
   "keywords": ["chat", "websocket", "anonymous", "ephemeral", "real-time"],
   "author": "Ephemeral Chat Team",

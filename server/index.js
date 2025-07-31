@@ -23,7 +23,9 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: process.env.NODE_ENV === 'production' ? true : "http://localhost:5173",
+    origin: process.env.NODE_ENV === 'production'
+      ? ['https://ephemeral-chat-frontend.onrender.com', /\.onrender\.com$/]
+      : "http://localhost:5173",
     methods: ["GET", "POST"],
     credentials: true
   }
@@ -32,7 +34,12 @@ const io = socketIo(server, {
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production'
+    ? ['https://ephemeral-chat-frontend.onrender.com', /\.onrender\.com$/]
+    : 'http://localhost:5173',
+  credentials: true
+}));
 app.use(express.json());
 
 // Rate limiting storage
@@ -256,10 +263,11 @@ io.on('connection', (socket) => {
 // Start server
 async function startServer() {
   await initializeRedis();
-  
-  server.listen(PORT, () => {
+
+  server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Ephemeral Chat server running on port ${PORT}`);
-    console.log(`📱 Client should connect to: http://localhost:${PORT}`);
+    console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`📡 Server ready to accept connections`);
   });
 }
 
