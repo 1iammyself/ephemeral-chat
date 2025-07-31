@@ -1,0 +1,31 @@
+services:
+  # Backend API Service
+  - type: web
+    name: ephemeral-chat-api
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: ROOM_EXPIRY_MINUTES
+        value: 10
+      - key: MAX_MESSAGES_PER_MINUTE
+        value: 30
+
+  # Frontend Static Site
+  - type: static
+    name: ephemeral-chat-frontend
+    env: static
+    plan: free
+    buildCommand: cd client && npm install && npm run build
+    staticPublishPath: ./client/dist
+    envVars:
+      - key: VITE_SERVER_URL
+        fromService:
+          type: web
+          name: ephemeral-chat-api
+          property: host

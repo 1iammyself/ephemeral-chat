@@ -5,10 +5,10 @@
   "main": "server/index.js",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "server": "cd server && node index.js",
+    "server": "node server/index.js",
     "client": "cd client && npm run dev",
     "build": "cd client && npm run build",
-    "start": "cd server && node index.js"
+    "start": "node server/index.js"
   },
   "keywords": ["chat", "websocket", "anonymous", "ephemeral", "real-time"],
   "author": "Ephemeral Chat Team",
