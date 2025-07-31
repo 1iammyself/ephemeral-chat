@@ -1,10 +1,10 @@
 services:
-  # Backend API Service
+  # Combined Frontend + Backend Service
   - type: web
-    name: ephemeral-chat-api
+    name: ephemeral-chat
     env: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm install && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
@@ -16,17 +16,3 @@ services:
         value: 10
       - key: MAX_MESSAGES_PER_MINUTE
         value: 30
-
-  # Frontend Static Site
-  - type: static
-    name: ephemeral-chat-frontend
-    env: static
-    plan: free
-    buildCommand: cd client && npm install && npm run build
-    staticPublishPath: ./client/dist
-    envVars:
-      - key: VITE_SERVER_URL
-        fromService:
-          type: web
-          name: ephemeral-chat-api
-          property: host
