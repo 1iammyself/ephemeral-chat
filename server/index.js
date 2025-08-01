@@ -30,23 +30,38 @@ const isRender = process.env.RENDER === 'true';
 
 // Configure CORS options
 const getCorsOptions = () => {
+  // Allow all origins in development
+  if (!isProduction) {
+    return {
+      origin: true, // Reflect the request origin
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+      exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
+      maxAge: 86400 // 24 hours
+    };
+  }
+
+  // In production, allow specific origins
+  const allowedOrigins = [
+    'https://ephemeral-chat-iota.vercel.app',
+    'https://ephemeral-chat-7j66.onrender.com',
+    'http://localhost:3000',
+    'http://localhost:3001'
+  ];
+
   return {
     origin: (origin, callback) => {
-      // Allow all origins in development
-      if (!isProduction) return callback(null, true);
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
       
-      // In production, only allow specific origins
-      if (isVercel) {
-        if (origin && (origin.endsWith('vercel.app') || origin.includes('localhost'))) {
-          return callback(null, true);
-        }
-      } else if (isRender) {
-        if (origin && (origin.includes('onrender.com') || origin.includes('localhost'))) {
-          return callback(null, true);
-        }
+      // Check if the origin is in the allowed list
+      if (allowedOrigins.includes(origin) || 
+          origin.endsWith('.vercel.app') || 
+          origin.includes('onrender.com')) {
+        return callback(null, true);
       }
       
-      // Default: deny other origins in production
       callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
@@ -66,7 +81,30 @@ app.options('*', cors(corsOptions));
 
 // Configure WebSocket with CORS and additional settings
 const io = socketIo(server, {
-  cors: corsOptions,
+  cors: {
+    origin: (origin, callback) => {
+      // Allow all in development
+      if (!isProduction) return callback(null, true);
+      
+      // In production, check against allowed origins
+      const allowedOrigins = [
+        'https://ephemeral-chat-iota.vercel.app',
+        'https://ephemeral-chat-7j66.onrender.com',
+        'http://localhost:3000',
+        'http://localhost:3001'
+      ];
+      
+      if (!origin || allowedOrigins.includes(origin) || 
+          origin.endsWith('.vercel.app') || 
+          origin.includes('onrender.com')) {
+        return callback(null, true);
+      }
+      
+      callback(new Error('Not allowed by CORS'));
+    },
+    methods: ['GET', 'POST'],
+    credentials: true
+  },
   transports: ['websocket', 'polling'],
   allowUpgrades: true,
   pingTimeout: 60000, // 60 seconds
@@ -79,16 +117,6 @@ const io = socketIo(server, {
     zlibDeflateOptions: {
       chunkSize: 16 * 1024,
     },
-  },
-  // Enable CORS for Socket.IO
-  handlePreflightRequest: (req, res) => {
-    const headers = {
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-      'Access-Control-Allow-Origin': req.headers.origin || '*',
-      'Access-Control-Allow-Credentials': true
-    };
-    res.writeHead(200, headers);
-    res.end();
   }
 });
 

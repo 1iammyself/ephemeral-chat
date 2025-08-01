@@ -4,26 +4,31 @@
 
 import { io } from 'socket.io-client';
 
-// Determine the server URL based on the current environment
-let SERVER_URL = import.meta.env.VITE_API_URL || '';
-
-// If we're in the browser, use the current origin for API requests
-if (typeof window !== 'undefined') {
-  const isVercel = window.location.hostname.includes('vercel.app');
-  const isRender = window.location.hostname.includes('onrender.com');
-  
-  if (!SERVER_URL) {
-    if (isVercel) {
-      SERVER_URL = 'https://ephemeral-chat-iota.vercel.app';
-    } else if (isRender) {
-      SERVER_URL = 'https://ephemeral-chat-7j66.onrender.com';
-    } else {
-      // Default to local development
-      SERVER_URL = 'http://localhost:3001';
-    }
+// Get the current hostname and protocol
+const getServerUrl = () => {
+  // Use VITE_API_URL if explicitly set
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
   }
-}
 
+  // In browser environment
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname, port } = window.location;
+    
+    // For production environments (Vercel or Render)
+    if (hostname.includes('vercel.app') || hostname.includes('onrender.com')) {
+      return `${protocol}//${hostname}`;
+    }
+    
+    // For local development
+    return 'http://localhost:3001';
+  }
+  
+  // Default fallback
+  return 'http://localhost:3001';
+};
+
+const SERVER_URL = getServerUrl();
 console.log('🌐 Connecting to server:', SERVER_URL);
 
 // Simple logging function
@@ -48,24 +53,29 @@ class SocketManager {
       log('✅ Already connected, returning existing socket');
       return this.socket;
     }
+    
+    // Close existing socket if any
+    if (this.socket) {
+      this.socket.close();
+    }
 
     log('🔧 Creating new socket connection...');
     
     try {
       this.socket = io(SERVER_URL, {
-        path: '/socket.io/',
-        transports: ['websocket', 'polling'],
-        upgrade: true,
-        secure: true,
-        rejectUnauthorized: false,
         withCredentials: true,
         reconnection: true,
-        reconnectionAttempts: 5,
+        reconnectionAttempts: this.maxReconnectAttempts,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
         timeout: 20000,
+        transports: ['websocket', 'polling'],
         autoConnect: true,
         forceNew: true,
+        upgrade: true,
+        rememberUpgrade: true,
+        path: '/socket.io/',
+        query: {},
         extraHeaders: {
           'Access-Control-Allow-Origin': window.location.origin,
           'Access-Control-Allow-Credentials': 'true'
