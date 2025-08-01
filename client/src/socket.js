@@ -242,3 +242,4 @@ class SocketManager {
 const socketManager = new SocketManager();
 
 export default socketManager;
+
