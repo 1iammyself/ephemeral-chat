@@ -2,14 +2,55 @@
   "appId": "com.ephemeralchat.app",
   "appName": "Ephemeral Chat",
   "webDir": "dist",
+  "bundledWebRuntime": false,
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "hostname": "ephemeral-chat-app",
+    "iosScheme": "ephemeralchat",
+    "cleartext": true,
+    "allowNavigation": [
+      "ephemeral-chat-7j66.onrender.com",
+      "*.onrender.com"
+    ]
   },
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 2000,
+      "launchAutoHide": true,
       "backgroundColor": "#1f2937",
-      "showSpinner": false
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": true
+    },
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    },
+    "StatusBar": {
+      "backgroundColor": "#1f2937",
+      "style": "light"
     }
-  }
-} 
+  },
+  "android": {
+    "allowMixedContent": true,
+    "webContentsDebuggingEnabled": true,
+    "buildOptions": {
+      "keystorePath": "android/app/keystore/ephemeral-chat-key.keystore",
+      "keystoreAlias": "ephemeral-chat-alias",
+      "androidX": true
+    },
+    "captureInput": true,
+    "webViewDebuggingEnabled": true
+  },
+  "ios": {
+    "scheme": "EphemeralChat",
+    "scrollEnabled": true,
+    "disallowOverscroll": true,
+    "allowsLinkPreview": false
+  },
+  "hideLogs": false,
+  "loggingBehavior": "debug",
+  "npmClient": "npm",
+  "cordova": {}
+}

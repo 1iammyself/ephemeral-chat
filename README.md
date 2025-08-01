@@ -1,85 +1,191 @@
 # Ephemeral Chat
 
-Anonymous, temporary chat rooms with real-time messaging.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Features
+A secure, anonymous, and ephemeral chat application that allows users to create temporary chat rooms with self-destructing messages. Built with React, Node.js, and Socket.IO for real-time communication.
 
-- 🧾 **Room Creation**: Generate unique 6-digit room codes
-- 🪪 **Anonymous Join**: Users join with temporary nicknames
-- 🔁 **Real-Time Chat**: Instant messaging using WebSockets
-- 🕐 **Message TTL**: Messages auto-delete after set time
-- 🧼 **Room Expiry**: Rooms close after inactivity
-- 🔐 **Optional Security**: Room passwords and rate limiting
+## ✨ Features
 
-## Quick Start
+### Core Features
+- 🧾 **Instant Room Creation**: Generate unique 6-digit room codes instantly
+- 🪪 **Anonymous Participation**: Join with temporary nicknames, no accounts required
+- ⚡ **Real-Time Messaging**: Lightning-fast message delivery using WebSockets
+- 🕒 **Self-Destructing Messages**: Set custom TTL for messages
+- 🧹 **Auto-Cleanup**: Rooms automatically close after period of inactivity
+
+### Security & Privacy
+- 🔐 **Optional Room Passwords**: Add an extra layer of security
+- 🛡️ **Rate Limiting**: Prevent abuse with configurable message limits
+- 🔄 **No Message Persistence**: Messages are never stored on the server
+- 🔒 **End-to-End Encryption**: Optional encryption for private conversations (coming soon)
+
+## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js (v16 or higher)
-- Redis (optional for enhanced features)
+- Node.js (v18 or higher)
+- npm (v9 or higher) or yarn
+- Redis (optional but recommended for production)
 
 ### Installation
 
-1. Clone and navigate to the project:
+1. **Clone the repository**
 ```bash
+git clone https://github.com/yourusername/ephemeral-chat.git
 cd ephemeral-chat
 ```
 
-2. Install dependencies:
+2. **Install dependencies**
 ```bash
+# Install server dependencies
 npm install
+
+# Install client dependencies
+cd client
+npm install
+cd ..
 ```
 
-3. Install client dependencies:
+3. **Set up environment variables**
 ```bash
-cd client && npm install && cd ..
+cp .env.example .env
+# Edit .env file with your configuration
 ```
 
-4. Start Redis (optional, for TTL and enhanced features):
+4. **Start the application**
 ```bash
-redis-server
-```
-
-5. Run the application:
-```bash
+# Development mode (with hot-reload)
 npm run dev
+
+# Production build
+npm run build
+npm start
 ```
 
-The server will start on http://localhost:3001 and the client on http://localhost:5173
+5. **Access the application**
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:3001
 
-## Project Structure
+### With Docker (Alternative)
+```bash
+docker-compose up --build
+```
+
+## 🏗️ Project Structure
 
 ```
 ephemeral-chat/
-├── client/                  # React frontend
-│   ├── public/
+├── client/                    # React frontend
+│   ├── public/               # Static assets
 │   └── src/
-│       ├── components/
-│       ├── App.jsx
-│       └── socket.js
-├── server/                  # Express + Socket.IO backend
-│   ├── index.js            # Entry point
-│   ├── rooms.js            # Room management
-│   └── utils.js            # Utilities
-├── .env
-├── package.json
+│       ├── assets/           # Images, fonts, etc.
+│       ├── components/       # Reusable UI components
+│       ├── hooks/            # Custom React hooks
+│       ├── services/         # API and service integrations
+│       ├── utils/            # Helper functions
+│       ├── App.jsx           # Main App component
+│       └── main.jsx          # Entry point
+│
+├── server/                   # Express + Socket.IO backend
+│   ├── config/              # Configuration files
+│   ├── controllers/         # Request handlers
+│   ├── middleware/          # Custom middleware
+│   ├── models/              # Data models
+│   ├── routes/              # API routes
+│   ├── services/            # Business logic
+│   ├── socket/              # Socket.IO handlers
+│   ├── utils/               # Utility functions
+│   ├── index.js             # Server entry point
+│   └── package.json
+│
+├── .env.example            # Environment variables template
+├── .gitignore
+├── docker-compose.yml      # Docker configuration
+├── Dockerfile             # Frontend Dockerfile
+├── package.json           # Root package.json
 └── README.md
 ```
 
-## Usage
+## 📱 Usage
 
-1. **Create a Room**: Click "Create a New Room" on the home page
-2. **Join a Room**: Enter a 6-digit room code and your nickname
-3. **Chat**: Send messages in real-time with other participants
-4. **Privacy**: Messages can be set to auto-delete after specified time
+### For Users
+1. **Create a Room**
+   - Click "Create a New Room"
+   - Configure room settings (password, message TTL)
+   - Share the room code with others
 
-## Configuration
+2. **Join a Room**
+   - Enter the 6-digit room code
+   - Choose a nickname (anonymous)
+   - Enter password if required
 
-Edit `.env` file to configure:
-- `PORT`: Server port (default: 3001)
-- `REDIS_URL`: Redis connection URL
-- `ROOM_EXPIRY_MINUTES`: Room auto-expiry time
-- `MAX_MESSAGES_PER_MINUTE`: Rate limiting
+3. **Chat Features**
+   - Send and receive messages in real-time
+   - Set message expiration time
+   - View active participants
+   - Copy room link to clipboard
 
-## License
+### For Developers
+```javascript
+// Example: Connect to a room
+const socket = io('http://localhost:3001');
+socket.emit('joinRoom', { room: '123456', username: 'anon' });
 
-MIT License
+// Send a message
+socket.emit('sendMessage', {
+  room: '123456',
+  message: 'Hello, World!',
+  ttl: 60 // seconds
+});
+```
+
+## ⚙️ Configuration
+
+### Environment Variables
+Create a `.env` file in the root directory:
+
+```env
+# Server
+PORT=3001
+NODE_ENV=development
+
+# Redis (optional)
+REDIS_URL=redis://localhost:6379
+
+# Room Settings
+ROOM_EXPIRY_MINUTES=30
+MAX_MESSAGES_PER_MINUTE=60
+MAX_ROOMS=1000
+MAX_USERS_PER_ROOM=50
+
+# Security
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX=100
+```
+
+### Available Scripts
+- `npm run dev`: Start development server
+- `npm run build`: Create production build
+- `npm start`: Start production server
+- `npm test`: Run tests
+- `npm run lint`: Lint code
+- `npm run format`: Format code
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Contributing
+
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+
+## 📬 Contact
+
+- **Email**: [kyereboatengcaleb@gmail.com](mailto:kyereboatengcaleb@gmail.com)
+- **GitHub**: [cLLeB/ephemeral-chat](https://github.com/cLLeB/-ephemeral-chat/)
+- **Issues**: [GitHub Issues](https://github.com/cLLeB/-ephemeral-chat/issues)
+
+## 🤝 Acknowledgments
+
+- Built with ❤️ using React, Node.js, and Socket.IO
+- Inspired by privacy-focused chat applications
+- Thanks to all contributors who helped with this project

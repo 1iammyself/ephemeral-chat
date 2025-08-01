@@ -22,25 +22,31 @@ const {
 
 const app = express();
 const server = http.createServer(app);
+// Configure CORS for WebSocket
 const io = socketIo(server, {
   cors: {
-    origin: process.env.NODE_ENV === 'production'
-      ? ['https://ephemeral-chat-7j66.onrender.com', /\.onrender\.com$/, '*']
-      : "http://localhost:5173",
+    origin: true, // Allow all origins in development
     methods: ["GET", "POST"],
-    credentials: true
-  }
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"],
+    exposedHeaders: ["Access-Control-Allow-Origin"]
+  },
+  allowEIO3: true, // Enable Socket.IO v3 compatibility
+  transports: ['websocket', 'polling']
 });
 
 const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? ['https://ephemeral-chat-7j66.onrender.com', /\.onrender\.com$/, '*']
-    : 'http://localhost:5173',
-  credentials: true
+  origin: true, // Allow all origins
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Handle preflight requests
+app.options('*', cors());
 app.use(express.json());
 
 // Serve static files from the client build directory

@@ -4,7 +4,8 @@
 
 import { io } from 'socket.io-client';
 
-const SERVER_URL = 'https://ephemeral-chat-7j66.onrender.com';
+// Use environment variable or fallback to production URL
+const SERVER_URL = process.env.REACT_APP_API_URL || 'https://ephemeral-chat-7j66.onrender.com';
 
 // Add Android-specific logging
 const log = (message, data = null) => {
@@ -39,26 +40,62 @@ class SocketManager {
     }
 
     log('🔧 Creating new socket connection...');
-    this.socket = io(SERVER_URL, {
-      transports: ['websocket', 'polling'],
-      timeout: 10000,
-      forceNew: true,
-      reconnection: true,
-      reconnectionAttempts: this.maxReconnectAttempts,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      maxReconnectAttempts: this.maxReconnectAttempts,
-      autoConnect: true
-    });
+    
+    try {
+      this.socket = io(SERVER_URL, {
+        transports: ['websocket', 'polling'],
+        timeout: 15000, // Increased timeout for mobile
+        forceNew: true,
+        reconnection: true,
+        reconnectionAttempts: this.maxReconnectAttempts,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 10000,
+        autoConnect: true,
+        withCredentials: true,
+        rejectUnauthorized: process.env.NODE_ENV !== 'production',
+        extraHeaders: {
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+    } catch (error) {
+      log('❌ Error creating socket connection:', error);
+      throw error; // Re-throw to be handled by the caller
+    }
 
     log('📡 Socket created, setting up event listeners...');
 
     this.socket.on('connect', () => {
+      log('✅ Connected to server');
       this.isConnected = true;
       this.reconnectAttempts = 0;
-      log('✅ Connected to server successfully!');
-      log('🆔 Socket ID:', this.socket.id);
+      
+      // Force UI update after connection
+      if (window.dispatchEvent) {
+        window.dispatchEvent(new Event('online'));
+      }
     });
+    
+      // Add error handling
+      this.socket.on('connect_error', (error) => {
+        log('❌ Connection Error:', error.message);
+        this.isConnected = false;
+        
+        // Force UI update on error
+        if (typeof window !== 'undefined' && window.dispatchEvent) {
+          window.dispatchEvent(new Event('offline'));
+        }
+        
+        // Attempt to reconnect with exponential backoff
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+          const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+          log(`⏳ Reconnecting in ${delay/1000} seconds... (attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
+          
+          setTimeout(() => {
+            this.reconnectAttempts++;
+            this.socket.connect();
+          }, delay);
+        }
+      });
 
     this.socket.on('disconnect', (reason) => {
       this.isConnected = false;

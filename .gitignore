@@ -67,3 +67,91 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+keystore/
+
+# Capacitor
+/android/
+/ios/
+/.capacitor/
+
+# Android
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Vite specific
+.cache/
+.temp/
+
+# Environment files (uncomment and modify as needed)
+# .env
+# .env.*
+# !.env.example
+
+# IDE specific
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Testing
+/coverage/
+/cypress/
+
+# Production
+/build/
+/dist/
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local development
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file (keep .env for template)
+# .env
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
