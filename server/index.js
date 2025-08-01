@@ -22,70 +22,79 @@ const {
 
 const app = express();
 const server = http.createServer(app);
-// Configure CORS for WebSocket
-const io = socketIo(server, {
-  cors: {
-    origin: true, // Allow all origins
-    methods: ["GET", "POST", "OPTIONS"],
+
+// Detect environment
+const isProduction = process.env.NODE_ENV === 'production';
+const isVercel = process.env.VERCEL === '1';
+const isRender = process.env.RENDER === 'true';
+
+// Configure CORS options
+const getCorsOptions = () => {
+  return {
+    origin: (origin, callback) => {
+      // Allow all origins in development
+      if (!isProduction) return callback(null, true);
+      
+      // In production, only allow specific origins
+      if (isVercel) {
+        if (origin && (origin.endsWith('vercel.app') || origin.includes('localhost'))) {
+          return callback(null, true);
+        }
+      } else if (isRender) {
+        if (origin && (origin.includes('onrender.com') || origin.includes('localhost'))) {
+          return callback(null, true);
+        }
+      }
+      
+      // Default: deny other origins in production
+      callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-    exposedHeaders: ["Access-Control-Allow-Origin"]
-  },
-  allowEIO3: true, // Enable Socket.IO v3 compatibility
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
+    maxAge: 86400 // 24 hours
+  };
+};
+
+// Get CORS options
+const corsOptions = getCorsOptions();
+
+// Apply CORS middleware to Express
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
+// Configure WebSocket with CORS and additional settings
+const io = socketIo(server, {
+  cors: corsOptions,
   transports: ['websocket', 'polling'],
-  pingTimeout: 60000, // Increase timeout to 60 seconds
-  pingInterval: 25000,
+  allowUpgrades: true,
+  pingTimeout: 60000, // 60 seconds
+  pingInterval: 25000, // 25 seconds
   cookie: false,
   serveClient: false,
-  allowUpgrades: true,
+  allowEIO3: true, // Enable Socket.IO v3 compatibility
   perMessageDeflate: {
     threshold: 1024, // 1KB
     zlibDeflateOptions: {
       chunkSize: 16 * 1024,
     },
+  },
+  // Enable CORS for Socket.IO
+  handlePreflightRequest: (req, res) => {
+    const headers = {
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+      'Access-Control-Allow-Origin': req.headers.origin || '*',
+      'Access-Control-Allow-Credentials': true
+    };
+    res.writeHead(200, headers);
+    res.end();
   }
 });
 
 const PORT = process.env.PORT || 3001;
 
-// Enhanced CORS configuration
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow all origins in development, check against a whitelist in production
-    if (process.env.NODE_ENV !== 'production' || !origin) {
-      return callback(null, true);
-    }
-    
-    // Add your production domains here
-    const allowedOrigins = [
-      'https://ephemeral-chat-7j66.onrender.com',
-      'http://localhost:*',
-      'capacitor://localhost',
-      'http://localhost'
-    ];
-    
-    if (allowedOrigins.some(allowedOrigin => 
-      origin === allowedOrigin || 
-      origin.startsWith('http://localhost:') ||
-      origin.startsWith('https://localhost:') ||
-      allowedOrigin === '*')) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
-  maxAge: 86400 // 24 hours
-};
-
-// Apply CORS
-app.use(cors(corsOptions));
-
-// Handle preflight requests
-app.options('*', cors(corsOptions));
+// Apply JSON middleware
 app.use(express.json());
 
 // Serve static files from the client build directory

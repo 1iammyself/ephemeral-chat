@@ -1,0 +1,63 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "server/index.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["server/**"]
+      }
+    },
+    {
+      "src": "client/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/server"
+    },
+    {
+      "src": "/socket.io/(.*)",
+      "dest": "/server",
+      "headers": {
+        "Connection": "upgrade",
+        "Upgrade": "websocket"
+      }
+    },
+    {
+      "src": "^/static/(.*)",
+      "dest": "/client/static/$1"
+    },
+    {
+      "src": "^/assets/(.*)",
+      "dest": "/client/assets/$1"
+    },
+    {
+      "src": "^/manifest.json",
+      "dest": "/client/manifest.json"
+    },
+    {
+      "src": "^/favicon.ico",
+      "dest": "/client/favicon.ico"
+    },
+    {
+      "src": "^/logo(.*)",
+      "dest": "/client/logo$1"
+    },
+    {
+      "src": "^/(.*)",
+      "dest": "/client"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/client"
+    }
+  ]
+}
