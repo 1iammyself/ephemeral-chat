@@ -7,18 +7,9 @@ import { io } from 'socket.io-client';
 // Use environment variable or fallback to production URL
 const SERVER_URL = process.env.REACT_APP_API_URL || 'https://ephemeral-chat-7j66.onrender.com';
 
-// Add Android-specific logging
+// Simple logging function
 const log = (message, data = null) => {
-  const logMessage = `[SOCKET] ${message}`;
-  console.log(logMessage, data);
-  
-  // Force log to Android Logcat
-  if (typeof window !== 'undefined' && window.Capacitor) {
-    window.Capacitor.Plugins.Console.log({
-      level: 'info',
-      message: logMessage + (data ? ' ' + JSON.stringify(data) : '')
-    });
-  }
+  console.log(`[SOCKET] ${message}`, data || '');
 };
 
 class SocketManager {
@@ -44,18 +35,7 @@ class SocketManager {
     try {
       this.socket = io(SERVER_URL, {
         transports: ['websocket', 'polling'],
-        timeout: 15000, // Increased timeout for mobile
-        forceNew: true,
-        reconnection: true,
-        reconnectionAttempts: this.maxReconnectAttempts,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 10000,
-        autoConnect: true,
-        withCredentials: true,
-        rejectUnauthorized: process.env.NODE_ENV !== 'production',
-        extraHeaders: {
-          'Access-Control-Allow-Origin': '*'
-        }
+        withCredentials: true
       });
     } catch (error) {
       log('❌ Error creating socket connection:', error);

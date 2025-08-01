@@ -12,6 +12,9 @@ A secure, anonymous, and ephemeral chat application that allows users to create 
 - ⚡ **Real-Time Messaging**: Lightning-fast message delivery using WebSockets
 - 🕒 **Self-Destructing Messages**: Set custom TTL for messages
 - 🧹 **Auto-Cleanup**: Rooms automatically close after period of inactivity
+- 📱 **Progressive Web App**: Install on mobile devices and desktop for an app-like experience
+- 📴 **Offline Support**: Basic offline functionality with service worker caching
+- 🚀 **Fast Loading**: Optimized assets and caching for quick startup
 
 ### Security & Privacy
 - 🔐 **Optional Room Passwords**: Add an extra layer of security
@@ -19,7 +22,25 @@ A secure, anonymous, and ephemeral chat application that allows users to create 
 - 🔄 **No Message Persistence**: Messages are never stored on the server
 - 🔒 **End-to-End Encryption**: Optional encryption for private conversations (coming soon)
 
+## 📱 Mobile Experience
+
+Ephemeral Chat is a Progressive Web App (PWA) that can be installed on your device for a native app-like experience.
+
+### Install on Mobile/Desktop
+1. Open Ephemeral Chat in Chrome, Edge, or Safari
+2. Look for the install prompt or:
+   - **Android/Chrome**: Tap the "Add to Home screen" prompt or use the browser menu
+   - **iOS/Safari**: Tap the Share button and select "Add to Home Screen"
+   - **Desktop/Chrome**: Click the install icon in the address bar or use the browser menu
+
+### Offline Usage
+- Basic app shell and resources are cached for offline use
+- Messages will sync when you're back online
+- App updates automatically when a new version is available
+
 ## 🚀 Quick Start
+
+For detailed deployment instructions, see the [Deployment Guide](DEPLOYMENT.md).
 
 ### Prerequisites
 - Node.js (v18 or higher)
@@ -30,7 +51,7 @@ A secure, anonymous, and ephemeral chat application that allows users to create 
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/ephemeral-chat.git
+git clone https://github.com/cLLeB/ephemeral-chat.git
 cd ephemeral-chat
 ```
 
@@ -69,6 +90,24 @@ npm start
 ```bash
 docker-compose up --build
 ```
+
+## 🛠 PWA Configuration
+
+The PWA is configured with the following features:
+- Service worker for offline support and caching
+- Web App Manifest for installability
+- Responsive design for all screen sizes
+- Automatic updates when new versions are available
+
+### Service Worker
+- Caches static assets for offline use
+- Implements network-first strategy for API calls
+- Automatically updates when new content is available
+
+### Web App Manifest
+- Defines app name, icons, and theme colors
+- Configures display mode and orientation
+- Provides app-like experience when installed
 
 ## 🏗️ Project Structure
 

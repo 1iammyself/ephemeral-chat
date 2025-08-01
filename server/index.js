@@ -25,28 +25,67 @@ const server = http.createServer(app);
 // Configure CORS for WebSocket
 const io = socketIo(server, {
   cors: {
-    origin: true, // Allow all origins in development
-    methods: ["GET", "POST"],
+    origin: true, // Allow all origins
+    methods: ["GET", "POST", "OPTIONS"],
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
     exposedHeaders: ["Access-Control-Allow-Origin"]
   },
   allowEIO3: true, // Enable Socket.IO v3 compatibility
-  transports: ['websocket', 'polling']
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000, // Increase timeout to 60 seconds
+  pingInterval: 25000,
+  cookie: false,
+  serveClient: false,
+  allowUpgrades: true,
+  perMessageDeflate: {
+    threshold: 1024, // 1KB
+    zlibDeflateOptions: {
+      chunkSize: 16 * 1024,
+    },
+  }
 });
 
 const PORT = process.env.PORT || 3001;
 
-// Middleware
-app.use(cors({
-  origin: true, // Allow all origins
+// Enhanced CORS configuration
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow all origins in development, check against a whitelist in production
+    if (process.env.NODE_ENV !== 'production' || !origin) {
+      return callback(null, true);
+    }
+    
+    // Add your production domains here
+    const allowedOrigins = [
+      'https://ephemeral-chat-7j66.onrender.com',
+      'http://localhost:*',
+      'capacitor://localhost',
+      'http://localhost'
+    ];
+    
+    if (allowedOrigins.some(allowedOrigin => 
+      origin === allowedOrigin || 
+      origin.startsWith('http://localhost:') ||
+      origin.startsWith('https://localhost:') ||
+      allowedOrigin === '*')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
+  maxAge: 86400 // 24 hours
+};
+
+// Apply CORS
+app.use(cors(corsOptions));
 
 // Handle preflight requests
-app.options('*', cors());
+app.options('*', cors(corsOptions));
 app.use(express.json());
 
 // Serve static files from the client build directory

@@ -15,18 +15,25 @@
     "start": "node server/index.js",
     "test": "echo \"No tests specified\" && exit 0"
   },
-  "keywords": ["chat", "websocket", "anonymous", "ephemeral", "real-time"],
+  "keywords": [
+    "chat",
+    "websocket",
+    "anonymous",
+    "ephemeral",
+    "real-time"
+  ],
   "author": "Ephemeral Chat Team",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
-    "socket.io": "^4.7.2",
-    "cors": "^2.8.5",
     "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
     "redis": "^4.6.8",
-    "dotenv": "^16.3.1"
+    "socket.io": "^4.7.2"
   },
   "devDependencies": {
+    "canvas": "^3.1.2",
     "concurrently": "^8.2.0",
     "nodemon": "^3.0.1"
   }
