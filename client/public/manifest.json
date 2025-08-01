@@ -2,7 +2,8 @@
   "name": "Ephemeral Chat",
   "short_name": "EphChat",
   "description": "Secure, anonymous, and ephemeral chat application",
-  "start_url": "/",
+  "start_url": "https://ephemeral-chat-iota.vercel.app/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#1f2937",
   "theme_color": "#4F46E5",
@@ -46,21 +47,26 @@
   ],
   "shortcuts": [
     {
-      "name": "New Chat Room",
-      "short_name": "New Room",
-      "description": "Create a new chat room",
-      "url": "/?new=true"
+      "name": "New Chat",
+      "short_name": "New",
+      "description": "Start a new chat room",
+      "url": "/new",
+      "icons": [{ "src": "icons/plus.png", "sizes": "192x192" }]
     },
     {
-      "name": "Join Existing Room",
-      "short_name": "Join Room",
+      "name": "Join Chat",
+      "short_name": "Join",
       "description": "Join an existing chat room",
-      "url": "/?join=true"
+      "url": "/join"
     }
   ],
   "prefer_related_applications": false,
-  "related_applications": [],
-  "scope": "/",
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "https://ephemeral-chat-iota.vercel.app/manifest.json"
+    }
+  ],
   "dir": "ltr",
   "lang": "en-US",
   "splash_pages": null,
