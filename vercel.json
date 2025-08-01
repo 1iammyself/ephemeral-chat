@@ -30,34 +30,28 @@
       }
     },
     {
-      "src": "^/static/(.*)",
+      "src": "/static/(.*)",
       "dest": "/client/static/$1"
     },
     {
-      "src": "^/assets/(.*)",
+      "src": "/assets/(.*)",
       "dest": "/client/assets/$1"
     },
     {
-      "src": "^/manifest.json",
+      "src": "/manifest.json",
       "dest": "/client/manifest.json"
     },
     {
-      "src": "^/favicon.ico",
+      "src": "/favicon.ico",
       "dest": "/client/favicon.ico"
     },
     {
-      "src": "^/logo(.*)",
+      "src": "/logo(.*)",
       "dest": "/client/logo$1"
     },
     {
-      "src": "^/(.*)",
+      "src": "/(.*)",
       "dest": "/client"
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/client"
     }
   ]
 }
