@@ -5,7 +5,7 @@
 import { io } from 'socket.io-client';
 
 // Use environment variable or fallback to production URL
-const SERVER_URL = process.env.REACT_APP_API_URL || 'https://ephemeral-chat-7j66.onrender.com';
+const SERVER_URL = import.meta.env.VITE_API_URL || 'https://ephemeral-chat-7j66.onrender.com';
 
 // Simple logging function
 const log = (message, data = null) => {
