@@ -6,6 +6,7 @@ import { io } from 'socket.io-client';
 
 // Use environment variable or fallback to production URL
 const SERVER_URL = import.meta.env.VITE_API_URL || 'https://ephemeral-chat-7j66.onrender.com';
+console.log('Connecting to server:', SERVER_URL);
 
 // Simple logging function
 const log = (message, data = null) => {
@@ -34,8 +35,45 @@ class SocketManager {
     
     try {
       this.socket = io(SERVER_URL, {
+        path: '/socket.io/',
         transports: ['websocket', 'polling'],
-        withCredentials: true
+        upgrade: true,
+        secure: true,
+        rejectUnauthorized: false,
+        withCredentials: true,
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
+        autoConnect: true,
+        forceNew: true,
+        extraHeaders: {
+          'Access-Control-Allow-Origin': window.location.origin,
+          'Access-Control-Allow-Credentials': 'true'
+        }
+      });
+      
+      // Debug events
+      this.socket.on('connect', () => {
+        console.log('🔌 Socket connected:', this.socket.id);
+        this.isConnected = true;
+        this.reconnectAttempts = 0;
+      });
+      
+      this.socket.on('connect_error', (error) => {
+        console.error('❌ Connection error:', error);
+        this.isConnected = false;
+        this.handleReconnect();
+      });
+      
+      this.socket.on('disconnect', (reason) => {
+        console.log('🔌 Socket disconnected:', reason);
+        this.isConnected = false;
+        if (reason === 'io server disconnect') {
+          // The disconnection was initiated by the server, you need to reconnect manually
+          this.socket.connect();
+        }
       });
     } catch (error) {
       log('❌ Error creating socket connection:', error);
