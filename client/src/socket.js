@@ -4,9 +4,27 @@
 
 import { io } from 'socket.io-client';
 
-// Use environment variable or fallback to production URL
-const SERVER_URL = import.meta.env.VITE_API_URL || 'https://ephemeral-chat-7j66.onrender.com';
-console.log('Connecting to server:', SERVER_URL);
+// Determine the server URL based on the current environment
+let SERVER_URL = import.meta.env.VITE_API_URL || '';
+
+// If we're in the browser, use the current origin for API requests
+if (typeof window !== 'undefined') {
+  const isVercel = window.location.hostname.includes('vercel.app');
+  const isRender = window.location.hostname.includes('onrender.com');
+  
+  if (!SERVER_URL) {
+    if (isVercel) {
+      SERVER_URL = 'https://ephemeral-chat-iota.vercel.app';
+    } else if (isRender) {
+      SERVER_URL = 'https://ephemeral-chat-7j66.onrender.com';
+    } else {
+      // Default to local development
+      SERVER_URL = 'http://localhost:3001';
+    }
+  }
+}
+
+console.log('🌐 Connecting to server:', SERVER_URL);
 
 // Simple logging function
 const log = (message, data = null) => {
