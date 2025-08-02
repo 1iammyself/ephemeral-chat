@@ -6,23 +6,13 @@ export default defineConfig(({ mode }) => {
   // Load environment variables based on the current mode
   const env = loadEnv(mode, process.cwd(), '');
   
-  // Determine base URL based on deployment platform
+  // Determine base URL based on environment
   const isProd = mode === 'production';
-  let baseUrl = '/';
+  let baseUrl = process.env.VITE_BASE_URL || '/';
   
-  if (isProd) {
-    // For Vercel deployment
-    if (process.env.VERCEL) {
-      baseUrl = 'https://ephemeral-chat-iota.vercel.app';
-    } 
-    // For Render deployment
-    else if (process.env.RENDER) {
-      baseUrl = 'https://ephemeral-chat-7j66.onrender.com';
-    }
-    // Local development or fallback
-    else {
-      baseUrl = process.env.VITE_BASE_URL || '/';
-    }
+  // For production on Render
+  if (isProd && process.env.RENDER) {
+    baseUrl = 'https://ephemeral-chat-7j66.onrender.com';
   }
 
   return {

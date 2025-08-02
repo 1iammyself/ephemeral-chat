@@ -132,14 +132,14 @@ const Home = () => {
         </div>
 
         {/* Features */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
           {features.map((feature, index) => (
-            <div key={index} className="card p-6 text-center">
-              <div className="bg-gray-100 p-3 rounded-full w-fit mx-auto mb-4 text-gray-600">
-                {feature.icon}
+            <div key={index} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 text-center">
+              <div className="text-gray-500 mb-2">
+                {React.cloneElement(feature.icon, { className: 'w-5 h-5 mx-auto' })}
               </div>
-              <h4 className="font-semibold mb-2">{feature.title}</h4>
-              <p className="text-sm text-gray-600">{feature.description}</p>
+              <h4 className="text-sm font-medium text-gray-700 mb-1">{feature.title}</h4>
+              <p className="text-xs text-gray-500">{feature.description}</p>
             </div>
           ))}
         </div>

@@ -25,7 +25,6 @@ const server = http.createServer(app);
 
 // Detect environment
 const isProduction = process.env.NODE_ENV === 'production';
-const isVercel = process.env.VERCEL === '1';
 const isRender = process.env.RENDER === 'true';
 
 // Configure CORS options
@@ -44,7 +43,6 @@ const getCorsOptions = () => {
 
   // In production, allow specific origins
   const allowedOrigins = [
-    'https://ephemeral-chat-iota.vercel.app',
     'https://ephemeral-chat-7j66.onrender.com',
     'http://localhost:3000',
     'http://localhost:3001'
@@ -56,9 +54,7 @@ const getCorsOptions = () => {
       if (!origin) return callback(null, true);
       
       // Check if the origin is in the allowed list
-      if (allowedOrigins.includes(origin) || 
-          origin.endsWith('.vercel.app') || 
-          origin.includes('onrender.com')) {
+      if (allowedOrigins.includes(origin) || origin.includes('onrender.com')) {
         return callback(null, true);
       }
       
@@ -88,15 +84,12 @@ const io = socketIo(server, {
       
       // In production, check against allowed origins
       const allowedOrigins = [
-        'https://ephemeral-chat-iota.vercel.app',
         'https://ephemeral-chat-7j66.onrender.com',
         'http://localhost:3000',
         'http://localhost:3001'
       ];
       
-      if (!origin || allowedOrigins.includes(origin) || 
-          origin.endsWith('.vercel.app') || 
-          origin.includes('onrender.com')) {
+      if (!origin || allowedOrigins.includes(origin) || origin.includes('onrender.com')) {
         return callback(null, true);
       }
       

@@ -1,17 +1,16 @@
 # Ephemeral Chat - Deployment Guide
 
-This guide provides step-by-step instructions for deploying the Ephemeral Chat application to production.
+This guide provides step-by-step instructions for deploying the Ephemeral Chat application to production using Render.
 
 ## Table of Contents
 1. [Quick Start](#quick-start)
 2. [Prerequisites](#prerequisites)
 3. [Environment Variables](#environment-variables)
 4. [Option 1: One-Click Deployment (Easiest)](#option-1-one-click-deployment-easiest)
-5. [Option 2: Vercel Deployment](#option-2-vercel-deployment)
-6. [Option 3: Manual Render Deployment](#option-3-manual-render-deployment)
-7. [PWA Configuration](#pwa-configuration)
-8. [Testing Your Deployment](#testing-your-deployment)
-9. [Troubleshooting](#troubleshooting)
+5. [Option 2: Manual Render Deployment](#option-2-manual-render-deployment)
+6. [PWA Configuration](#pwa-configuration)
+7. [Testing Your Deployment](#testing-your-deployment)
+8. [Troubleshooting](#troubleshooting)
 
 ## Quick Start
 
@@ -29,7 +28,7 @@ This guide provides step-by-step instructions for deploying the Ephemeral Chat a
 - Git
 - MongoDB Atlas account (for database)
 - Redis account (for caching/not compulsory, can use local))
-- Vercel account (recommended) or Render account
+- Render account
 
 ## Environment Variables
 
@@ -63,39 +62,7 @@ ROOM_EXPIRY_MINUTES=10
 MAX_MESSAGES_PER_MINUTE=30
 ```
 
-## Option 1: Vercel Deployment (Recommended)
-
-### Backend (Serverless Functions)
-1. **Deploy to Vercel**
-   - Push your code to a GitHub/GitLab/Bitbucket repository
-   - Go to [Vercel Dashboard](https://vercel.com/dashboard)
-   - Click "Add New" → "Project"
-   - Import your repository
-   - Configure the project:
-     - Framework Preset: Other
-     - Root Directory: (leave as is)
-     - Build Command: `npm install`
-     - Output Directory: (leave empty)
-     - Install Command: `npm install`
-   - Add environment variables from your `.env` file
-   - Click "Deploy"
-
-### Frontend (Static Deployment)
-1. **Update Environment Variables**
-   - In your Vercel project settings, update:
-     ```
-     VITE_API_URL=https://your-vercel-app.vercel.app/api
-     VITE_BASE_URL=/
-     ```
-2. **Enable PWA**
-   - The PWA is automatically configured in `vite.config.js`
-   - Ensure all required PWA assets exist in `client/public/`:
-     - `pwa-192x192.png`
-     - `pwa-512x512.png`
-     - `maskable-icon.png`
-     - `favicon.ico`
-
-## Option 3: Manual Render Deployment
+## Option 2: Manual Render Deployment
 
 ### Deploy Backend API
 1. Go to https://render.com → Sign up with GitHub
@@ -218,7 +185,7 @@ Ensure these files exist in `client/public/`:
    - Clear site data and hard refresh
 
 4. **Build Failures**
-   - Check logs in Vercel/Render for specific errors
+   - Check logs in Render for specific errors
    - Ensure all dependencies are properly installed
    - Verify Node.js version compatibility
 
@@ -232,7 +199,7 @@ If you encounter issues:
 
 ### Frontend Issues
 - **API connection errors**: Verify `VITE_API_URL` is correctly set
-- **Build failures**: Check the build logs in Vercel for specific errors
+- **Build failures**: Check the build logs in Render for specific errors
 - **PWA not working**: Ensure the service worker is registered and the site is served over HTTPS
 
 ### Backend Issues
@@ -240,7 +207,7 @@ If you encounter issues:
 - **Redis connection issues**: Verify your Redis URL and that the service is running
 - **Port conflicts**: Check if another service is using the same port
 ### General
-- Check logs in both Render and Vercel dashboards
+- Check logs in the Render dashboard
 - Ensure all environment variables are set correctly
 - Verify CORS settings if you encounter cross-origin issues
 

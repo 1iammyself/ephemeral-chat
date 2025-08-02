@@ -15,8 +15,8 @@ const getServerUrl = () => {
   if (typeof window !== 'undefined') {
     const { protocol, hostname, port } = window.location;
     
-    // For production environments (Vercel or Render)
-    if (hostname.includes('vercel.app') || hostname.includes('onrender.com')) {
+    // For production environments on Render
+    if (hostname.includes('onrender.com')) {
       return `${protocol}//${hostname}`;
     }
     
