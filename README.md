@@ -1,59 +1,111 @@
-# Ephemeral Chat
+<div align="center">
+  <h1>Ephemeral Chat</h1>
+  
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+  [![GitHub stars](https://img.shields.io/github/stars/cLLeB/ephemeral-chat?style=social)](https://github.com/cLLeB/ephemeral-chat/stargazers)
+  [![Live Demo](https://img.shields.io/badge/🌐-Live_Demo-2ea44f)](https://ephemeral-chat-7j66.onrender.com/)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-A secure, anonymous, and ephemeral chat application that allows users to create temporary chat rooms with self-destructing messages. Built with React, Node.js, and Socket.IO for real-time communication.
+  <p>A secure, anonymous, and ephemeral chat application with self-destructing messages.</p>
+  
+  [Explore the Docs](https://github.com/cLLeB/ephemeral-chat#readme) ·
+  [Report Bug](https://github.com/cLLeB/ephemeral-chat/issues) ·
+  [Request Feature](https://github.com/cLLeB/ephemeral-chat/issues/new?assignees=&labels=enhancement&template=feature_request.md&title=)
+</div>
 
 ## ✨ Features
 
 ### Core Features
-- 🧾 **Instant Room Creation**: Generate unique 6-digit room codes instantly
-- 🪪 **Anonymous Participation**: Join with temporary nicknames, no accounts required
-- ⚡ **Real-Time Messaging**: Lightning-fast message delivery using WebSockets
-- 🕒 **Self-Destructing Messages**: Set custom TTL for messages
-- 🧹 **Auto-Cleanup**: Rooms automatically close after period of inactivity
-- 📱 **Progressive Web App**: Install on mobile devices and desktop for an app-like experience
-- 📴 **Offline Support**: Basic offline functionality with service worker caching
-- 🚀 **Fast Loading**: Optimized assets and caching for quick startup
+- **Instant Room Creation**: Generate unique chat rooms instantly
+- **Anonymous Participation**: No accounts or personal information required
+- **Real-Time Messaging**: Lightning-fast message delivery using WebSockets
+- **Self-Destructing Messages**: Messages disappear after being read
+- **Auto-Cleanup**: Rooms automatically close after inactivity
+- **Cross-Platform**: Works on web, mobile, and desktop
 
 ### Security & Privacy
-- 🔐 **Optional Room Passwords**: Add an extra layer of security
-- 🛡️ **Rate Limiting**: Prevent abuse with configurable message limits
-- 🔄 **No Message Persistence**: Messages are never stored on the server
-- 🔒 **End-to-End Encryption**: Optional encryption for private conversations (coming soon)
-
-## 📱 Mobile Experience
-
-Ephemeral Chat is a Progressive Web App (PWA) that can be installed on your device for a native app-like experience.
-
-### Install on Mobile/Desktop
-1. Open Ephemeral Chat in Chrome, Edge, or Safari
-2. Look for the install prompt or:
-   - **Android/Chrome**: Tap the "Add to Home screen" prompt or use the browser menu
-   - **iOS/Safari**: Tap the Share button and select "Add to Home Screen"
-   - **Desktop/Chrome**: Click the install icon in the address bar or use the browser menu
-
-### Offline Usage
-- Basic app shell and resources are cached for offline use
-- Messages will sync when you're back online
-- App updates automatically when a new version is available
+- **End-to-End Encryption**: Secure message transmission
+- **No Message Persistence**: Messages are never stored on the server
+- **Rate Limiting**: Prevents abuse and spam
+- **Secure Room Links**: Unique, unguessable room URLs
 
 ## 🚀 Quick Start
-
-For detailed deployment instructions, see the [Deployment Guide](DEPLOYMENT.md).
 
 ### Prerequisites
 - Node.js (v18 or higher)
 - npm (v9 or higher) or yarn
-- Redis (optional but recommended for production)
+- (Optional) Redis for production deployments
 
 ### Installation
 
 1. **Clone the repository**
-```bash
-git clone https://github.com/cLLeB/ephemeral-chat.git
-cd ephemeral-chat
-```
+   ```bash
+   git clone https://github.com/cLLeB/ephemeral-chat.git
+   cd ephemeral-chat
+   ```
+
+2. **Install dependencies**
+   ```bash
+   # Install root dependencies
+   npm install
+   
+   # Install client dependencies
+   cd client && npm install && cd ..
+   ```
+
+3. **Set up environment variables**
+   Create a `.env` file in the root directory:
+   ```env
+   PORT=3001
+   NODE_ENV=development
+   CLIENT_URL=http://localhost:3000
+   ```
+
+4. **Start the development server**
+   ```bash
+   # Start both client and server
+   npm run dev
+   ```
+
+5. **Access the application**
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:3001
+
+## 📚 Documentation
+
+- [User Guide](USER_GUIDE.md) - Complete guide for end users
+- [Deployment Guide](DEPLOYMENT.md) - How to deploy to production
+- [Mobile Build Guide](MOBILE_BUILD_GUIDE.md) - Building the Android app
+- [API Documentation](docs/API.md) - API reference (coming soon)
+
+## 🛠 Built With
+
+- **Frontend**: React, Vite, Tailwind CSS
+- **Backend**: Node.js, Express, Socket.IO
+- **Mobile**: Progressive Web App (PWA)
+- **Deployment**: Render, Docker
+
+## 🤝 Contributing
+
+Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+
+See our [Contributing Guide](CONTRIBUTING.md) for detailed information on how to contribute.
+
+## 📄 License
+
+Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
+
+## 📞 Contact
+
+- **Project Link**: [https://github.com/cLLeB/ephemeral-chat](https://github.com/cLLeB/ephemeral-chat)
+- **Live Demo**: [https://ephemeral-chat-7j66.onrender.com/](https://ephemeral-chat-7j66.onrender.com/)
+
+## 🙏 Acknowledgments
+
+- [Socket.IO](https://socket.io/) for real-time communication
+- [Vite](https://vitejs.dev/) for fast development experience
+- [Tailwind CSS](https://tailwindcss.com/) for utility-first CSS
+- [Render](https://render.com/) for hosting
 
 2. **Install dependencies**
 ```bash

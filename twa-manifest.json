@@ -1,0 +1,53 @@
+{
+  "packageId": "com.onrender.ephemeral_chat_7j66.twa",
+  "host": "ephemeral-chat-7j66.onrender.com",
+  "name": "Ephemeral Chat",
+  "launcherName": "EphChat",
+  "display": "standalone",
+  "themeColor": "#4F46E5",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
+  "backgroundColor": "#1F2937",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://ephemeral-chat-7j66.onrender.com/pwa-512x512.png",
+  "maskableIconUrl": "https://ephemeral-chat-7j66.onrender.com/maskable-icon.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "C:\\Users\\kyere\\Documents\\codes\\ephemeral-chat\\android.keystore",
+    "alias": "android"
+  },
+  "appVersionName": "1",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "New Chat",
+      "shortName": "New",
+      "url": "https://ephemeral-chat-7j66.onrender.com/new",
+      "chosenIconUrl": "https://ephemeral-chat-7j66.onrender.com/icons/plus.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://ephemeral-chat-7j66.onrender.com/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://ephemeral-chat-7j66.onrender.com/",
+  "minSdkVersion": 21,
+  "orientation": "portrait",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "protocolHandlers": [],
+  "fileHandlers": [],
+  "launchHandlerClientMode": "",
+  "appVersion": "1"
+}

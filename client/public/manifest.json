@@ -50,8 +50,7 @@
       "name": "New Chat",
       "short_name": "New",
       "description": "Start a new chat room",
-      "url": "/new",
-      "icons": [{ "src": "icons/plus.png", "sizes": "192x192" }]
+      "url": "/new"
     },
     {
       "name": "Join Chat",

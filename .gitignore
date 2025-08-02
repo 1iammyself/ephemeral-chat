@@ -9,6 +9,7 @@ yarn-error.log*
 /client/build/
 
 # Environment variables
+.env
 .env.local
 .env.development.local
 .env.test.local
@@ -45,8 +46,46 @@ jspm_packages/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variables file (keep .env for template)
-# .env
+# Android
+android-app/local.properties
+android-app/.gradle/
+android-app/build/
+android-app/app/build/
+android-app/.idea/
+android-app/app-release-signed.apk.idsig
+android-app/manifest-checksum.txt
+*.iml
+.idea/
+
+# Root Android files (from root directory)
+/build.gradle
+/gradle.properties
+/settings.gradle
+/gradlew
+/gradlew.bat
+/gradle/
+
+# Keystore files
+*.keystore
+*.jks
+*.p12
+android.keystore
+
+# Build artifacts
+build/
+.gradle/
+
+# VSCode
+.vscode/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
 # IDE files
 .vscode/
