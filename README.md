@@ -74,11 +74,10 @@
 ## 📚 Documentation
 
 - [User Guide](docs/USER_GUIDE.md) - Complete guide for end users
-- [Deployment Guide](docs/DEPLOYMENT.md) - How to deploy to production
+- [Deployment Guide](docs/DEPLOYMENT.md) - How to deploy to production (including one-click deployment)
 - [Mobile Build Guide](docs/MOBILE_BUILD_GUIDE.md) - Building the Android app
 - [Contributing Guide](docs/CONTRIBUTING.md) - How to contribute to the project
 - [Code of Conduct](docs/CODE_OF_CONDUCT.md) - Community guidelines
-- [API Documentation](docs/API.md) - API reference (coming soon)
 
 ## 🛠 Built With
 
