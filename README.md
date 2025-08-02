@@ -2,7 +2,7 @@
   <h1>Ephemeral Chat</h1>
   
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-  [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+  [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](docs/CONTRIBUTING.md)
   [![GitHub stars](https://img.shields.io/github/stars/cLLeB/ephemeral-chat?style=social)](https://github.com/cLLeB/ephemeral-chat/stargazers)
   [![Live Demo](https://img.shields.io/badge/🌐-Live_Demo-2ea44f)](https://ephemeral-chat-7j66.onrender.com/)
 
@@ -73,9 +73,11 @@
 
 ## 📚 Documentation
 
-- [User Guide](USER_GUIDE.md) - Complete guide for end users
-- [Deployment Guide](DEPLOYMENT.md) - How to deploy to production
-- [Mobile Build Guide](MOBILE_BUILD_GUIDE.md) - Building the Android app
+- [User Guide](docs/USER_GUIDE.md) - Complete guide for end users
+- [Deployment Guide](docs/DEPLOYMENT.md) - How to deploy to production
+- [Mobile Build Guide](docs/MOBILE_BUILD_GUIDE.md) - Building the Android app
+- [Contributing Guide](docs/CONTRIBUTING.md) - How to contribute to the project
+- [Code of Conduct](docs/CODE_OF_CONDUCT.md) - Community guidelines
 - [API Documentation](docs/API.md) - API reference (coming soon)
 
 ## 🛠 Built With
@@ -89,7 +91,7 @@
 
 Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
-See our [Contributing Guide](CONTRIBUTING.md) for detailed information on how to contribute.
+See our [Contributing Guide](docs/CONTRIBUTING.md) for detailed information on how to contribute.
 
 ## 📄 License
 
