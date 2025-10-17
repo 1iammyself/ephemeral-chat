@@ -28,6 +28,11 @@
 - **No Message Persistence**: Messages are never stored on the server
 - **Rate Limiting**: Prevents abuse and spam
 - **Secure Room Links**: Unique, unguessable room URLs
+- **🔒 Inactivity Timeout**: Automatic logout after 15 minutes of inactivity
+- **🔐 Secure Credentials**: bcrypt password hashing, no plain text storage
+- **🛡️ Brute Force Protection**: Failed attempt tracking and automatic lockout
+- **🎫 Invite Token System**: Secure, time-limited room access tokens
+- **✅ Input Validation**: XSS prevention and credential sanitization
 
 ## 🚀 Quick Start
 
@@ -55,10 +60,25 @@
 
 3. **Set up environment variables**
    Create a `.env` file in the root directory:
-   ```env
+   ```bash
+   # Copy the security example configuration
+   cp .env.security.example .env
+   
+   # Or create manually with these essential settings:
    PORT=3001
    NODE_ENV=development
    CLIENT_URL=http://localhost:3000
+   
+   # Security Settings (recommended)
+   INACTIVITY_TIMEOUT_MINUTES=15
+   MAX_FAILED_ATTEMPTS=5
+   LOCKOUT_DURATION_MINUTES=15
+   ROOM_CODE_SALT=your-random-secret-salt
+   ```
+   
+   **Important**: Generate a secure `ROOM_CODE_SALT`:
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
    ```
 
 4. **Start the development server**
@@ -73,9 +93,18 @@
 
 ## 📚 Documentation
 
+### User Documentation
 - [User Guide](docs/USER_GUIDE.md) - Complete guide for end users
-- [Deployment Guide](docs/DEPLOYMENT.md) - How to deploy to production (including one-click deployment)
 - [Mobile Build Guide](docs/MOBILE_BUILD_GUIDE.md) - Building the Android app
+
+### Security Documentation
+- **[Security Features](docs/SECURITY.md)** - Comprehensive security documentation
+- **[Integration Guide](docs/INTEGRATION_GUIDE.md)** - How to integrate security features
+- **[Testing Guide](docs/TESTING_GUIDE.md)** - Security testing procedures
+- **[Implementation Summary](SECURITY_IMPLEMENTATION_SUMMARY.md)** - Quick overview
+
+### Developer Documentation
+- [Deployment Guide](docs/DEPLOYMENT.md) - How to deploy to production
 - [Contributing Guide](docs/CONTRIBUTING.md) - How to contribute to the project
 - [Code of Conduct](docs/CODE_OF_CONDUCT.md) - Community guidelines
 

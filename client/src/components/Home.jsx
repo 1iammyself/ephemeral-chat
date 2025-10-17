@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { MessageCircle, Users, Clock, Shield, Plus, ArrowRight } from 'lucide-react';
 import CreateRoomModal from './CreateRoomModal';
 
-const Home = () => {
+const Home = ({ children }) => {
   const [roomCode, setRoomCode] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
@@ -64,102 +64,127 @@ const Home = () => {
   ];
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="max-w-4xl w-full">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <div className="flex items-center justify-center mb-6">
-            <div className="bg-primary-600 p-3 rounded-2xl">
-              <MessageCircle className="w-8 h-8 text-white" />
-            </div>
-          </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+    <div className="min-h-screen flex flex-col">
+      {/* Header */}
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-indigo-600 flex items-center">
+            <MessageCircle className="h-8 w-8 mr-2" />
             Ephemeral Chat
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Anonymous, temporary chat rooms with real-time messaging. 
-            No registration required.
-          </p>
         </div>
+      </header>
 
-        {/* Main Actions */}
-        <div className="grid md:grid-cols-2 gap-6 mb-12">
-          {/* Create Room */}
-          <div className="card p-8 text-center">
-            <div className="bg-green-100 p-3 rounded-full w-fit mx-auto mb-4">
-              <Plus className="w-6 h-6 text-green-600" />
+      {/* Main Content */}
+      <main className="flex-grow">
+        {children || (
+          <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+            {/* Hero Section */}
+            <div className="text-center mb-16">
+              <h2 className="text-4xl font-extrabold text-gray-900 sm:text-5xl sm:tracking-tight lg:text-6xl">
+                Secure, Temporary Chat Rooms
+              </h2>
+              <p className="mt-5 max-w-2xl mx-auto text-xl text-gray-500">
+                Create or join a room to start chatting. Your messages disappear when you leave!
+              </p>
             </div>
-            <h3 className="text-xl font-semibold mb-3">Create New Room</h3>
-            <p className="text-gray-600 mb-6">
-              Start a new chat room and get a unique room code to share
-            </p>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="btn-primary w-full"
-            >
-              Create Room
-            </button>
-          </div>
 
-          {/* Join Room */}
-          <div className="card p-8">
-            <div className="bg-blue-100 p-3 rounded-full w-fit mx-auto mb-4">
-              <ArrowRight className="w-6 h-6 text-blue-600" />
-            </div>
-            <h3 className="text-xl font-semibold mb-3 text-center">Join Existing Room</h3>
-            <p className="text-gray-600 mb-6 text-center">
-              Enter a room code to join an ongoing conversation
-            </p>
-            <form onSubmit={handleJoinRoom} className="space-y-4">
-              <input
-                type="text"
-                placeholder="Enter 6-digit room code..."
-                value={roomCode}
-                onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                maxLength={6}
-                className="input-field text-center text-lg font-mono tracking-wider"
-                disabled={isJoining}
-              />
-              <button
-                type="submit"
-                disabled={isJoining || roomCode.length !== 6}
-                className="btn-primary w-full"
-              >
-                {isJoining ? 'Joining...' : 'Join Room'}
-              </button>
-            </form>
-          </div>
-        </div>
+            {/* Join Room Form */}
+            <div className="mt-10 max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6">
+              <form onSubmit={handleJoinRoom} className="space-y-6">
+                <div>
+                  <label htmlFor="roomCode" className="block text-sm font-medium text-gray-700">
+                    Room Code
+                  </label>
+                  <div className="mt-1 flex rounded-md shadow-sm">
+                    <input
+                      type="text"
+                      id="roomCode"
+                      value={roomCode}
+                      onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                      maxLength={6}
+                      placeholder="ABCDEF"
+                      className="flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-l-md border border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isJoining}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-r-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                    >
+                      {isJoining ? 'Joining...' : 'Join Room'}
+                    </button>
+                  </div>
+                  <p className="mt-2 text-sm text-gray-500">
+                    Enter a 6-character room code to join an existing room
+                  </p>
+                </div>
+              </form>
 
-        {/* Features */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {features.map((feature, index) => (
-            <div key={index} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 text-center">
-              <div className="text-gray-500 mb-2">
-                {React.cloneElement(feature.icon, { className: 'w-5 h-5 mx-auto' })}
+              <div className="mt-6">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-300" />
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-white text-gray-500">Or</span>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="w-full flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                  >
+                    <Plus className="-ml-1 mr-2 h-5 w-5" />
+                    Create New Room
+                  </button>
+                </div>
               </div>
-              <h4 className="text-sm font-medium text-gray-700 mb-1">{feature.title}</h4>
-              <p className="text-xs text-gray-500">{feature.description}</p>
             </div>
-          ))}
-        </div>
 
-        {/* Footer */}
-        <div className="text-center mt-12 text-gray-500 text-sm">
-          <p>
-            Built with React, Socket.IO, and Redis • 
-            <span className="ml-1">Privacy-focused • No data stored permanently</span>
+            {/* Features */}
+            <div className="mt-16">
+              <h3 className="text-center text-lg font-medium text-gray-900 mb-8">
+                Why use Ephemeral Chat?
+              </h3>
+              <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+                {features.map((feature, index) => (
+                  <div key={index} className="pt-6">
+                    <div className="flow-root bg-white rounded-lg px-6 pb-8">
+                      <div className="-mt-6">
+                        <div className="inline-flex items-center justify-center p-3 bg-indigo-500 rounded-md shadow-lg">
+                          {React.cloneElement(feature.icon, { className: 'h-6 w-6 text-white' })}
+                        </div>
+                        <h3 className="mt-4 text-lg font-medium text-gray-900">{feature.title}</h3>
+                        <p className="mt-2 text-base text-gray-500">
+                          {feature.description}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Create Room Modal */}
+        {showCreateModal && (
+          <CreateRoomModal
+            onClose={() => setShowCreateModal(false)}
+            onRoomCreated={handleRoomCreated}
+          />
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-white border-t border-gray-200 py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-center text-sm text-gray-500">
+            Built with React, Socket.IO, and Redis • Privacy-focused • No data stored permanently
           </p>
         </div>
-      </div>
-
-      {/* Create Room Modal */}
-      {showCreateModal && (
-        <CreateRoomModal
-          onClose={() => setShowCreateModal(false)}
-          onRoomCreated={handleRoomCreated}
-        />
-      )}
+      </footer>
     </div>
   );
 };

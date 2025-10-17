@@ -92,7 +92,6 @@ class SocketManager {
       this.socket.on('connect_error', (error) => {
         console.error('❌ Connection error:', error);
         this.isConnected = false;
-        this.handleReconnect();
       });
       
       this.socket.on('disconnect', (reason) => {
@@ -120,28 +119,6 @@ class SocketManager {
         window.dispatchEvent(new Event('online'));
       }
     });
-    
-      // Add error handling
-      this.socket.on('connect_error', (error) => {
-        log('❌ Connection Error:', error.message);
-        this.isConnected = false;
-        
-        // Force UI update on error
-        if (typeof window !== 'undefined' && window.dispatchEvent) {
-          window.dispatchEvent(new Event('offline'));
-        }
-        
-        // Attempt to reconnect with exponential backoff
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-          const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-          log(`⏳ Reconnecting in ${delay/1000} seconds... (attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
-          
-          setTimeout(() => {
-            this.reconnectAttempts++;
-            this.socket.connect();
-          }, delay);
-        }
-      });
 
     this.socket.on('disconnect', (reason) => {
       this.isConnected = false;

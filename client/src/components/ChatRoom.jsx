@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Send, 
   Users, 
@@ -8,9 +8,12 @@ import {
   Wifi, 
   WifiOff,
   Clock,
-  Lock
+  Lock,
+  Share2,
+  X
 } from 'lucide-react';
-import socketManager from '../socket';
+import InviteLinkModal from './InviteLinkModal';
+import socketManager from '../socket-simple';
 import JoinRoomModal from './JoinRoomModal';
 import MessageList from './MessageList';
 import UserList from './UserList';
@@ -18,9 +21,11 @@ import UserList from './UserList';
 const ChatRoom = () => {
   const { roomCode } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isConnected, setIsConnected] = useState(false);
   const [isJoined, setIsJoined] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(true);
+  const [isProcessingInvite, setIsProcessingInvite] = useState(false);
   const [room, setRoom] = useState(null);
   const [messages, setMessages] = useState([]);
   const [users, setUsers] = useState([]);
@@ -28,25 +33,83 @@ const ChatRoom = () => {
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState(null);
+  const [inviteToken, setInviteToken] = useState(null);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const messagesEndRef = useRef(null);
+
+  // Check for invite token in location state or query params
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const tokenFromUrl = searchParams.get('token');
+    
+    // Always prefer the token from location state if available
+    if (location.state?.inviteToken) {
+      console.log('Got invite token from location state:', location.state.inviteToken);
+      setInviteToken(location.state.inviteToken);
+    } else if (tokenFromUrl) {
+      console.log('Got invite token from URL:', tokenFromUrl);
+      setInviteToken(tokenFromUrl);
+    }
+  }, [location]);
+
+  // Handle auto-join if we have nickname and password from invite
+  useEffect(() => {
+    if (location.state?.fromInvite && location.state?.nickname && !isJoined) {
+      console.log('Auto-joining room from invite with token:', inviteToken || 'no token');
+      // Use a small timeout to ensure state is updated
+      const timer = setTimeout(() => {
+        handleJoinRoom(location.state.nickname, location.state.password || '');
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [location.state, isJoined, inviteToken]);
 
   useEffect(() => {
     // Connect to socket
     const socket = socketManager.connect();
     
     // Connection status
-    const handleConnect = () => setIsConnected(true);
-    const handleDisconnect = () => setIsConnected(false);
+    const handleConnect = () => {
+      console.log('Socket connected');
+      setIsConnected(true);
+    };
     
-    socketManager.on('connect', handleConnect);
-    socketManager.on('disconnect', handleDisconnect);
+    const handleDisconnect = (reason) => {
+      console.log('Socket disconnected:', reason);
+      setIsConnected(false);
+      
+      // Show error message to user
+      if (reason === 'io server disconnect') {
+        setError('You have been disconnected by the server');
+      } else if (reason === 'transport close') {
+        setError('Connection lost. Trying to reconnect...');
+      }
+    };
+    
+    // Room events
+    const handleRoomJoined = (data) => {
+      console.log('Room joined:', data);
+      setRoom(data.room);
+      setUsers(data.users || []);
+      setMessages(data.messages || []);
+      setCurrentUser({
+        id: data.userId,
+        nickname: data.nickname,
+        isAdmin: data.isAdmin
+      });
+      setIsJoined(true);
+      setShowJoinModal(false);
+      setError(null);
+    };
     
     // Chat events
     const handleNewMessage = (message) => {
+      console.log('New message:', message);
       setMessages(prev => [...prev, message]);
     };
     
     const handleUserJoined = ({ nickname, userCount }) => {
+      console.log('User joined:', nickname, 'Total users:', userCount);
       setMessages(prev => [...prev, {
         id: `system_${Date.now()}`,
         type: 'system',
@@ -54,85 +117,220 @@ const ChatRoom = () => {
         timestamp: new Date().toISOString()
       }]);
       
-      // Update user count if we have room data
-      setRoom(prev => prev ? { ...prev, users: { length: userCount } } : null);
+      // Update user count - create a dummy user array with the right length
+      setUsers(prev => {
+        // If we don't have the actual user data, create placeholder
+        const newUsers = [...prev];
+        // Ensure we have the right number of users
+        while (newUsers.length < userCount) {
+          newUsers.push({ id: `user_${Date.now()}_${newUsers.length}`, nickname: 'User' });
+        }
+        return newUsers.slice(0, userCount);
+      });
     };
     
-    const handleUserLeft = ({ nickname }) => {
+    const handleUserLeft = ({ nickname, userCount }) => {
+      console.log('User left:', nickname, 'Remaining users:', userCount);
       setMessages(prev => [...prev, {
         id: `system_${Date.now()}`,
         type: 'system',
         content: `${nickname} left the room`,
         timestamp: new Date().toISOString()
       }]);
+      
+      // Update user count
+      setUsers(prev => prev.slice(0, userCount));
     };
     
     const handleError = ({ message }) => {
+      console.error('Socket error:', message);
       setError(message);
       setTimeout(() => setError(null), 5000);
+      
+      // If there's an error, ensure join modal is shown
+      if (message.includes('Invalid') || message.includes('expired')) {
+        setShowJoinModal(true);
+      }
     };
     
+    // Register event listeners
+    socketManager.on('connect', handleConnect);
+    socketManager.on('disconnect', handleDisconnect);
+    socketManager.on('room-joined', handleRoomJoined);
     socketManager.on('new-message', handleNewMessage);
     socketManager.on('user-joined', handleUserJoined);
     socketManager.on('user-left', handleUserLeft);
     socketManager.on('error', handleError);
     
     return () => {
+      // Clean up event listeners
       socketManager.off('connect', handleConnect);
       socketManager.off('disconnect', handleDisconnect);
+      socketManager.off('room-joined', handleRoomJoined);
       socketManager.off('new-message', handleNewMessage);
       socketManager.off('user-joined', handleUserJoined);
       socketManager.off('user-left', handleUserLeft);
       socketManager.off('error', handleError);
-      socketManager.disconnect();
+      
+      // Only disconnect if we're not in development with hot reload
+      if (process.env.NODE_ENV !== 'development') {
+        socketManager.disconnect();
+      }
     };
-  }, []);
+  }, [roomCode]);
 
   useEffect(() => {
     // Auto-scroll to bottom when new messages arrive
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleJoinRoom = async (nickname, password) => {
+  const handleJoinRoom = async (nickname, password = '') => {
+    if (!nickname.trim()) {
+      setError('Please enter a nickname');
+      return;
+    }
+    
+    // If we're already joining or joined, don't proceed
+    if (isProcessingInvite || isJoined) {
+      console.log('Already joining/joined, skipping duplicate join attempt');
+      return;
+    }
+    
+    setIsProcessingInvite(true);
+    setError(null);
+    
+    // Set a timeout to handle cases where the server doesn't respond
+    const joinTimeout = setTimeout(() => {
+      if (!isJoined) {
+        console.log('Join room timeout - no response from server');
+        setError('Connection timed out. Please try again.');
+        setIsProcessingInvite(false);
+      }
+    }, 10000); // 10 second timeout
+    
     try {
-      socketManager.emit('join-room', {
+      console.log(`Joining room ${roomCode} with nickname ${nickname}`, {
+        hasToken: !!inviteToken,
+        token: inviteToken ? `${inviteToken.substring(0, 8)}...` : 'none',
+        hasPassword: !!password
+      });
+      
+      // Emit join-room event with the invite token if available
+      const joinData = {
         roomCode,
-        nickname,
-        password
-      }, (response) => {
+        nickname: nickname.trim(),
+        password: password.trim()
+      };
+      
+      // Only include inviteToken if it exists
+      if (inviteToken) {
+        joinData.inviteToken = inviteToken;
+      }
+      
+      socketManager.emit('join-room', joinData, (response) => {
+        console.log('Join room response:', response);
+        
+        // Clear timeout immediately on any response
+        clearTimeout(joinTimeout);
+        
+        if (!response) {
+          setError('No response from server');
+          setIsProcessingInvite(false);
+          return;
+        }
+        
+        // Handle redirect response
+        if (response.redirect) {
+          console.log(`Redirecting to room ${response.roomCode}`, response);
+          
+          // If password is required, show the join modal for the new room
+          if (response.requiresPassword) {
+            setShowJoinModal(true);
+            setError(response.error || 'This room requires a password');
+            navigate(`/room/${response.roomCode}`, {
+              state: {
+                fromInvite: true,
+                nickname: nickname.trim(),
+                inviteToken: inviteToken || undefined
+              }
+            });
+          } else {
+            // Auto-join the new room
+            navigate(`/room/${response.roomCode}`, {
+              state: {
+                fromInvite: true,
+                nickname: nickname.trim(),
+                inviteToken: inviteToken || undefined
+              }
+            });
+          }
+          return;
+        }
+        
+        // Handle success response
         if (response.success) {
-          setIsJoined(true);
-          setShowJoinModal(false);
+          console.log('Successfully joined room, updating UI');
+          console.log('Room data:', response.room);
+          console.log('Messages:', response.messages);
+          console.log('Users:', response.room?.users);
+          
           setRoom(response.room);
           setMessages(response.messages || []);
-          setUsers(response.room.users || []);
-          setCurrentUser({ nickname: response.nickname });
-        } else {
-          setError(response.error);
+          setUsers(response.room?.users || []);
+          setCurrentUser({
+            id: socketManager.socket?.id,
+            nickname: response.nickname,
+            isAdmin: false
+          });
+          setIsJoined(true);
+          setShowJoinModal(false);
+          setError(null);
+          setIsProcessingInvite(false);
+          
+          console.log('State updated: isJoined=true, showJoinModal=false');
+          return;
+        }
+        
+        // Handle error response
+        if (!response.success) {
+          setError(response.error || 'Failed to join room');
+          setIsProcessingInvite(false);
         }
       });
-    } catch (error) {
-      setError('Failed to join room');
+      
+    } catch (err) {
+      console.error('Error joining room:', err);
+      setError('Failed to join room. Please try again.');
+      setIsProcessingInvite(false);
     }
   };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || isSending || !isConnected) return;
-
+    
     setIsSending(true);
-    socketManager.emit('send-message', { content: newMessage.trim() });
-    setNewMessage('');
-    setIsSending(false);
+    
+    try {
+      socketManager.emit('send-message', {
+        content: newMessage.trim()
+      });
+      
+      // Notify server of user activity to reset inactivity timer
+      socketManager.emit('user-activity');
+      
+      setNewMessage('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setError('Failed to send message');
+    } finally {
+      setIsSending(false);
+    }
   };
 
-  const copyRoomCode = async () => {
-    try {
-      await navigator.clipboard.writeText(roomCode);
-      // Could add a toast notification here
-    } catch (error) {
-      console.error('Failed to copy room code:', error);
-    }
+  const copyRoomCode = () => {
+    navigator.clipboard.writeText(roomCode);
+    // Could add a toast notification here
   };
 
   const getTTLDisplay = () => {
@@ -144,7 +342,10 @@ const ChatRoom = () => {
     return `${Math.floor(ttl / 3600)}h`;
   };
 
+  console.log('Render state:', { showJoinModal, isJoined, isConnected, hasRoom: !!room });
+
   if (showJoinModal) {
+    console.log('Rendering JoinRoomModal');
     return (
       <JoinRoomModal
         roomCode={roomCode}
@@ -155,6 +356,18 @@ const ChatRoom = () => {
     );
   }
 
+  if (showInviteModal) {
+    console.log('Rendering InviteLinkModal');
+    return (
+      <InviteLinkModal 
+        isOpen={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        roomCode={roomCode}
+      />
+    );
+  }
+
+  console.log('Rendering ChatRoom interface');
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
@@ -177,6 +390,13 @@ const ChatRoom = () => {
                   title="Copy room code"
                 >
                   <Copy className="w-4 h-4 text-gray-500" />
+                </button>
+                <button
+                  onClick={() => setShowInviteModal(true)}
+                  className="ml-2 p-1 text-blue-500 hover:bg-blue-50 rounded transition-colors"
+                  title="Invite people"
+                >
+                  <Share2 className="w-4 h-4" />
                 </button>
               </div>
               
