@@ -15,6 +15,19 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
   const [isCheckingInvite, setIsCheckingInvite] = useState(false);
   const [inviteToken, setInviteToken] = useState(null);
   const [requiresPassword, setRequiresPassword] = useState(false);
+  const [captcha, setCaptcha] = useState({ problem: '', answer: '' });
+  const [captchaInput, setCaptchaInput] = useState('');
+
+  // Fetch CAPTCHA function
+  const fetchCaptcha = async () => {
+    try {
+      const response = await fetch('/api/captcha');
+      const data = await response.json();
+      setCaptcha(data);
+    } catch (error) {
+      console.error('Error fetching CAPTCHA:', error);
+    }
+  };
 
   // Check for invite token in URL or location state
   useEffect(() => {
@@ -39,6 +52,11 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
       setPassword(location.state.password);
     }
   }, [location]);
+
+  // Fetch CAPTCHA on component mount
+  useEffect(() => {
+    fetchCaptcha();
+  }, []);
 
   // Check room info and validate invite token when component mounts or roomCode changes
   useEffect(() => {
@@ -142,11 +160,15 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
       return;
     }
     
+    if (!captchaInput.trim()) {
+      return;
+    }
+    
     setIsJoining(true);
     
     try {
       // Call the parent's onJoin handler with the form data
-      await onJoin(nickname.trim(), password.trim() || '');
+      await onJoin(nickname.trim(), password.trim() || '', captchaInput.trim(), captcha.problem);
     } catch (error) {
       console.error('Error in join handler:', error);
       // Error handling is done by the parent component
@@ -277,6 +299,27 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
                 )}
               </div>
             )}
+            
+            {/* CAPTCHA */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Solve the Math Problem
+              </label>
+              <div className="mb-3">
+                <div className="p-3 bg-gray-50 border rounded-lg text-center font-mono text-lg">
+                  {captcha.problem || 'Loading...'}
+                </div>
+              </div>
+              <input
+                type="text"
+                placeholder="Enter your answer"
+                value={captchaInput}
+                onChange={(e) => setCaptchaInput(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+                disabled={isJoining || isProcessingInvite}
+              />
+            </div>
             
             <div className="flex flex-col space-y-3">
               <button

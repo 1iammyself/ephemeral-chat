@@ -7,10 +7,16 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
     messageTTL: 'none',
     password: ''
   });
+  const [captcha, setCaptcha] = useState({ problem: '', answer: '' });
+  const [captchaInput, setCaptchaInput] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [createdRoom, setCreatedRoom] = useState(null);
   const [inviteLink, setInviteLink] = useState('');
-  const [isCopied, setIsCopied] = useState(false);
+  const [isCopied, setIsCopied] = useState({
+    roomCode: false,
+    password: false,
+    inviteLink: false
+  });
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
   const navigate = useNavigate();
   
@@ -23,6 +29,22 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
     { value: '30min', label: '30 Minutes', description: 'Messages disappear after 30 minutes' },
     { value: '1hour', label: '1 Hour', description: 'Messages disappear after 1 hour' }
   ];
+
+  // Fetch CAPTCHA function
+  const fetchCaptcha = async () => {
+    try {
+      const response = await fetch('/api/captcha');
+      const data = await response.json();
+      setCaptcha(data);
+    } catch (error) {
+      console.error('Error fetching CAPTCHA:', error);
+    }
+  };
+
+  // Fetch CAPTCHA on component mount
+  useEffect(() => {
+    fetchCaptcha();
+  }, []);
 
   const generateInviteLink = async (roomCode, password) => {
     try {
@@ -62,7 +84,9 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
         },
         body: JSON.stringify({
           messageTTL: settings.messageTTL !== 'none' ? settings.messageTTL : undefined,
-          password: settings.password.trim() || undefined
+          password: settings.password.trim() || undefined,
+          captchaAnswer: captchaInput.trim(),
+          captchaProblem: captcha.problem
         }),
       });
 
@@ -86,10 +110,12 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
     }
   };
 
-  const copyToClipboard = (text) => {
+  const copyToClipboard = (text, type) => {
     navigator.clipboard.writeText(text);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
+    setIsCopied(prev => ({ ...prev, [type]: true }));
+    setTimeout(() => {
+      setIsCopied(prev => ({ ...prev, [type]: false }));
+    }, 2000);
   };
 
   const handleJoinRoom = () => {
@@ -101,10 +127,18 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const handleNewRoom = () => {
     setCreatedRoom(null);
     setInviteLink('');
+    setCaptchaInput('');
+    setIsCopied({
+      roomCode: false,
+      password: false,
+      inviteLink: false
+    });
     setSettings({
       messageTTL: 'none',
       password: ''
     });
+    // Fetch new CAPTCHA
+    fetchCaptcha();
   };
 
   // If room was created, show success message with invite options
@@ -128,10 +162,10 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                     className="flex-1 p-2 border rounded-l-md bg-gray-50 font-mono"
                   />
                   <button
-                    onClick={() => copyToClipboard(createdRoom.roomCode)}
+                    onClick={() => copyToClipboard(createdRoom.roomCode, 'roomCode')}
                     className="bg-blue-500 text-white p-2 rounded-r-md hover:bg-blue-600 transition-colors"
                   >
-                    {isCopied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+                    {isCopied.roomCode ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
                   </button>
                 </div>
               </div>
@@ -147,10 +181,10 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                       className="flex-1 p-2 border rounded-l-md bg-gray-50 font-mono"
                     />
                     <button
-                      onClick={() => copyToClipboard(createdRoom.password)}
+                      onClick={() => copyToClipboard(createdRoom.password, 'password')}
                       className="bg-blue-500 text-white p-2 rounded-r-md hover:bg-blue-600 transition-colors"
                     >
-                      {isCopied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+                      {isCopied.password ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
                     </button>
                   </div>
                 </div>
@@ -166,11 +200,11 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                     className="flex-1 p-2 border rounded-l-md bg-gray-50 text-sm truncate"
                   />
                   <button
-                    onClick={() => inviteLink && copyToClipboard(inviteLink)}
+                    onClick={() => inviteLink && copyToClipboard(inviteLink, 'inviteLink')}
                     disabled={!inviteLink}
                     className={`p-2 rounded-r-md transition-colors ${inviteLink ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
                   >
-                    {isCopied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+                    {isCopied.inviteLink ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
                   </button>
                 </div>
                 <p className="mt-1 text-xs text-gray-500">Share this link with others to join easily</p>
@@ -208,7 +242,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
           <X className="w-6 h-6" />
         </button>
 
-        <div className="p-6">
+        <div className="p-6 max-h-[90vh] overflow-y-auto">
           <h2 className="text-2xl font-bold mb-6 flex items-center">
             <Settings className="w-5 h-5 mr-2" />
             Create a New Room
@@ -271,6 +305,34 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 onChange={(e) => setSettings(prev => ({ ...prev, password: e.target.value }))}
                 className="input-field"
                 maxLength={50}
+              />
+            </div>
+
+            {/* CAPTCHA */}
+            <div>
+              <div className="flex items-center space-x-2 mb-3">
+                <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 font-bold text-sm">?</span>
+                </div>
+                <label className="font-medium text-gray-900">
+                  Solve the Math Problem
+                </label>
+              </div>
+              <p className="text-sm text-gray-600 mb-3">
+                Prove you're human by solving this simple math problem
+              </p>
+              <div className="mb-3">
+                <div className="p-3 bg-gray-50 border rounded-lg text-center font-mono text-lg">
+                  {captcha.problem || 'Loading...'}
+                </div>
+              </div>
+              <input
+                type="text"
+                placeholder="Enter your answer"
+                value={captchaInput}
+                onChange={(e) => setCaptchaInput(e.target.value)}
+                className="input-field"
+                required
               />
             </div>
 

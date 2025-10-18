@@ -20,7 +20,8 @@ const {
   isValidRoomCode, 
   isValidNickname,
   getTTLOptions,
-  generateInviteLink
+  generateInviteLink,
+  generateMathCaptcha
 } = require('./utils');
 
 // Initialize in-memory storage
@@ -235,12 +236,14 @@ app.get('/api/invite/:token', async (req, res) => {
   }
 });
 
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    redis: redisClient ? 'connected' : 'not connected'
-  });
+app.get('/api/captcha', (req, res) => {
+  try {
+    const captcha = generateMathCaptcha();
+    res.json(captcha);
+  } catch (error) {
+    console.error('Error generating CAPTCHA:', error);
+    res.status(500).json({ error: 'Failed to generate CAPTCHA' });
+  }
 });
 
 /**
@@ -292,7 +295,16 @@ app.post('/api/rooms/:roomCode/invite', async (req, res) => {
 
 app.post('/api/rooms', async (req, res) => {
   try {
-    const { messageTTL, password } = req.body;
+    const { messageTTL, password, captchaAnswer, captchaProblem } = req.body;
+    
+    // Verify CAPTCHA if provided
+    if (captchaProblem && captchaAnswer) {
+      // Parse the problem and calculate expected answer
+      const expectedAnswer = calculateCaptchaAnswer(captchaProblem);
+      if (expectedAnswer !== captchaAnswer) {
+        return res.status(400).json({ error: 'Incorrect CAPTCHA answer' });
+      }
+    }
     
     const settings = {};
     if (messageTTL && getTTLOptions()[messageTTL] !== undefined) {
@@ -360,6 +372,28 @@ app.get('/api/rooms/:roomCode', async (req, res) => {
   }
 });
 
+// Helper function to calculate CAPTCHA answer from problem
+function calculateCaptchaAnswer(problem) {
+  // Parse problem like "47 + 23 = ?" or "36 / 4 = ?"
+  const match = problem.match(/^(\d+)\s*([+\-*\/])\s*(\d+)\s*=\s*\?$/);
+  if (!match) return null;
+  
+  const num1 = parseInt(match[1]);
+  const operation = match[2];
+  const num2 = parseInt(match[3]);
+  
+  let answer;
+  switch (operation) {
+    case '+': answer = num1 + num2; break;
+    case '-': answer = Math.max(num1, num2) - Math.min(num1, num2); break; // Positive result
+    case '*': answer = num1 * num2; break;
+    case '/': answer = num1 / num2; break; // Assume whole number from generation
+    default: return null;
+  }
+  
+  return answer.toString();
+}
+
 // Socket.IO Connection Handling
 io.on('connection', (socket) => {
   console.log(`🔌 User connected: ${socket.id}`);
@@ -386,7 +420,7 @@ io.on('connection', (socket) => {
   
   socket.on('join-room', async (data, callback) => {
     try {
-      const { roomCode, nickname, password, inviteToken } = data;
+      const { roomCode, nickname, password, inviteToken, captchaAnswer, captchaProblem } = data;
       const userId = socket.id; // Use socket ID as user ID
       
       // Validate credentials
@@ -394,6 +428,15 @@ io.on('connection', (socket) => {
       if (!validation.valid) {
         console.error(`Invalid credentials: ${validation.errors.join(', ')}`);
         return callback({ success: false, error: validation.errors[0] });
+      }
+      
+      // Verify CAPTCHA
+      if (captchaProblem && captchaAnswer) {
+        const expectedAnswer = calculateCaptchaAnswer(captchaProblem);
+        if (expectedAnswer !== captchaAnswer) {
+          console.error(`Invalid CAPTCHA answer for room ${roomCode}`);
+          return callback({ success: false, error: 'Incorrect CAPTCHA answer' });
+        }
       }
       
       // Check if user is locked out due to failed attempts
@@ -564,18 +607,20 @@ io.on('connection', (socket) => {
     }
   });
   
-  // Handle user activity pings from client
-  socket.on('user-activity', () => {
-    securityManager.updateUserActivity(socket.id, (socketId, userId, roomCode) => {
-      console.log(`⏰ User ${userId} timed out, disconnecting...`);
-      const socket = io.sockets.sockets.get(socketId);
-      if (socket) {
-        socket.emit('inactivity-timeout', { 
-          message: 'You have been disconnected due to inactivity' 
-        });
-        socket.disconnect(true);
-      }
-    });
+  socket.on('screenshot-detected', (data) => {
+    const { roomCode, nickname } = data;
+    
+    // Validate that user is in the room
+    const room = roomManager.getRoom(roomCode);
+    if (room && room.users.some(user => user.socketId === socket.id)) {
+      // Broadcast screenshot notification to all users in room
+      io.to(roomCode).emit('screenshot-notification', {
+        nickname,
+        timestamp: new Date().toISOString()
+      });
+      
+      console.log(`📸 Screenshot detected by ${nickname} in room ${roomCode}`);
+    }
   });
   
   socket.on('disconnect', async () => {

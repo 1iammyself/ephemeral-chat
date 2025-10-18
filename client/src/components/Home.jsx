@@ -11,8 +11,8 @@ const Home = ({ children }) => {
 
   const handleJoinRoom = async (e) => {
     e.preventDefault();
-    if (!roomCode.trim() || roomCode.length !== 6) {
-      alert('Please enter a valid 6-character room code');
+    if (!roomCode.trim() || roomCode.length !== 10) {
+      alert('Please enter a valid 10-character room code');
       return;
     }
 
@@ -102,8 +102,8 @@ const Home = ({ children }) => {
                       id="roomCode"
                       value={roomCode}
                       onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                      maxLength={6}
-                      placeholder="ABCDEF"
+                      maxLength={10}
+                      placeholder="ABCDEFGHIJ"
                       className="flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-l-md border border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
                     />
                     <button
@@ -115,7 +115,7 @@ const Home = ({ children }) => {
                     </button>
                   </div>
                   <p className="mt-2 text-sm text-gray-500">
-                    Enter a 6-character room code to join an existing room
+                    Enter a 10-character room code to join an existing room
                   </p>
                 </div>
               </form>

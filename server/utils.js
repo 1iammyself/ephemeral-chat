@@ -9,7 +9,7 @@
 function generateRoomCode() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 10; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
@@ -60,7 +60,7 @@ function sanitizeInput(input) {
  */
 function isValidRoomCode(code) {
   return typeof code === 'string' && 
-         code.length === 6 && 
+         code.length === 10 && 
          /^[A-Z0-9]+$/.test(code);
 }
 
@@ -91,11 +91,44 @@ function getTTLOptions() {
   };
 }
 
+/**
+ * Generate a random math CAPTCHA problem
+ * @returns {Object} { problem: string, answer: string }
+ */
+function generateMathCaptcha() {
+  const operations = ['+', '-', '*', '/'];
+  const operation = operations[Math.floor(Math.random() * operations.length)];
+  
+  let num1, num2, answer;
+  
+  if (operation === '/') {
+    // For division, ensure whole number result
+    num2 = Math.floor(Math.random() * 20) + 1; // 1-20
+    answer = Math.floor(Math.random() * 15) + 1; // 1-15
+    num1 = num2 * answer; // Ensures num1 / num2 = answer
+  } else {
+    num1 = Math.floor(Math.random() * 99) + 1; // 1-99
+    num2 = Math.floor(Math.random() * 99) + 1; // 1-99
+    
+    switch (operation) {
+      case '+': answer = num1 + num2; break;
+      case '-': answer = num1 - num2; break; // Allow negative results
+      case '*': answer = num1 * num2; break;
+    }
+  }
+  
+  return {
+    problem: `${num1} ${operation} ${num2} = ?`,
+    answer: answer.toString()
+  };
+}
+
 module.exports = {
   generateRoomCode,
   generateRandomNickname,
   sanitizeInput,
   isValidRoomCode,
   isValidNickname,
-  getTTLOptions
+  getTTLOptions,
+  generateMathCaptcha
 };

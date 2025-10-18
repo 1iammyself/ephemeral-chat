@@ -201,7 +201,7 @@ function validateCredentials(credentials) {
   // Validate room code
   if (credentials.roomCode) {
     const roomCode = credentials.roomCode.toString().trim().toUpperCase();
-    if (!/^[A-Z0-9]{6}$/.test(roomCode)) {
+    if (!/^[A-Z0-9]{10}$/.test(roomCode)) {
       errors.push('Invalid room code format');
     } else {
       sanitized.roomCode = roomCode;

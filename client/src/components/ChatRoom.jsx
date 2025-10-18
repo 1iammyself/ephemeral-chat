@@ -54,14 +54,15 @@ const ChatRoom = () => {
 
   // Handle auto-join if we have nickname and password from invite
   useEffect(() => {
-    if (location.state?.fromInvite && location.state?.nickname && !isJoined) {
-      console.log('Auto-joining room from invite with token:', inviteToken || 'no token');
-      // Use a small timeout to ensure state is updated
-      const timer = setTimeout(() => {
-        handleJoinRoom(location.state.nickname, location.state.password || '');
-      }, 100);
-      return () => clearTimeout(timer);
-    }
+    // Disable auto-join for invite links to ensure CAPTCHA is required
+    // if (location.state?.fromInvite && location.state?.nickname && !isJoined) {
+    //   console.log('Auto-joining room from invite with token:', inviteToken || 'no token');
+    //   // Use a small timeout to ensure state is updated
+    //   const timer = setTimeout(() => {
+    //     handleJoinRoom(location.state.nickname, location.state.password || '');
+    //   }, 100);
+    //   return () => clearTimeout(timer);
+    // }
   }, [location.state, isJoined, inviteToken]);
 
   useEffect(() => {
@@ -142,6 +143,17 @@ const ChatRoom = () => {
       setUsers(prev => prev.slice(0, userCount));
     };
     
+    const handleScreenshotNotification = ({ nickname, timestamp }) => {
+      console.log(`📸 Screenshot detected by ${nickname}`);
+      setMessages(prev => [...prev, {
+        id: `screenshot_${Date.now()}`,
+        type: 'screenshot',
+        content: `${nickname} took a screenshot`,
+        timestamp: timestamp,
+        nickname: nickname
+      }]);
+    };
+    
     const handleError = ({ message }) => {
       console.error('Socket error:', message);
       setError(message);
@@ -160,6 +172,7 @@ const ChatRoom = () => {
     socketManager.on('new-message', handleNewMessage);
     socketManager.on('user-joined', handleUserJoined);
     socketManager.on('user-left', handleUserLeft);
+    socketManager.on('screenshot-notification', handleScreenshotNotification);
     socketManager.on('error', handleError);
     
     return () => {
@@ -170,6 +183,7 @@ const ChatRoom = () => {
       socketManager.off('new-message', handleNewMessage);
       socketManager.off('user-joined', handleUserJoined);
       socketManager.off('user-left', handleUserLeft);
+      socketManager.off('screenshot-notification', handleScreenshotNotification);
       socketManager.off('error', handleError);
       
       // Only disconnect if we're not in development with hot reload
@@ -179,12 +193,46 @@ const ChatRoom = () => {
     };
   }, [roomCode]);
 
-  useEffect(() => {
-    // Auto-scroll to bottom when new messages arrive
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  const handleScreenshotDetected = () => {
+    // Emit screenshot event to server
+    socketManager.emit('screenshot-detected', {
+      roomCode,
+      nickname: currentUser?.nickname || 'Unknown'
+    });
+  };
 
-  const handleJoinRoom = async (nickname, password = '') => {
+  // Screenshot detection
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Detect PrintScreen key (common screenshot method)
+      if (e.key === 'PrintScreen' || (e.ctrlKey && e.key === 's')) {
+        handleScreenshotDetected();
+      }
+    };
+
+    const handlePaste = (e) => {
+      // Detect if screenshot is pasted (less reliable)
+      const items = e.clipboardData?.items;
+      if (items) {
+        for (let item of items) {
+          if (item.type.startsWith('image/')) {
+            handleScreenshotDetected();
+            break;
+          }
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('paste', handlePaste);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('paste', handlePaste);
+    };
+  }, [roomCode, currentUser]);
+
+  const handleJoinRoom = async (nickname, password = '', captchaAnswer = '', captchaProblem = '') => {
     if (!nickname.trim()) {
       setError('Please enter a nickname');
       return;
@@ -212,14 +260,17 @@ const ChatRoom = () => {
       console.log(`Joining room ${roomCode} with nickname ${nickname}`, {
         hasToken: !!inviteToken,
         token: inviteToken ? `${inviteToken.substring(0, 8)}...` : 'none',
-        hasPassword: !!password
+        hasPassword: !!password,
+        hasCaptcha: !!captchaAnswer
       });
       
       // Emit join-room event with the invite token if available
       const joinData = {
         roomCode,
         nickname: nickname.trim(),
-        password: password.trim()
+        password: password.trim(),
+        captchaAnswer: captchaAnswer.trim(),
+        captchaProblem: captchaProblem
       };
       
       // Only include inviteToken if it exists

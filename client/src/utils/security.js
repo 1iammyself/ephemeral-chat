@@ -37,7 +37,7 @@ export function generateSecureToken(length = 32) {
  */
 export function isValidRoomCode(roomCode) {
   return typeof roomCode === 'string' && 
-         roomCode.length === 6 && 
+         roomCode.length === 10 && 
          /^[A-Z0-9]+$/.test(roomCode);
 }
 
@@ -137,6 +137,14 @@ export async function prepareCredentials(credentials) {
 
   if (credentials.inviteToken) {
     prepared.inviteToken = credentials.inviteToken;
+  }
+
+  if (credentials.captchaAnswer) {
+    prepared.captchaAnswer = credentials.captchaAnswer;
+  }
+
+  if (credentials.captchaProblem) {
+    prepared.captchaProblem = credentials.captchaProblem;
   }
 
   return prepared;
