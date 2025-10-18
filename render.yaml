@@ -32,8 +32,6 @@ services:
         value: 20
       - key: BASE_URL
         sync: false
-      - key: FRONTEND_URL
-        sync: false
 
   # Frontend Static Site
   - type: web
