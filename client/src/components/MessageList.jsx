@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, User, Camera } from 'lucide-react';
+import { Clock, User } from 'lucide-react';
 
 const MessageList = ({ messages, currentUser, messageTTL }) => {
   const [messageTimers, setMessageTimers] = useState(new Map());
@@ -8,7 +8,7 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
     // Set up timers for messages with TTL
     if (messageTTL && messageTTL > 0) {
       messages.forEach(message => {
-        if (message.type !== 'system' && message.type !== 'screenshot' && !messageTimers.has(message.id)) {
+        if (message.type !== 'system' && !messageTimers.has(message.id)) {
           const messageTime = new Date(message.timestamp).getTime();
           const expiryTime = messageTime + (messageTTL * 1000);
           const timeLeft = expiryTime - Date.now();
@@ -54,7 +54,7 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
   };
 
   const getTimeLeft = (message) => {
-    if (!messageTTL || messageTTL === 0 || message.type === 'system' || message.type === 'screenshot') return null;
+    if (!messageTTL || messageTTL === 0 || message.type === 'system') return null;
     
     const messageTime = new Date(message.timestamp).getTime();
     const expiryTime = messageTime + (messageTTL * 1000);
@@ -93,17 +93,6 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
             <div key={message.id} className="text-center">
               <div className="inline-block bg-gray-100 text-gray-600 text-sm px-3 py-1 rounded-full">
                 {message.content}
-              </div>
-            </div>
-          );
-        }
-
-        if (message.type === 'screenshot') {
-          return (
-            <div key={message.id} className="text-center">
-              <div className="inline-block bg-orange-100 text-orange-700 text-sm px-3 py-1 rounded-full flex items-center space-x-1">
-                <Camera className="w-3 h-3" />
-                <span>{message.content}</span>
               </div>
             </div>
           );

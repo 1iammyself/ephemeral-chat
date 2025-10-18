@@ -37,6 +37,18 @@ const ChatRoom = () => {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const messagesEndRef = useRef(null);
 
+  // Debug logging
+  console.log('🏠 ChatRoom render:', {
+    roomCode,
+    isConnected,
+    isJoined,
+    showJoinModal,
+    hasRoom: !!room,
+    messageCount: messages.length,
+    userCount: users.length,
+    error
+  });
+
   // Check for invite token in location state or query params
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -143,17 +155,6 @@ const ChatRoom = () => {
       setUsers(prev => prev.slice(0, userCount));
     };
     
-    const handleScreenshotNotification = ({ nickname, timestamp }) => {
-      console.log(`📸 Screenshot detected by ${nickname}`);
-      setMessages(prev => [...prev, {
-        id: `screenshot_${Date.now()}`,
-        type: 'screenshot',
-        content: `${nickname} took a screenshot`,
-        timestamp: timestamp,
-        nickname: nickname
-      }]);
-    };
-    
     const handleError = ({ message }) => {
       console.error('Socket error:', message);
       setError(message);
@@ -172,7 +173,6 @@ const ChatRoom = () => {
     socketManager.on('new-message', handleNewMessage);
     socketManager.on('user-joined', handleUserJoined);
     socketManager.on('user-left', handleUserLeft);
-    socketManager.on('screenshot-notification', handleScreenshotNotification);
     socketManager.on('error', handleError);
     
     return () => {
@@ -183,7 +183,6 @@ const ChatRoom = () => {
       socketManager.off('new-message', handleNewMessage);
       socketManager.off('user-joined', handleUserJoined);
       socketManager.off('user-left', handleUserLeft);
-      socketManager.off('screenshot-notification', handleScreenshotNotification);
       socketManager.off('error', handleError);
       
       // Only disconnect if we're not in development with hot reload
@@ -193,44 +192,10 @@ const ChatRoom = () => {
     };
   }, [roomCode]);
 
-  const handleScreenshotDetected = () => {
-    // Emit screenshot event to server
-    socketManager.emit('screenshot-detected', {
-      roomCode,
-      nickname: currentUser?.nickname || 'Unknown'
-    });
-  };
-
-  // Screenshot detection
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      // Detect PrintScreen key (common screenshot method)
-      if (e.key === 'PrintScreen' || (e.ctrlKey && e.key === 's')) {
-        handleScreenshotDetected();
-      }
-    };
-
-    const handlePaste = (e) => {
-      // Detect if screenshot is pasted (less reliable)
-      const items = e.clipboardData?.items;
-      if (items) {
-        for (let item of items) {
-          if (item.type.startsWith('image/')) {
-            handleScreenshotDetected();
-            break;
-          }
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('paste', handlePaste);
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('paste', handlePaste);
-    };
-  }, [roomCode, currentUser]);
+    // Auto-scroll to bottom when new messages arrive
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const handleJoinRoom = async (nickname, password = '', captchaAnswer = '', captchaProblem = '') => {
     if (!nickname.trim()) {
@@ -393,7 +358,25 @@ const ChatRoom = () => {
     return `${Math.floor(ttl / 3600)}h`;
   };
 
-  console.log('Render state:', { showJoinModal, isJoined, isConnected, hasRoom: !!room });
+  // If there's an error, show it prominently
+  if (error && !isJoined) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <p className="font-bold">Error</p>
+            <p>{error}</p>
+          </div>
+          <button
+            onClick={() => navigate('/')}
+            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          >
+            Go Back to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (showJoinModal) {
     console.log('Rendering JoinRoomModal');

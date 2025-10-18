@@ -295,13 +295,15 @@ app.post('/api/rooms/:roomCode/invite', async (req, res) => {
 
 app.post('/api/rooms', async (req, res) => {
   try {
-    const { messageTTL, password, captchaAnswer, captchaProblem } = req.body;
+    const { messageTTL, password, maxUsers, captchaAnswer, captchaProblem } = req.body;
     
-    // Verify CAPTCHA if provided
+    console.log('HTTP room creation request:', { messageTTL, password, maxUsers, captchaAnswer, captchaProblem });
+    
+    // Validate CAPTCHA
     if (captchaProblem && captchaAnswer) {
-      // Parse the problem and calculate expected answer
       const expectedAnswer = calculateCaptchaAnswer(captchaProblem);
       if (expectedAnswer !== captchaAnswer) {
+        console.error('Invalid CAPTCHA answer');
         return res.status(400).json({ error: 'Incorrect CAPTCHA answer' });
       }
     }
@@ -313,11 +315,14 @@ app.post('/api/rooms', async (req, res) => {
     if (password && typeof password === 'string' && password.length > 0) {
       settings.password = sanitizeInput(password);
     }
+    if (maxUsers && typeof maxUsers === 'number' && maxUsers >= 1 && maxUsers <= 200) {
+      settings.maxUsers = maxUsers;
+    }
     
     const roomCode = await roomManager.createRoom(settings);
-    res.json({ roomCode, settings: { messageTTL: settings.messageTTL || 0 } });
+    res.json({ success: true, roomCode });
   } catch (error) {
-    console.error('Error creating room:', error);
+    console.error('Error creating room via HTTP:', error);
     res.status(500).json({ error: 'Failed to create room' });
   }
 });
@@ -385,7 +390,7 @@ function calculateCaptchaAnswer(problem) {
   let answer;
   switch (operation) {
     case '+': answer = num1 + num2; break;
-    case '-': answer = Math.max(num1, num2) - Math.min(num1, num2); break; // Positive result
+    case '-': answer = num1 - num2; break; // Allow negative results
     case '*': answer = num1 * num2; break;
     case '/': answer = num1 / num2; break; // Assume whole number from generation
     default: return null;
@@ -394,13 +399,18 @@ function calculateCaptchaAnswer(problem) {
   return answer.toString();
 }
 
-// Socket.IO Connection Handling
+app.get('/api/captcha', (req, res) => {
+  const captcha = generateCaptchaProblem();
+  res.json(captcha);
+});
 io.on('connection', (socket) => {
   console.log(`🔌 User connected: ${socket.id}`);
   
   socket.on('create-room', async (data, callback) => {
     try {
-      const { messageTTL, password } = data || {};
+      const { messageTTL, password, maxUsers } = data || {};
+      
+      console.log('Creating room with data:', { messageTTL, password, maxUsers });
       
       const settings = {};
       if (messageTTL && getTTLOptions()[messageTTL] !== undefined) {
@@ -408,6 +418,12 @@ io.on('connection', (socket) => {
       }
       if (password && typeof password === 'string' && password.length > 0) {
         settings.password = sanitizeInput(password);
+      }
+      if (maxUsers && typeof maxUsers === 'number' && maxUsers >= 1 && maxUsers <= 200) {
+        settings.maxUsers = maxUsers;
+        console.log('Setting maxUsers to:', maxUsers);
+      } else {
+        console.log('Invalid or missing maxUsers, using default');
       }
       
       const roomCode = await roomManager.createRoom(settings);
@@ -604,22 +620,6 @@ io.on('connection', (socket) => {
     } catch (error) {
       console.error('Error sending message:', error);
       socket.emit('error', { message: 'Failed to send message' });
-    }
-  });
-  
-  socket.on('screenshot-detected', (data) => {
-    const { roomCode, nickname } = data;
-    
-    // Validate that user is in the room
-    const room = roomManager.getRoom(roomCode);
-    if (room && room.users.some(user => user.socketId === socket.id)) {
-      // Broadcast screenshot notification to all users in room
-      io.to(roomCode).emit('screenshot-notification', {
-        nickname,
-        timestamp: new Date().toISOString()
-      });
-      
-      console.log(`📸 Screenshot detected by ${nickname} in room ${roomCode}`);
     }
   });
   

@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Clock, Lock, Copy, Check } from 'lucide-react';
+import { X, Settings, Clock, Lock, Copy, Check, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const CreateRoomModal = ({ onClose, onRoomCreated }) => {
+  const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '';
+
   const [settings, setSettings] = useState({
     messageTTL: 'none',
-    password: ''
+    password: '',
+    maxUsers: 1
   });
   const [captcha, setCaptcha] = useState({ problem: '', answer: '' });
   const [captchaInput, setCaptchaInput] = useState('');
@@ -30,10 +33,9 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
     { value: '1hour', label: '1 Hour', description: 'Messages disappear after 1 hour' }
   ];
 
-  // Fetch CAPTCHA function
   const fetchCaptcha = async () => {
     try {
-      const response = await fetch('/api/captcha');
+      const response = await fetch(`${API_BASE}/api/captcha`);
       const data = await response.json();
       setCaptcha(data);
     } catch (error) {
@@ -49,7 +51,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const generateInviteLink = async (roomCode, password) => {
     try {
       setIsGeneratingInvite(true);
-      const response = await fetch(`/api/rooms/${roomCode}/invite`, {
+      const response = await fetch(`${API_BASE}/api/rooms/${roomCode}/invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: password || undefined }),
@@ -77,7 +79,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
     setIsCreating(true);
 
     try {
-      const response = await fetch('/api/rooms', {
+      const response = await fetch(`${API_BASE}/api/rooms`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -85,9 +87,18 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
         body: JSON.stringify({
           messageTTL: settings.messageTTL !== 'none' ? settings.messageTTL : undefined,
           password: settings.password.trim() || undefined,
+          maxUsers: settings.maxUsers,
           captchaAnswer: captchaInput.trim(),
           captchaProblem: captcha.problem
         }),
+      });
+
+      console.log('Sending room creation data:', {
+        messageTTL: settings.messageTTL !== 'none' ? settings.messageTTL : undefined,
+        password: settings.password.trim() || undefined,
+        maxUsers: settings.maxUsers,
+        captchaAnswer: captchaInput.trim(),
+        captchaProblem: captcha.problem
       });
 
       const data = await response.json();
@@ -135,7 +146,8 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
     });
     setSettings({
       messageTTL: 'none',
-      password: ''
+      password: '',
+      maxUsers: 1
     });
     // Fetch new CAPTCHA
     fetchCaptcha();
@@ -307,8 +319,38 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 maxLength={50}
               />
             </div>
-
-            {/* CAPTCHA */}
+            <div>
+              <div className="flex items-center space-x-2 mb-3">
+                <Users className="w-5 h-5 text-gray-600" />
+                <label className="font-medium text-gray-900">
+                  Maximum Users
+                </label>
+              </div>
+              <p className="text-sm text-gray-600 mb-3">
+                Set the maximum number of people who can join this room (1-200)
+              </p>
+              <div className="px-3">
+                <div className="flex items-center space-x-4 mb-2">
+                  <span className="text-sm text-gray-600">1</span>
+                  <input
+                    type="range"
+                    min="1"
+                    max="200"
+                    value={settings.maxUsers}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value);
+                      console.log('Max users slider changed to:', value);
+                      setSettings(prev => ({ ...prev, maxUsers: value }));
+                    }}
+                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                  />
+                  <span className="text-sm text-gray-600">200</span>
+                </div>
+                <div className="text-center">
+                  <span className="text-lg font-semibold text-blue-600">{settings.maxUsers} users</span>
+                </div>
+              </div>
+            </div>
             <div>
               <div className="flex items-center space-x-2 mb-3">
                 <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center">

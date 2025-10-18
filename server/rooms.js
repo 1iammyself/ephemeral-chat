@@ -53,7 +53,7 @@ class RoomManager {
         messageTTL: settings.messageTTL || 0,
         passwordHash: settings.password ? await bcrypt.hash(settings.password, 10) : null,
         isInviteOnly: settings.isInviteOnly || false,
-        maxUsers: settings.maxUsers || 50,
+        maxUsers: settings.maxUsers,
         lifetimeMinutes: lifetimeMinutes // Store lifetime for reference
       }
     };
@@ -159,7 +159,7 @@ class RoomManager {
       }
 
       // Check room capacity
-      if (room.users.length >= (room.settings.maxUsers || 50)) {
+      if (room.settings.maxUsers && room.users.length >= room.settings.maxUsers) {
         throw new Error('Room is full');
       }
 
