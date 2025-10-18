@@ -405,61 +405,64 @@ const ChatRoom = () => {
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3">
+      <div className="bg-white border-b border-gray-200 px-3 sm:px-4 py-2 sm:py-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             <button
               onClick={() => navigate('/')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors min-h-[44px] min-w-[44px]"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
             
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="flex items-center space-x-2">
-                <h1 className="text-lg font-semibold">Room {roomCode}</h1>
+                <h1 className="text-base sm:text-lg font-semibold truncate">Room {roomCode}</h1>
                 <button
                   onClick={copyRoomCode}
-                  className="p-1 hover:bg-gray-100 rounded transition-colors"
+                  className="p-1 hover:bg-gray-100 rounded transition-colors min-h-[32px] min-w-[32px]"
                   title="Copy room code"
                 >
                   <Copy className="w-4 h-4 text-gray-500" />
                 </button>
                 <button
                   onClick={() => setShowInviteModal(true)}
-                  className="ml-2 p-1 text-blue-500 hover:bg-blue-50 rounded transition-colors"
+                  className="ml-1 sm:ml-2 p-1 text-blue-500 hover:bg-blue-50 rounded transition-colors min-h-[32px] min-w-[32px]"
                   title="Invite people"
                 >
                   <Share2 className="w-4 h-4" />
                 </button>
               </div>
               
-              <div className="flex items-center space-x-4 text-sm text-gray-600">
+              <div className="flex items-center space-x-3 sm:space-x-4 text-xs sm:text-sm text-gray-600 mt-1">
                 <div className="flex items-center space-x-1">
                   {isConnected ? (
-                    <Wifi className="w-4 h-4 text-green-500" />
+                    <Wifi className="w-3 h-3 sm:w-4 sm:h-4 text-green-500" />
                   ) : (
-                    <WifiOff className="w-4 h-4 text-red-500" />
+                    <WifiOff className="w-3 h-3 sm:w-4 sm:h-4 text-red-500" />
                   )}
-                  <span>{isConnected ? 'Connected' : 'Disconnected'}</span>
+                  <span className="hidden sm:inline">{isConnected ? 'Connected' : 'Disconnected'}</span>
+                  <span className="sm:hidden">{isConnected ? 'Online' : 'Offline'}</span>
                 </div>
                 
                 <div className="flex items-center space-x-1">
-                  <Users className="w-4 h-4" />
-                  <span>{users.length} online</span>
+                  <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+                  <span>{users.length}</span>
                 </div>
                 
                 {room?.settings?.passwordHash && (
                   <div className="flex items-center space-x-1">
-                    <Lock className="w-4 h-4" />
-                    <span>Protected</span>
+                    <Lock className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Protected</span>
+                    <span className="sm:hidden">Locked</span>
                   </div>
                 )}
                 
                 {getTTLDisplay() && (
                   <div className="flex items-center space-x-1">
-                    <Clock className="w-4 h-4" />
-                    <span>TTL: {getTTLDisplay()}</span>
+                    <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">TTL: {getTTLDisplay()}</span>
+                    <span className="sm:hidden">{getTTLDisplay()}</span>
                   </div>
                 )}
               </div>
@@ -480,7 +483,7 @@ const ChatRoom = () => {
         {/* Chat Area */}
         <div className="flex-1 flex flex-col">
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4">
             <MessageList 
               messages={messages} 
               currentUser={currentUser}
@@ -490,23 +493,23 @@ const ChatRoom = () => {
           </div>
 
           {/* Message Input */}
-          <div className="border-t border-gray-200 p-4 bg-white">
-            <form onSubmit={handleSendMessage} className="flex space-x-2">
+          <div className="border-t border-gray-200 p-3 sm:p-4 bg-white">
+            <form onSubmit={handleSendMessage} className="flex space-x-2 sm:space-x-3">
               <input
                 type="text"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 placeholder="Type your message..."
-                className="flex-1 input-field"
+                className="flex-1 input-field text-sm sm:text-base py-2 sm:py-3 px-3 sm:px-4 min-h-[44px]"
                 disabled={!isConnected || isSending}
                 maxLength={500}
               />
               <button
                 type="submit"
                 disabled={!newMessage.trim() || !isConnected || isSending}
-                className="btn-primary px-4"
+                className="btn-primary px-3 sm:px-4 py-2 sm:py-3 min-h-[44px] min-w-[44px] flex-shrink-0"
               >
-                <Send className="w-4 h-4" />
+                <Send className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </form>
           </div>

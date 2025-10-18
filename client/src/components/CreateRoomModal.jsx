@@ -254,29 +254,29 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
           <X className="w-6 h-6" />
         </button>
 
-        <div className="p-6 max-h-[90vh] overflow-y-auto">
-          <h2 className="text-2xl font-bold mb-6 flex items-center">
+        <div className="p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
+          <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 flex items-center">
             <Settings className="w-5 h-5 mr-2" />
             Create a New Room
           </h2>
 
-          <form onSubmit={handleCreate} className="space-y-6">
+          <form onSubmit={handleCreate} className="space-y-4 sm:space-y-6">
             {/* Message TTL Setting */}
             <div>
-              <div className="flex items-center space-x-2 mb-3">
-                <Clock className="w-5 h-5 text-gray-600" />
-                <label className="font-medium text-gray-900">
+              <div className="flex items-center space-x-2 mb-2 sm:mb-3">
+                <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
+                <label className="font-medium text-gray-900 text-sm sm:text-base">
                   Message Auto-Delete
                 </label>
               </div>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
                 Choose when messages should automatically disappear for privacy
               </p>
               <div className="space-y-2">
                 {ttlOptions.map((option) => (
                   <label
                     key={option.value}
-                    className={`flex items-start space-x-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                    className={`flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 rounded-lg border cursor-pointer transition-colors ${
                       settings.messageTTL === option.value
                         ? 'border-primary-500 bg-primary-50'
                         : 'border-gray-200 hover:bg-gray-50'
@@ -290,8 +290,8 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                       onChange={(e) => setSettings(prev => ({ ...prev, messageTTL: e.target.value }))}
                       className="mt-1"
                     />
-                    <div>
-                      <div className="font-medium text-sm">{option.label}</div>
+                    <div className="min-w-0">
+                      <div className="font-medium text-xs sm:text-sm">{option.label}</div>
                       <div className="text-xs text-gray-600">{option.description}</div>
                     </div>
                   </label>
@@ -301,13 +301,13 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
 
             {/* Password Setting */}
             <div>
-              <div className="flex items-center space-x-2 mb-3">
-                <Lock className="w-5 h-5 text-gray-600" />
-                <label className="font-medium text-gray-900">
+              <div className="flex items-center space-x-2 mb-2 sm:mb-3">
+                <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
+                <label className="font-medium text-gray-900 text-sm sm:text-base">
                   Room Password (Optional)
                 </label>
               </div>
-              <p className="text-sm text-gray-600 mb-3">
+              <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
                 Set a password to restrict access to your room
               </p>
               <input
@@ -315,23 +315,23 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 placeholder="Enter password (optional)"
                 value={settings.password}
                 onChange={(e) => setSettings(prev => ({ ...prev, password: e.target.value }))}
-                className="input-field"
+                className="input-field text-sm sm:text-base py-2 sm:py-3 px-3 sm:px-4"
                 maxLength={50}
               />
             </div>
             <div>
-              <div className="flex items-center space-x-2 mb-3">
-                <Users className="w-5 h-5 text-gray-600" />
-                <label className="font-medium text-gray-900">
+              <div className="flex items-center space-x-2 mb-2 sm:mb-3">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
+                <label className="font-medium text-gray-900 text-sm sm:text-base">
                   Maximum Users
                 </label>
               </div>
-              <p className="text-sm text-gray-600 mb-3">
+              <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
                 Set the maximum number of people who can join this room (1-200)
               </p>
-              <div className="px-3">
-                <div className="flex items-center space-x-4 mb-2">
-                  <span className="text-sm text-gray-600">1</span>
+              <div className="px-2 sm:px-3">
+                <div className="flex items-center space-x-3 sm:space-x-4 mb-2">
+                  <span className="text-xs sm:text-sm text-gray-600">1</span>
                   <input
                     type="range"
                     min="1"
@@ -344,27 +344,27 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                     }}
                     className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                   />
-                  <span className="text-sm text-gray-600">200</span>
+                  <span className="text-xs sm:text-sm text-gray-600">200</span>
                 </div>
                 <div className="text-center">
-                  <span className="text-lg font-semibold text-blue-600">{settings.maxUsers} users</span>
+                  <span className="text-base sm:text-lg font-semibold text-blue-600">{settings.maxUsers} users</span>
                 </div>
               </div>
             </div>
             <div>
-              <div className="flex items-center space-x-2 mb-3">
-                <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-blue-600 font-bold text-sm">?</span>
+              <div className="flex items-center space-x-2 mb-2 sm:mb-3">
+                <div className="w-4 h-4 sm:w-5 sm:h-5 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 font-bold text-xs sm:text-sm">?</span>
                 </div>
-                <label className="font-medium text-gray-900">
+                <label className="font-medium text-gray-900 text-sm sm:text-base">
                   Solve the Math Problem
                 </label>
               </div>
-              <p className="text-sm text-gray-600 mb-3">
+              <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
                 Prove you're human by solving this simple math problem
               </p>
               <div className="mb-3">
-                <div className="p-3 bg-gray-50 border rounded-lg text-center font-mono text-lg">
+                <div className="p-2 sm:p-3 bg-gray-50 border rounded-lg text-center font-mono text-base sm:text-lg">
                   {captcha.problem || 'Loading...'}
                 </div>
               </div>
@@ -373,17 +373,17 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 placeholder="Enter your answer"
                 value={captchaInput}
                 onChange={(e) => setCaptchaInput(e.target.value)}
-                className="input-field"
+                className="input-field text-sm sm:text-base py-2 sm:py-3 px-3 sm:px-4"
                 required
               />
             </div>
 
             {/* Actions */}
-            <div className="mt-6 flex justify-end space-x-3">
+            <div className="mt-4 sm:mt-6 flex justify-end space-x-2 sm:space-x-3">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                className="px-3 sm:px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md transition-colors text-sm sm:text-base min-h-[44px]"
                 disabled={isCreating}
               >
                 Cancel
@@ -391,11 +391,11 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
               <button
                 type="submit"
                 disabled={isCreating}
-                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors flex items-center"
+                className="px-3 sm:px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors flex items-center text-sm sm:text-base min-h-[44px]"
               >
                 {isCreating ? (
                   <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin -ml-1 mr-2 h-3 w-3 sm:h-4 sm:w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
