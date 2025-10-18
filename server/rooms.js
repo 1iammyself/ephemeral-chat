@@ -461,10 +461,10 @@ class RoomManager {
    */
   async generateInviteLink(roomCode, { isPermanent = false, expiryMs } = {}) {
     const token = await this.generateInviteToken(roomCode, isPermanent, expiryMs);
-    // In development, use frontend URL (5173), in production use BASE_URL
+    // In development, use localhost:5173, in production use FRONTEND_URL
     const isProduction = process.env.NODE_ENV === 'production';
     const baseUrl = isProduction 
-      ? (process.env.BASE_URL || `http://localhost:${process.env.PORT || 3001}`)
+      ? (process.env.FRONTEND_URL || process.env.BASE_URL || `http://localhost:${process.env.PORT || 3001}`)
       : 'http://localhost:5173';
     const url = `${baseUrl}/invite/${token}`;
     
