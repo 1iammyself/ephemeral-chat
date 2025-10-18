@@ -461,10 +461,24 @@ class RoomManager {
    */
   async generateInviteLink(roomCode, { isPermanent = false, expiryMs } = {}) {
     const token = await this.generateInviteToken(roomCode, isPermanent, expiryMs);
-    // Use BASE_URL for production (since frontend is served from backend)
-    const baseUrl = process.env.BASE_URL || 'http://localhost:5173';
+
+    // Robust URL detection for different environments
+    let baseUrl;
+
+    if (process.env.NODE_ENV === 'production') {
+      // In production, prefer BASE_URL, fallback to Render's external hostname
+      baseUrl = process.env.BASE_URL ||
+                (process.env.RENDER_EXTERNAL_HOSTNAME ? `https://${process.env.RENDER_EXTERNAL_HOSTNAME}` : null);
+    } else {
+      // In development, use localhost
+      baseUrl = 'http://localhost:5173';
+    }
+
+    // Final fallback
+    baseUrl = baseUrl || 'http://localhost:5173';
+
     const url = `${baseUrl}/invite/${token}`;
-    
+
     const tokenData = this.inviteTokens.get(token);
     return {
       token,
