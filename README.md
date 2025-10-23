@@ -1,44 +1,47 @@
 <div align="center">
   <h1>Ephemeral Chat</h1>
-  
+
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-  [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](docs/CONTRIBUTING.md)
-  [![GitHub stars](https://img.shields.io/github/stars/cLLeB/ephemeral-chat?style=social)](https://github.com/cLLeB/ephemeral-chat/stargazers)
+  [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/cLLeB/ephemeral-chat/issues)
   [![Live Demo](https://img.shields.io/badge/🌐-Live_Demo-2ea44f)](https://ephemeral-chat-7j66.onrender.com/)
 
-  <p>A secure, anonymous, and ephemeral chat application with self-destructing messages.</p>
-  
-  [Explore the Docs](https://github.com/cLLeB/ephemeral-chat#readme) ·
-  [Report Bug](https://github.com/cLLeB/ephemeral-chat/issues) ·
-  [Request Feature](https://github.com/cLLeB/ephemeral-chat/issues/new?assignees=&labels=enhancement&template=feature_request.md&title=)
+  <p>A secure, anonymous, and ephemeral chat application with self-destructing messages. Installable as a Progressive Web App (PWA) for native-like experience.</p>
+
+  [Report Bug](https://github.com/cLLeB/ephemeral-chat/issues) · [Request Feature](https://github.com/cLLeB/ephemeral-chat/issues/new?assignees=&labels=enhancement&template=feature_request.md&title=)
 </div>
 
 ## ✨ Features
 
 ### Core Features
-- **Instant Room Creation**: Generate unique chat rooms instantly
+- **Instant Room Creation**: Generate unique chat rooms instantly with 6-digit codes
 - **Anonymous Participation**: No accounts or personal information required
 - **Real-Time Messaging**: Lightning-fast message delivery using WebSockets
-- **Self-Destructing Messages**: Messages disappear after being read
+- **Self-Destructing Messages**: Messages disappear after being read or after a set time
 - **Auto-Cleanup**: Rooms automatically close after inactivity
-- **Cross-Platform**: Works on web, mobile, and desktop
+- **Progressive Web App**: Install on any device for native-like experience
 
 ### Security & Privacy
-- **End-to-End Encryption**: Secure message transmission
+- **End-to-End Security**: Secure message transmission with rate limiting
 - **No Message Persistence**: Messages are never stored on the server
-- **Rate Limiting**: Prevents abuse and spam
-- **Secure Room Links**: Unique, unguessable room URLs
-- **🔒 Inactivity Timeout**: Automatic logout after 15 minutes of inactivity
-- **🔐 Secure Credentials**: bcrypt password hashing, no plain text storage
+- **Secure Room Links**: Unique, unguessable room URLs with optional passwords
+- **🔒 Inactivity Timeout**: Automatic logout after 10 minutes of inactivity
+- **🔐 Secure Credentials**: bcrypt password hashing for protected rooms
 - **🛡️ Brute Force Protection**: Failed attempt tracking and automatic lockout
 - **🎫 Invite Token System**: Secure, time-limited room access tokens
 - **✅ Input Validation**: XSS prevention and credential sanitization
 
+### PWA Features
+- **📱 Installable**: Add to home screen on any device
+- **🔄 Offline Support**: Works without internet connection
+- **⚡ Fast Loading**: Service worker caching for instant access
+- **📲 Native Feel**: App-like experience with splash screen and theme colors
+- **🔄 Auto-Updates**: Always runs the latest version
+
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js (v18 or higher)
-- npm (v9 or higher) or yarn
+- Node.js (v16 or higher)
+- npm (v8 or higher) or yarn
 - (Optional) Redis for production deployments
 
 ### Installation
@@ -53,73 +56,81 @@
    ```bash
    # Install root dependencies
    npm install
-   
+
    # Install client dependencies
    cd client && npm install && cd ..
    ```
 
 3. **Set up environment variables**
-   Create a `.env` file in the root directory:
-   ```bash
-   # Copy the security example configuration
-   cp .env.security.example .env
-   
-   # Or create manually with these essential settings:
+   Copy the existing `.env` file or create one with these settings:
+   ```env
+   # Server Configuration
    PORT=3001
    NODE_ENV=development
-   CLIENT_URL=http://localhost:3000
-   
-   # Security Settings (recommended)
-   INACTIVITY_TIMEOUT_MINUTES=15
+
+   # Security Settings (already configured)
+   INACTIVITY_TIMEOUT_MINUTES=10
    MAX_FAILED_ATTEMPTS=5
-   LOCKOUT_DURATION_MINUTES=15
-   ROOM_CODE_SALT=your-random-secret-salt
-   ```
-   
-   **Important**: Generate a secure `ROOM_CODE_SALT`:
-   ```bash
-   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   LOCKOUT_DURATION_MINUTES=10
+   ROOM_CODE_SALT=your-secure-salt-here
+
+   # Room Settings
+   ROOM_EXPIRY_MINUTES=60
+   INVITE_TOKEN_EXPIRY_MINUTES=5
+   MAX_MESSAGES_PER_MINUTE=30
    ```
 
 4. **Start the development server**
    ```bash
-   # Start both client and server
+   # Start both client and server concurrently
    npm run dev
    ```
 
 5. **Access the application**
-   - Frontend: http://localhost:3000
+   - Frontend: http://localhost:5173 (Vite dev server)
    - Backend API: http://localhost:3001
+
+## 📱 Progressive Web App (PWA)
+
+Your chat application is a fully-featured PWA that can be installed on any device!
+
+### Installation
+1. **Open in browser** and visit the live demo
+2. **Look for install prompt** in your browser's address bar
+3. **Click "Install"** or "Add to Home Screen"
+4. **Launch from home screen** like a native app
+
+### PWA Features
+- **Offline functionality** - Chat works without internet
+- **Native app feel** - Custom splash screen and theme colors
+- **Auto-updates** - Always runs the latest version
+- **Fast loading** - Cached assets for instant access
+
+## 🛠 Built With
+
+- **Frontend**: React 18, Vite, Tailwind CSS, TypeScript
+- **Backend**: Node.js, Express, Socket.IO, bcryptjs
+- **PWA**: Vite PWA Plugin, Workbox, Web App Manifest
+- **Database**: In-memory storage (Redis optional for production)
+- **Deployment**: Render
 
 ## 📚 Documentation
 
 ### User Documentation
 - [User Guide](docs/USER_GUIDE.md) - Complete guide for end users
-- [Mobile Build Guide](docs/MOBILE_BUILD_GUIDE.md) - Building the Android app
-
-### Security Documentation
-- **[Security Features](docs/SECURITY.md)** - Comprehensive security documentation
-- **[Integration Guide](docs/INTEGRATION_GUIDE.md)** - How to integrate security features
-- **[Testing Guide](docs/TESTING_GUIDE.md)** - Security testing procedures
-- **[Implementation Summary](SECURITY_IMPLEMENTATION_SUMMARY.md)** - Quick overview
-
-### Developer Documentation
-- [Deployment Guide](docs/DEPLOYMENT.md) - How to deploy to production
-- [Contributing Guide](docs/CONTRIBUTING.md) - How to contribute to the project
-- [Code of Conduct](docs/CODE_OF_CONDUCT.md) - Community guidelines
-
-## 🛠 Built With
-
-- **Frontend**: React, Vite, Tailwind CSS
-- **Backend**: Node.js, Express, Socket.IO
-- **Mobile**: Progressive Web App (PWA)
-- **Deployment**: Render, Docker
 
 ## 🤝 Contributing
 
-Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+Contributions are welcome! Here's how you can help:
 
-See our [Contributing Guide](docs/CONTRIBUTING.md) for detailed information on how to contribute.
+1. **Fork the repository**
+2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
+3. **Make your changes** and test them thoroughly
+4. **Commit your changes**: `git commit -m 'Add amazing feature'`
+5. **Push to the branch**: `git push origin feature/amazing-feature`
+6. **Open a Pull Request**
+
+See our [Contributing Guidelines](https://github.com/cLLeB/ephemeral-chat/issues) for more details.
 
 ## 📄 License
 
@@ -129,184 +140,117 @@ Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
 
 - **Project Link**: [https://github.com/cLLeB/ephemeral-chat](https://github.com/cLLeB/ephemeral-chat)
 - **Live Demo**: [https://ephemeral-chat-7j66.onrender.com/](https://ephemeral-chat-7j66.onrender.com/)
+- **Email**: kyereboatengcaleb@gmail.com
 
 ## 🙏 Acknowledgments
 
 - [Socket.IO](https://socket.io/) for real-time communication
+- [React](https://reactjs.org/) for the amazing UI framework
 - [Vite](https://vitejs.dev/) for fast development experience
 - [Tailwind CSS](https://tailwindcss.com/) for utility-first CSS
 - [Render](https://render.com/) for hosting
+- [Progressive Web Apps](https://developers.google.com/web/progressive-web-apps) for native-like web experience
 
-2. **Install dependencies**
-```bash
-# Install server dependencies
-npm install
-
-# Install client dependencies
-cd client
-npm install
-cd ..
-```
-
-3. **Set up environment variables**
-```bash
-cp .env.example .env
-# Edit .env file with your configuration
-```
-
-4. **Start the application**
-```bash
-# Development mode (with hot-reload)
-npm run dev
-
-# Production build
-npm run build
-npm start
-```
-
-5. **Access the application**
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:3001
-
-### With Docker (Alternative)
-```bash
-docker-compose up --build
-```
-
-## 🛠 PWA Configuration
-
-The PWA is configured with the following features:
-- Service worker for offline support and caching
-- Web App Manifest for installability
-- Responsive design for all screen sizes
-- Automatic updates when new versions are available
-
-### Service Worker
-- Caches static assets for offline use
-- Implements network-first strategy for API calls
-- Automatically updates when new content is available
-
-### Web App Manifest
-- Defines app name, icons, and theme colors
-- Configures display mode and orientation
-- Provides app-like experience when installed
+---
 
 ## 🏗️ Project Structure
 
 ```
 ephemeral-chat/
-├── client/                    # React frontend
-│   ├── public/               # Static assets
-│   └── src/
-│       ├── assets/           # Images, fonts, etc.
-│       ├── components/       # Reusable UI components
-│       ├── hooks/            # Custom React hooks
-│       ├── services/         # API and service integrations
-│       ├── utils/            # Helper functions
-│       ├── App.jsx           # Main App component
-│       └── main.jsx          # Entry point
-│
-├── server/                   # Express + Socket.IO backend
-│   ├── config/              # Configuration files
-│   ├── controllers/         # Request handlers
-│   ├── middleware/          # Custom middleware
-│   ├── models/              # Data models
-│   ├── routes/              # API routes
-│   ├── services/            # Business logic
-│   ├── socket/              # Socket.IO handlers
-│   ├── utils/               # Utility functions
-│   ├── index.js             # Server entry point
+├── client/                    # React frontend (Vite + PWA)
+│   ├── public/               # PWA assets & manifest
+│   │   ├── manifest.json     # Web app manifest
+│   │   ├── sw.js            # Service worker
+│   │   └── *.png            # PWA icons
+│   ├── src/                  # React source code
+│   │   ├── components/       # Reusable UI components
+│   │   ├── hooks/            # Custom React hooks
+│   │   ├── services/         # API integrations
+│   │   └── utils/            # Helper functions
+│   ├── vite.config.js        # Vite configuration with PWA
 │   └── package.json
 │
-├── .env.example            # Environment variables template
-├── .gitignore
-├── docker-compose.yml      # Docker configuration
-├── Dockerfile             # Frontend Dockerfile
-├── package.json           # Root package.json
+├── server/                   # Express + Socket.IO backend
+│   ├── auth-utils.js         # Authentication utilities
+│   ├── index.js             # Server entry point
+│   ├── rooms.js             # Room management
+│   ├── security.js          # Security middleware
+│   └── utils.js             # Utility functions
+│
+├── docs/                    # Documentation
+│   └── USER_GUIDE.md       # User guide
+│
+├── .env                    # Environment variables
+├── package.json           # Root dependencies
 └── README.md
-```
-
-## 📱 Usage
-
-### For Users
-1. **Create a Room**
-   - Click "Create a New Room"
-   - Configure room settings (password, message TTL)
-   - Share the room code with others
-
-2. **Join a Room**
-   - Enter the 6-digit room code
-   - Choose a nickname (anonymous)
-   - Enter password if required
-
-3. **Chat Features**
-   - Send and receive messages in real-time
-   - Set message expiration time
-   - View active participants
-   - Copy room link to clipboard
-
-### For Developers
-```javascript
-// Example: Connect to a room
-const socket = io('http://localhost:3001');
-socket.emit('joinRoom', { room: '123456', username: 'anon' });
-
-// Send a message
-socket.emit('sendMessage', {
-  room: '123456',
-  message: 'Hello, World!',
-  ttl: 60 // seconds
-});
 ```
 
 ## ⚙️ Configuration
 
 ### Environment Variables
-Create a `.env` file in the root directory:
+The application uses the following environment variables (see `.env` file):
 
 ```env
 # Server
 PORT=3001
 NODE_ENV=development
 
-# Redis (optional)
-REDIS_URL=redis://localhost:6379
+# Security (REQUIRED)
+INACTIVITY_TIMEOUT_MINUTES=10
+MAX_FAILED_ATTEMPTS=5
+LOCKOUT_DURATION_MINUTES=10
+ROOM_CODE_SALT=your-secure-salt-here
 
 # Room Settings
-ROOM_EXPIRY_MINUTES=30
-MAX_MESSAGES_PER_MINUTE=60
-MAX_ROOMS=1000
-MAX_USERS_PER_ROOM=50
+ROOM_EXPIRY_MINUTES=60
+INVITE_TOKEN_EXPIRY_MINUTES=5
+MAX_MESSAGES_PER_MINUTE=30
 
-# Security
-RATE_LIMIT_WINDOW_MS=60000
-RATE_LIMIT_MAX=100
+# Redis (optional)
+# REDIS_URL=redis://localhost:6379
 ```
 
 ### Available Scripts
-- `npm run dev`: Start development server
-- `npm run build`: Create production build
+- `npm run dev`: Start development servers (client + server)
+- `npm run server`: Start backend server only
+- `npm run client`: Start frontend client only
+- `npm run build`: Build frontend for production
 - `npm start`: Start production server
-- `npm test`: Run tests
-- `npm run lint`: Lint code
-- `npm run format`: Format code
 
-## 📄 License
+## 🔧 Development
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### Frontend Development
+The client is built with React and Vite:
 
-## 🙏 Contributing
+```bash
+cd client
+npm run dev  # Starts on http://localhost:5173
+```
 
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+### Backend Development
+The server uses Node.js with Express and Socket.IO:
 
-## 📬 Contact
+```bash
+npm run server  # Starts on http://localhost:3001
+```
 
-- **Email**: [kyereboatengcaleb@gmail.com](mailto:kyereboatengcaleb@gmail.com)
-- **GitHub**: [cLLeB/ephemeral-chat](https://github.com/cLLeB/-ephemeral-chat/)
-- **Issues**: [GitHub Issues](https://github.com/cLLeB/-ephemeral-chat/issues)
+### API Endpoints
+- `GET /` - Health check
+- `POST /api/rooms` - Create room
+- `GET /api/rooms/:code` - Get room info
+- WebSocket events: `joinRoom`, `sendMessage`, `leaveRoom`
 
-## 🤝 Acknowledgments
+## 🚀 Deployment
 
-- Built with ❤️ using React, Node.js, and Socket.IO
-- Inspired by privacy-focused chat applications
-- Thanks to all contributors who helped with this project
+The application is currently deployed on **Render**:
+
+- **Frontend**: Static site deployment
+- **Backend**: Web service
+- **URL**: https://ephemeral-chat-7j66.onrender.com/
+
+### Deployment Configuration
+The deployment uses the `render.yaml` configuration for automatic builds and deployments.
+
+---
+
+*Built with ❤️ for privacy-focused communication*
