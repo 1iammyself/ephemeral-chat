@@ -56,6 +56,11 @@ const server = http.createServer(app);
 const isProduction = process.env.NODE_ENV === 'production';
 const isRender = process.env.RENDER === 'true';
 
+// Allowed origins can be provided as a comma-separated list via env
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : ['https://ephemeral-chat-7j66.onrender.com'];
+
 // Configure CORS options
 const getCorsOptions = () => {
   // Allow all origins in development
@@ -70,23 +75,16 @@ const getCorsOptions = () => {
     };
   }
 
-  // In production, allow specific origins
-  const allowedOrigins = [
-    'https://ephemeral-chat-7j66.onrender.com',
-    'http://localhost:3000',
-    'http://localhost:3001'
-  ];
-
+  // In production, use the environment-configured allowedOrigins array
   return {
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
-      
-      // Check if the origin is in the allowed list
-      if (allowedOrigins.includes(origin) || origin.includes('onrender.com')) {
+
+      if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('onrender.com')) {
         return callback(null, true);
       }
-      
+
       callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
@@ -110,18 +108,14 @@ const io = socketIo(server, {
     origin: (origin, callback) => {
       // Allow all in development
       if (!isProduction) return callback(null, true);
-      
-      // In production, check against allowed origins
-      const allowedOrigins = [
-        'https://ephemeral-chat-7j66.onrender.com',
-        'http://localhost:3000',
-        'http://localhost:3001'
-      ];
-      
-      if (!origin || allowedOrigins.includes(origin) || origin.includes('onrender.com')) {
+
+      // In production, check against the environment-configured allowedOrigins
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('onrender.com')) {
         return callback(null, true);
       }
-      
+
       callback(new Error('Not allowed by CORS'));
     },
     methods: ['GET', 'POST'],
