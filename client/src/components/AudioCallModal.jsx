@@ -22,6 +22,7 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
     const [isMuted, setIsMuted] = useState(false);
     const [isSpeakerOn, setIsSpeakerOn] = useState(true);
     const [callDuration, setCallDuration] = useState(0);
+    const [remoteStreamReady, setRemoteStreamReady] = useState(false);
 
     const localAudioRef = useRef(null);
     const remoteAudioRef = useRef(null);
@@ -29,6 +30,7 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
     const remoteVideoRef = useRef(null);
     const callStartTimeRef = useRef(0);
     const durationIntervalRef = useRef(null);
+    const streamCheckIntervalRef = useRef(null);
 
     // Subscribe to call state changes
     useEffect(() => {
@@ -61,10 +63,33 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
         };
     }, [callState.state]);
 
+    // Poll for remote stream availability (stream may arrive after state changes)
+    useEffect(() => {
+        if (callState.state === CallState.CONNECTED || callState.state === CallState.CONNECTING) {
+            // Check for stream every 100ms until we get it
+            streamCheckIntervalRef.current = setInterval(() => {
+                const remoteStream = webRTCService.getRemoteStream();
+                if (remoteStream && remoteStream.getAudioTracks().length > 0) {
+                    console.log('🔊 Remote stream available with audio tracks:', remoteStream.getAudioTracks().length);
+                    setRemoteStreamReady(true);
+                    clearInterval(streamCheckIntervalRef.current);
+                }
+            }, 100);
+        }
+
+        return () => {
+            if (streamCheckIntervalRef.current) {
+                clearInterval(streamCheckIntervalRef.current);
+            }
+        };
+    }, [callState.state]);
+
     // Setup audio/video streams
     useEffect(() => {
         const localStream = webRTCService.getLocalStream();
         const remoteStream = webRTCService.getRemoteStream();
+
+        console.log('🎧 Setting up streams - Local:', !!localStream, 'Remote:', !!remoteStream);
 
         // Local audio (muted to prevent feedback)
         if (localStream && localAudioRef.current) {
@@ -78,10 +103,23 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
             localVideoRef.current.muted = true;
         }
 
-        // Remote audio
+        // Remote audio - CRITICAL: ensure we play it
         if (remoteStream && remoteAudioRef.current) {
+            console.log('🔊 Attaching remote stream to audio element');
             remoteAudioRef.current.srcObject = remoteStream;
-            remoteAudioRef.current.play().catch(console.error);
+            remoteAudioRef.current.muted = false; // Ensure not muted
+            remoteAudioRef.current.volume = 1.0; // Max volume
+
+            // Try to play - handle autoplay policy
+            const playPromise = remoteAudioRef.current.play();
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => console.log('🔊 Remote audio playing successfully'))
+                    .catch(err => {
+                        console.error('🔇 Audio play failed:', err);
+                        // If autoplay was prevented, we'll need user gesture
+                    });
+            }
         }
 
         // Remote video
@@ -89,7 +127,7 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
             remoteVideoRef.current.srcObject = remoteStream;
             remoteVideoRef.current.play().catch(console.error);
         }
-    }, [callState]);
+    }, [callState, remoteStreamReady]);
 
     const handleAcceptCall = useCallback(async () => {
         if (callState.callId) {
@@ -251,8 +289,8 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                             <button
                                 onClick={toggleMute}
                                 className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${isMuted
-                                        ? 'bg-red-500 text-white'
-                                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                                    ? 'bg-red-500 text-white'
+                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                                     }`}
                             >
                                 {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
@@ -262,8 +300,8 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                             <button
                                 onClick={toggleSpeaker}
                                 className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${!isSpeakerOn
-                                        ? 'bg-red-500 text-white'
-                                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                                    ? 'bg-red-500 text-white'
+                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                                     }`}
                             >
                                 {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}

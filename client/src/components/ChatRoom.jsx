@@ -207,7 +207,9 @@ const ChatRoom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleJoinRoom = async (nickname, password = '', captchaAnswer = '', captchaProblem = '') => {
+  const handleJoinRoom = async (params) => {
+    const { nickname, password = '', capToken = null, inviteToken } = params;
+
     if (!nickname.trim()) {
       setError('Please enter a nickname');
       return;
@@ -236,7 +238,7 @@ const ChatRoom = () => {
         hasToken: !!inviteToken,
         token: inviteToken ? `${inviteToken.substring(0, 8)}...` : 'none',
         hasPassword: !!password,
-        hasCaptcha: !!captchaAnswer
+        hasCapToken: !!capToken
       });
 
       // Emit join-room event with the invite token if available
@@ -244,8 +246,7 @@ const ChatRoom = () => {
         roomCode,
         nickname: nickname.trim(),
         password: password.trim(),
-        captchaAnswer: captchaAnswer.trim(),
-        captchaProblem: captchaProblem
+        capToken: capToken
       };
 
       // Only include inviteToken if it exists

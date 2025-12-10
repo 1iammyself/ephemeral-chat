@@ -24,16 +24,16 @@ function generateRandomNickname() {
     'Anonymous', 'Mystery', 'Secret', 'Hidden', 'Phantom', 'Shadow',
     'Silent', 'Quiet', 'Swift', 'Clever', 'Bright', 'Quick'
   ];
-  
+
   const animals = [
     'Panda', 'Tiger', 'Eagle', 'Wolf', 'Fox', 'Bear',
     'Lion', 'Hawk', 'Owl', 'Cat', 'Dog', 'Rabbit'
   ];
-  
+
   const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
   const animal = animals[Math.floor(Math.random() * animals.length)];
   const number = Math.floor(Math.random() * 999) + 1;
-  
+
   return `${adjective}${animal}${number}`;
 }
 
@@ -44,7 +44,7 @@ function generateRandomNickname() {
  */
 function sanitizeInput(input) {
   if (typeof input !== 'string') return '';
-  
+
   return input
     .replace(/[<>]/g, '') // Remove < and > characters
     .replace(/javascript:/gi, '') // Remove javascript: protocol
@@ -59,9 +59,9 @@ function sanitizeInput(input) {
  * @returns {boolean} True if valid
  */
 function isValidRoomCode(code) {
-  return typeof code === 'string' && 
-         code.length === 10 && 
-         /^[A-Z0-9]+$/.test(code);
+  return typeof code === 'string' &&
+    code.length === 10 &&
+    /^[A-Z0-9]+$/.test(code);
 }
 
 /**
@@ -70,10 +70,10 @@ function isValidRoomCode(code) {
  * @returns {boolean} True if valid
  */
 function isValidNickname(nickname) {
-  return typeof nickname === 'string' && 
-         nickname.length >= 1 && 
-         nickname.length <= 20 &&
-         /^[a-zA-Z0-9_\-\s]+$/.test(nickname);
+  return typeof nickname === 'string' &&
+    nickname.length >= 1 &&
+    nickname.length <= 20 &&
+    /^[a-zA-Z0-9_\-\s]+$/.test(nickname);
 }
 
 /**
@@ -91,44 +91,11 @@ function getTTLOptions() {
   };
 }
 
-/**
- * Generate a random math CAPTCHA problem
- * @returns {Object} { problem: string, answer: string }
- */
-function generateMathCaptcha() {
-  const operations = ['+', '-', '*', '/'];
-  const operation = operations[Math.floor(Math.random() * operations.length)];
-  
-  let num1, num2, answer;
-  
-  if (operation === '/') {
-    // For division, ensure whole number result
-    num2 = Math.floor(Math.random() * 20) + 1; // 1-20
-    answer = Math.floor(Math.random() * 15) + 1; // 1-15
-    num1 = num2 * answer; // Ensures num1 / num2 = answer
-  } else {
-    num1 = Math.floor(Math.random() * 99) + 1; // 1-99
-    num2 = Math.floor(Math.random() * 99) + 1; // 1-99
-    
-    switch (operation) {
-      case '+': answer = num1 + num2; break;
-      case '-': answer = num1 - num2; break; // Allow negative results
-      case '*': answer = num1 * num2; break;
-    }
-  }
-  
-  return {
-    problem: `${num1} ${operation} ${num2} = ?`,
-    answer: answer.toString()
-  };
-}
-
 module.exports = {
   generateRoomCode,
   generateRandomNickname,
   sanitizeInput,
   isValidRoomCode,
   isValidNickname,
-  getTTLOptions,
-  generateMathCaptcha
+  getTTLOptions
 };

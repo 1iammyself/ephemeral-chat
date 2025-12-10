@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { X, Settings, Clock, Lock, Copy, Check, Users } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { X, Settings, Clock, Lock, Copy, Check, Users, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import '@cap.js/widget';
 
 const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '';
@@ -10,8 +11,8 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
     password: '',
     maxUsers: 1
   });
-  const [captcha, setCaptcha] = useState({ problem: '', answer: '' });
-  const [captchaInput, setCaptchaInput] = useState('');
+  const [capToken, setCapToken] = useState(null);
+  const [isCapVerified, setIsCapVerified] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createdRoom, setCreatedRoom] = useState(null);
   const [inviteLink, setInviteLink] = useState('');
@@ -23,6 +24,28 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
   const navigate = useNavigate();
 
+  // Use callback ref to ensure listener is attached when element mounts
+  const setCapWidgetRef = useCallback((node) => {
+    if (node) {
+      const handleSuccess = (event) => {
+        console.log('Cap event captured:', event.type, event.detail);
+        if (event.detail && event.detail.token) {
+          setCapToken(event.detail.token);
+          setIsCapVerified(true);
+        }
+      };
+      const handleError = (e) => console.error('Cap widget error:', e);
+
+      // Listen for various possible event names to be safe
+      node.addEventListener('cap:success', handleSuccess);
+      node.addEventListener('success', handleSuccess);
+      node.addEventListener('solve', handleSuccess);
+      node.addEventListener('token', handleSuccess);
+
+      node.addEventListener('cap:error', handleError);
+      node.addEventListener('error', handleError);
+    }
+  }, []);
 
   const ttlOptions = [
     { value: 'none', label: 'Never (Default)', description: 'Messages stay until room expires' },
@@ -32,21 +55,6 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
     { value: '30min', label: '30 Minutes', description: 'Messages disappear after 30 minutes' },
     { value: '1hour', label: '1 Hour', description: 'Messages disappear after 1 hour' }
   ];
-
-  const fetchCaptcha = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/api/captcha`);
-      const data = await response.json();
-      setCaptcha(data);
-    } catch (error) {
-      console.error('Error fetching CAPTCHA:', error);
-    }
-  };
-
-  // Fetch CAPTCHA on component mount
-  useEffect(() => {
-    fetchCaptcha();
-  }, []);
 
   const generateInviteLink = async (roomCode, password) => {
     try {
@@ -76,6 +84,12 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+
+    if (!isCapVerified && !capToken) {
+      alert('Please complete the verification first.');
+      return;
+    }
+
     setIsCreating(true);
 
     try {
@@ -88,8 +102,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
           messageTTL: settings.messageTTL !== 'none' ? settings.messageTTL : undefined,
           password: settings.password.trim() || undefined,
           maxUsers: settings.maxUsers,
-          captchaAnswer: captchaInput.trim(),
-          captchaProblem: captcha.problem
+          capToken: capToken
         }),
       });
 
@@ -97,8 +110,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
         messageTTL: settings.messageTTL !== 'none' ? settings.messageTTL : undefined,
         password: settings.password.trim() || undefined,
         maxUsers: settings.maxUsers,
-        captchaAnswer: captchaInput.trim(),
-        captchaProblem: captcha.problem
+        hasCapToken: !!capToken
       });
 
       const data = await response.json();
@@ -138,7 +150,6 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const handleNewRoom = () => {
     setCreatedRoom(null);
     setInviteLink('');
-    setCaptchaInput('');
     setIsCopied({
       roomCode: false,
       password: false,
@@ -149,8 +160,8 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
       password: '',
       maxUsers: 1
     });
-    // Fetch new CAPTCHA
-    fetchCaptcha();
+    setCapToken(null);
+    setIsCapVerified(false);
   };
 
   // If room was created, show success message with invite options
@@ -277,8 +288,8 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                   <label
                     key={option.value}
                     className={`flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 rounded-lg border cursor-pointer transition-colors ${settings.messageTTL === option.value
-                        ? 'border-primary-500 bg-primary-50'
-                        : 'border-gray-200 hover:bg-gray-50'
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 hover:bg-gray-50'
                       }`}
                   >
                     <input
@@ -372,29 +383,27 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
             </div>
             <div>
               <div className="flex items-center space-x-2 mb-2 sm:mb-3">
-                <div className="w-4 h-4 sm:w-5 sm:h-5 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-blue-600 font-bold text-xs sm:text-sm">?</span>
-                </div>
+                <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
                 <label className="font-medium text-gray-900 text-sm sm:text-base">
-                  Solve the Math Problem
+                  Verification
                 </label>
               </div>
               <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
-                Prove you're human by solving this simple math problem
+                Complete this quick verification to prove you're human
               </p>
-              <div className="mb-3">
-                <div className="p-2 sm:p-3 bg-gray-50 border rounded-lg text-center font-mono text-base sm:text-lg">
-                  {captcha.problem || 'Loading...'}
-                </div>
+              <div className="flex justify-center">
+                <cap-widget
+                  ref={setCapWidgetRef}
+                  data-cap-api-endpoint={`${API_BASE}/api/cap/`}
+                  className="w-full"
+                />
               </div>
-              <input
-                type="text"
-                placeholder="Enter your answer"
-                value={captchaInput}
-                onChange={(e) => setCaptchaInput(e.target.value)}
-                className="input-field text-sm sm:text-base py-2 sm:py-3 px-3 sm:px-4"
-                required
-              />
+              {isCapVerified && (
+                <div className="mt-2 flex items-center justify-center text-green-600 text-sm">
+                  <Check className="w-4 h-4 mr-1" />
+                  Verified
+                </div>
+              )}
             </div>
 
             {/* Actions */}

@@ -14,15 +14,22 @@ const { createClient } = require('redis');
 const RoomManager = require('./rooms');
 const SecurityManager = require('./security');
 const authUtils = require('./auth-utils');
+const Cap = require('@cap.js/server');
 const {
   generateRandomNickname,
   sanitizeInput,
   isValidRoomCode,
   isValidNickname,
   getTTLOptions,
-  generateInviteLink,
-  generateMathCaptcha
+  generateInviteLink
 } = require('./utils');
+
+// Initialize Cap.js for proof-of-work CAPTCHA
+const cap = new Cap({
+  tokens_per_challenge: 1,
+  // Use environment variable for secret in production
+  secret: process.env.CAP_SECRET || 'ephemeral-chat-cap-secret-change-in-production'
+});
 
 // Initialize in-memory storage
 console.log('🔌 Using in-memory storage for rooms and messages');
@@ -51,6 +58,12 @@ async function initializeRedis() {
 
 const app = express();
 const server = http.createServer(app);
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
 
 // Detect environment
 const isProduction = process.env.NODE_ENV === 'production';
@@ -230,13 +243,60 @@ app.get('/api/invite/:token', async (req, res) => {
   }
 });
 
-app.get('/api/captcha', (req, res) => {
+// Cap.js API endpoints for proof-of-work CAPTCHA
+app.post('/api/cap/challenge', async (req, res) => {
+  console.log('Received Cap challenge request');
   try {
-    const captcha = generateMathCaptcha();
-    res.json(captcha);
+    const challenge = await cap.createChallenge();
+    console.log('Generated challenge:', challenge);
+    res.json(challenge);
   } catch (error) {
-    console.error('Error generating CAPTCHA:', error);
-    res.status(500).json({ error: 'Failed to generate CAPTCHA' });
+    console.error('Error generating Cap challenge:', error);
+    res.status(500).json({ error: 'Failed to generate challenge' });
+  }
+});
+
+app.post('/api/cap/redeem', async (req, res) => {
+  console.log('Received Cap redeem request');
+  console.log('Request body:', req.body);
+  try {
+    const { token, solution } = req.body;
+    // The widget might send 'token' or 'solution' or both.
+    // Let's try to validate using the available data.
+
+    // Check if we should use redeemChallenge or validateToken
+    // Based on prototype, redeemChallenge exists.
+
+    // Try validateToken first (as we did)
+    // const result = await cap.validateToken(token);
+
+    // Let's try redeemChallenge if validateToken failed or as primary
+    // Assuming the widget sends the token it received + solution?
+    // Or maybe just the token?
+
+    // If the widget sends { token: '...' }, let's try passing that.
+
+    let result;
+    if (cap.redeemChallenge) {
+      // Note: redeemChallenge might be the correct method for the server-side check
+      // It might expect the token and the solution?
+      // Let's assume it takes the object sent by the widget.
+      result = await cap.redeemChallenge(req.body);
+    } else {
+      result = await cap.validateToken(token);
+    }
+
+    console.log('Verification result:', result);
+
+    // If result is an object, send it directly. If boolean, wrap it.
+    if (typeof result === 'object') {
+      res.json(result);
+    } else {
+      res.json({ success: result });
+    }
+  } catch (error) {
+    console.error('Error redeeming Cap token:', error);
+    res.status(500).json({ success: false, error: 'Failed to verify token' });
   }
 });
 
@@ -289,16 +349,16 @@ app.post('/api/rooms/:roomCode/invite', async (req, res) => {
 
 app.post('/api/rooms', async (req, res) => {
   try {
-    const { messageTTL, password, maxUsers, captchaAnswer, captchaProblem } = req.body;
+    const { messageTTL, password, maxUsers, capToken } = req.body;
 
-    console.log('HTTP room creation request:', { messageTTL, password, maxUsers, captchaAnswer, captchaProblem });
+    console.log('HTTP room creation request:', { messageTTL, password, maxUsers, hasCapToken: !!capToken });
 
-    // Validate CAPTCHA
-    if (captchaProblem && captchaAnswer) {
-      const expectedAnswer = calculateCaptchaAnswer(captchaProblem);
-      if (expectedAnswer !== captchaAnswer) {
-        console.error('Invalid CAPTCHA answer');
-        return res.status(400).json({ error: 'Incorrect CAPTCHA answer' });
+    // Validate Cap token (proof-of-work verification)
+    if (capToken) {
+      const isValid = await cap.validateToken(capToken);
+      if (!isValid) {
+        console.error('Invalid Cap token');
+        return res.status(400).json({ error: 'Verification failed. Please try again.' });
       }
     }
 
@@ -371,32 +431,6 @@ app.get('/api/rooms/:roomCode', async (req, res) => {
   }
 });
 
-// Helper function to calculate CAPTCHA answer from problem
-function calculateCaptchaAnswer(problem) {
-  // Parse problem like "47 + 23 = ?" or "36 / 4 = ?"
-  const match = problem.match(/^(\d+)\s*([+\-*\/])\s*(\d+)\s*=\s*\?$/);
-  if (!match) return null;
-
-  const num1 = parseInt(match[1]);
-  const operation = match[2];
-  const num2 = parseInt(match[3]);
-
-  let answer;
-  switch (operation) {
-    case '+': answer = num1 + num2; break;
-    case '-': answer = num1 - num2; break; // Allow negative results
-    case '*': answer = num1 * num2; break;
-    case '/': answer = num1 / num2; break; // Assume whole number from generation
-    default: return null;
-  }
-
-  return answer.toString();
-}
-
-app.get('/api/captcha', (req, res) => {
-  const captcha = generateCaptchaProblem();
-  res.json(captcha);
-});
 io.on('connection', (socket) => {
   console.log(`🔌 User connected: ${socket.id}`);
 
@@ -430,7 +464,7 @@ io.on('connection', (socket) => {
 
   socket.on('join-room', async (data, callback) => {
     try {
-      const { roomCode, nickname, password, inviteToken, captchaAnswer, captchaProblem } = data;
+      const { roomCode, nickname, password, inviteToken, capToken } = data;
       const userId = socket.id; // Use socket ID as user ID
 
       // Validate credentials
@@ -440,12 +474,12 @@ io.on('connection', (socket) => {
         return callback({ success: false, error: validation.errors[0] });
       }
 
-      // Verify CAPTCHA
-      if (captchaProblem && captchaAnswer) {
-        const expectedAnswer = calculateCaptchaAnswer(captchaProblem);
-        if (expectedAnswer !== captchaAnswer) {
-          console.error(`Invalid CAPTCHA answer for room ${roomCode}`);
-          return callback({ success: false, error: 'Incorrect CAPTCHA answer' });
+      // Verify Cap token (proof-of-work verification)
+      if (capToken) {
+        const isValid = await cap.validateToken(capToken);
+        if (!isValid) {
+          console.error(`Invalid Cap token for room ${roomCode}`);
+          return callback({ success: false, error: 'Verification failed. Please try again.' });
         }
       }
 

@@ -328,9 +328,23 @@ class WebRTCService {
 
         // Handle remote stream
         this.peerConnection.ontrack = (event) => {
-            console.log('📞 Remote track received');
-            this.remoteStream = event.streams[0];
-            this.updateCallState({ state: CallState.CONNECTED });
+            console.log('📞 Remote track received:', event.track.kind, 'Track ID:', event.track.id);
+            console.log('📞 Track enabled:', event.track.enabled, 'Track readyState:', event.track.readyState);
+
+            if (!this.remoteStream) {
+                this.remoteStream = new MediaStream();
+            }
+
+            // Add the track to the remote stream
+            this.remoteStream.addTrack(event.track);
+
+            console.log('📞 Remote stream now has', this.remoteStream.getAudioTracks().length, 'audio tracks and', this.remoteStream.getVideoTracks().length, 'video tracks');
+
+            // Update state to notify listeners
+            this.updateCallState({
+                state: CallState.CONNECTED,
+                hasRemoteAudio: this.remoteStream.getAudioTracks().length > 0
+            });
         };
 
         // Handle connection state changes

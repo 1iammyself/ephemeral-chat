@@ -11,6 +11,7 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "@cap.js/widget": "^0.1.32",
     "axios": "^1.11.0",
     "lucide-react": "^0.279.0",
     "react": "^18.2.0",
