@@ -209,11 +209,6 @@ function checkRateLimit(socketId, maxMessages = 30, windowMs = 60000) {
   return userLimits.count <= maxMessages;
 }
 
-// Health check endpoint for Render
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
 // REST API Routes
 app.get('/api/invite/:token', async (req, res) => {
   try {
