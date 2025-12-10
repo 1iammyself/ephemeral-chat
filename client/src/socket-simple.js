@@ -1,7 +1,8 @@
 import { io } from 'socket.io-client';
 
 // Use environment variable or default to localhost for development
-const SERVER_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Use environment variable, default to relative path in production, or localhost in development
+const SERVER_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/' : 'http://localhost:3001');
 
 class SimpleSocketManager {
   constructor() {
@@ -13,13 +14,13 @@ class SimpleSocketManager {
     if (this.socket && this.isConnected) {
       return this.socket;
     }
-    
+
     console.log('Connecting to:', SERVER_URL);
-    
+
     this.socket = io(SERVER_URL, {
       transports: ['polling', 'websocket']
     });
-    
+
     this.socket.on('connect', () => {
       console.log('Connected:', this.socket.id);
       this.isConnected = true;

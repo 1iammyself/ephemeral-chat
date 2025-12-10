@@ -35,10 +35,40 @@ class WebRTCService {
         };
 
         // ICE servers for NAT traversal
-        this.iceServers = [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' }
+        // Try to load from environment variable first
+        let configuredIceServers = [];
+        try {
+            if (import.meta.env.VITE_ICE_SERVERS) {
+                configuredIceServers = JSON.parse(import.meta.env.VITE_ICE_SERVERS);
+            }
+        } catch (e) {
+            console.warn('Failed to parse VITE_ICE_SERVERS', e);
+        }
+
+        this.iceServers = configuredIceServers.length > 0 ? configuredIceServers : [
+            {
+                urls: "stun:stun.relay.metered.ca:80"
+            },
+            {
+                urls: "turn:global.relay.metered.ca:80",
+                username: "55d4dca65d669e7f334fd513",
+                credential: "GMA0pbTySv4AwkH7"
+            },
+            {
+                urls: "turn:global.relay.metered.ca:80?transport=tcp",
+                username: "55d4dca65d669e7f334fd513",
+                credential: "GMA0pbTySv4AwkH7"
+            },
+            {
+                urls: "turn:global.relay.metered.ca:443",
+                username: "55d4dca65d669e7f334fd513",
+                credential: "GMA0pbTySv4AwkH7"
+            },
+            {
+                urls: "turns:global.relay.metered.ca:443?transport=tcp",
+                username: "55d4dca65d669e7f334fd513",
+                credential: "GMA0pbTySv4AwkH7"
+            }
         ];
 
         this.setupSocketHandlers();
