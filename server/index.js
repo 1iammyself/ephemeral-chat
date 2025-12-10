@@ -706,7 +706,8 @@ io.on('connection', (socket) => {
   socket.on('call-offer', (data) => {
     if (!socket.roomCode) return;
 
-    console.log(`📞 Call offer from ${socket.nickname} in room ${socket.roomCode}`);
+    console.log(`📞 Call offer from ${socket.nickname} (${socket.id}) in room ${socket.roomCode}`);
+    console.log(`   Target: ${data.targetNickname}, Video: ${data.includeVideo}`);
 
     // Broadcast offer to other participants in the room
     socket.to(socket.roomCode).emit('call-offer', {
@@ -720,7 +721,7 @@ io.on('connection', (socket) => {
   socket.on('call-answer', (data) => {
     if (!socket.roomCode) return;
 
-    console.log(`📞 Call answer from ${socket.nickname} in room ${socket.roomCode}`);
+    console.log(`📞 Call answer from ${socket.nickname} (${socket.id}) in room ${socket.roomCode}`);
 
     // Broadcast answer to other participants
     socket.to(socket.roomCode).emit('call-answer', {

@@ -1,6 +1,7 @@
 /**
  * WebRTC Service for Ephemeral Chat
  * Handles peer-to-peer audio/video calls using WebRTC
+ * Re-implemented based on reference implementation
  */
 
 import socketManager from './socket-simple';
@@ -21,14 +22,16 @@ class WebRTCService {
         this.localStream = null;
         this.remoteStream = null;
         this.callStateHandlers = new Map();
-        this.currentRoomCode = null;
 
         this.currentCallState = {
-            state: CallState.IDLE,
+            isCallActive: false,
+            isIncomingCall: false,
+            isOutgoingCall: false,
+            isCalling: false,
+            isConnected: false,
             remoteNickname: null,
             callId: null,
-            isVideoEnabled: false,
-            isMuted: false
+            state: CallState.IDLE // Mapped for backward compatibility
         };
 
         // ICE servers for NAT traversal
@@ -81,6 +84,14 @@ class WebRTCService {
      */
     updateCallState(updates) {
         this.currentCallState = { ...this.currentCallState, ...updates };
+
+        // Map boolean flags to state string for backward compatibility with UI
+        if (this.currentCallState.isIncomingCall) this.currentCallState.state = CallState.INCOMING;
+        else if (this.currentCallState.isCalling) this.currentCallState.state = CallState.CALLING;
+        else if (this.currentCallState.isConnected) this.currentCallState.state = CallState.CONNECTED;
+        else if (this.currentCallState.isCallActive) this.currentCallState.state = CallState.CONNECTING;
+        else this.currentCallState.state = CallState.IDLE;
+
         this.callStateHandlers.forEach(handler => handler(this.currentCallState));
     }
 
@@ -96,20 +107,17 @@ class WebRTCService {
      * Start an outgoing call
      * @param {string} roomCode - Room code
      * @param {string} remoteNickname - Target user's nickname
-     * @param {boolean} includeVideo - Include video stream
      */
-    async startCall(roomCode, remoteNickname, includeVideo = false) {
+    async startCall(roomCode, remoteNickname) {
         try {
             console.log('📞 Starting call to:', remoteNickname);
-
             this.currentRoomCode = roomCode;
-            const callId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
             this.updateCallState({
-                state: CallState.CALLING,
+                isOutgoingCall: true,
+                isCalling: true,
                 remoteNickname,
-                callId,
-                isVideoEnabled: includeVideo
+                callId: `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
             });
 
             // Get local media stream
@@ -119,7 +127,7 @@ class WebRTCService {
                     noiseSuppression: true,
                     autoGainControl: true
                 },
-                video: includeVideo
+                video: false
             });
 
             // Create peer connection
@@ -138,13 +146,11 @@ class WebRTCService {
 
             socketManager.emit('call-offer', {
                 roomCode,
-                callId,
+                callId: this.currentCallState.callId,
                 offer,
-                targetNickname: remoteNickname,
-                includeVideo
+                targetNickname: remoteNickname
             });
 
-            console.log('📞 Call offer sent');
         } catch (error) {
             console.error('Failed to start call:', error);
             this.endCall();
@@ -158,10 +164,9 @@ class WebRTCService {
      */
     async acceptCall(callId) {
         try {
-            console.log('📞 Accepting call:', callId);
-
             this.updateCallState({
-                state: CallState.CONNECTING,
+                isIncomingCall: false,
+                isCallActive: true,
                 callId
             });
 
@@ -172,10 +177,13 @@ class WebRTCService {
                     noiseSuppression: true,
                     autoGainControl: true
                 },
-                video: this.currentCallState.isVideoEnabled
+                video: false
             });
 
             // Add local tracks to existing peer connection
+            // Note: In reference, peerConnection might not exist yet if handleCallOffer created it?
+            // Actually handleCallOffer creates it.
+
             if (this.peerConnection && this.localStream) {
                 this.localStream.getTracks().forEach(track => {
                     if (this.peerConnection && this.localStream) {
@@ -192,9 +200,8 @@ class WebRTCService {
                     callId,
                     answer
                 });
-
-                console.log('📞 Call answer sent');
             }
+
         } catch (error) {
             console.error('Failed to accept call:', error);
             this.rejectCall(callId);
@@ -207,13 +214,10 @@ class WebRTCService {
      * @param {string} callId - Call ID to reject
      */
     rejectCall(callId) {
-        console.log('📞 Rejecting call:', callId);
-
         socketManager.emit('call-rejected', {
             roomCode: this.currentRoomCode,
             callId
         });
-
         this.endCall();
     }
 
@@ -221,9 +225,6 @@ class WebRTCService {
      * End the current call
      */
     endCall() {
-        console.log('📞 Ending call');
-
-        // Send end signal if we have a call ID
         if (this.currentCallState.callId && this.currentRoomCode) {
             socketManager.emit('call-ended', {
                 roomCode: this.currentRoomCode,
@@ -231,13 +232,12 @@ class WebRTCService {
             });
         }
 
-        // Stop all local tracks
+        // Clean up streams
         if (this.localStream) {
             this.localStream.getTracks().forEach(track => track.stop());
             this.localStream = null;
         }
 
-        // Stop all remote tracks
         if (this.remoteStream) {
             this.remoteStream.getTracks().forEach(track => track.stop());
             this.remoteStream = null;
@@ -249,61 +249,16 @@ class WebRTCService {
             this.peerConnection = null;
         }
 
-        // Reset state
         this.currentRoomCode = null;
         this.updateCallState({
-            state: CallState.IDLE,
+            isCallActive: false,
+            isIncomingCall: false,
+            isOutgoingCall: false,
+            isCalling: false,
+            isConnected: false,
             remoteNickname: null,
-            callId: null,
-            isVideoEnabled: false,
-            isMuted: false
+            callId: null
         });
-    }
-
-    /**
-     * Toggle mute state
-     */
-    toggleMute() {
-        if (this.localStream) {
-            const audioTrack = this.localStream.getAudioTracks()[0];
-            if (audioTrack) {
-                audioTrack.enabled = !audioTrack.enabled;
-                this.updateCallState({ isMuted: !audioTrack.enabled });
-                return !audioTrack.enabled;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Toggle video state
-     */
-    toggleVideo() {
-        if (this.localStream) {
-            const videoTrack = this.localStream.getVideoTracks()[0];
-            if (videoTrack) {
-                videoTrack.enabled = !videoTrack.enabled;
-                this.updateCallState({ isVideoEnabled: videoTrack.enabled });
-                return videoTrack.enabled;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Get local media stream
-     * @returns {MediaStream|null}
-     */
-    getLocalStream() {
-        return this.localStream;
-    }
-
-    /**
-     * Get remote media stream
-     * @returns {MediaStream|null}
-     */
-    getRemoteStream() {
-        return this.remoteStream;
     }
 
     /**
@@ -328,41 +283,18 @@ class WebRTCService {
 
         // Handle remote stream
         this.peerConnection.ontrack = (event) => {
-            console.log('📞 Remote track received:', event.track.kind, 'Track ID:', event.track.id);
-            console.log('📞 Track enabled:', event.track.enabled, 'Track readyState:', event.track.readyState);
-
-            if (!this.remoteStream) {
-                this.remoteStream = new MediaStream();
-            }
-
-            // Add the track to the remote stream
-            this.remoteStream.addTrack(event.track);
-
-            console.log('📞 Remote stream now has', this.remoteStream.getAudioTracks().length, 'audio tracks and', this.remoteStream.getVideoTracks().length, 'video tracks');
-
-            // Update state to notify listeners
-            this.updateCallState({
-                state: CallState.CONNECTED,
-                hasRemoteAudio: this.remoteStream.getAudioTracks().length > 0
-            });
+            console.log('📞 Remote track received');
+            this.remoteStream = event.streams[0];
+            this.updateCallState({ isConnected: true });
         };
 
         // Handle connection state changes
         this.peerConnection.onconnectionstatechange = () => {
             if (this.peerConnection) {
                 const state = this.peerConnection.connectionState;
-                console.log('📞 Connection state:', state);
-
                 if (state === 'failed' || state === 'disconnected' || state === 'closed') {
                     this.endCall();
                 }
-            }
-        };
-
-        // Handle ICE connection state changes
-        this.peerConnection.oniceconnectionstatechange = () => {
-            if (this.peerConnection) {
-                console.log('📞 ICE connection state:', this.peerConnection.iceConnectionState);
             }
         };
     }
@@ -373,15 +305,12 @@ class WebRTCService {
      */
     async handleCallOffer(data) {
         try {
-            console.log('📞 Received call offer from:', data.fromNickname);
-
             this.currentRoomCode = data.roomCode;
 
             this.updateCallState({
-                state: CallState.INCOMING,
+                isIncomingCall: true,
                 remoteNickname: data.fromNickname,
-                callId: data.callId,
-                isVideoEnabled: data.includeVideo || false
+                callId: data.callId
             });
 
             // Create peer connection
@@ -402,11 +331,13 @@ class WebRTCService {
      */
     async handleCallAnswer(data) {
         try {
-            console.log('📞 Received call answer');
-
             if (this.peerConnection) {
                 await this.peerConnection.setRemoteDescription(data.answer);
-                this.updateCallState({ state: CallState.CONNECTED });
+                this.updateCallState({
+                    isOutgoingCall: false,
+                    isCalling: false,
+                    isCallActive: true
+                });
             }
         } catch (error) {
             console.error('Failed to handle call answer:', error);
@@ -420,11 +351,11 @@ class WebRTCService {
      */
     async handleIceCandidate(data) {
         try {
-            if (this.peerConnection && data.candidate) {
+            if (this.peerConnection) {
                 await this.peerConnection.addIceCandidate(data.candidate);
             }
         } catch (error) {
-            console.error('Failed to add ICE candidate:', error);
+            console.error('Failed to handle ICE candidate:', error);
         }
     }
 
@@ -433,7 +364,6 @@ class WebRTCService {
      * @private
      */
     handleCallRejected(data) {
-        console.log('📞 Call was rejected');
         this.endCall();
     }
 
@@ -442,8 +372,26 @@ class WebRTCService {
      * @private
      */
     handleCallEnded(data) {
-        console.log('📞 Call ended by remote');
         this.endCall();
+    }
+
+    getLocalStream() {
+        return this.localStream;
+    }
+
+    getRemoteStream() {
+        return this.remoteStream;
+    }
+
+    toggleMute() {
+        if (this.localStream) {
+            const audioTrack = this.localStream.getAudioTracks()[0];
+            if (audioTrack) {
+                audioTrack.enabled = !audioTrack.enabled;
+                return !audioTrack.enabled;
+            }
+        }
+        return false;
     }
 }
 

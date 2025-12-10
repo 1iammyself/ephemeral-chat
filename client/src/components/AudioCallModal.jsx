@@ -1,9 +1,10 @@
 /**
  * AudioCallModal Component
  * Displays the audio/video call UI with controls
+ * Re-implemented based on reference implementation
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Phone,
     PhoneOff,
@@ -22,15 +23,12 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
     const [isMuted, setIsMuted] = useState(false);
     const [isSpeakerOn, setIsSpeakerOn] = useState(true);
     const [callDuration, setCallDuration] = useState(0);
-    const [remoteStreamReady, setRemoteStreamReady] = useState(false);
 
     const localAudioRef = useRef(null);
     const remoteAudioRef = useRef(null);
     const localVideoRef = useRef(null);
     const remoteVideoRef = useRef(null);
     const callStartTimeRef = useRef(0);
-    const durationIntervalRef = useRef(null);
-    const streamCheckIntervalRef = useRef(null);
 
     // Subscribe to call state changes
     useEffect(() => {
@@ -40,96 +38,60 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
 
     // Handle call duration timer
     useEffect(() => {
-        if (callState.state === CallState.CONNECTED && callStartTimeRef.current === 0) {
+        if (callState.isConnected && callStartTimeRef.current === 0) {
             callStartTimeRef.current = Date.now();
-            durationIntervalRef.current = setInterval(() => {
+        }
+
+        if (!callState.isCallActive && !callState.isIncomingCall) {
+            callStartTimeRef.current = 0;
+            setCallDuration(0);
+        }
+    }, [callState]);
+
+    useEffect(() => {
+        let interval;
+
+        if (callState.isConnected && callStartTimeRef.current > 0) {
+            interval = setInterval(() => {
                 setCallDuration(Math.floor((Date.now() - callStartTimeRef.current) / 1000));
             }, 1000);
         }
 
-        if (callState.state === CallState.IDLE || callState.state === CallState.ENDED) {
-            callStartTimeRef.current = 0;
-            setCallDuration(0);
-            if (durationIntervalRef.current) {
-                clearInterval(durationIntervalRef.current);
-                durationIntervalRef.current = null;
-            }
-        }
-
         return () => {
-            if (durationIntervalRef.current) {
-                clearInterval(durationIntervalRef.current);
-            }
+            if (interval) clearInterval(interval);
         };
-    }, [callState.state]);
-
-    // Poll for remote stream availability (stream may arrive after state changes)
-    useEffect(() => {
-        if (callState.state === CallState.CONNECTED || callState.state === CallState.CONNECTING) {
-            // Check for stream every 100ms until we get it
-            streamCheckIntervalRef.current = setInterval(() => {
-                const remoteStream = webRTCService.getRemoteStream();
-                if (remoteStream && remoteStream.getAudioTracks().length > 0) {
-                    console.log('🔊 Remote stream available with audio tracks:', remoteStream.getAudioTracks().length);
-                    setRemoteStreamReady(true);
-                    clearInterval(streamCheckIntervalRef.current);
-                }
-            }, 100);
-        }
-
-        return () => {
-            if (streamCheckIntervalRef.current) {
-                clearInterval(streamCheckIntervalRef.current);
-            }
-        };
-    }, [callState.state]);
+    }, [callState.isConnected]);
 
     // Setup audio/video streams
     useEffect(() => {
+        // Setup local audio stream
         const localStream = webRTCService.getLocalStream();
-        const remoteStream = webRTCService.getRemoteStream();
-
-        console.log('🎧 Setting up streams - Local:', !!localStream, 'Remote:', !!remoteStream);
-
-        // Local audio (muted to prevent feedback)
         if (localStream && localAudioRef.current) {
             localAudioRef.current.srcObject = localStream;
-            localAudioRef.current.muted = true;
+            localAudioRef.current.muted = true; // Always mute local audio
         }
 
-        // Local video
+        // Setup local video stream (if video enabled)
         if (localStream && localVideoRef.current) {
             localVideoRef.current.srcObject = localStream;
             localVideoRef.current.muted = true;
         }
 
-        // Remote audio - CRITICAL: ensure we play it
+        // Setup remote audio stream
+        const remoteStream = webRTCService.getRemoteStream();
         if (remoteStream && remoteAudioRef.current) {
-            console.log('🔊 Attaching remote stream to audio element');
             remoteAudioRef.current.srcObject = remoteStream;
-            remoteAudioRef.current.muted = false; // Ensure not muted
-            remoteAudioRef.current.volume = 1.0; // Max volume
-
-            // Try to play - handle autoplay policy
-            const playPromise = remoteAudioRef.current.play();
-            if (playPromise !== undefined) {
-                playPromise
-                    .then(() => console.log('🔊 Remote audio playing successfully'))
-                    .catch(err => {
-                        console.error('🔇 Audio play failed:', err);
-                        // If autoplay was prevented, we'll need user gesture
-                    });
-            }
+            remoteAudioRef.current.play().catch(console.error);
         }
 
-        // Remote video
+        // Setup remote video stream
         if (remoteStream && remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = remoteStream;
             remoteVideoRef.current.play().catch(console.error);
         }
-    }, [callState, remoteStreamReady]);
+    }, [callState]);
 
-    const handleAcceptCall = useCallback(async () => {
+    const handleAcceptCall = async () => {
         if (callState.callId) {
             try {
                 await webRTCService.acceptCall(callState.callId);
@@ -137,31 +99,31 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                 console.error('Failed to accept call:', error);
             }
         }
-    }, [callState.callId]);
+    };
 
-    const handleRejectCall = useCallback(() => {
+    const handleRejectCall = () => {
         if (callState.callId) {
             webRTCService.rejectCall(callState.callId);
         }
         onClose();
-    }, [callState.callId, onClose]);
+    };
 
-    const handleEndCall = useCallback(() => {
+    const handleEndCall = () => {
         webRTCService.endCall();
         onClose();
-    }, [onClose]);
+    };
 
-    const toggleMute = useCallback(() => {
-        const newMuteState = webRTCService.toggleMute();
-        setIsMuted(newMuteState);
-    }, []);
+    const toggleMute = () => {
+        const isNowMuted = webRTCService.toggleMute();
+        setIsMuted(isNowMuted);
+    };
 
-    const toggleSpeaker = useCallback(() => {
+    const toggleSpeaker = () => {
         if (remoteAudioRef.current) {
             remoteAudioRef.current.muted = isSpeakerOn;
             setIsSpeakerOn(!isSpeakerOn);
         }
-    }, [isSpeakerOn]);
+    };
 
     const formatDuration = (seconds) => {
         const mins = Math.floor(seconds / 60);
@@ -170,36 +132,18 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
     };
 
     const getStatusText = () => {
-        switch (callState.state) {
-            case CallState.INCOMING:
-                return 'Incoming call...';
-            case CallState.CALLING:
-                return 'Calling...';
-            case CallState.CONNECTING:
-                return 'Connecting...';
-            case CallState.CONNECTED:
-                return 'Connected';
-            case CallState.ENDED:
-                return 'Call ended';
-            default:
-                return '';
-        }
+        if (callState.isIncomingCall) return 'Incoming call...';
+        if (callState.isCalling) return 'Calling...';
+        if (callState.isConnected) return 'Connected';
+        if (callState.isCallActive) return 'Connecting...';
+        return 'Call ended';
     };
 
     const getStatusColor = () => {
-        switch (callState.state) {
-            case CallState.INCOMING:
-                return 'bg-amber-500';
-            case CallState.CALLING:
-            case CallState.CONNECTING:
-                return 'bg-blue-500';
-            case CallState.CONNECTED:
-                return 'bg-green-500';
-            case CallState.ENDED:
-                return 'bg-gray-500';
-            default:
-                return 'bg-gray-500';
-        }
+        if (callState.isIncomingCall) return 'bg-amber-500';
+        if (callState.isCalling || callState.isCallActive) return 'bg-blue-500';
+        if (callState.isConnected) return 'bg-green-500';
+        return 'bg-gray-500';
     };
 
     if (!isOpen) return null;
@@ -236,7 +180,7 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                     </div>
 
                     {/* Call Duration */}
-                    {callState.state === CallState.CONNECTED && (
+                    {callState.isConnected && (
                         <p className="text-white/80 text-lg font-mono mt-2">
                             {formatDuration(callDuration)}
                         </p>
@@ -244,7 +188,7 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                 </div>
 
                 {/* Video Preview (if video call) */}
-                {callState.isVideoEnabled && callState.state === CallState.CONNECTED && (
+                {callState.isVideoEnabled && callState.isConnected && (
                     <div className="relative bg-gray-900 aspect-video">
                         {/* Remote Video */}
                         <video
@@ -266,7 +210,7 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
 
                 {/* Call Controls */}
                 <div className="px-6 py-6">
-                    {callState.state === CallState.INCOMING ? (
+                    {callState.isIncomingCall ? (
                         // Incoming call controls
                         <div className="flex justify-center space-x-6">
                             <button
