@@ -1,22 +1,28 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { 
-  Send, 
-  Users, 
-  Copy, 
-  ArrowLeft, 
-  Wifi, 
+import {
+  Send,
+  Users,
+  Copy,
+  ArrowLeft,
+  Wifi,
   WifiOff,
   Clock,
   Lock,
   Share2,
-  X
+  X,
+  Phone,
+  PhoneOff,
+  Image as ImageIcon,
+  Loader2
 } from 'lucide-react';
 import InviteLinkModal from './InviteLinkModal';
 import socketManager from '../socket-simple';
 import JoinRoomModal from './JoinRoomModal';
 import MessageList from './MessageList';
 import UserList from './UserList';
+import AudioCallModal from './AudioCallModal';
+import webRTCService, { CallState } from '../webrtc';
 
 const ChatRoom = () => {
   const { roomCode } = useParams();
@@ -35,7 +41,11 @@ const ChatRoom = () => {
   const [error, setError] = useState(null);
   const [inviteToken, setInviteToken] = useState(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showCallModal, setShowCallModal] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [callState, setCallState] = useState({ state: CallState.IDLE });
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Debug logging
   console.log('🏠 ChatRoom render:', {
@@ -53,7 +63,7 @@ const ChatRoom = () => {
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const tokenFromUrl = searchParams.get('token');
-    
+
     // Always prefer the token from location state if available
     if (location.state?.inviteToken) {
       console.log('Got invite token from location state:', location.state.inviteToken);
@@ -80,17 +90,17 @@ const ChatRoom = () => {
   useEffect(() => {
     // Connect to socket
     const socket = socketManager.connect();
-    
+
     // Connection status
     const handleConnect = () => {
       console.log('Socket connected');
       setIsConnected(true);
     };
-    
+
     const handleDisconnect = (reason) => {
       console.log('Socket disconnected:', reason);
       setIsConnected(false);
-      
+
       // Show error message to user
       if (reason === 'io server disconnect') {
         setError('You have been disconnected by the server');
@@ -98,7 +108,7 @@ const ChatRoom = () => {
         setError('Connection lost. Trying to reconnect...');
       }
     };
-    
+
     // Room events
     const handleRoomJoined = (data) => {
       console.log('Room joined:', data);
@@ -114,13 +124,13 @@ const ChatRoom = () => {
       setShowJoinModal(false);
       setError(null);
     };
-    
+
     // Chat events
     const handleNewMessage = (message) => {
       console.log('New message:', message);
       setMessages(prev => [...prev, message]);
     };
-    
+
     const handleUserJoined = ({ nickname, userCount }) => {
       console.log('User joined:', nickname, 'Total users:', userCount);
       setMessages(prev => [...prev, {
@@ -129,7 +139,7 @@ const ChatRoom = () => {
         content: `${nickname} joined the room`,
         timestamp: new Date().toISOString()
       }]);
-      
+
       // Update user count - create a dummy user array with the right length
       setUsers(prev => {
         // If we don't have the actual user data, create placeholder
@@ -141,7 +151,7 @@ const ChatRoom = () => {
         return newUsers.slice(0, userCount);
       });
     };
-    
+
     const handleUserLeft = ({ nickname, userCount }) => {
       console.log('User left:', nickname, 'Remaining users:', userCount);
       setMessages(prev => [...prev, {
@@ -150,22 +160,22 @@ const ChatRoom = () => {
         content: `${nickname} left the room`,
         timestamp: new Date().toISOString()
       }]);
-      
+
       // Update user count
       setUsers(prev => prev.slice(0, userCount));
     };
-    
+
     const handleError = ({ message }) => {
       console.error('Socket error:', message);
       setError(message);
       setTimeout(() => setError(null), 5000);
-      
+
       // If there's an error, ensure join modal is shown
       if (message.includes('Invalid') || message.includes('expired')) {
         setShowJoinModal(true);
       }
     };
-    
+
     // Register event listeners
     socketManager.on('connect', handleConnect);
     socketManager.on('disconnect', handleDisconnect);
@@ -174,7 +184,7 @@ const ChatRoom = () => {
     socketManager.on('user-joined', handleUserJoined);
     socketManager.on('user-left', handleUserLeft);
     socketManager.on('error', handleError);
-    
+
     return () => {
       // Clean up event listeners
       socketManager.off('connect', handleConnect);
@@ -184,7 +194,7 @@ const ChatRoom = () => {
       socketManager.off('user-joined', handleUserJoined);
       socketManager.off('user-left', handleUserLeft);
       socketManager.off('error', handleError);
-      
+
       // Only disconnect if we're not in development with hot reload
       if (process.env.NODE_ENV !== 'development') {
         socketManager.disconnect();
@@ -202,16 +212,16 @@ const ChatRoom = () => {
       setError('Please enter a nickname');
       return;
     }
-    
+
     // If we're already joining or joined, don't proceed
     if (isProcessingInvite || isJoined) {
       console.log('Already joining/joined, skipping duplicate join attempt');
       return;
     }
-    
+
     setIsProcessingInvite(true);
     setError(null);
-    
+
     // Set a timeout to handle cases where the server doesn't respond
     const joinTimeout = setTimeout(() => {
       if (!isJoined) {
@@ -220,7 +230,7 @@ const ChatRoom = () => {
         setIsProcessingInvite(false);
       }
     }, 10000); // 10 second timeout
-    
+
     try {
       console.log(`Joining room ${roomCode} with nickname ${nickname}`, {
         hasToken: !!inviteToken,
@@ -228,7 +238,7 @@ const ChatRoom = () => {
         hasPassword: !!password,
         hasCaptcha: !!captchaAnswer
       });
-      
+
       // Emit join-room event with the invite token if available
       const joinData = {
         roomCode,
@@ -237,28 +247,28 @@ const ChatRoom = () => {
         captchaAnswer: captchaAnswer.trim(),
         captchaProblem: captchaProblem
       };
-      
+
       // Only include inviteToken if it exists
       if (inviteToken) {
         joinData.inviteToken = inviteToken;
       }
-      
+
       socketManager.emit('join-room', joinData, (response) => {
         console.log('Join room response:', response);
-        
+
         // Clear timeout immediately on any response
         clearTimeout(joinTimeout);
-        
+
         if (!response) {
           setError('No response from server');
           setIsProcessingInvite(false);
           return;
         }
-        
+
         // Handle redirect response
         if (response.redirect) {
           console.log(`Redirecting to room ${response.roomCode}`, response);
-          
+
           // If password is required, show the join modal for the new room
           if (response.requiresPassword) {
             setShowJoinModal(true);
@@ -282,14 +292,14 @@ const ChatRoom = () => {
           }
           return;
         }
-        
+
         // Handle success response
         if (response.success) {
           console.log('Successfully joined room, updating UI');
           console.log('Room data:', response.room);
           console.log('Messages:', response.messages);
           console.log('Users:', response.room?.users);
-          
+
           setRoom(response.room);
           setMessages(response.messages || []);
           setUsers(response.room?.users || []);
@@ -302,18 +312,18 @@ const ChatRoom = () => {
           setShowJoinModal(false);
           setError(null);
           setIsProcessingInvite(false);
-          
+
           console.log('State updated: isJoined=true, showJoinModal=false');
           return;
         }
-        
+
         // Handle error response
         if (!response.success) {
           setError(response.error || 'Failed to join room');
           setIsProcessingInvite(false);
         }
       });
-      
+
     } catch (err) {
       console.error('Error joining room:', err);
       setError('Failed to join room. Please try again.');
@@ -324,17 +334,17 @@ const ChatRoom = () => {
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || isSending || !isConnected) return;
-    
+
     setIsSending(true);
-    
+
     try {
       socketManager.emit('send-message', {
         content: newMessage.trim()
       });
-      
+
       // Notify server of user activity to reset inactivity timer
       socketManager.emit('user-activity');
-      
+
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
@@ -344,6 +354,94 @@ const ChatRoom = () => {
     }
   };
 
+  // Handle image upload for view-once images
+  const handleImageUpload = useCallback(async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file');
+      return;
+    }
+
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be smaller than 5MB');
+      return;
+    }
+
+    setIsUploading(true);
+    setError(null);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const imageData = e.target.result;
+
+        // Send image as view-once message
+        socketManager.emit('send-message', {
+          messageType: 'image',
+          imageData,
+          isViewOnce: true
+        });
+
+        setIsUploading(false);
+        // Reset file input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      };
+      reader.onerror = () => {
+        setError('Failed to read image file');
+        setIsUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Error uploading image:', err);
+      setError('Failed to upload image');
+      setIsUploading(false);
+    }
+  }, []);
+
+  // Handle starting a call
+  const handleStartCall = useCallback(async () => {
+    if (users.length < 2) {
+      setError('Need at least 2 users to start a call');
+      return;
+    }
+
+    // Find another user to call
+    const otherUser = users.find(u =>
+      u.socketId !== currentUser?.id && u.id !== currentUser?.id
+    );
+
+    if (otherUser) {
+      try {
+        await webRTCService.startCall(roomCode, otherUser.nickname);
+        setShowCallModal(true);
+      } catch (err) {
+        console.error('Failed to start call:', err);
+        setError('Failed to start call. Please check microphone permissions.');
+      }
+    }
+  }, [users, currentUser, roomCode]);
+
+  // Listen for incoming calls
+  useEffect(() => {
+    const unsubscribe = webRTCService.onCallStateChange((state) => {
+      setCallState(state);
+      if (state.state === CallState.INCOMING) {
+        setShowCallModal(true);
+      }
+      if (state.state === CallState.IDLE && showCallModal) {
+        // Keep modal open briefly to show 'Call ended'
+        setTimeout(() => setShowCallModal(false), 1000);
+      }
+    });
+    return unsubscribe;
+  }, [showCallModal]);
+
   const copyRoomCode = () => {
     navigator.clipboard.writeText(roomCode);
     // Could add a toast notification here
@@ -351,7 +449,7 @@ const ChatRoom = () => {
 
   const getTTLDisplay = () => {
     if (!room?.settings?.messageTTL) return null;
-    
+
     const ttl = room.settings.messageTTL;
     if (ttl < 60) return `${ttl}s`;
     if (ttl < 3600) return `${Math.floor(ttl / 60)}m`;
@@ -393,7 +491,7 @@ const ChatRoom = () => {
   if (showInviteModal) {
     console.log('Rendering InviteLinkModal');
     return (
-      <InviteLinkModal 
+      <InviteLinkModal
         isOpen={showInviteModal}
         onClose={() => setShowInviteModal(false)}
         roomCode={roomCode}
@@ -414,7 +512,7 @@ const ChatRoom = () => {
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
-            
+
             <div className="min-w-0 flex-1">
               <div className="flex items-center space-x-2">
                 <h1 className="text-base sm:text-lg font-semibold truncate">Room {roomCode}</h1>
@@ -425,15 +523,8 @@ const ChatRoom = () => {
                 >
                   <Copy className="w-4 h-4 text-gray-500" />
                 </button>
-                <button
-                  onClick={() => setShowInviteModal(true)}
-                  className="ml-1 sm:ml-2 p-1 text-blue-500 hover:bg-blue-50 rounded transition-colors min-h-[32px] min-w-[32px]"
-                  title="Invite people"
-                >
-                  <Share2 className="w-4 h-4" />
-                </button>
               </div>
-              
+
               <div className="flex items-center space-x-3 sm:space-x-4 text-xs sm:text-sm text-gray-600 mt-1">
                 <div className="flex items-center space-x-1">
                   {isConnected ? (
@@ -444,12 +535,12 @@ const ChatRoom = () => {
                   <span className="hidden sm:inline">{isConnected ? 'Connected' : 'Disconnected'}</span>
                   <span className="sm:hidden">{isConnected ? 'Online' : 'Offline'}</span>
                 </div>
-                
+
                 <div className="flex items-center space-x-1">
                   <Users className="w-3 h-3 sm:w-4 sm:h-4" />
                   <span>{users.length}</span>
                 </div>
-                
+
                 {room?.settings?.passwordHash && (
                   <div className="flex items-center space-x-1">
                     <Lock className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -457,7 +548,7 @@ const ChatRoom = () => {
                     <span className="sm:hidden">Locked</span>
                   </div>
                 )}
-                
+
                 {getTTLDisplay() && (
                   <div className="flex items-center space-x-1">
                     <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -484,8 +575,8 @@ const ChatRoom = () => {
         <div className="flex-1 flex flex-col">
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-3 sm:p-4">
-            <MessageList 
-              messages={messages} 
+            <MessageList
+              messages={messages}
               currentUser={currentUser}
               messageTTL={room?.settings?.messageTTL}
             />
@@ -494,7 +585,44 @@ const ChatRoom = () => {
 
           {/* Message Input */}
           <div className="border-t border-gray-200 p-3 sm:p-4 bg-white">
-            <form onSubmit={handleSendMessage} className="flex space-x-2 sm:space-x-3">
+            <form onSubmit={handleSendMessage} className="flex items-center space-x-2 sm:space-x-3">
+              {/* Hidden file input for image upload */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+                id="image-upload"
+              />
+
+              {/* Image upload button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!isConnected || isUploading}
+                className="p-2 sm:p-3 min-h-[44px] min-w-[44px] rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                title="Send view-once image"
+              >
+                {isUploading ? (
+                  <Loader2 className="w-5 h-5 text-gray-500 animate-spin" />
+                ) : (
+                  <ImageIcon className="w-5 h-5 text-gray-500" />
+                )}
+              </button>
+
+              {/* Call button */}
+              <button
+                type="button"
+                onClick={handleStartCall}
+                disabled={!isConnected || users.length < 2}
+                className="p-2 sm:p-3 min-h-[44px] min-w-[44px] rounded-lg hover:bg-green-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                title="Start audio call"
+              >
+                <Phone className="w-5 h-5 text-green-500" />
+              </button>
+
+              {/* Text input */}
               <input
                 type="text"
                 value={newMessage}
@@ -504,6 +632,8 @@ const ChatRoom = () => {
                 disabled={!isConnected || isSending}
                 maxLength={500}
               />
+
+              {/* Send button */}
               <button
                 type="submit"
                 disabled={!newMessage.trim() || !isConnected || isSending}
@@ -520,6 +650,15 @@ const ChatRoom = () => {
           <UserList users={users} currentUser={currentUser} />
         </div>
       </div>
+
+      {/* Audio Call Modal */}
+      {showCallModal && (
+        <AudioCallModal
+          isOpen={showCallModal}
+          onClose={() => setShowCallModal(false)}
+          roomCode={roomCode}
+        />
+      )}
     </div>
   );
 };

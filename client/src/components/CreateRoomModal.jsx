@@ -22,7 +22,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   });
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
   const navigate = useNavigate();
-  
+
 
   const ttlOptions = [
     { value: 'none', label: 'Never (Default)', description: 'Messages stay until room expires' },
@@ -56,9 +56,9 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: password || undefined }),
       });
-      
+
       const data = await response.json();
-      
+
       if (response.ok && data.inviteLink) {
         setInviteLink(data.inviteLink);
         return data.inviteLink;
@@ -102,13 +102,13 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
       });
 
       const data = await response.json();
-      
+
       if (response.ok && data.roomCode) {
         setCreatedRoom({
           roomCode: data.roomCode,
           password: settings.password.trim() || ''
         });
-        
+
         // Generate invite link automatically
         await generateInviteLink(data.roomCode, settings.password.trim() || undefined);
       } else {
@@ -162,7 +162,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
             <h2 className="text-2xl font-bold mb-4 text-green-600">
               Room Created Successfully!
             </h2>
-            
+
             <div className="space-y-4 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Room Code</label>
@@ -181,7 +181,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                   </button>
                 </div>
               </div>
-              
+
               {createdRoom.password && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
@@ -201,7 +201,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                   </div>
                 </div>
               )}
-              
+
               <div className="pt-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Invite Link (Expires in 5 min)</label>
                 <div className="flex items-center">
@@ -222,7 +222,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 <p className="mt-1 text-xs text-gray-500">Share this link with others to join easily</p>
               </div>
             </div>
-            
+
             <div className="flex justify-between pt-2">
               <button
                 onClick={handleNewRoom}
@@ -276,11 +276,10 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 {ttlOptions.map((option) => (
                   <label
                     key={option.value}
-                    className={`flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 rounded-lg border cursor-pointer transition-colors ${
-                      settings.messageTTL === option.value
+                    className={`flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 rounded-lg border cursor-pointer transition-colors ${settings.messageTTL === option.value
                         ? 'border-primary-500 bg-primary-50'
                         : 'border-gray-200 hover:bg-gray-50'
-                    }`}
+                      }`}
                   >
                     <input
                       type="radio"
@@ -330,7 +329,30 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 Set the maximum number of people who can join this room (1-200)
               </p>
               <div className="px-2 sm:px-3">
-                <div className="flex items-center space-x-3 sm:space-x-4 mb-2">
+                {/* +/- buttons with current value */}
+                <div className="flex items-center justify-center space-x-3 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setSettings(prev => ({ ...prev, maxUsers: Math.max(1, prev.maxUsers - 1) }))}
+                    disabled={settings.maxUsers <= 1}
+                    className="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-300 rounded-full text-xl font-bold transition-colors"
+                  >
+                    −
+                  </button>
+                  <span className="text-xl sm:text-2xl font-bold text-blue-600 w-16 text-center">
+                    {settings.maxUsers}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSettings(prev => ({ ...prev, maxUsers: Math.min(200, prev.maxUsers + 1) }))}
+                    disabled={settings.maxUsers >= 200}
+                    className="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-300 rounded-full text-xl font-bold transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
+                {/* Slider */}
+                <div className="flex items-center space-x-3 sm:space-x-4">
                   <span className="text-xs sm:text-sm text-gray-600">1</span>
                   <input
                     type="range"
@@ -345,9 +367,6 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                     className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                   />
                   <span className="text-xs sm:text-sm text-gray-600">200</span>
-                </div>
-                <div className="text-center">
-                  <span className="text-base sm:text-lg font-semibold text-blue-600">{settings.maxUsers} users</span>
                 </div>
               </div>
             </div>

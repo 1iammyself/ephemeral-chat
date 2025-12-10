@@ -16,10 +16,11 @@ class RoomManager {
     this.INVITE_TOKEN_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes expiry for invite tokens
     this.ROOM_DEFAULT_LIFETIME_MS = 2 * 60 * 60 * 1000; // 2 hours default room lifetime
     this.ROOM_DEFAULT_LIFETIME_MINUTES = 120; // 2 hours in minutes
-    
+
     // In-memory storage for invite tokens
     this.inviteTokens = new Map(); // token -> { roomCode, timeoutId, isPermanent: boolean }
     this.roomToTokens = new Map(); // roomCode -> Set of tokens (for cleanup)
+    this._io = null; // socket.io reference for broadcasts
   }
 
   /**
@@ -42,7 +43,7 @@ class RoomManager {
     } while (await this.roomExists(roomCode));
 
     const lifetimeMinutes = settings.lifetimeMinutes || this.ROOM_DEFAULT_LIFETIME_MINUTES;
-    
+
     const room = {
       id: roomCode,
       createdAt: new Date().toISOString(),
@@ -146,7 +147,7 @@ class RoomManager {
 
       // Sanitize nickname
       const sanitizedNickname = sanitizeInput(nickname);
-      
+
       // Check if user is already in the room with this socket
       const existingUserIndex = room.users.findIndex(u => u.socketId === socketId);
       if (existingUserIndex !== -1) {
@@ -166,13 +167,13 @@ class RoomManager {
       // Check if room is invite-only or if an invite token is provided
       if (room.settings.isInviteOnly || inviteToken) {
         console.log(`Room ${roomCode} is ${room.settings.isInviteOnly ? 'invite-only' : 'public'}, validating token...`);
-        
+
         if (!inviteToken) {
           console.error('No invite token provided but one is required');
-          return { 
-            success: false, 
-            error: room.settings.isInviteOnly 
-              ? 'This is an invite-only room. An invite token is required to join.' 
+          return {
+            success: false,
+            error: room.settings.isInviteOnly
+              ? 'This is an invite-only room. An invite token is required to join.'
               : 'An invite token is required to join this room.'
           };
         }
@@ -180,24 +181,24 @@ class RoomManager {
         // Validate the invite token (don't consume it yet)
         const tokenValid = await this.validateInviteToken(inviteToken, roomCode, false);
         console.log('Token validation result:', tokenValid);
-        
+
         if (!tokenValid.valid) {
           console.error('Invalid or expired token for room', roomCode);
-          return { 
-            success: false, 
-            error: tokenValid.error || 'Invalid or expired invite token' 
+          return {
+            success: false,
+            error: tokenValid.error || 'Invalid or expired invite token'
           };
         }
-        
+
         console.log(`Token validated successfully for room ${roomCode}`);
-        
+
         // If token is valid but room code doesn't match, update the room code
         if (tokenValid.roomCode && tokenValid.roomCode !== roomCode) {
           console.log(`Redirecting to room ${tokenValid.roomCode} based on token`);
           const targetRoom = await this.getRoom(tokenValid.roomCode);
           if (targetRoom) {
-            return { 
-              success: false, 
+            return {
+              success: false,
               error: 'Invalid room',
               redirectRoomCode: tokenValid.roomCode,
               requiresPassword: !!targetRoom.settings.passwordHash
@@ -252,7 +253,7 @@ class RoomManager {
     if (!room) return;
 
     room.users = room.users.filter(user => user.socketId !== socketId);
-    
+
     if (room.users.length === 0) {
       await this.deleteRoom(roomCode);
     } else {
@@ -269,7 +270,10 @@ class RoomManager {
     const room = await this.getRoom(roomCode);
     if (!room) return;
 
-    message.content = sanitizeInput(message.content);
+    // Only sanitize text messages, not image data (which contains base64)
+    if (message.messageType !== 'image') {
+      message.content = sanitizeInput(message.content);
+    }
     message.timestamp = new Date().toISOString();
 
     // Handle message TTL with Redis
@@ -297,18 +301,56 @@ class RoomManager {
       // Get messages from Redis with TTL
       const messageKeys = await this.redis.keys(`message:${roomCode}:*`);
       const messages = [];
-      
+
       for (const key of messageKeys) {
         const messageData = await this.redis.get(key);
         if (messageData) {
           messages.push(JSON.parse(messageData));
         }
       }
-      
+
       return messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     }
 
     return room.messages || [];
+  }
+
+  /**
+   * Get a message by id across all rooms
+   */
+  getMessageById(messageId) {
+    for (const [roomCode, room] of this.rooms.entries()) {
+      const msg = (room.messages || []).find(m => m.id === messageId);
+      if (msg) return { roomCode, message: msg };
+    }
+    return null;
+  }
+
+  /**
+   * Mark a message as viewed (immediate) and remove stored media path if any
+   */
+  async markMessageViewed(messageId) {
+    for (const [roomCode, room] of this.rooms.entries()) {
+      const idx = (room.messages || []).findIndex(m => m.id === messageId);
+      if (idx >= 0) {
+        const msg = room.messages[idx];
+        msg.hasBeenViewed = true;
+        // Remove any direct storage references to prevent further access
+        if (msg.storagePath) {
+          try { require('fs').unlinkSync(msg.storagePath); } catch (e) { /* ignore */ }
+          msg.storagePath = null;
+        }
+        await this.saveRoom(roomCode, room);
+        // Broadcast via socket.io if available
+        if (this._io) this._io.to(roomCode).emit('message-viewed', { messageId });
+        return true;
+      }
+    }
+    return false;
+  }
+
+  setIo(io) {
+    this._io = io;
   }
 
   /**
@@ -318,16 +360,16 @@ class RoomManager {
    */
   setRoomExpiry(roomCode, lifetimeMs) {
     this.clearRoomTimer(roomCode);
-    
+
     const expiryTime = lifetimeMs || this.ROOM_DEFAULT_LIFETIME_MS;
-    
+
     const timer = setTimeout(async () => {
       console.log(`Room ${roomCode} has expired after ${expiryTime / (60 * 1000)} minutes`);
       await this.deleteRoom(roomCode);
     }, expiryTime);
-    
+
     this.roomTimers.set(roomCode, timer);
-    
+
     // Log expiration time for debugging
     const expiryDate = new Date(Date.now() + expiryTime);
     console.log(`Room ${roomCode} will expire at: ${expiryDate.toISOString()}`);
@@ -359,13 +401,13 @@ class RoomManager {
    */
   async deleteRoom(roomCode) {
     console.log(`Deleting room ${roomCode} and cleaning up resources`);
-    
+
     // Clear any timers
     if (this.roomTimers.has(roomCode)) {
       clearTimeout(this.roomTimers.get(roomCode));
       this.roomTimers.delete(roomCode);
     }
-    
+
     // Clean up any invite tokens for this room
     if (this.roomToTokens.has(roomCode)) {
       const tokens = this.roomToTokens.get(roomCode);
@@ -374,7 +416,7 @@ class RoomManager {
       }
       this.roomToTokens.delete(roomCode);
     }
-    
+
     // Delete from storage
     if (this.redis) {
       await this.redis.del(`room:${roomCode}`);
@@ -405,14 +447,14 @@ class RoomManager {
     if (!room) {
       throw new Error('Room not found');
     }
-    
+
     // Generate a secure random token
     const token = this.generateSecureToken();
-    
+
     // Calculate expiration time
     const expiryMs = customExpiryMs || this.INVITE_TOKEN_EXPIRY_MS;
     const expiresAt = isPermanent ? null : new Date(Date.now() + expiryMs);
-    
+
     // Create token data
     const tokenData = {
       roomCode,
@@ -422,16 +464,16 @@ class RoomManager {
       uses: 0,
       maxUses: isPermanent ? null : 1 // One-time use for non-permanent tokens
     };
-    
+
     // Store the token
     this.inviteTokens.set(token, tokenData);
-    
+
     // Add to room's token set for cleanup
     if (!this.roomToTokens.has(roomCode)) {
       this.roomToTokens.set(roomCode, new Set());
     }
     this.roomToTokens.get(roomCode).add(token);
-    
+
     // Set up cleanup for non-permanent tokens
     if (!isPermanent) {
       tokenData.timeoutId = setTimeout(() => {
@@ -439,7 +481,7 @@ class RoomManager {
         this.cleanupToken(token);
       }, expiryMs);
     }
-    
+
     console.log(`Generated ${isPermanent ? 'permanent' : 'temporary'} token for room ${roomCode}`);
     console.log('All tokens:', Array.from(this.inviteTokens.entries()).map(([t, d]) => ({
       token: t.substring(0, 8) + '...',
@@ -450,7 +492,7 @@ class RoomManager {
 
     return token;
   }
-  
+
   /**
    * Generate a shareable invite link
    * @param {string} roomCode - The room code to generate an invite for
@@ -468,7 +510,7 @@ class RoomManager {
     if (process.env.NODE_ENV === 'production') {
       // In production, prefer BASE_URL, fallback to Render's external hostname
       baseUrl = process.env.BASE_URL ||
-                (process.env.RENDER_EXTERNAL_HOSTNAME ? `https://${process.env.RENDER_EXTERNAL_HOSTNAME}` : null);
+        (process.env.RENDER_EXTERNAL_HOSTNAME ? `https://${process.env.RENDER_EXTERNAL_HOSTNAME}` : null);
     } else {
       // In development, use localhost
       baseUrl = 'http://localhost:5173';
@@ -496,15 +538,15 @@ class RoomManager {
   cleanupToken(token) {
     const tokenData = this.inviteTokens.get(token);
     if (!tokenData) return;
-    
+
     // Clear the timeout if it exists
     if (tokenData.timeoutId) {
       clearTimeout(tokenData.timeoutId);
     }
-    
+
     // Remove the token from the main map
     this.inviteTokens.delete(token);
-    
+
     // Remove the token from the room's token set
     if (tokenData.roomCode) {
       const tokens = this.roomToTokens.get(tokenData.roomCode);
@@ -515,7 +557,7 @@ class RoomManager {
         }
       }
     }
-    
+
     console.log(`Cleaned up token: ${token}`);
   }
 
@@ -528,38 +570,38 @@ class RoomManager {
    */
   async validateInviteToken(token, roomCode = null, consumeToken = false) {
     console.log(`Validating token: ${token} for room: ${roomCode || 'any'}, consume: ${consumeToken}`);
-    
+
     // Basic token validation
     if (!token || typeof token !== 'string' || token.length < 16) {
       console.log('Invalid token format');
       return { valid: false, error: 'Invalid token format' };
     }
-    
+
     const tokenData = this.inviteTokens.get(token);
-    
+
     // Check if token exists
     if (!tokenData) {
       console.log(`Token ${token} not found`);
       return { valid: false, error: 'Invalid or expired token' };
     }
-    
+
     // Check if token is expired
     if (tokenData.expiresAt && new Date() > new Date(tokenData.expiresAt)) {
       console.log(`Token ${token} has expired`);
       this.cleanupToken(token);
       return { valid: false, error: 'Token has expired' };
     }
-    
+
     // If roomCode is provided, verify it matches the token's room
     if (roomCode && tokenData.roomCode !== roomCode) {
       console.log(`Token ${token} is for room ${tokenData.roomCode}, but was used for room ${roomCode}`);
-      return { 
-        valid: false, 
+      return {
+        valid: false,
         error: 'This invite is for a different room',
         roomCode: tokenData.roomCode
       };
     }
-    
+
     // Verify the room still exists
     const room = await this.getRoom(tokenData.roomCode);
     if (!room) {
@@ -575,7 +617,7 @@ class RoomManager {
       }
       return { valid: false, error: 'The room no longer exists' };
     }
-    
+
     // If this is a one-time token and we're consuming it, invalidate it after use
     if (!tokenData.isPermanent && consumeToken) {
       console.log('Consuming one-time token after successful join');
@@ -588,14 +630,14 @@ class RoomManager {
         }
       }
     }
-    
+
     console.log(`Token validation successful for room ${tokenData.roomCode}`);
-    return { 
+    return {
       valid: true,
       roomCode: tokenData.roomCode,
       isPermanent: tokenData.isPermanent,
       room, // Include full room data for reference
-      error: null 
+      error: null
     };
   }
 
@@ -605,7 +647,7 @@ class RoomManager {
    */
   cleanupInviteTokens(roomCode) {
     const tokens = this.roomToTokens.get(roomCode) || new Set();
-    
+
     for (const token of tokens) {
       const tokenData = this.inviteTokens.get(token);
       if (tokenData) {
@@ -613,7 +655,7 @@ class RoomManager {
         this.inviteTokens.delete(token);
       }
     }
-    
+
     this.roomToTokens.delete(roomCode);
   }
 
@@ -624,13 +666,13 @@ class RoomManager {
   async deleteRoom(roomCode) {
     // Clean up invite tokens first
     this.cleanupInviteTokens(roomCode);
-    
+
     // Clear any room expiry timer
     if (this.roomTimers.has(roomCode)) {
       clearTimeout(this.roomTimers.get(roomCode));
       this.roomTimers.delete(roomCode);
     }
-    
+
     // Delete from storage
     if (this.redis) {
       await this.redis.del(`room:${roomCode}`);

@@ -1,8 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { Clock, User } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Clock, User, Eye, Lock, Image as ImageIcon } from 'lucide-react';
+import ImageViewer from './ImageViewer';
+import socketManager from '../socket-simple';
 
 const MessageList = ({ messages, currentUser, messageTTL }) => {
   const [messageTimers, setMessageTimers] = useState(new Map());
+  const [viewingImage, setViewingImage] = useState(null);
+  const [currentImageUrl, setCurrentImageUrl] = useState(null); // Save image URL separately
+  const [viewedMessages, setViewedMessages] = useState(new Set());
+
+  // Listen for message-viewed events from server
+  useEffect(() => {
+    const handleMessageViewed = ({ messageId }) => {
+      setViewedMessages(prev => new Set([...prev, messageId]));
+    };
+
+    socketManager.on('message-viewed', handleMessageViewed);
+
+    return () => {
+      socketManager.off('message-viewed', handleMessageViewed);
+    };
+  }, []);
 
   useEffect(() => {
     // Set up timers for messages with TTL
@@ -12,7 +30,7 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
           const messageTime = new Date(message.timestamp).getTime();
           const expiryTime = messageTime + (messageTTL * 1000);
           const timeLeft = expiryTime - Date.now();
-          
+
           if (timeLeft > 0) {
             const timer = setTimeout(() => {
               setMessageTimers(prev => {
@@ -21,7 +39,7 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
                 return newMap;
               });
             }, timeLeft);
-            
+
             setMessageTimers(prev => {
               const newMap = new Map(prev);
               newMap.set(message.id, timer);
@@ -55,13 +73,13 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
 
   const getTimeLeft = (message) => {
     if (!messageTTL || messageTTL === 0 || message.type === 'system') return null;
-    
+
     const messageTime = new Date(message.timestamp).getTime();
     const expiryTime = messageTime + (messageTTL * 1000);
     const timeLeft = Math.max(0, expiryTime - Date.now());
-    
+
     if (timeLeft === 0) return null;
-    
+
     if (timeLeft < 60000) {
       return `${Math.ceil(timeLeft / 1000)}s`;
     } else {
@@ -72,6 +90,36 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
   const isMessageExpired = (message) => {
     return messageTimers.get(message.id) === 'expired';
   };
+
+  const isMessageViewed = useCallback((message) => {
+    return message.hasBeenViewed || viewedMessages.has(message.id);
+  }, [viewedMessages]);
+
+  const handleImageClick = useCallback((message) => {
+    // Don't allow viewing if already viewed
+    if (isMessageViewed(message)) {
+      return;
+    }
+
+    // IMPORTANT: Save the image URL FIRST before any state changes
+    const imageUrl = message.content;
+    console.log('Opening image viewer with URL length:', imageUrl?.length);
+
+    // Save both the message reference and the actual image URL
+    setViewingImage(message);
+    setCurrentImageUrl(imageUrl);
+
+    // Emit message-viewed event to server
+    socketManager.emit('message-viewed', { messageId: message.id });
+
+    // Mark as viewed locally
+    setViewedMessages(prev => new Set([...prev, message.id]));
+  }, [isMessageViewed]);
+
+  const handleViewerClose = useCallback(() => {
+    setViewingImage(null);
+    setCurrentImageUrl(null);
+  }, []);
 
   if (messages.length === 0) {
     return (
@@ -86,73 +134,157 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
   }
 
   return (
-    <div className="space-y-4">
-      {messages.map((message) => {
-        if (message.type === 'system') {
-          return (
-            <div key={message.id} className="text-center">
-              <div className="inline-block bg-gray-100 text-gray-600 text-sm px-3 py-1 rounded-full">
-                {message.content}
+    <>
+      <div className="space-y-4">
+        {messages.map((message) => {
+          if (message.type === 'system') {
+            return (
+              <div key={message.id} className="text-center">
+                <div className="inline-block bg-gray-100 text-gray-600 text-sm px-3 py-1 rounded-full">
+                  {message.content}
+                </div>
               </div>
-            </div>
+            );
+          }
+
+          const isOwnMessage = currentUser && (
+            message.sender.socketId === currentUser.socketId ||
+            message.sender.socketId === currentUser.id
           );
-        }
+          const isExpired = isMessageExpired(message);
+          const timeLeft = getTimeLeft(message);
+          const isImage = message.messageType === 'image';
+          const isViewOnce = message.isViewOnce;
+          const hasBeenViewed = isMessageViewed(message);
 
-        const isOwnMessage = currentUser && message.sender.socketId === currentUser.socketId;
-        const isExpired = isMessageExpired(message);
-        const timeLeft = getTimeLeft(message);
-
-        if (isExpired) {
-          return (
-            <div key={message.id} className="text-center">
-              <div className="inline-block bg-gray-100 text-gray-500 text-xs px-3 py-1 rounded-full italic">
-                Message expired
+          if (isExpired) {
+            return (
+              <div key={message.id} className="text-center">
+                <div className="inline-block bg-gray-100 text-gray-500 text-xs px-3 py-1 rounded-full italic">
+                  Message expired
+                </div>
               </div>
-            </div>
-          );
-        }
+            );
+          }
 
-        return (
-          <div
-            key={message.id}
-            className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
-          >
+          // View-once image that has been viewed
+          if (isImage && isViewOnce && hasBeenViewed) {
+            return (
+              <div
+                key={message.id}
+                className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${isOwnMessage
+                    ? 'bg-gray-300 text-gray-600'
+                    : 'bg-gray-100 border border-gray-200 text-gray-600'
+                    }`}
+                >
+                  {!isOwnMessage && (
+                    <div className="text-xs font-medium text-gray-500 mb-1">
+                      {message.sender.nickname}
+                    </div>
+                  )}
+                  <div className="flex items-center space-x-2 text-sm italic">
+                    <Eye className="w-4 h-4" />
+                    <span>This image has been viewed and deleted</span>
+                  </div>
+                  <div className={`flex items-center justify-between mt-2 text-xs text-gray-500`}>
+                    <span>{formatTime(message.timestamp)}</span>
+                    <div className="flex items-center space-x-1">
+                      <Lock className="w-3 h-3 text-green-500" />
+                      <span>View once</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          return (
             <div
-              className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                isOwnMessage
+              key={message.id}
+              className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${isOwnMessage
                   ? 'bg-primary-600 text-white'
                   : 'bg-white border border-gray-200'
-              }`}
-            >
-              {/* Sender name (only for others' messages) */}
-              {!isOwnMessage && (
-                <div className="text-xs font-medium text-gray-600 mb-1">
-                  {message.sender.nickname}
-                </div>
-              )}
-              
-              {/* Message content */}
-              <div className="break-words">
-                {message.content}
-              </div>
-              
-              {/* Timestamp and TTL */}
-              <div className={`flex items-center justify-between mt-2 text-xs ${
-                isOwnMessage ? 'text-primary-100' : 'text-gray-500'
-              }`}>
-                <span>{formatTime(message.timestamp)}</span>
-                {timeLeft && (
-                  <div className="flex items-center space-x-1">
-                    <Clock className="w-3 h-3" />
-                    <span>{timeLeft}</span>
+                  }`}
+              >
+                {/* Sender name (only for others' messages) */}
+                {!isOwnMessage && (
+                  <div className="text-xs font-medium text-gray-600 mb-1">
+                    {message.sender.nickname}
                   </div>
                 )}
+
+                {/* Message content */}
+                <div className="break-words">
+                  {isImage ? (
+                    // Image message
+                    <div
+                      className={`relative cursor-pointer ${isViewOnce && !hasBeenViewed ? 'group' : ''}`}
+                      onClick={() => isViewOnce && !hasBeenViewed && handleImageClick(message)}
+                    >
+                      {isViewOnce && !hasBeenViewed ? (
+                        // View-once image placeholder
+                        <div className="w-48 h-32 bg-gray-200 dark:bg-gray-700 rounded-lg flex flex-col items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                          <div className="w-12 h-12 bg-amber-500/20 rounded-full flex items-center justify-center mb-2 group-hover:animate-pulse">
+                            <Eye className="w-6 h-6 text-amber-500" />
+                          </div>
+                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Tap to view</p>
+                          <p className="text-xs text-gray-500">Disappears after viewing</p>
+                        </div>
+                      ) : (
+                        // Regular image preview
+                        <img
+                          src={message.content}
+                          alt="Shared image"
+                          className="max-w-48 max-h-32 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => setViewingImage(message)}
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    // Text message
+                    message.content
+                  )}
+                </div>
+
+                {/* Timestamp, TTL, and view-once indicator */}
+                <div className={`flex items-center justify-between mt-2 text-xs ${isOwnMessage ? 'text-primary-100' : 'text-gray-500'
+                  }`}>
+                  <span>{formatTime(message.timestamp)}</span>
+                  <div className="flex items-center space-x-2">
+                    {isViewOnce && (
+                      <div className="flex items-center space-x-1">
+                        <Clock className="w-3 h-3 text-amber-500" />
+                        <span className="text-amber-500">View once</span>
+                      </div>
+                    )}
+                    {timeLeft && (
+                      <div className="flex items-center space-x-1">
+                        <Clock className="w-3 h-3" />
+                        <span>{timeLeft}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+
+      {/* Image Viewer Modal */}
+      <ImageViewer
+        isOpen={!!viewingImage}
+        onClose={handleViewerClose}
+        imageUrl={currentImageUrl}
+        duration={20}
+      />
+    </>
   );
 };
 

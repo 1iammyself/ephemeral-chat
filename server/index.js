@@ -14,10 +14,10 @@ const { createClient } = require('redis');
 const RoomManager = require('./rooms');
 const SecurityManager = require('./security');
 const authUtils = require('./auth-utils');
-const { 
-  generateRandomNickname, 
-  sanitizeInput, 
-  isValidRoomCode, 
+const {
+  generateRandomNickname,
+  sanitizeInput,
+  isValidRoomCode,
   isValidNickname,
   getTTLOptions,
   generateInviteLink,
@@ -170,10 +170,10 @@ async function initializeRedis() {
     console.log('⚠️  Redis connection failed, using in-memory storage:', error.message);
     redisClient = null;
   }
-  
+
   roomManager = new RoomManager(redisClient);
   securityManager = new SecurityManager();
-  
+
   // Periodic cleanup for security manager
   setInterval(() => {
     securityManager.cleanup();
@@ -184,15 +184,15 @@ async function initializeRedis() {
 function checkRateLimit(socketId, maxMessages = 30, windowMs = 60000) {
   const now = Date.now();
   const userLimits = rateLimits.get(socketId) || { count: 0, resetTime: now + windowMs };
-  
+
   if (now > userLimits.resetTime) {
     userLimits.count = 0;
     userLimits.resetTime = now + windowMs;
   }
-  
+
   userLimits.count++;
   rateLimits.set(socketId, userLimits);
-  
+
   return userLimits.count <= maxMessages;
 }
 
@@ -201,11 +201,11 @@ app.get('/api/invite/:token', async (req, res) => {
   try {
     const { token } = req.params;
     const { roomCode } = req.query; // Optional room code to validate against
-    
+
     console.log(`Validating invite token: ${token} for room: ${roomCode || 'any'}`);
-    
+
     const result = await roomManager.validateInviteToken(token, roomCode || null, false);
-    
+
     if (result.valid) {
       console.log(`Token validation successful for room ${result.roomCode}`);
       res.json({
@@ -249,13 +249,13 @@ app.post('/api/rooms/:roomCode/invite', async (req, res) => {
   try {
     const { roomCode } = req.params;
     const { password } = req.body;
-    
+
     // Verify room exists and password is correct if required
     const room = await roomManager.getRoom(roomCode);
     if (!room) {
       return res.status(404).json({ error: 'Room not found' });
     }
-    
+
     if (room.settings.passwordHash) {
       if (!password) {
         return res.status(400).json({ error: 'Password is required for this room' });
@@ -265,24 +265,24 @@ app.post('/api/rooms/:roomCode/invite', async (req, res) => {
         return res.status(401).json({ error: 'Incorrect password' });
       }
     }
-    
+
     // Generate the invite link using the generateInviteLink method
-    const invite = await roomManager.generateInviteLink(roomCode, { 
+    const invite = await roomManager.generateInviteLink(roomCode, {
       isPermanent: false,
       expiryMs: 5 * 60 * 1000 // 5 minutes
     });
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       inviteLink: invite.url,
       expiresIn: '5 minutes'
     });
-    
+
   } catch (error) {
     console.error('Error generating invite:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to generate invite',
-      details: error.message 
+      details: error.message
     });
   }
 });
@@ -290,9 +290,9 @@ app.post('/api/rooms/:roomCode/invite', async (req, res) => {
 app.post('/api/rooms', async (req, res) => {
   try {
     const { messageTTL, password, maxUsers, captchaAnswer, captchaProblem } = req.body;
-    
+
     console.log('HTTP room creation request:', { messageTTL, password, maxUsers, captchaAnswer, captchaProblem });
-    
+
     // Validate CAPTCHA
     if (captchaProblem && captchaAnswer) {
       const expectedAnswer = calculateCaptchaAnswer(captchaProblem);
@@ -301,7 +301,7 @@ app.post('/api/rooms', async (req, res) => {
         return res.status(400).json({ error: 'Incorrect CAPTCHA answer' });
       }
     }
-    
+
     const settings = {};
     if (messageTTL && getTTLOptions()[messageTTL] !== undefined) {
       settings.messageTTL = getTTLOptions()[messageTTL];
@@ -312,7 +312,7 @@ app.post('/api/rooms', async (req, res) => {
     if (maxUsers && typeof maxUsers === 'number' && maxUsers >= 1 && maxUsers <= 200) {
       settings.maxUsers = maxUsers;
     }
-    
+
     const roomCode = await roomManager.createRoom(settings);
     res.json({ success: true, roomCode });
   } catch (error) {
@@ -331,17 +331,17 @@ app.get('/api/invite/:token', async (req, res) => {
   try {
     const { token } = req.params;
     const roomCredentials = await roomManager.validateInviteToken(token);
-    
+
     res.json({
       success: true,
       ...roomCredentials
     });
-    
+
   } catch (error) {
     console.error('Error validating invite token:', error);
-    res.status(400).json({ 
+    res.status(400).json({
       error: 'Invalid or expired invite token',
-      details: error.message 
+      details: error.message
     });
   }
 });
@@ -349,21 +349,21 @@ app.get('/api/invite/:token', async (req, res) => {
 app.get('/api/rooms/:roomCode', async (req, res) => {
   try {
     const { roomCode } = req.params;
-    
+
     if (!isValidRoomCode(roomCode)) {
       return res.status(400).json({ error: 'Invalid room code format' });
     }
-    
+
     const exists = await roomManager.roomExists(roomCode);
     if (!exists) {
       return res.status(404).json({ error: 'Room not found' });
     }
-    
+
     const room = await roomManager.getRoom(roomCode);
-    res.json({ 
-      exists: true, 
+    res.json({
+      exists: true,
       requiresPassword: !!room.settings.passwordHash,
-      userCount: room.users.length 
+      userCount: room.users.length
     });
   } catch (error) {
     console.error('Error checking room:', error);
@@ -376,11 +376,11 @@ function calculateCaptchaAnswer(problem) {
   // Parse problem like "47 + 23 = ?" or "36 / 4 = ?"
   const match = problem.match(/^(\d+)\s*([+\-*\/])\s*(\d+)\s*=\s*\?$/);
   if (!match) return null;
-  
+
   const num1 = parseInt(match[1]);
   const operation = match[2];
   const num2 = parseInt(match[3]);
-  
+
   let answer;
   switch (operation) {
     case '+': answer = num1 + num2; break;
@@ -389,7 +389,7 @@ function calculateCaptchaAnswer(problem) {
     case '/': answer = num1 / num2; break; // Assume whole number from generation
     default: return null;
   }
-  
+
   return answer.toString();
 }
 
@@ -399,13 +399,13 @@ app.get('/api/captcha', (req, res) => {
 });
 io.on('connection', (socket) => {
   console.log(`🔌 User connected: ${socket.id}`);
-  
+
   socket.on('create-room', async (data, callback) => {
     try {
       const { messageTTL, password, maxUsers } = data || {};
-      
+
       console.log('Creating room with data:', { messageTTL, password, maxUsers });
-      
+
       const settings = {};
       if (messageTTL && getTTLOptions()[messageTTL] !== undefined) {
         settings.messageTTL = getTTLOptions()[messageTTL];
@@ -419,7 +419,7 @@ io.on('connection', (socket) => {
       } else {
         console.log('Invalid or missing maxUsers, using default');
       }
-      
+
       const roomCode = await roomManager.createRoom(settings);
       callback({ success: true, roomCode });
     } catch (error) {
@@ -427,19 +427,19 @@ io.on('connection', (socket) => {
       callback({ success: false, error: 'Failed to create room' });
     }
   });
-  
+
   socket.on('join-room', async (data, callback) => {
     try {
       const { roomCode, nickname, password, inviteToken, captchaAnswer, captchaProblem } = data;
       const userId = socket.id; // Use socket ID as user ID
-      
+
       // Validate credentials
       const validation = authUtils.validateCredentials({ roomCode, password, nickname });
       if (!validation.valid) {
         console.error(`Invalid credentials: ${validation.errors.join(', ')}`);
         return callback({ success: false, error: validation.errors[0] });
       }
-      
+
       // Verify CAPTCHA
       if (captchaProblem && captchaAnswer) {
         const expectedAnswer = calculateCaptchaAnswer(captchaProblem);
@@ -448,93 +448,93 @@ io.on('connection', (socket) => {
           return callback({ success: false, error: 'Incorrect CAPTCHA answer' });
         }
       }
-      
+
       // Check if user is locked out due to failed attempts
       const lockStatus = securityManager.isLocked(socket.id);
       if (lockStatus.locked) {
         const remainingTime = Math.ceil((lockStatus.lockedUntil - Date.now()) / 1000 / 60);
-        return callback({ 
-          success: false, 
-          error: `Too many failed attempts. Please try again in ${remainingTime} minutes.` 
+        return callback({
+          success: false,
+          error: `Too many failed attempts. Please try again in ${remainingTime} minutes.`
         });
       }
-      
+
       if (!isValidRoomCode(roomCode)) {
         console.error(`Invalid room code format: ${roomCode}`);
         return callback({ success: false, error: 'Invalid room code format' });
       }
-      
+
       // Validate and sanitize nickname
-      let userNickname = nickname && isValidNickname(nickname) 
-        ? sanitizeInput(nickname) 
+      let userNickname = nickname && isValidNickname(nickname)
+        ? sanitizeInput(nickname)
         : generateRandomNickname();
-      
+
       console.log(`User ${userNickname} (${socket.id}) attempting to join room ${roomCode} with token:`, inviteToken || 'none');
-      
+
       // First, validate the invite token if provided (don't consume it yet)
       if (inviteToken) {
         console.log(`Validating invite token for room ${roomCode}`);
         const tokenValidation = await roomManager.validateInviteToken(inviteToken, roomCode, false);
-        
+
         if (!tokenValidation.valid) {
           console.error('Invalid or expired invite token:', tokenValidation.error);
-          return callback({ 
-            success: false, 
-            error: tokenValidation.error || 'Invalid or expired invite token' 
+          return callback({
+            success: false,
+            error: tokenValidation.error || 'Invalid or expired invite token'
           });
         }
-        
+
         console.log(`Token validation successful for room ${roomCode}`);
       }
-      
+
       // Join the room with the provided credentials
       const result = await roomManager.joinRoom(
-        roomCode, 
-        userId, 
-        userNickname, 
-        password || '', 
+        roomCode,
+        userId,
+        userNickname,
+        password || '',
         inviteToken || null,
         socket.id
       );
-      
+
       if (result.success) {
         // Successful join - clear any failed attempts
         securityManager.clearFailedAttempts(socket.id);
-        
+
         console.log(`User ${userNickname} (${socket.id}) successfully joined room ${roomCode}`);
         socket.join(roomCode);
         socket.roomCode = roomCode;
         socket.nickname = userNickname;
-        
+
         // Register user activity and start inactivity timer
         securityManager.registerUserActivity(socket.id, userId, roomCode, (socketId, userId, roomCode) => {
           console.log(`⏰ User ${userId} timed out, disconnecting...`);
           const socket = io.sockets.sockets.get(socketId);
           if (socket) {
-            socket.emit('inactivity-timeout', { 
-              message: 'You have been disconnected due to inactivity' 
+            socket.emit('inactivity-timeout', {
+              message: 'You have been disconnected due to inactivity'
             });
             socket.disconnect(true);
           }
         });
-        
+
         // Send room data to user
         const messages = await roomManager.getMessages(roomCode);
-        callback({ 
-          success: true, 
-          room: result.room, 
+        callback({
+          success: true,
+          room: result.room,
           messages,
           nickname: userNickname,
           isInviteOnly: result.room.settings?.isInviteOnly || false,
           inactivityTimeoutMs: securityManager.INACTIVITY_TIMEOUT_MS
         });
-        
+
         // Notify others
-        socket.to(roomCode).emit('user-joined', { 
+        socket.to(roomCode).emit('user-joined', {
           nickname: userNickname,
-          userCount: result.room.users.length 
+          userCount: result.room.users.length
         });
-        
+
         console.log(`👤 ${userNickname} joined room ${roomCode}`);
       } else if (result.redirectRoomCode) {
         // Handle redirect to a different room based on the token
@@ -550,11 +550,11 @@ io.on('connection', (socket) => {
         // Other errors - record failed attempt
         const failedAttempt = securityManager.recordFailedAttempt(socket.id);
         console.error(`Failed to join room ${roomCode}:`, result.error);
-        
+
         if (failedAttempt.locked) {
-          callback({ 
-            success: false, 
-            error: `Too many failed attempts. Please try again later.` 
+          callback({
+            success: false,
+            error: `Too many failed attempts. Please try again later.`
           });
         } else {
           callback({
@@ -568,75 +568,190 @@ io.on('connection', (socket) => {
       callback({ success: false, error: 'Failed to join room' });
     }
   });
-  
+
   socket.on('send-message', async (data) => {
     try {
       if (!socket.roomCode) return;
-      
+
       // Update user activity
       securityManager.updateUserActivity(socket.id, (socketId, userId, roomCode) => {
         console.log(`⏰ User ${userId} timed out, disconnecting...`);
         const socket = io.sockets.sockets.get(socketId);
         if (socket) {
-          socket.emit('inactivity-timeout', { 
-            message: 'You have been disconnected due to inactivity' 
+          socket.emit('inactivity-timeout', {
+            message: 'You have been disconnected due to inactivity'
           });
           socket.disconnect(true);
         }
       });
-      
+
       // Rate limiting
       if (!checkRateLimit(socket.id)) {
         socket.emit('error', { message: 'Rate limit exceeded. Please slow down.' });
         return;
       }
-      
-      const { content } = data;
-      if (!content || typeof content !== 'string' || content.trim().length === 0) {
-        return;
+
+      // Support for text and image messages
+      const { content, messageType = 'text', isViewOnce = false, imageData } = data;
+
+      // For text messages, validate content
+      if (messageType === 'text') {
+        if (!content || typeof content !== 'string' || content.trim().length === 0) {
+          return;
+        }
       }
-      
+
+      // For image messages, validate imageData
+      if (messageType === 'image') {
+        if (!imageData || typeof imageData !== 'string' || !imageData.startsWith('data:image/')) {
+          socket.emit('error', { message: 'Invalid image data' });
+          return;
+        }
+        // Check image size (max 5MB)
+        const base64Size = imageData.length * 0.75; // Approximate size in bytes
+        if (base64Size > 5 * 1024 * 1024) {
+          socket.emit('error', { message: 'Image too large. Maximum size is 5MB.' });
+          return;
+        }
+      }
+
       const message = {
         id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        content: sanitizeInput(content.trim()),
+        content: messageType === 'image' ? imageData : sanitizeInput(content.trim()),
+        messageType,
+        isViewOnce,
+        hasBeenViewed: false,
         sender: {
           socketId: socket.id,
           nickname: socket.nickname
         },
         timestamp: new Date().toISOString()
       };
-      
+
+      // DEBUG: Log image message details
+      if (messageType === 'image') {
+        console.log(`📷 Image message created - ID: ${message.id}, content length: ${message.content?.length}, starts with: ${message.content?.substring(0, 50)}`);
+      }
+
       await roomManager.addMessage(socket.roomCode, message);
-      
+
       // Broadcast to all users in room
       io.to(socket.roomCode).emit('new-message', message);
-      
+
     } catch (error) {
       console.error('Error sending message:', error);
       socket.emit('error', { message: 'Failed to send message' });
     }
   });
-  
+
+  // Handle message viewed events (for view-once images)
+  socket.on('message-viewed', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode) return;
+
+      console.log(`👁️ Message ${messageId} viewed by ${socket.nickname}`);
+
+      // Mark message as viewed in room manager
+      const result = await roomManager.markMessageViewed(messageId);
+
+      if (result) {
+        // Broadcast to all users in room that message was viewed
+        io.to(socket.roomCode).emit('message-viewed', {
+          messageId,
+          viewedBy: socket.nickname
+        });
+      }
+    } catch (error) {
+      console.error('Error marking message as viewed:', error);
+    }
+  });
+
+  // WebRTC Call Signaling Events
+
+  // Handle call offer
+  socket.on('call-offer', (data) => {
+    if (!socket.roomCode) return;
+
+    console.log(`📞 Call offer from ${socket.nickname} in room ${socket.roomCode}`);
+
+    // Broadcast offer to other participants in the room
+    socket.to(socket.roomCode).emit('call-offer', {
+      ...data,
+      fromNickname: socket.nickname,
+      fromSocketId: socket.id
+    });
+  });
+
+  // Handle call answer
+  socket.on('call-answer', (data) => {
+    if (!socket.roomCode) return;
+
+    console.log(`📞 Call answer from ${socket.nickname} in room ${socket.roomCode}`);
+
+    // Broadcast answer to other participants
+    socket.to(socket.roomCode).emit('call-answer', {
+      ...data,
+      fromNickname: socket.nickname
+    });
+  });
+
+  // Handle ICE candidate exchange
+  socket.on('call-ice-candidate', (data) => {
+    if (!socket.roomCode) return;
+
+    // Forward ICE candidate to other participants
+    socket.to(socket.roomCode).emit('call-ice-candidate', {
+      ...data,
+      fromSocketId: socket.id
+    });
+  });
+
+  // Handle call rejected
+  socket.on('call-rejected', (data) => {
+    if (!socket.roomCode) return;
+
+    console.log(`📞 Call rejected by ${socket.nickname} in room ${socket.roomCode}`);
+
+    // Notify caller that call was rejected
+    socket.to(socket.roomCode).emit('call-rejected', {
+      ...data,
+      rejectedBy: socket.nickname
+    });
+  });
+
+  // Handle call ended
+  socket.on('call-ended', (data) => {
+    if (!socket.roomCode) return;
+
+    console.log(`📞 Call ended by ${socket.nickname} in room ${socket.roomCode}`);
+
+    // Notify other participants that call ended
+    socket.to(socket.roomCode).emit('call-ended', {
+      ...data,
+      endedBy: socket.nickname
+    });
+  });
+
   socket.on('disconnect', async () => {
     console.log(`🔌 User disconnected: ${socket.id}`);
-    
+
     // Clear user activity tracking
     securityManager.clearUserActivity(socket.id);
-    
+
     // Invalidate all sessions for this socket
     securityManager.invalidateSocketSessions(socket.id);
-    
+
     if (socket.roomCode) {
       await roomManager.leaveRoom(socket.roomCode, socket.id);
-      
+
       // Notify others
-      socket.to(socket.roomCode).emit('user-left', { 
-        nickname: socket.nickname 
+      socket.to(socket.roomCode).emit('user-left', {
+        nickname: socket.nickname
       });
-      
+
       console.log(`👤 ${socket.nickname} left room ${socket.roomCode}`);
     }
-    
+
     // Clean up rate limiting
     rateLimits.delete(socket.id);
   });
@@ -656,7 +771,7 @@ async function startServer() {
   try {
     // Initialize server components
     await initializeServer();
-    
+
     // Start the server
     server.listen(PORT, () => {
       console.log(`🚀 Ephemeral Chat server running on port ${PORT}`);

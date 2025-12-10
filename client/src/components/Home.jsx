@@ -21,7 +21,7 @@ const Home = ({ children }) => {
       // Check if room exists
       const response = await fetch(`/api/rooms/${roomCode.toUpperCase()}`);
       const data = await response.json();
-      
+
       if (response.ok && data.exists) {
         navigate(`/room/${roomCode.toUpperCase()}`);
       } else {
@@ -152,19 +152,16 @@ const Home = ({ children }) => {
               </div>
             </div>
 
-            {/* Features */}
-            <div className="mt-16">
-              <h3 className="text-center text-lg font-medium text-gray-900 mb-8">
+            {/* Features - Info Section */}
+            <div className="mt-12 opacity-75">
+              <p className="text-center text-xs text-gray-500 mb-4">
                 Why use Ephemeral Chat?
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3 mb-6">
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5 sm:gap-2 max-w-lg mx-auto">
                 {features.map((feature, index) => (
-                  <div key={index} className="flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-sm hover:shadow-md transition-shadow">
-                    <feature.icon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 flex-shrink-0" />
-                    <div className="min-w-0">
-                      <div className="font-semibold text-gray-900 text-sm sm:text-base">{feature.title}</div>
-                      <div className="text-xs text-gray-600 truncate">{feature.description}</div>
-                    </div>
+                  <div key={index} className="flex items-center space-x-1.5 p-1.5 sm:p-2 bg-gray-50 rounded text-xs">
+                    <feature.icon className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                    <span className="text-gray-600 truncate">{feature.title}</span>
                   </div>
                 ))}
               </div>
@@ -185,7 +182,7 @@ const Home = ({ children }) => {
       <footer className="bg-white border-t border-gray-200 py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="text-center text-sm text-gray-500">
-            Ephemeral Chat offers a fast, secure, and anonymous experience 
+            Ephemeral Chat offers a fast, secure, and anonymous experience
           </p>
         </div>
       </footer>
