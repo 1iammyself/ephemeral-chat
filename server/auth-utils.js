@@ -26,7 +26,7 @@ async function verifyPassword(password, hash) {
   try {
     return await bcrypt.compare(password, hash);
   } catch (error) {
-    console.error('Error verifying password:', error);
+    // console.error('Error verifying password:', error);
     return false;
   }
 }

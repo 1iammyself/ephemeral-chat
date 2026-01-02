@@ -91,11 +91,34 @@ function getTTLOptions() {
   };
 }
 
+/**
+ * Logger that only outputs in development mode or when DEBUG is set
+ */
+const logger = {
+  info: (...args) => {
+    if (process.env.DEBUG) {
+      console.log(...args);
+    }
+  },
+  error: (...args) => {
+    console.error(...args);
+  },
+  warn: (...args) => {
+    console.warn(...args);
+  },
+  debug: (...args) => {
+    if (process.env.DEBUG) {
+      console.log('[DEBUG]', ...args);
+    }
+  }
+};
+
 module.exports = {
   generateRoomCode,
   generateRandomNickname,
   sanitizeInput,
   isValidRoomCode,
   isValidNickname,
-  getTTLOptions
+  getTTLOptions,
+  logger
 };

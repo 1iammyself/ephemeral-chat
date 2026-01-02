@@ -132,10 +132,10 @@ class RoomManager {
    */
   async joinRoom(roomCode, userId, nickname, password = '', inviteToken = null, socketId = null) {
     try {
-      console.log(`Attempting to join room ${roomCode} with token:`, inviteToken);
+      // console.log(`Attempting to join room ${roomCode} with token:`, inviteToken);
       const room = await this.getRoom(roomCode);
       if (!room) {
-        console.error(`Room ${roomCode} not found`);
+        // console.error(`Room ${roomCode} not found`);
         return { success: false, error: 'Room not found' };
       }
 
@@ -166,10 +166,10 @@ class RoomManager {
 
       // Check if room is invite-only or if an invite token is provided
       if (room.settings.isInviteOnly || inviteToken) {
-        console.log(`Room ${roomCode} is ${room.settings.isInviteOnly ? 'invite-only' : 'public'}, validating token...`);
+        // console.log(`Room ${roomCode} is ${room.settings.isInviteOnly ? 'invite-only' : 'public'}, validating token...`);
 
         if (!inviteToken) {
-          console.error('No invite token provided but one is required');
+          // console.error('No invite token provided but one is required');
           return {
             success: false,
             error: room.settings.isInviteOnly
@@ -180,21 +180,21 @@ class RoomManager {
 
         // Validate the invite token (don't consume it yet)
         const tokenValid = await this.validateInviteToken(inviteToken, roomCode, false);
-        console.log('Token validation result:', tokenValid);
+        // console.log('Token validation result:', tokenValid);
 
         if (!tokenValid.valid) {
-          console.error('Invalid or expired token for room', roomCode);
+          // console.error('Invalid or expired token for room', roomCode);
           return {
             success: false,
             error: tokenValid.error || 'Invalid or expired invite token'
           };
         }
 
-        console.log(`Token validated successfully for room ${roomCode}`);
+        // console.log(`Token validated successfully for room ${roomCode}`);
 
         // If token is valid but room code doesn't match, update the room code
         if (tokenValid.roomCode && tokenValid.roomCode !== roomCode) {
-          console.log(`Redirecting to room ${tokenValid.roomCode} based on token`);
+          // console.log(`Redirecting to room ${tokenValid.roomCode} based on token`);
           const targetRoom = await this.getRoom(tokenValid.roomCode);
           if (targetRoom) {
             return {
@@ -238,7 +238,7 @@ class RoomManager {
       this.refreshRoomExpiry(roomCode);
       return { success: true, room };
     } catch (error) {
-      console.error('Error joining room:', error);
+      // console.error('Error joining room:', error);
       return { success: false, error: error.message };
     }
   }
@@ -270,8 +270,8 @@ class RoomManager {
     const room = await this.getRoom(roomCode);
     if (!room) return;
 
-    // Only sanitize text messages, not image data (which contains base64)
-    if (message.messageType !== 'image') {
+    // Only sanitize text messages, not image/audio data (which contains base64)
+    if (message.messageType !== 'image' && message.messageType !== 'audio') {
       message.content = sanitizeInput(message.content);
     }
     message.timestamp = new Date().toISOString();
@@ -364,7 +364,7 @@ class RoomManager {
     const expiryTime = lifetimeMs || this.ROOM_DEFAULT_LIFETIME_MS;
 
     const timer = setTimeout(async () => {
-      console.log(`Room ${roomCode} has expired after ${expiryTime / (60 * 1000)} minutes`);
+      // console.log(`Room ${roomCode} has expired after ${expiryTime / (60 * 1000)} minutes`);
       await this.deleteRoom(roomCode);
     }, expiryTime);
 
@@ -372,7 +372,7 @@ class RoomManager {
 
     // Log expiration time for debugging
     const expiryDate = new Date(Date.now() + expiryTime);
-    console.log(`Room ${roomCode} will expire at: ${expiryDate.toISOString()}`);
+    // console.log(`Room ${roomCode} will expire at: ${expiryDate.toISOString()}`);
   }
 
   /**
@@ -400,7 +400,7 @@ class RoomManager {
    * @param {string} roomCode - Room code
    */
   async deleteRoom(roomCode) {
-    console.log(`Deleting room ${roomCode} and cleaning up resources`);
+    // console.log(`Deleting room ${roomCode} and cleaning up resources`);
 
     // Clear any timers
     if (this.roomTimers.has(roomCode)) {
@@ -477,18 +477,18 @@ class RoomManager {
     // Set up cleanup for non-permanent tokens
     if (!isPermanent) {
       tokenData.timeoutId = setTimeout(() => {
-        console.log(`Token ${token} expired, cleaning up`);
+        // console.log(`Token ${token} expired, cleaning up`);
         this.cleanupToken(token);
       }, expiryMs);
     }
 
-    console.log(`Generated ${isPermanent ? 'permanent' : 'temporary'} token for room ${roomCode}`);
-    console.log('All tokens:', Array.from(this.inviteTokens.entries()).map(([t, d]) => ({
+    // console.log(`Generated ${isPermanent ? 'permanent' : 'temporary'} token for room ${roomCode}`);
+    /* console.log('All tokens:', Array.from(this.inviteTokens.entries()).map(([t, d]) => ({
       token: t.substring(0, 8) + '...',
       roomCode: d.roomCode,
       expiresAt: d.expiresAt,
       isPermanent: d.isPermanent
-    })));
+    }))); */
 
     return token;
   }
@@ -558,7 +558,7 @@ class RoomManager {
       }
     }
 
-    console.log(`Cleaned up token: ${token}`);
+    // console.log(`Cleaned up token: ${token}`);
   }
 
   /**
@@ -569,11 +569,11 @@ class RoomManager {
    * @returns {Promise<{valid: boolean, roomCode: string, isPermanent: boolean, error?: string}>}
    */
   async validateInviteToken(token, roomCode = null, consumeToken = false) {
-    console.log(`Validating token: ${token} for room: ${roomCode || 'any'}, consume: ${consumeToken}`);
+    // console.log(`Validating token: ${token} for room: ${roomCode || 'any'}, consume: ${consumeToken}`);
 
     // Basic token validation
     if (!token || typeof token !== 'string' || token.length < 16) {
-      console.log('Invalid token format');
+      // console.log('Invalid token format');
       return { valid: false, error: 'Invalid token format' };
     }
 
@@ -581,20 +581,20 @@ class RoomManager {
 
     // Check if token exists
     if (!tokenData) {
-      console.log(`Token ${token} not found`);
+      // console.log(`Token ${token} not found`);
       return { valid: false, error: 'Invalid or expired token' };
     }
 
     // Check if token is expired
     if (tokenData.expiresAt && new Date() > new Date(tokenData.expiresAt)) {
-      console.log(`Token ${token} has expired`);
+      // console.log(`Token ${token} has expired`);
       this.cleanupToken(token);
       return { valid: false, error: 'Token has expired' };
     }
 
     // If roomCode is provided, verify it matches the token's room
     if (roomCode && tokenData.roomCode !== roomCode) {
-      console.log(`Token ${token} is for room ${tokenData.roomCode}, but was used for room ${roomCode}`);
+      // console.log(`Token ${token} is for room ${tokenData.roomCode}, but was used for room ${roomCode}`);
       return {
         valid: false,
         error: 'This invite is for a different room',
@@ -605,7 +605,7 @@ class RoomManager {
     // Verify the room still exists
     const room = await this.getRoom(tokenData.roomCode);
     if (!room) {
-      console.log(`Room ${tokenData.roomCode} not found for token ${token}`);
+      // console.log(`Room ${tokenData.roomCode} not found for token ${token}`);
       // Clean up invalid token
       this.inviteTokens.delete(token);
       const tokens = this.roomToTokens.get(tokenData.roomCode);
@@ -620,7 +620,7 @@ class RoomManager {
 
     // If this is a one-time token and we're consuming it, invalidate it after use
     if (!tokenData.isPermanent && consumeToken) {
-      console.log('Consuming one-time token after successful join');
+      // console.log('Consuming one-time token after successful join');
       this.inviteTokens.delete(token);
       const tokens = this.roomToTokens.get(tokenData.roomCode);
       if (tokens) {
@@ -631,7 +631,7 @@ class RoomManager {
       }
     }
 
-    console.log(`Token validation successful for room ${tokenData.roomCode}`);
+    // console.log(`Token validation successful for room ${tokenData.roomCode}`);
     return {
       valid: true,
       roomCode: tokenData.roomCode,

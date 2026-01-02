@@ -1,0 +1,164 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { Play, Pause } from 'lucide-react';
+
+const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [audioUrl, setAudioUrl] = useState(null);
+  const audioRef = useRef(null);
+
+  useEffect(() => {
+    let objectUrl = null;
+
+    const processAudio = async () => {
+      if (!src) return;
+
+      try {
+        // If it doesn't look like a URL, treat it as our raw clean base64
+        if (!src.startsWith('http') && !src.startsWith('blob:') && !src.startsWith('data:')) {
+          const binaryString = window.atob(src);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+
+          // Create the blob with the specific codec your logs showed
+          const blob = new Blob([bytes], { type: 'audio/webm;codecs=opus' });
+          objectUrl = URL.createObjectURL(blob);
+          setAudioUrl(objectUrl);
+        } else {
+          // Fallback for standard URLs or existing data URIs
+          setAudioUrl(src);
+        }
+      } catch (err) {
+        console.error("Audio reconstruction failed:", err);
+        setAudioUrl(src);
+      }
+    };
+
+    processAudio();
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [src]);
+
+  // Handle auto-play logic
+  useEffect(() => {
+    if (autoPlay && audioRef.current && audioUrl) {
+      const timer = setTimeout(() => {
+        if (audioRef.current) {
+          const playPromise = audioRef.current.play();
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => setIsPlaying(true))
+              .catch(e => console.error("Auto-play failed:", e));
+          }
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [autoPlay, audioUrl]);
+
+  // Audio event listeners
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const updateProgress = () => {
+      if (audio.duration && isFinite(audio.duration)) {
+        setProgress((audio.currentTime / audio.duration) * 100);
+      }
+    };
+
+    const handleLoadedMetadata = () => {
+      if (isFinite(audio.duration)) {
+        setDuration(audio.duration);
+      } else {
+        // Fix for WebM duration bugs (often seen in recorded voice notes)
+        setDuration(0); 
+        audio.currentTime = 1e101; // Seek to end to force duration calculation
+        audio.ontimeupdate = function() {
+          this.ontimeupdate = () => {};
+          audio.currentTime = 0;
+          setDuration(audio.duration);
+        };
+      }
+    };
+
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setProgress(100);
+      if (onEnded) onEnded();
+    };
+
+    audio.addEventListener('timeupdate', updateProgress);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('ended', handleEnded);
+
+    return () => {
+      audio.removeEventListener('timeupdate', updateProgress);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, [onEnded]);
+
+  const togglePlay = (e) => {
+    e.stopPropagation();
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (audio.paused) {
+      audio.play().catch(err => console.error("Play failed:", err));
+    } else {
+      audio.pause();
+    }
+  };
+
+  const formatTime = (time) => {
+    if (isNaN(time)) return "0:00";
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="flex items-center space-x-3 min-w-[200px] py-1">
+      <button
+        onClick={togglePlay}
+        className={`p-2 rounded-full transition-colors ${
+          isOwnMessage 
+            ? 'bg-white/20 hover:bg-white/30 text-white' 
+            : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+        }`}
+      >
+        {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+      </button>
+      <div className="flex-1 flex flex-col justify-center">
+        <div className={`h-1 rounded-full overflow-hidden ${
+          isOwnMessage ? 'bg-white/30' : 'bg-gray-200'
+        }`}>
+          <div 
+            className={`h-full transition-all duration-100 ${
+              isOwnMessage ? 'bg-white' : 'bg-primary-500'
+            }`}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <div className={`flex justify-between text-[10px] mt-1 ${
+          isOwnMessage ? 'text-white/80' : 'text-gray-500'
+        }`}>
+          <span>{formatTime(audioRef.current?.currentTime || 0)}</span>
+          <span>{duration ? formatTime(duration) : '--:--'}</span>
+        </div>
+      </div>
+      <audio
+        ref={audioRef}
+        src={audioUrl}
+        onPause={() => setIsPlaying(false)}
+        onPlay={() => setIsPlaying(true)}
+        className="hidden"
+      />
+    </div>
+  );
+};
+
+export default AudioPlayer;

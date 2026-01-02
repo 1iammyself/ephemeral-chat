@@ -14,7 +14,9 @@ import {
   Phone,
   PhoneOff,
   Image as ImageIcon,
-  Loader2
+  Loader2,
+  Trash2,
+  Mic
 } from 'lucide-react';
 import InviteLinkModal from './InviteLinkModal';
 import socketManager from '../socket-simple';
@@ -44,64 +46,37 @@ const ChatRoom = () => {
   const [showCallModal, setShowCallModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [callState, setCallState] = useState({ state: CallState.IDLE });
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
+
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
-
-  // Debug logging
-  console.log('🏠 ChatRoom render:', {
-    roomCode,
-    isConnected,
-    isJoined,
-    showJoinModal,
-    hasRoom: !!room,
-    messageCount: messages.length,
-    userCount: users.length,
-    error
-  });
 
   // Check for invite token in location state or query params
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const tokenFromUrl = searchParams.get('token');
 
-    // Always prefer the token from location state if available
     if (location.state?.inviteToken) {
-      console.log('Got invite token from location state:', location.state.inviteToken);
       setInviteToken(location.state.inviteToken);
     } else if (tokenFromUrl) {
-      console.log('Got invite token from URL:', tokenFromUrl);
       setInviteToken(tokenFromUrl);
     }
   }, [location]);
 
-  // Handle auto-join if we have nickname and password from invite
   useEffect(() => {
-    // Disable auto-join for invite links to ensure CAPTCHA is required
-    // if (location.state?.fromInvite && location.state?.nickname && !isJoined) {
-    //   console.log('Auto-joining room from invite with token:', inviteToken || 'no token');
-    //   // Use a small timeout to ensure state is updated
-    //   const timer = setTimeout(() => {
-    //     handleJoinRoom(location.state.nickname, location.state.password || '');
-    //   }, 100);
-    //   return () => clearTimeout(timer);
-    // }
-  }, [location.state, isJoined, inviteToken]);
-
-  useEffect(() => {
-    // Connect to socket
     const socket = socketManager.connect();
 
-    // Connection status
     const handleConnect = () => {
-      console.log('Socket connected');
       setIsConnected(true);
     };
 
     const handleDisconnect = (reason) => {
-      console.log('Socket disconnected:', reason);
       setIsConnected(false);
-
-      // Show error message to user
       if (reason === 'io server disconnect') {
         setError('You have been disconnected by the server');
       } else if (reason === 'transport close') {
@@ -109,14 +84,12 @@ const ChatRoom = () => {
       }
     };
 
-    // Room events
     const handleRoomJoined = (data) => {
-      console.log('Room joined:', data);
       setRoom(data.room);
       setUsers(data.users || []);
       setMessages(data.messages || []);
       setCurrentUser({
-        id: data.userId,
+        id: socketManager.socket?.id,
         nickname: data.nickname,
         isAdmin: data.isAdmin
       });
@@ -125,26 +98,19 @@ const ChatRoom = () => {
       setError(null);
     };
 
-    // Chat events
     const handleNewMessage = (message) => {
-      console.log('New message:', message);
       setMessages(prev => [...prev, message]);
     };
 
     const handleUserJoined = ({ nickname, userCount }) => {
-      console.log('User joined:', nickname, 'Total users:', userCount);
       setMessages(prev => [...prev, {
         id: `system_${Date.now()}`,
         type: 'system',
         content: `${nickname} joined the room`,
         timestamp: new Date().toISOString()
       }]);
-
-      // Update user count - create a dummy user array with the right length
       setUsers(prev => {
-        // If we don't have the actual user data, create placeholder
         const newUsers = [...prev];
-        // Ensure we have the right number of users
         while (newUsers.length < userCount) {
           newUsers.push({ id: `user_${Date.now()}_${newUsers.length}`, nickname: 'User' });
         }
@@ -153,30 +119,23 @@ const ChatRoom = () => {
     };
 
     const handleUserLeft = ({ nickname, userCount }) => {
-      console.log('User left:', nickname, 'Remaining users:', userCount);
       setMessages(prev => [...prev, {
         id: `system_${Date.now()}`,
         type: 'system',
         content: `${nickname} left the room`,
         timestamp: new Date().toISOString()
       }]);
-
-      // Update user count
       setUsers(prev => prev.slice(0, userCount));
     };
 
     const handleError = ({ message }) => {
-      console.error('Socket error:', message);
       setError(message);
       setTimeout(() => setError(null), 5000);
-
-      // If there's an error, ensure join modal is shown
       if (message.includes('Invalid') || message.includes('expired')) {
         setShowJoinModal(true);
       }
     };
 
-    // Register event listeners
     socketManager.on('connect', handleConnect);
     socketManager.on('disconnect', handleDisconnect);
     socketManager.on('room-joined', handleRoomJoined);
@@ -186,7 +145,6 @@ const ChatRoom = () => {
     socketManager.on('error', handleError);
 
     return () => {
-      // Clean up event listeners
       socketManager.off('connect', handleConnect);
       socketManager.off('disconnect', handleDisconnect);
       socketManager.off('room-joined', handleRoomJoined);
@@ -194,8 +152,6 @@ const ChatRoom = () => {
       socketManager.off('user-joined', handleUserJoined);
       socketManager.off('user-left', handleUserLeft);
       socketManager.off('error', handleError);
-
-      // Only disconnect if we're not in development with hot reload
       if (process.env.NODE_ENV !== 'development') {
         socketManager.disconnect();
       }
@@ -203,261 +159,264 @@ const ChatRoom = () => {
   }, [roomCode]);
 
   useEffect(() => {
-    // Auto-scroll to bottom when new messages arrive
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const handleJoinRoom = async (params) => {
     const { nickname, password = '', capToken = null, inviteToken } = params;
-
     if (!nickname.trim()) {
       setError('Please enter a nickname');
       return;
     }
-
-    // If we're already joining or joined, don't proceed
-    if (isProcessingInvite || isJoined) {
-      console.log('Already joining/joined, skipping duplicate join attempt');
-      return;
-    }
+    if (isProcessingInvite || isJoined) return;
 
     setIsProcessingInvite(true);
     setError(null);
 
-    // Set a timeout to handle cases where the server doesn't respond
     const joinTimeout = setTimeout(() => {
       if (!isJoined) {
-        console.log('Join room timeout - no response from server');
         setError('Connection timed out. Please try again.');
         setIsProcessingInvite(false);
       }
-    }, 10000); // 10 second timeout
+    }, 10000);
 
     try {
-      console.log(`Joining room ${roomCode} with nickname ${nickname}`, {
-        hasToken: !!inviteToken,
-        token: inviteToken ? `${inviteToken.substring(0, 8)}...` : 'none',
-        hasPassword: !!password,
-        hasCapToken: !!capToken
-      });
-
-      // Emit join-room event with the invite token if available
       const joinData = {
         roomCode,
         nickname: nickname.trim(),
         password: password.trim(),
         capToken: capToken
       };
-
-      // Only include inviteToken if it exists
-      if (inviteToken) {
-        joinData.inviteToken = inviteToken;
-      }
+      if (inviteToken) joinData.inviteToken = inviteToken;
 
       socketManager.emit('join-room', joinData, (response) => {
-        console.log('Join room response:', response);
-
-        // Clear timeout immediately on any response
         clearTimeout(joinTimeout);
-
         if (!response) {
           setError('No response from server');
           setIsProcessingInvite(false);
           return;
         }
-
-        // Handle redirect response
         if (response.redirect) {
-          console.log(`Redirecting to room ${response.roomCode}`, response);
-
-          // If password is required, show the join modal for the new room
-          if (response.requiresPassword) {
-            setShowJoinModal(true);
-            setError(response.error || 'This room requires a password');
-            navigate(`/room/${response.roomCode}`, {
-              state: {
-                fromInvite: true,
-                nickname: nickname.trim(),
-                inviteToken: inviteToken || undefined
-              }
-            });
-          } else {
-            // Auto-join the new room
-            navigate(`/room/${response.roomCode}`, {
-              state: {
-                fromInvite: true,
-                nickname: nickname.trim(),
-                inviteToken: inviteToken || undefined
-              }
-            });
-          }
+          navigate(`/room/${response.roomCode}`, {
+            state: { fromInvite: true, nickname: nickname.trim(), inviteToken: inviteToken || undefined }
+          });
           return;
         }
-
-        // Handle success response
         if (response.success) {
-          console.log('Successfully joined room, updating UI');
-          console.log('Room data:', response.room);
-          console.log('Messages:', response.messages);
-          console.log('Users:', response.room?.users);
-
           setRoom(response.room);
           setMessages(response.messages || []);
           setUsers(response.room?.users || []);
-          setCurrentUser({
-            id: socketManager.socket?.id,
-            nickname: response.nickname,
-            isAdmin: false
-          });
+          setCurrentUser({ id: socketManager.socket?.id, nickname: response.nickname, isAdmin: false });
           setIsJoined(true);
           setShowJoinModal(false);
-          setError(null);
           setIsProcessingInvite(false);
-
-          console.log('State updated: isJoined=true, showJoinModal=false');
           return;
         }
-
-        // Handle error response
-        if (!response.success) {
-          setError(response.error || 'Failed to join room');
-          setIsProcessingInvite(false);
-        }
+        setError(response.error || 'Failed to join room');
+        setIsProcessingInvite(false);
       });
-
     } catch (err) {
-      console.error('Error joining room:', err);
       setError('Failed to join room. Please try again.');
       setIsProcessingInvite(false);
     }
   };
 
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || isSending || !isConnected) return;
-
     setIsSending(true);
-
     try {
-      socketManager.emit('send-message', {
-        content: newMessage.trim()
-      });
-
-      // Notify server of user activity to reset inactivity timer
+      socketManager.emit('send-message', { content: newMessage.trim() });
       socketManager.emit('user-activity');
-
       setNewMessage('');
     } catch (error) {
-      console.error('Error sending message:', error);
       setError('Failed to send message');
     } finally {
       setIsSending(false);
     }
   };
 
-  // Handle image upload for view-once images
   const handleImageUpload = useCallback(async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       setError('Please select an image file');
       return;
     }
-
-    // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setError('Image must be smaller than 5MB');
       return;
     }
-
     setIsUploading(true);
-    setError(null);
-
     try {
       const reader = new FileReader();
       reader.onload = (e) => {
-        const imageData = e.target.result;
-
-        // Send image as view-once message
-        socketManager.emit('send-message', {
-          messageType: 'image',
-          imageData,
-          isViewOnce: true
-        });
-
+        socketManager.emit('send-message', { messageType: 'image', imageData: e.target.result, isViewOnce: true });
         setIsUploading(false);
-        // Reset file input
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-      };
-      reader.onerror = () => {
-        setError('Failed to read image file');
-        setIsUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
       };
       reader.readAsDataURL(file);
     } catch (err) {
-      console.error('Error uploading image:', err);
       setError('Failed to upload image');
       setIsUploading(false);
     }
   }, []);
 
-  // Handle starting a call
   const handleStartCall = useCallback(async () => {
     if (users.length < 2) {
       setError('Need at least 2 users to start a call');
       return;
     }
-
-    // Find another user to call
-    const otherUser = users.find(u =>
-      u.socketId !== currentUser?.id && u.id !== currentUser?.id
-    );
-
+    const otherUser = users.find(u => u.socketId !== currentUser?.id && u.id !== currentUser?.id);
     if (otherUser) {
       try {
         await webRTCService.startCall(roomCode, otherUser.nickname);
         setShowCallModal(true);
       } catch (err) {
-        console.error('Failed to start call:', err);
         setError('Failed to start call. Please check microphone permissions.');
       }
     }
   }, [users, currentUser, roomCode]);
 
-  // Listen for incoming calls
+  const startRecording = async () => {
+    try {
+      // Optimize constraints for voice: Mono, lower sample rate
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          channelCount: 1,
+          sampleRate: 22050, // Lower sample rate for voice
+          echoCancellation: true,
+          noiseSuppression: true
+        } 
+      });
+      
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
+        ? 'audio/webm;codecs=opus' 
+        : 'audio/webm';
+
+      // AGGRESSIVE COMPRESSION: 
+      // 16kbps is very efficient for voice while maintaining clarity
+      const options = {
+        mimeType,
+        audioBitsPerSecond: 16000 
+      };
+
+      mediaRecorderRef.current = new MediaRecorder(stream, options);
+      audioChunksRef.current = [];
+      
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+      
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration(prev => {
+          if (prev >= 29) { 
+            handleStopRecording();
+            return 30;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+
+    } catch (err) {
+      setError('Could not access microphone.');
+    }
+  };
+
+  const handleStopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.onstop = () => {
+        // Create the final blob with a guaranteed mime type
+        const audioBlob = new Blob(audioChunksRef.current, { 
+          type: mediaRecorderRef.current.mimeType 
+        });
+        
+        if (audioBlob.size > 0) {
+          sendAudioMessage(audioBlob);
+        }
+        
+        // Clean up tracks immediately
+        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      };
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    clearInterval(recordingTimerRef.current);
+  };
+
+  const handleCancelRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.onstop = () => {
+             mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+        };
+        mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    setRecordingDuration(0);
+    clearInterval(recordingTimerRef.current);
+  };
+
+  const sendAudioMessage = (audioBlob) => {
+    // Client-side size check (5MB limit)
+    if (audioBlob.size > 5 * 1024 * 1024) {
+      setError('Voice note is too large (max 5MB). Please record a shorter message.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.readAsArrayBuffer(audioBlob); // Read as raw binary
+    
+    reader.onloadend = () => {
+      const arrayBuffer = reader.result;
+      const uint8Array = new Uint8Array(arrayBuffer);
+      
+      // Efficiently convert binary to base64 string
+      let binary = '';
+      const len = uint8Array.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(uint8Array[i]);
+      }
+      const base64Audio = btoa(binary);
+
+      console.log('🚀 Sending sanitized audio. Length:', base64Audio.length);
+
+      socketManager.emit('send-message', { 
+        messageType: 'audio', 
+        content: base64Audio, // Sending raw base64 ONLY
+        isViewOnce: true 
+      });
+    };
+  };
+
   useEffect(() => {
     const unsubscribe = webRTCService.onCallStateChange((state) => {
       setCallState(state);
-      if (state.state === CallState.INCOMING) {
-        setShowCallModal(true);
-      }
-      if (state.state === CallState.IDLE && showCallModal) {
-        // Keep modal open briefly to show 'Call ended'
-        setTimeout(() => setShowCallModal(false), 1000);
-      }
+      if (state.state === CallState.INCOMING) setShowCallModal(true);
+      if (state.state === CallState.IDLE && showCallModal) setTimeout(() => setShowCallModal(false), 1000);
     });
     return unsubscribe;
   }, [showCallModal]);
 
-  const copyRoomCode = () => {
-    navigator.clipboard.writeText(roomCode);
-    // Could add a toast notification here
-  };
+  const copyRoomCode = () => navigator.clipboard.writeText(roomCode);
 
   const getTTLDisplay = () => {
     if (!room?.settings?.messageTTL) return null;
-
     const ttl = room.settings.messageTTL;
     if (ttl < 60) return `${ttl}s`;
     if (ttl < 3600) return `${Math.floor(ttl / 60)}m`;
     return `${Math.floor(ttl / 3600)}h`;
   };
 
-  // If there's an error, show it prominently
   if (error && !isJoined) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50">
@@ -466,200 +425,82 @@ const ChatRoom = () => {
             <p className="font-bold">Error</p>
             <p>{error}</p>
           </div>
-          <button
-            onClick={() => navigate('/')}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-          >
-            Go Back to Home
-          </button>
+          <button onClick={() => navigate('/')} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Go Back to Home</button>
         </div>
       </div>
     );
   }
 
-  if (showJoinModal) {
-    console.log('Rendering JoinRoomModal');
-    return (
-      <JoinRoomModal
-        roomCode={roomCode}
-        onJoin={handleJoinRoom}
-        onCancel={() => navigate('/')}
-        error={error}
-      />
-    );
-  }
+  if (showJoinModal) return <JoinRoomModal roomCode={roomCode} onJoin={handleJoinRoom} onCancel={() => navigate('/')} error={error} />;
+  if (showInviteModal) return <InviteLinkModal isOpen={showInviteModal} onClose={() => setShowInviteModal(false)} roomCode={roomCode} />;
 
-  if (showInviteModal) {
-    console.log('Rendering InviteLinkModal');
-    return (
-      <InviteLinkModal
-        isOpen={showInviteModal}
-        onClose={() => setShowInviteModal(false)}
-        roomCode={roomCode}
-      />
-    );
-  }
-
-  console.log('Rendering ChatRoom interface');
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-3 sm:px-4 py-2 sm:py-3">
+      <div className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2 sm:space-x-4">
-            <button
-              onClick={() => navigate('/')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors min-h-[44px] min-w-[44px]"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-
-            <div className="min-w-0 flex-1">
+          <div className="flex items-center space-x-4">
+            <button onClick={() => navigate('/')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5" /></button>
+            <div>
               <div className="flex items-center space-x-2">
-                <h1 className="text-base sm:text-lg font-semibold truncate">Room {roomCode}</h1>
-                <button
-                  onClick={copyRoomCode}
-                  className="p-1 hover:bg-gray-100 rounded transition-colors min-h-[32px] min-w-[32px]"
-                  title="Copy room code"
-                >
-                  <Copy className="w-4 h-4 text-gray-500" />
-                </button>
+                <h1 className="text-lg font-semibold truncate">Room {roomCode}</h1>
+                <button onClick={copyRoomCode} className="p-1 hover:bg-gray-100 rounded transition-colors"><Copy className="w-4 h-4 text-gray-500" /></button>
               </div>
-
-              <div className="flex items-center space-x-3 sm:space-x-4 text-xs sm:text-sm text-gray-600 mt-1">
+              <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
                 <div className="flex items-center space-x-1">
-                  {isConnected ? (
-                    <Wifi className="w-3 h-3 sm:w-4 sm:h-4 text-green-500" />
-                  ) : (
-                    <WifiOff className="w-3 h-3 sm:w-4 sm:h-4 text-red-500" />
-                  )}
-                  <span className="hidden sm:inline">{isConnected ? 'Connected' : 'Disconnected'}</span>
-                  <span className="sm:hidden">{isConnected ? 'Online' : 'Offline'}</span>
+                  {isConnected ? <Wifi className="w-4 h-4 text-green-500" /> : <WifiOff className="w-4 h-4 text-red-500" />}
+                  <span>{isConnected ? 'Connected' : 'Disconnected'}</span>
                 </div>
-
-                <div className="flex items-center space-x-1">
-                  <Users className="w-3 h-3 sm:w-4 sm:h-4" />
-                  <span>{users.length}</span>
-                </div>
-
-                {room?.settings?.passwordHash && (
-                  <div className="flex items-center space-x-1">
-                    <Lock className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span className="hidden sm:inline">Protected</span>
-                    <span className="sm:hidden">Locked</span>
-                  </div>
-                )}
-
-                {getTTLDisplay() && (
-                  <div className="flex items-center space-x-1">
-                    <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span className="hidden sm:inline">TTL: {getTTLDisplay()}</span>
-                    <span className="sm:hidden">{getTTLDisplay()}</span>
-                  </div>
-                )}
+                <div className="flex items-center space-x-1"><Users className="w-4 h-4" /><span>{users.length}</span></div>
+                {room?.settings?.passwordHash && <div className="flex items-center space-x-1"><Lock className="w-4 h-4" /><span>Protected</span></div>}
+                {getTTLDisplay() && <div className="flex items-center space-x-1"><Clock className="w-4 h-4" /><span>TTL: {getTTLDisplay()}</span></div>}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Error Banner */}
-      {error && (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-3">
-          <p className="text-sm">{error}</p>
-        </div>
-      )}
+      {error && <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-3"><p className="text-sm">{error}</p></div>}
 
-      {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Chat Area */}
         <div className="flex-1 flex flex-col">
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-3 sm:p-4">
-            <MessageList
-              messages={messages}
-              currentUser={currentUser}
-              messageTTL={room?.settings?.messageTTL}
-            />
+          <div className="flex-1 overflow-y-auto p-4">
+            <MessageList messages={messages} currentUser={currentUser} messageTTL={room?.settings?.messageTTL} />
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Message Input */}
-          <div className="border-t border-gray-200 p-3 sm:p-4 bg-white">
-            <form onSubmit={handleSendMessage} className="flex items-center space-x-2 sm:space-x-3">
-              {/* Hidden file input for image upload */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
-                id="image-upload"
-              />
-
-              {/* Image upload button */}
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={!isConnected || isUploading}
-                className="p-2 sm:p-3 min-h-[44px] min-w-[44px] rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                title="Send view-once image"
-              >
-                {isUploading ? (
-                  <Loader2 className="w-5 h-5 text-gray-500 animate-spin" />
+          <div className="border-t border-gray-200 p-4 bg-white">
+              <form onSubmit={handleSendMessage} className="flex items-center space-x-3">
+                {isRecording ? (
+                  <div className="flex-1 flex items-center justify-between bg-red-50 rounded-lg px-4 py-2 animate-in fade-in duration-200">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                      <span className="text-red-600 font-medium font-mono">{formatDuration(recordingDuration)} / 0:30</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button type="button" onClick={handleCancelRecording} className="p-2 hover:bg-red-100 rounded-full text-red-500 transition-colors" title="Cancel">
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                      <button type="button" onClick={handleStopRecording} className="p-2 bg-red-500 hover:bg-red-600 rounded-full text-white transition-colors shadow-sm" title="Send">
+                        <Send className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
                 ) : (
-                  <ImageIcon className="w-5 h-5 text-gray-500" />
+                  <>
+                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" id="image-upload" />
+                    <button type="button" onClick={() => fileInputRef.current?.click()} disabled={!isConnected || isUploading} className="p-3 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50">{isUploading ? <Loader2 className="w-5 h-5 text-gray-500 animate-spin" /> : <ImageIcon className="w-5 h-5 text-gray-500" />}</button>
+                    <button type="button" onClick={handleStartCall} disabled={!isConnected || users.length < 2} className="p-3 rounded-lg hover:bg-green-50 transition-colors disabled:opacity-50"><Phone className="w-5 h-5 text-green-500" /></button>
+                    <button type="button" onClick={startRecording} disabled={!isConnected} className="p-3 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"><Mic className="w-5 h-5 text-red-500" /></button>
+                    <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Type your message..." className="flex-1 input-field py-3 px-4" disabled={!isConnected || isSending} maxLength={500} />
+                    <button type="submit" disabled={!newMessage.trim() || !isConnected || isSending} className="btn-primary px-4 py-3"><Send className="w-5 h-5" /></button>
+                  </>
                 )}
-              </button>
-
-              {/* Call button */}
-              <button
-                type="button"
-                onClick={handleStartCall}
-                disabled={!isConnected || users.length < 2}
-                className="p-2 sm:p-3 min-h-[44px] min-w-[44px] rounded-lg hover:bg-green-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                title="Start audio call"
-              >
-                <Phone className="w-5 h-5 text-green-500" />
-              </button>
-
-              {/* Text input */}
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Type your message..."
-                className="flex-1 input-field text-sm sm:text-base py-2 sm:py-3 px-3 sm:px-4 min-h-[44px]"
-                disabled={!isConnected || isSending}
-                maxLength={500}
-              />
-
-              {/* Send button */}
-              <button
-                type="submit"
-                disabled={!newMessage.trim() || !isConnected || isSending}
-                className="btn-primary px-3 sm:px-4 py-2 sm:py-3 min-h-[44px] min-w-[44px] flex-shrink-0"
-              >
-                <Send className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
-            </form>
+              </form>
           </div>
         </div>
-
-        {/* User List - Hidden on mobile, shown on larger screens */}
-        <div className="hidden lg:block w-64 border-l border-gray-200 bg-white">
-          <UserList users={users} currentUser={currentUser} />
-        </div>
+        <div className="hidden lg:block w-64 border-l border-gray-200 bg-white"><UserList users={users} currentUser={currentUser} /></div>
       </div>
-
-      {/* Audio Call Modal */}
-      {showCallModal && (
-        <AudioCallModal
-          isOpen={showCallModal}
-          onClose={() => setShowCallModal(false)}
-          roomCode={roomCode}
-        />
-      )}
+      {showCallModal && <AudioCallModal isOpen={showCallModal} onClose={() => setShowCallModal(false)} roomCode={roomCode} />}
     </div>
   );
 };

@@ -21,7 +21,8 @@ const {
   isValidRoomCode,
   isValidNickname,
   getTTLOptions,
-  generateInviteLink
+  generateInviteLink,
+  logger
 } = require('./utils');
 
 // Initialize Cap.js for proof-of-work CAPTCHA
@@ -32,13 +33,13 @@ const cap = new Cap({
 });
 
 // Initialize in-memory storage
-console.log('🔌 Using in-memory storage for rooms and messages');
+logger.info('🔌 Using in-memory storage for rooms and messages');
 
 async function initializeServer() {
-  console.log('🚀 Starting server with in-memory storage...');
+  logger.info('🚀 Starting server with in-memory storage...');
   // Initialize Redis if configured
   await initializeRedis();
-  console.log('✅ Server initialized');
+  logger.info('✅ Server initialized');
 }
 
 async function initializeRedis() {
@@ -46,13 +47,13 @@ async function initializeRedis() {
     if (process.env.REDIS_URL) {
       const redisClient = createClient({ url: process.env.REDIS_URL });
       await redisClient.connect();
-      console.log('✅ Connected to Redis');
+      logger.info('✅ Connected to Redis');
       return redisClient;
     } else {
-      console.log('⚠️  Redis not configured, using in-memory storage');
+      logger.info('⚠️  Redis not configured, using in-memory storage');
     }
   } catch (error) {
-    console.log('⚠️  Redis connection failed, using in-memory storage:', error.message);
+    logger.error('⚠️  Redis connection failed, using in-memory storage:', error.message);
   }
 }
 
@@ -61,7 +62,7 @@ const server = http.createServer(app);
 
 // Request logging middleware
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  logger.info(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
 
@@ -136,17 +137,13 @@ const io = socketIo(server, {
   },
   transports: ['websocket', 'polling'],
   allowUpgrades: true,
+  maxHttpBufferSize: 1e7, // 10MB to accommodate large audio/image strings
   pingTimeout: 60000, // 60 seconds
   pingInterval: 25000, // 25 seconds
   cookie: false,
   serveClient: false,
   allowEIO3: true, // Enable Socket.IO v3 compatibility
-  perMessageDeflate: {
-    threshold: 1024, // 1KB
-    zlibDeflateOptions: {
-      chunkSize: 16 * 1024,
-    },
-  }
+  perMessageDeflate: false // Disable to prevent Base64 corruption
 });
 
 const PORT = process.env.PORT || 3001;
@@ -175,12 +172,12 @@ async function initializeRedis() {
     if (process.env.REDIS_URL) {
       redisClient = createClient({ url: process.env.REDIS_URL });
       await redisClient.connect();
-      console.log('✅ Connected to Redis');
+      logger.info('✅ Connected to Redis');
     } else {
-      console.log('⚠️  Redis not configured, using in-memory storage');
+      logger.info('⚠️  Redis not configured, using in-memory storage');
     }
   } catch (error) {
-    console.log('⚠️  Redis connection failed, using in-memory storage:', error.message);
+    logger.info('⚠️  Redis connection failed, using in-memory storage:', error.message);
     redisClient = null;
   }
 
@@ -215,12 +212,12 @@ app.get('/api/invite/:token', async (req, res) => {
     const { token } = req.params;
     const { roomCode } = req.query; // Optional room code to validate against
 
-    console.log(`Validating invite token: ${token} for room: ${roomCode || 'any'}`);
+    // console.log(`Validating invite token: ${token} for room: ${roomCode || 'any'}`);
 
     const result = await roomManager.validateInviteToken(token, roomCode || null, false);
 
     if (result.valid) {
-      console.log(`Token validation successful for room ${result.roomCode}`);
+      // console.log(`Token validation successful for room ${result.roomCode}`);
       res.json({
         success: true,
         roomCode: result.roomCode,
@@ -228,7 +225,7 @@ app.get('/api/invite/:token', async (req, res) => {
         isPermanent: result.isPermanent
       });
     } else {
-      console.log('Token validation failed:', result.error);
+      // console.log('Token validation failed:', result.error);
       res.status(400).json({
         success: false,
         error: result.error || 'Invalid or expired token'
@@ -245,10 +242,10 @@ app.get('/api/invite/:token', async (req, res) => {
 
 // Cap.js API endpoints for proof-of-work CAPTCHA
 app.post('/api/cap/challenge', async (req, res) => {
-  console.log('Received Cap challenge request');
+  // console.log('Received Cap challenge request');
   try {
     const challenge = await cap.createChallenge();
-    console.log('Generated challenge:', challenge);
+    // console.log('Generated challenge:', challenge);
     res.json(challenge);
   } catch (error) {
     console.error('Error generating Cap challenge:', error);
@@ -257,8 +254,8 @@ app.post('/api/cap/challenge', async (req, res) => {
 });
 
 app.post('/api/cap/redeem', async (req, res) => {
-  console.log('Received Cap redeem request');
-  console.log('Request body:', req.body);
+  // console.log('Received Cap redeem request');
+  // console.log('Request body:', req.body);
   try {
     const { token, solution } = req.body;
     // The widget might send 'token' or 'solution' or both.
@@ -286,7 +283,7 @@ app.post('/api/cap/redeem', async (req, res) => {
       result = await cap.validateToken(token);
     }
 
-    console.log('Verification result:', result);
+    // console.log('Verification result:', result);
 
     // If result is an object, send it directly. If boolean, wrap it.
     if (typeof result === 'object') {
@@ -351,7 +348,7 @@ app.post('/api/rooms', async (req, res) => {
   try {
     const { messageTTL, password, maxUsers, capToken } = req.body;
 
-    console.log('HTTP room creation request:', { messageTTL, password, maxUsers, hasCapToken: !!capToken });
+    // console.log('HTTP room creation request:', { messageTTL, password, maxUsers, hasCapToken: !!capToken });
 
     // Validate Cap token (proof-of-work verification)
     if (capToken) {
@@ -398,7 +395,7 @@ app.get('/api/invite/:token', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error validating invite token:', error);
+    logger.error('Error validating invite token:', error);
     res.status(400).json({
       error: 'Invalid or expired invite token',
       details: error.message
@@ -426,19 +423,19 @@ app.get('/api/rooms/:roomCode', async (req, res) => {
       userCount: room.users.length
     });
   } catch (error) {
-    console.error('Error checking room:', error);
+    logger.error('Error checking room:', error);
     res.status(500).json({ error: 'Failed to check room' });
   }
 });
 
 io.on('connection', (socket) => {
-  console.log(`🔌 User connected: ${socket.id}`);
+  // logger.info(`🔌 User connected: ${socket.id}`);
 
   socket.on('create-room', async (data, callback) => {
     try {
       const { messageTTL, password, maxUsers } = data || {};
 
-      console.log('Creating room with data:', { messageTTL, password, maxUsers });
+      // logger.info('Creating room with data:', { messageTTL, password, maxUsers });
 
       const settings = {};
       if (messageTTL && getTTLOptions()[messageTTL] !== undefined) {
@@ -449,15 +446,15 @@ io.on('connection', (socket) => {
       }
       if (maxUsers && typeof maxUsers === 'number' && maxUsers >= 1 && maxUsers <= 200) {
         settings.maxUsers = maxUsers;
-        console.log('Setting maxUsers to:', maxUsers);
+        logger.info('Setting maxUsers to:', maxUsers);
       } else {
-        console.log('Invalid or missing maxUsers, using default');
+        logger.info('Invalid or missing maxUsers, using default');
       }
 
       const roomCode = await roomManager.createRoom(settings);
       callback({ success: true, roomCode });
     } catch (error) {
-      console.error('Error creating room:', error);
+      logger.error('Error creating room:', error);
       callback({ success: false, error: 'Failed to create room' });
     }
   });
@@ -470,7 +467,7 @@ io.on('connection', (socket) => {
       // Validate credentials
       const validation = authUtils.validateCredentials({ roomCode, password, nickname });
       if (!validation.valid) {
-        console.error(`Invalid credentials: ${validation.errors.join(', ')}`);
+        logger.error(`Invalid credentials: ${validation.errors.join(', ')}`);
         return callback({ success: false, error: validation.errors[0] });
       }
 
@@ -478,7 +475,7 @@ io.on('connection', (socket) => {
       if (capToken) {
         const isValid = await cap.validateToken(capToken);
         if (!isValid) {
-          console.error(`Invalid Cap token for room ${roomCode}`);
+          logger.error(`Invalid Cap token for room ${roomCode}`);
           return callback({ success: false, error: 'Verification failed. Please try again.' });
         }
       }
@@ -494,7 +491,7 @@ io.on('connection', (socket) => {
       }
 
       if (!isValidRoomCode(roomCode)) {
-        console.error(`Invalid room code format: ${roomCode}`);
+        logger.error(`Invalid room code format: ${roomCode}`);
         return callback({ success: false, error: 'Invalid room code format' });
       }
 
@@ -503,22 +500,22 @@ io.on('connection', (socket) => {
         ? sanitizeInput(nickname)
         : generateRandomNickname();
 
-      console.log(`User ${userNickname} (${socket.id}) attempting to join room ${roomCode} with token:`, inviteToken || 'none');
+      // logger.info(`User ${userNickname} (${socket.id}) attempting to join room ${roomCode} with token:`, inviteToken || 'none');
 
       // First, validate the invite token if provided (don't consume it yet)
       if (inviteToken) {
-        console.log(`Validating invite token for room ${roomCode}`);
+        // logger.info(`Validating invite token for room ${roomCode}`);
         const tokenValidation = await roomManager.validateInviteToken(inviteToken, roomCode, false);
 
         if (!tokenValidation.valid) {
-          console.error('Invalid or expired invite token:', tokenValidation.error);
+          logger.error('Invalid or expired invite token:', tokenValidation.error);
           return callback({
             success: false,
             error: tokenValidation.error || 'Invalid or expired invite token'
           });
         }
 
-        console.log(`Token validation successful for room ${roomCode}`);
+        // logger.info(`Token validation successful for room ${roomCode}`);
       }
 
       // Join the room with the provided credentials
@@ -535,14 +532,14 @@ io.on('connection', (socket) => {
         // Successful join - clear any failed attempts
         securityManager.clearFailedAttempts(socket.id);
 
-        console.log(`User ${userNickname} (${socket.id}) successfully joined room ${roomCode}`);
+        // logger.info(`User ${userNickname} (${socket.id}) successfully joined room ${roomCode}`);
         socket.join(roomCode);
         socket.roomCode = roomCode;
         socket.nickname = userNickname;
 
         // Register user activity and start inactivity timer
         securityManager.registerUserActivity(socket.id, userId, roomCode, (socketId, userId, roomCode) => {
-          console.log(`⏰ User ${userId} timed out, disconnecting...`);
+          // logger.info(`⏰ User ${userId} timed out, disconnecting...`);
           const socket = io.sockets.sockets.get(socketId);
           if (socket) {
             socket.emit('inactivity-timeout', {
@@ -569,10 +566,10 @@ io.on('connection', (socket) => {
           userCount: result.room.users.length
         });
 
-        console.log(`👤 ${userNickname} joined room ${roomCode}`);
+        // logger.info(`👤 ${userNickname} joined room ${roomCode}`);
       } else if (result.redirectRoomCode) {
         // Handle redirect to a different room based on the token
-        console.log(`Redirecting user to room ${result.redirectRoomCode}`);
+        // logger.info(`Redirecting user to room ${result.redirectRoomCode}`);
         callback({
           success: false,
           redirect: true,
@@ -583,7 +580,7 @@ io.on('connection', (socket) => {
       } else {
         // Other errors - record failed attempt
         const failedAttempt = securityManager.recordFailedAttempt(socket.id);
-        console.error(`Failed to join room ${roomCode}:`, result.error);
+        logger.error(`Failed to join room ${roomCode}:`, result.error);
 
         if (failedAttempt.locked) {
           callback({
@@ -598,7 +595,7 @@ io.on('connection', (socket) => {
         }
       }
     } catch (error) {
-      console.error('Error joining room:', error);
+      logger.error('Error joining room:', error);
       callback({ success: false, error: 'Failed to join room' });
     }
   });
@@ -609,7 +606,7 @@ io.on('connection', (socket) => {
 
       // Update user activity
       securityManager.updateUserActivity(socket.id, (socketId, userId, roomCode) => {
-        console.log(`⏰ User ${userId} timed out, disconnecting...`);
+        logger.info(`⏰ User ${userId} timed out, disconnecting...`);
         const socket = io.sockets.sockets.get(socketId);
         if (socket) {
           socket.emit('inactivity-timeout', {
@@ -625,7 +622,7 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // Support for text and image messages
+      // Support for text, image and audio messages
       const { content, messageType = 'text', isViewOnce = false, imageData } = data;
 
       // For text messages, validate content
@@ -649,9 +646,35 @@ io.on('connection', (socket) => {
         }
       }
 
+      // For audio messages, validate content
+      if (messageType === 'audio') {
+        // Relaxed validation to allow raw base64 strings (without data URI prefix)
+        if (!content || typeof content !== 'string') {
+          socket.emit('error', { message: 'Invalid audio data' });
+          return;
+        }
+        // Check audio size (max 5MB)
+        const base64Size = content.length * 0.75; // Approximate size in bytes
+        if (base64Size > 5 * 1024 * 1024) {
+          socket.emit('error', { message: 'Audio too large. Maximum size is 5MB.' });
+          return;
+        }
+      }
+
+      let messageContent;
+      if (messageType === 'image') {
+        messageContent = imageData;
+      } else if (messageType === 'audio') {
+        // CRITICAL: Do NOT use sanitizeInput on audio content.
+        // Sanitization is for text and will destroy binary Base64 data.
+        messageContent = content;
+      } else {
+        messageContent = sanitizeInput(content.trim());
+      }
+
       const message = {
         id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        content: messageType === 'image' ? imageData : sanitizeInput(content.trim()),
+        content: messageContent,
         messageType,
         isViewOnce,
         hasBeenViewed: false,
@@ -662,9 +685,9 @@ io.on('connection', (socket) => {
         timestamp: new Date().toISOString()
       };
 
-      // DEBUG: Log image message details
+      // DEBUG: Log message details
       if (messageType === 'image') {
-        console.log(`📷 Image message created - ID: ${message.id}, content length: ${message.content?.length}, starts with: ${message.content?.substring(0, 50)}`);
+        // logger.info(`📷 Image message created - ID: ${message.id}, content length: ${message.content?.length}`);
       }
 
       await roomManager.addMessage(socket.roomCode, message);
@@ -673,7 +696,7 @@ io.on('connection', (socket) => {
       io.to(socket.roomCode).emit('new-message', message);
 
     } catch (error) {
-      console.error('Error sending message:', error);
+      logger.error('Error sending message:', error);
       socket.emit('error', { message: 'Failed to send message' });
     }
   });
@@ -683,7 +706,7 @@ io.on('connection', (socket) => {
     try {
       if (!socket.roomCode) return;
 
-      console.log(`👁️ Message ${messageId} viewed by ${socket.nickname}`);
+      // logger.info(`👁️ Message ${messageId} viewed by ${socket.nickname}`);
 
       // Mark message as viewed in room manager
       const result = await roomManager.markMessageViewed(messageId);
@@ -696,7 +719,7 @@ io.on('connection', (socket) => {
         });
       }
     } catch (error) {
-      console.error('Error marking message as viewed:', error);
+      logger.error('Error marking message as viewed:', error);
     }
   });
 
@@ -706,8 +729,8 @@ io.on('connection', (socket) => {
   socket.on('call-offer', (data) => {
     if (!socket.roomCode) return;
 
-    console.log(`📞 Call offer from ${socket.nickname} (${socket.id}) in room ${socket.roomCode}`);
-    console.log(`   Target: ${data.targetNickname}, Video: ${data.includeVideo}`);
+    // logger.info(`📞 Call offer from ${socket.nickname} (${socket.id}) in room ${socket.roomCode}`);
+    // logger.info(`   Target: ${data.targetNickname}, Video: ${data.includeVideo}`);
 
     // Broadcast offer to other participants in the room
     socket.to(socket.roomCode).emit('call-offer', {
@@ -721,7 +744,7 @@ io.on('connection', (socket) => {
   socket.on('call-answer', (data) => {
     if (!socket.roomCode) return;
 
-    console.log(`📞 Call answer from ${socket.nickname} (${socket.id}) in room ${socket.roomCode}`);
+    // logger.info(`📞 Call answer from ${socket.nickname} (${socket.id}) in room ${socket.roomCode}`);
 
     // Broadcast answer to other participants
     socket.to(socket.roomCode).emit('call-answer', {
@@ -745,7 +768,7 @@ io.on('connection', (socket) => {
   socket.on('call-rejected', (data) => {
     if (!socket.roomCode) return;
 
-    console.log(`📞 Call rejected by ${socket.nickname} in room ${socket.roomCode}`);
+    // logger.info(`📞 Call rejected by ${socket.nickname} in room ${socket.roomCode}`);
 
     // Notify caller that call was rejected
     socket.to(socket.roomCode).emit('call-rejected', {
@@ -758,7 +781,7 @@ io.on('connection', (socket) => {
   socket.on('call-ended', (data) => {
     if (!socket.roomCode) return;
 
-    console.log(`📞 Call ended by ${socket.nickname} in room ${socket.roomCode}`);
+    // logger.info(`📞 Call ended by ${socket.nickname} in room ${socket.roomCode}`);
 
     // Notify other participants that call ended
     socket.to(socket.roomCode).emit('call-ended', {
@@ -768,7 +791,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', async () => {
-    console.log(`🔌 User disconnected: ${socket.id}`);
+    // logger.info(`🔌 User disconnected: ${socket.id}`);
 
     // Clear user activity tracking
     securityManager.clearUserActivity(socket.id);
@@ -784,7 +807,7 @@ io.on('connection', (socket) => {
         nickname: socket.nickname
       });
 
-      console.log(`👤 ${socket.nickname} left room ${socket.roomCode}`);
+      // logger.info(`👤 ${socket.nickname} left room ${socket.roomCode}`);
     }
 
     // Clean up rate limiting
@@ -809,26 +832,26 @@ async function startServer() {
 
     // Start the server
     server.listen(PORT, () => {
-      console.log(`🚀 Ephemeral Chat server running on port ${PORT}`);
-      console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`📡 Server ready to accept connections`);
+      logger.info(`🚀 Ephemeral Chat server running on port ${PORT}`);
+      logger.info(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
+      logger.info(`📡 Server ready to accept connections`);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    logger.error('Failed to start server:', error);
     process.exit(1);
   }
 }
 
-startServer().catch(console.error);
+startServer().catch(logger.error);
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('🛑 Shutting down server...');
+  logger.info('🛑 Shutting down server...');
   if (redisClient) {
     await redisClient.quit();
   }
   server.close(() => {
-    console.log('✅ Server shut down gracefully');
+    logger.info('✅ Server shut down gracefully');
     process.exit(0);
   });
 });

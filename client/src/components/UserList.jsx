@@ -23,12 +23,12 @@ const UserList = ({ users, currentUser }) => {
       'bg-indigo-500',
       'bg-teal-500'
     ];
-    
+
     let hash = 0;
     for (let i = 0; i < nickname.length; i++) {
       hash = nickname.charCodeAt(i) + ((hash << 5) - hash);
     }
-    
+
     return colors[Math.abs(hash) % colors.length];
   };
 
@@ -56,37 +56,35 @@ const UserList = ({ users, currentUser }) => {
             {users.map((user, index) => {
               const isCurrentUser = currentUser && user.socketId === currentUser.socketId;
               const isFirstUser = index === 0; // First user is considered room creator
-              
+
               return (
                 <div
-                  key={user.socketId}
-                  className={`flex items-center space-x-3 p-2 rounded-lg ${
-                    isCurrentUser ? 'bg-primary-50 border border-primary-200' : 'hover:bg-gray-50'
-                  }`}
+                  key={user.socketId || user.id || index}
+                  className={`flex items-center space-x-3 p-2 rounded-lg ${isCurrentUser ? 'bg-primary-50 border border-primary-200' : 'hover:bg-gray-50'
+                    }`}
                 >
                   {/* Avatar */}
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${getAvatarColor(user.nickname)}`}>
                     {getInitials(user.nickname)}
                   </div>
-                  
+
                   {/* User Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-2">
-                      <p className={`text-sm font-medium truncate ${
-                        isCurrentUser ? 'text-primary-900' : 'text-gray-900'
-                      }`}>
+                      <p className={`text-sm font-medium truncate ${isCurrentUser ? 'text-primary-900' : 'text-gray-900'
+                        }`}>
                         {user.nickname}
                         {isCurrentUser && (
                           <span className="text-xs text-primary-600 ml-1">(You)</span>
                         )}
                       </p>
-                      
+
                       {/* Room creator indicator */}
                       {isFirstUser && (
                         <Crown className="w-3 h-3 text-yellow-500" title="Room Creator" />
                       )}
                     </div>
-                    
+
                     {/* Online status */}
                     <div className="flex items-center space-x-1">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>

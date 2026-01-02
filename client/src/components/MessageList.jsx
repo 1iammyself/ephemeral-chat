@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Clock, User, Eye, Lock, Image as ImageIcon } from 'lucide-react';
+import { Clock, User, Eye, Lock, Image as ImageIcon, Mic } from 'lucide-react';
 import ImageViewer from './ImageViewer';
+import AudioPlayer from './AudioPlayer';
 import socketManager from '../socket-simple';
 
 const MessageList = ({ messages, currentUser, messageTTL }) => {
@@ -8,6 +9,7 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
   const [viewingImage, setViewingImage] = useState(null);
   const [currentImageUrl, setCurrentImageUrl] = useState(null); // Save image URL separately
   const [viewedMessages, setViewedMessages] = useState(new Set());
+  const [playingAudioId, setPlayingAudioId] = useState(null);
 
   // Listen for message-viewed events from server
   useEffect(() => {
@@ -103,7 +105,7 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
 
     // IMPORTANT: Save the image URL FIRST before any state changes
     const imageUrl = message.content;
-    console.log('Opening image viewer with URL length:', imageUrl?.length);
+    // console.log('Opening image viewer with URL length:', imageUrl?.length);
 
     // Save both the message reference and the actual image URL
     setViewingImage(message);
@@ -113,6 +115,18 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
     socketManager.emit('message-viewed', { messageId: message.id });
 
     // Mark as viewed locally
+    setViewedMessages(prev => new Set([...prev, message.id]));
+  }, [isMessageViewed]);
+
+  const handleAudioPlay = useCallback((message) => {
+    if (isMessageViewed(message)) return;
+    
+    // Set this audio as playing to reveal the player
+    setPlayingAudioId(message.id);
+    
+    // Don't mark as viewed immediately, wait for playback to start or end?
+    // For now, let's mark as viewed when they click to listen, similar to image
+    socketManager.emit('message-viewed', { messageId: message.id });
     setViewedMessages(prev => new Set([...prev, message.id]));
   }, [isMessageViewed]);
 
@@ -154,6 +168,7 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
           const isExpired = isMessageExpired(message);
           const timeLeft = getTimeLeft(message);
           const isImage = message.messageType === 'image';
+          const isAudio = message.messageType === 'audio';
           const isViewOnce = message.isViewOnce;
           const hasBeenViewed = isMessageViewed(message);
 
@@ -167,38 +182,44 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
             );
           }
 
-          // View-once image that has been viewed
-          if (isImage && isViewOnce && hasBeenViewed) {
-            return (
-              <div
-                key={message.id}
-                className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
-              >
+          // View-once content that has been viewed
+          // For audio, we keep showing the player if it's currently playing (or just unlocked for this session)
+          if ((isImage || isAudio) && isViewOnce && hasBeenViewed) {
+            // If it's audio and we are currently playing it, don't show the "viewed" placeholder yet
+            if (isAudio && playingAudioId === message.id) {
+               // Pass through to render the player
+            } else {
+              return (
                 <div
-                  className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${isOwnMessage
-                    ? 'bg-gray-300 text-gray-600'
-                    : 'bg-gray-100 border border-gray-200 text-gray-600'
-                    }`}
+                  key={message.id}
+                  className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
                 >
-                  {!isOwnMessage && (
-                    <div className="text-xs font-medium text-gray-500 mb-1">
-                      {message.sender.nickname}
+                  <div
+                    className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${isOwnMessage
+                      ? 'bg-gray-300 text-gray-600'
+                      : 'bg-gray-100 border border-gray-200 text-gray-600'
+                      }`}
+                  >
+                    {!isOwnMessage && (
+                      <div className="text-xs font-medium text-gray-500 mb-1">
+                        {message.sender.nickname}
+                      </div>
+                    )}
+                    <div className="flex items-center space-x-2 text-sm italic">
+                      {isImage ? <Eye className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                      <span>This {isImage ? 'image' : 'audio'} has been viewed</span>
                     </div>
-                  )}
-                  <div className="flex items-center space-x-2 text-sm italic">
-                    <Eye className="w-4 h-4" />
-                    <span>This image has been viewed and deleted</span>
-                  </div>
-                  <div className={`flex items-center justify-between mt-2 text-xs text-gray-500`}>
-                    <span>{formatTime(message.timestamp)}</span>
-                    <div className="flex items-center space-x-1">
-                      <Lock className="w-3 h-3 text-green-500" />
-                      <span>View once</span>
+                    <div className={`flex items-center justify-between mt-2 text-xs text-gray-500`}>
+                      <span>{formatTime(message.timestamp)}</span>
+                      <div className="flex items-center space-x-1">
+                        <Lock className="w-3 h-3 text-green-500" />
+                        <span>View once</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
+              );
+            }
           }
 
           return (
@@ -243,6 +264,33 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
                           alt="Shared image"
                           className="max-w-48 max-h-32 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
                           onClick={() => setViewingImage(message)}
+                        />
+                      )}
+                    </div>
+                  ) : isAudio ? (
+                    // Audio message
+                    <div className="min-w-[200px]">
+                      {isViewOnce && !hasBeenViewed && playingAudioId !== message.id ? (
+                        <div 
+                          className="flex items-center space-x-3 p-2 bg-white/10 rounded-lg cursor-pointer hover:bg-white/20 transition-colors"
+                          onClick={() => handleAudioPlay(message)}
+                        >
+                          <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center">
+                            <Mic className="w-5 h-5 text-amber-500" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">Voice Message</p>
+                            <p className="text-xs opacity-70">Tap to listen (View Once)</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <AudioPlayer 
+                          src={message.content} 
+                          isOwnMessage={isOwnMessage}
+                          autoPlay={playingAudioId === message.id}
+                          onEnded={() => {
+                            // Optional: do something when audio ends
+                          }}
                         />
                       )}
                     </div>
