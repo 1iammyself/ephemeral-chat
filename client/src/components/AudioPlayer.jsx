@@ -127,24 +127,24 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
         className={`p-2 rounded-full transition-colors ${
           isOwnMessage 
             ? 'bg-white/20 hover:bg-white/30 text-white' 
-            : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+            : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200'
         }`}
       >
         {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
       </button>
       <div className="flex-1 flex flex-col justify-center">
         <div className={`h-1 rounded-full overflow-hidden ${
-          isOwnMessage ? 'bg-white/30' : 'bg-gray-200'
+          isOwnMessage ? 'bg-white/30' : 'bg-gray-200 dark:bg-gray-700'
         }`}>
           <div 
             className={`h-full transition-all duration-100 ${
-              isOwnMessage ? 'bg-white' : 'bg-primary-500'
+              isOwnMessage ? 'bg-white' : 'bg-primary-500 dark:bg-primary-400'
             }`}
             style={{ width: `${progress}%` }}
           />
         </div>
         <div className={`flex justify-between text-[10px] mt-1 ${
-          isOwnMessage ? 'text-white/80' : 'text-gray-500'
+          isOwnMessage ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'
         }`}>
           <span>{formatTime(audioRef.current?.currentTime || 0)}</span>
           <span>{duration ? formatTime(duration) : '--:--'}</span>

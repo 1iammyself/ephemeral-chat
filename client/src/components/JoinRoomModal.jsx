@@ -169,15 +169,15 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
   if (isWaitingForHost) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg p-6 flex flex-col items-center max-w-md w-full text-center">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 flex flex-col items-center max-w-md w-full text-center">
           <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
-          <h3 className="text-xl font-bold mb-2">Waiting for Host</h3>
-          <p className="text-gray-600 mb-6">
+          <h3 className="text-xl font-bold mb-2 dark:text-white">Waiting for Host</h3>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">
             The host has been notified of your arrival. Please wait for them to let you in.
           </p>
           <button
             onClick={onCancel}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
           >
             Cancel Request
           </button>
@@ -189,9 +189,9 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
   if (isLoading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg p-6 flex flex-col items-center">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 flex flex-col items-center">
           <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-2" />
-          <p className="text-gray-600">Loading room info...</p>
+          <p className="text-gray-600 dark:text-gray-300">Loading room info...</p>
         </div>
       </div>
     );
@@ -199,34 +199,34 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg w-full max-w-md relative">
+      <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md relative">
         <button
           onClick={onCancel}
-          className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+          className="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
           disabled={isJoining || isProcessingInvite}
         >
           <X className="w-6 h-6" />
         </button>
 
         <div className="p-6">
-          <h2 className="text-2xl font-bold mb-6 flex items-center">
-            <MessageCircle className="w-6 h-6 mr-2 text-blue-600" />
+          <h2 className="text-2xl font-bold mb-6 flex items-center dark:text-white">
+            <MessageCircle className="w-6 h-6 mr-2 text-blue-600 dark:text-blue-400" />
             Join Room
           </h2>
 
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-sm text-gray-500">Room Code</span>
-              <span className="font-mono font-bold text-lg">{roomCode}</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">Room Code</span>
+              <span className="font-mono font-bold text-lg dark:text-white">{roomCode}</span>
             </div>
             {roomInfo && (
               <>
-                <div className="flex items-center text-sm text-gray-600 mb-1">
+                <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mb-1">
                   <Users className="w-4 h-4 mr-2" />
                   {roomInfo.activeUsers} / {roomInfo.maxUsers} Users
                 </div>
                 {roomInfo.expiresAt && (
-                  <div className="flex items-center text-sm text-gray-600">
+                  <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
                     <Clock className="w-4 h-4 mr-2" />
                     Expires in {formatTimeRemaining(roomInfo.expiresAt)}
                   </div>
@@ -236,7 +236,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md flex items-start text-sm">
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-md flex items-start text-sm">
               <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
@@ -244,14 +244,14 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Nickname
               </label>
               <input
                 type="text"
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
-                className="input-field w-full p-2"
+                className="input-field w-full p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
                 placeholder="Enter your nickname"
                 maxLength={20}
                 required
@@ -261,7 +261,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
 
             {requiresPassword && !inviteValid && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Room Password
                 </label>
                 <div className="relative">
@@ -270,7 +270,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="input-field w-full p-2 pl-9"
+                    className="input-field w-full p-2 pl-9 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
                     placeholder="Enter room password"
                     required
                     disabled={isJoining || isProcessingInvite}
@@ -280,7 +280,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
             )}
 
             {fromInvite && inviteValid && (
-              <div className="p-3 bg-green-50 text-green-700 rounded-md flex items-center text-sm">
+              <div className="p-3 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-md flex items-center text-sm">
                 <Check className="w-4 h-4 mr-2" />
                 Valid invite link applied
               </div>
@@ -289,12 +289,12 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
             {/* Cap Verification Widget */}
             <div className="mb-6">
               <div className="flex items-center space-x-2 mb-2">
-                <Shield className="w-4 h-4 text-blue-600" />
-                <label className="text-sm font-medium text-gray-700">
+                <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Verification
                 </label>
               </div>
-              <p className="text-xs text-gray-600 mb-2">
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
                 Complete this quick verification to prove you're human
               </p>
               <div className="flex justify-center">
@@ -305,7 +305,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
                 />
               </div>
               {isCapVerified && (
-                <div className="mt-2 flex items-center justify-center text-green-600 text-sm">
+                <div className="mt-2 flex items-center justify-center text-green-600 dark:text-green-400 text-sm">
                   <Check className="w-4 h-4 mr-1" />
                   Verified
                 </div>
@@ -316,7 +316,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
               <button
                 type="submit"
                 disabled={isJoining || isProcessingInvite || (!isCapVerified && !capToken)}
-                className={`w-full py-2 px-4 rounded-lg font-medium text-white ${isJoining || isProcessingInvite || (!isCapVerified && !capToken) ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'
+                className={`w-full py-2 px-4 rounded-lg font-medium text-white ${isJoining || isProcessingInvite || (!isCapVerified && !capToken) ? 'bg-blue-400 dark:bg-blue-500' : 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700'
                   } transition-colors flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed`}
               >
                 {isJoining || isProcessingInvite ? (
@@ -333,7 +333,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
                 type="button"
                 onClick={onCancel}
                 disabled={isJoining || isProcessingInvite}
-                className="w-full py-2 px-4 rounded-lg font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-2 px-4 rounded-lg font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>

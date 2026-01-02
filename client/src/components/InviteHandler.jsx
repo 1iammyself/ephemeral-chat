@@ -125,17 +125,17 @@ function InviteHandler() {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full">
-        <h2 className="text-xl font-bold mb-4">Join Chat Room</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+        <h2 className="text-xl font-bold mb-4 dark:text-white">Join Chat Room</h2>
         
         {error ? (
-          <div className="text-red-600 mb-4">{error}</div>
+          <div className="text-red-600 dark:text-red-400 mb-4">{error}</div>
         ) : status ? (
-          <div className="mb-4">{status}</div>
+          <div className="mb-4 text-gray-700 dark:text-gray-300">{status}</div>
         ) : (
           <form onSubmit={handleJoinRoom} className="space-y-4">
             <div>
-              <label htmlFor="nickname" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="nickname" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Your Nickname
               </label>
               <input
@@ -143,7 +143,7 @@ function InviteHandler() {
                 id="nickname"
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
-                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 placeholder="Enter your nickname"
                 autoFocus
                 required
@@ -152,7 +152,7 @@ function InviteHandler() {
             
             {requiresPassword && (
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Room Password
                 </label>
                 <input
@@ -160,7 +160,7 @@ function InviteHandler() {
                   id="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                   placeholder="Enter room password"
                 />
               </div>
@@ -170,14 +170,14 @@ function InviteHandler() {
               <button
                 type="submit"
                 disabled={isJoining}
-                className={`flex-1 bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors ${isJoining ? 'opacity-50' : ''}`}
+                className={`flex-1 bg-blue-500 dark:bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors ${isJoining ? 'opacity-50' : ''}`}
               >
                 {isJoining ? 'Joining...' : 'Join Room'}
               </button>
               <button
                 type="button"
                 onClick={() => navigate('/')}
-                className="px-4 py-2 border rounded hover:bg-gray-100 transition-colors"
+                className="px-4 py-2 border rounded hover:bg-gray-100 dark:hover:bg-gray-700 dark:border-gray-600 dark:text-gray-300 transition-colors"
               >
                 Cancel
               </button>

@@ -138,7 +138,7 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
   if (messages.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="text-center text-gray-500">
+        <div className="text-center text-gray-500 dark:text-gray-400">
           <User className="w-12 h-12 mx-auto mb-4 opacity-50" />
           <p className="text-lg font-medium mb-2">No messages yet</p>
           <p className="text-sm">Start the conversation by sending a message!</p>
@@ -154,7 +154,7 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
           if (message.type === 'system') {
             return (
               <div key={message.id} className="text-center">
-                <div className="inline-block bg-gray-100 text-gray-600 text-sm px-3 py-1 rounded-full">
+                <div className="inline-block bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-sm px-3 py-1 rounded-full">
                   {message.content}
                 </div>
               </div>
@@ -175,7 +175,7 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
           if (isExpired) {
             return (
               <div key={message.id} className="text-center">
-                <div className="inline-block bg-gray-100 text-gray-500 text-xs px-3 py-1 rounded-full italic">
+                <div className="inline-block bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs px-3 py-1 rounded-full italic">
                   Message expired
                 </div>
               </div>
@@ -196,12 +196,12 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
                 >
                   <div
                     className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${isOwnMessage
-                      ? 'bg-gray-300 text-gray-600'
-                      : 'bg-gray-100 border border-gray-200 text-gray-600'
+                      ? 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-200'
+                      : 'bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300'
                       }`}
                   >
                     {!isOwnMessage && (
-                      <div className="text-xs font-medium text-gray-500 mb-1">
+                      <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
                         {message.sender.nickname}
                       </div>
                     )}
@@ -209,7 +209,7 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
                       {isImage ? <Eye className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                       <span>This {isImage ? 'image' : 'audio'} has been viewed</span>
                     </div>
-                    <div className={`flex items-center justify-between mt-2 text-xs text-gray-500`}>
+                    <div className={`flex items-center justify-between mt-2 text-xs text-gray-500 dark:text-gray-400`}>
                       <span>{formatTime(message.timestamp)}</span>
                       <div className="flex items-center space-x-1">
                         <Lock className="w-3 h-3 text-green-500" />
@@ -229,13 +229,13 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
             >
               <div
                 className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${isOwnMessage
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-white border border-gray-200'
+                  ? 'bg-primary-600 dark:bg-primary-700 text-white'
+                  : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:text-gray-100'
                   }`}
               >
                 {/* Sender name (only for others' messages) */}
                 {!isOwnMessage && (
-                  <div className="text-xs font-medium text-gray-600 mb-1">
+                  <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     {message.sender.nickname}
                   </div>
                 )}
@@ -255,7 +255,7 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
                             <Eye className="w-6 h-6 text-amber-500" />
                           </div>
                           <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Tap to view</p>
-                          <p className="text-xs text-gray-500">Disappears after viewing</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Disappears after viewing</p>
                         </div>
                       ) : (
                         // Regular image preview
@@ -272,7 +272,11 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
                     <div className="min-w-[200px]">
                       {isViewOnce && !hasBeenViewed && playingAudioId !== message.id ? (
                         <div 
-                          className="flex items-center space-x-3 p-2 bg-white/10 rounded-lg cursor-pointer hover:bg-white/20 transition-colors"
+                          className={`flex items-center space-x-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                            isOwnMessage 
+                              ? 'bg-white/10 hover:bg-white/20' 
+                              : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          }`}
                           onClick={() => handleAudioPlay(message)}
                         >
                           <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center">
@@ -301,7 +305,7 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
                 </div>
 
                 {/* Timestamp, TTL, and view-once indicator */}
-                <div className={`flex items-center justify-between mt-2 text-xs ${isOwnMessage ? 'text-primary-100' : 'text-gray-500'
+                <div className={`flex items-center justify-between mt-2 text-xs ${isOwnMessage ? 'text-primary-100' : 'text-gray-500 dark:text-gray-400'
                   }`}>
                   <span>{formatTime(message.timestamp)}</span>
                   <div className="flex items-center space-x-2">

@@ -21,6 +21,11 @@ class RoomManager {
     this.inviteTokens = new Map(); // token -> { roomCode, timeoutId, isPermanent: boolean }
     this.roomToTokens = new Map(); // roomCode -> Set of tokens (for cleanup)
     this._io = null; // socket.io reference for broadcasts
+
+    // Start garbage collector for in-memory messages
+    if (!this.redis) {
+      this.cleanupInterval = setInterval(() => this.pruneExpiredMessages(), 60 * 1000);
+    }
   }
 
   /**
@@ -282,6 +287,12 @@ class RoomManager {
       await this.redis.setex(messageKey, room.settings.messageTTL, JSON.stringify(message));
     } else {
       room.messages.push(message);
+      
+      // Safety cap: prevent memory exhaustion (keep last 500 messages max)
+      if (room.messages.length > 500) {
+        room.messages = room.messages.slice(-500);
+      }
+      
       await this.saveRoom(roomCode, room);
     }
 
@@ -312,7 +323,51 @@ class RoomManager {
       return messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     }
 
+    // In-memory: Filter out expired messages on read
+    if (room.settings.messageTTL > 0) {
+      const now = new Date();
+      const ttlMs = room.settings.messageTTL * 1000;
+      
+      // Filter messages that haven't expired
+      const validMessages = room.messages.filter(msg => {
+        const msgTime = new Date(msg.timestamp);
+        return (now - msgTime) < ttlMs;
+      });
+      
+      // If we filtered anything out, update the room storage immediately
+      if (validMessages.length !== room.messages.length) {
+        room.messages = validMessages;
+        await this.saveRoom(roomCode, room);
+      }
+      
+      return validMessages;
+    }
+
     return room.messages || [];
+  }
+
+  /**
+   * Prune expired messages from in-memory storage
+   * Runs periodically to ensure "Black Hole" security
+   */
+  pruneExpiredMessages() {
+    const now = new Date();
+    
+    for (const [roomCode, room] of this.rooms.entries()) {
+      if (room.settings.messageTTL > 0) {
+        const ttlMs = room.settings.messageTTL * 1000;
+        const originalCount = room.messages.length;
+        
+        room.messages = room.messages.filter(msg => {
+          const msgTime = new Date(msg.timestamp);
+          return (now - msgTime) < ttlMs;
+        });
+
+        if (room.messages.length !== originalCount) {
+          // console.log(`Pruned ${originalCount - room.messages.length} expired messages from room ${roomCode}`);
+        }
+      }
+    }
   }
 
   /**
@@ -428,10 +483,14 @@ class RoomManager {
   /**
    * Generate a secure random token
    * @private
-   * @returns {string} A secure random token
+   * @returns {string} A secure random token (Base64URL)
    */
   generateSecureToken() {
-    return crypto.randomBytes(32).toString('hex');
+    // Use Base64URL for shorter tokens
+    return crypto.randomBytes(32).toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
   }
 
   /**
@@ -641,45 +700,7 @@ class RoomManager {
     };
   }
 
-  /**
-   * Cleanup all invite tokens for a room (when room is deleted)
-   * @param {string} roomCode - The room code to clean up tokens for
-   */
-  cleanupInviteTokens(roomCode) {
-    const tokens = this.roomToTokens.get(roomCode) || new Set();
 
-    for (const token of tokens) {
-      const tokenData = this.inviteTokens.get(token);
-      if (tokenData) {
-        clearTimeout(tokenData.timeoutId);
-        this.inviteTokens.delete(token);
-      }
-    }
-
-    this.roomToTokens.delete(roomCode);
-  }
-
-  /**
-   * Cleanup all resources when a room is deleted
-   * @param {string} roomCode - The room code being deleted
-   */
-  async deleteRoom(roomCode) {
-    // Clean up invite tokens first
-    this.cleanupInviteTokens(roomCode);
-
-    // Clear any room expiry timer
-    if (this.roomTimers.has(roomCode)) {
-      clearTimeout(this.roomTimers.get(roomCode));
-      this.roomTimers.delete(roomCode);
-    }
-
-    // Delete from storage
-    if (this.redis) {
-      await this.redis.del(`room:${roomCode}`);
-    } else {
-      this.rooms.delete(roomCode);
-    }
-  }
 }
 
 module.exports = RoomManager;

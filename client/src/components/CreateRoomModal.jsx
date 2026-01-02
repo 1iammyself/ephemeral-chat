@@ -178,25 +178,25 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   if (createdRoom) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg w-full max-w-md relative">
+        <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md relative">
           <div className="p-6">
-            <h2 className="text-2xl font-bold mb-4 text-green-600">
+            <h2 className="text-2xl font-bold mb-4 text-green-600 dark:text-green-400">
               Room Created Successfully!
             </h2>
 
             <div className="space-y-4 mb-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Room Code</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Room Code</label>
                 <div className="flex items-center">
                   <input
                     type="text"
                     readOnly
                     value={createdRoom.roomCode}
-                    className="flex-1 p-2 border rounded-l-md bg-gray-50 font-mono"
+                    className="flex-1 p-2 border rounded-l-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white font-mono"
                   />
                   <button
                     onClick={() => copyToClipboard(createdRoom.roomCode, 'roomCode')}
-                    className="bg-blue-500 text-white p-2 rounded-r-md hover:bg-blue-600 transition-colors"
+                    className="bg-blue-500 dark:bg-blue-600 text-white p-2 rounded-r-md hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors"
                   >
                     {isCopied.roomCode ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
                   </button>
@@ -205,17 +205,17 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
 
               {createdRoom.password && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
                   <div className="flex items-center">
                     <input
                       type="text"
                       readOnly
                       value={createdRoom.password}
-                      className="flex-1 p-2 border rounded-l-md bg-gray-50 font-mono"
+                      className="flex-1 p-2 border rounded-l-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white font-mono"
                     />
                     <button
                       onClick={() => copyToClipboard(createdRoom.password, 'password')}
-                      className="bg-blue-500 text-white p-2 rounded-r-md hover:bg-blue-600 transition-colors"
+                      className="bg-blue-500 dark:bg-blue-600 text-white p-2 rounded-r-md hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors"
                     >
                       {isCopied.password ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
                     </button>
@@ -224,36 +224,36 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
               )}
 
               <div className="pt-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Invite Link (Expires in 5 min)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Invite Link (Expires in 5 min)</label>
                 <div className="flex items-center">
                   <input
                     type="text"
                     readOnly
                     value={inviteLink || 'Generating...'}
-                    className="flex-1 p-2 border rounded-l-md bg-gray-50 text-sm truncate"
+                    className="flex-1 p-2 border rounded-l-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm truncate"
                   />
                   <button
                     onClick={() => inviteLink && copyToClipboard(inviteLink, 'inviteLink')}
                     disabled={!inviteLink}
-                    className={`p-2 rounded-r-md transition-colors ${inviteLink ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                    className={`p-2 rounded-r-md transition-colors ${inviteLink ? 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700' : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'}`}
                   >
                     {isCopied.inviteLink ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
                   </button>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">Share this link with others to join easily</p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Share this link with others to join easily</p>
               </div>
             </div>
 
             <div className="flex justify-between pt-2">
               <button
                 onClick={handleNewRoom}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+                className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"
               >
                 Create Another Room
               </button>
               <button
                 onClick={handleJoinRoom}
-                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+                className="px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors"
               >
                 Join Room Now
               </button>
@@ -267,16 +267,16 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   // Show the room creation form
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg w-full max-w-md relative">
+      <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md relative">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+          className="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
         >
           <X className="w-6 h-6" />
         </button>
 
         <div className="p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
-          <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 flex items-center">
+          <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 flex items-center dark:text-white">
             <Settings className="w-5 h-5 mr-2" />
             Create a New Room
           </h2>
@@ -285,12 +285,12 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
             {/* Message TTL Setting */}
             <div>
               <div className="flex items-center space-x-2 mb-2 sm:mb-3">
-                <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
-                <label className="font-medium text-gray-900 text-sm sm:text-base">
+                <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
+                <label className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">
                   Message Auto-Delete
                 </label>
               </div>
-              <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-3 sm:mb-4">
                 Choose when messages should automatically disappear for privacy
               </p>
               <div className="space-y-2">
@@ -298,8 +298,8 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                   <label
                     key={option.value}
                     className={`flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 rounded-lg border cursor-pointer transition-colors ${settings.messageTTL === option.value
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-gray-200 hover:bg-gray-50'
+                      ? 'border-primary-500 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/20'
+                      : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
                       }`}
                   >
                     <input
@@ -311,8 +311,8 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                       className="mt-1"
                     />
                     <div className="min-w-0">
-                      <div className="font-medium text-xs sm:text-sm">{option.label}</div>
-                      <div className="text-xs text-gray-600">{option.description}</div>
+                      <div className="font-medium text-xs sm:text-sm dark:text-white">{option.label}</div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">{option.description}</div>
                     </div>
                   </label>
                 ))}
@@ -322,12 +322,12 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
             {/* Password Setting */}
             <div>
               <div className="flex items-center space-x-2 mb-2 sm:mb-3">
-                <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
-                <label className="font-medium text-gray-900 text-sm sm:text-base">
+                <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
+                <label className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">
                   Room Password (Optional)
                 </label>
               </div>
-              <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 sm:mb-3">
                 Set a password to restrict access to your room
               </p>
               <input
@@ -335,18 +335,18 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 placeholder="Enter password (optional)"
                 value={settings.password}
                 onChange={(e) => setSettings(prev => ({ ...prev, password: e.target.value }))}
-                className="input-field text-sm sm:text-base py-2 sm:py-3 px-3 sm:px-4"
+                className="input-field text-sm sm:text-base py-2 sm:py-3 px-3 sm:px-4 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
                 maxLength={50}
               />
             </div>
             <div>
               <div className="flex items-center space-x-2 mb-2 sm:mb-3">
-                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
-                <label className="font-medium text-gray-900 text-sm sm:text-base">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
+                <label className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">
                   Maximum Users
                 </label>
               </div>
-              <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 sm:mb-3">
                 Set the maximum number of people who can join this room (1-200)
               </p>
               <div className="px-2 sm:px-3">
@@ -356,25 +356,25 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                     type="button"
                     onClick={() => setSettings(prev => ({ ...prev, maxUsers: Math.max(1, prev.maxUsers - 1) }))}
                     disabled={settings.maxUsers <= 1}
-                    className="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-300 rounded-full text-xl font-bold transition-colors"
+                    className="w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-300 dark:disabled:text-gray-600 rounded-full text-xl font-bold transition-colors dark:text-white"
                   >
                     −
                   </button>
-                  <span className="text-xl sm:text-2xl font-bold text-blue-600 w-16 text-center">
+                  <span className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400 w-16 text-center">
                     {settings.maxUsers}
                   </span>
                   <button
                     type="button"
                     onClick={() => setSettings(prev => ({ ...prev, maxUsers: Math.min(200, prev.maxUsers + 1) }))}
                     disabled={settings.maxUsers >= 200}
-                    className="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-300 rounded-full text-xl font-bold transition-colors"
+                    className="w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-300 dark:disabled:text-gray-600 rounded-full text-xl font-bold transition-colors dark:text-white"
                   >
                     +
                   </button>
                 </div>
                 {/* Slider */}
                 <div className="flex items-center space-x-3 sm:space-x-4">
-                  <span className="text-xs sm:text-sm text-gray-600">1</span>
+                  <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">1</span>
                   <input
                     type="range"
                     min="1"
@@ -385,20 +385,20 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                       console.log('Max users slider changed to:', value);
                       setSettings(prev => ({ ...prev, maxUsers: value }));
                     }}
-                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                    className="flex-1 h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
                   />
-                  <span className="text-xs sm:text-sm text-gray-600">200</span>
+                  <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">200</span>
                 </div>
               </div>
             </div>
             <div>
               <div className="flex items-center space-x-2 mb-2 sm:mb-3">
-                <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-                <label className="font-medium text-gray-900 text-sm sm:text-base">
+                <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400" />
+                <label className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">
                   Verification
                 </label>
               </div>
-              <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 sm:mb-3">
                 Complete this quick verification to prove you're human
               </p>
               <div className="flex justify-center">
@@ -409,7 +409,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 />
               </div>
               {isCapVerified && (
-                <div className="mt-2 flex items-center justify-center text-green-600 text-sm">
+                <div className="mt-2 flex items-center justify-center text-green-600 dark:text-green-400 text-sm">
                   <Check className="w-4 h-4 mr-1" />
                   Verified
                 </div>
@@ -421,7 +421,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3 sm:px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md transition-colors text-sm sm:text-base min-h-[44px]"
+                className="px-3 sm:px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors text-sm sm:text-base min-h-[44px]"
                 disabled={isCreating}
               >
                 Cancel
@@ -429,7 +429,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
               <button
                 type="submit"
                 disabled={isCreating}
-                className="px-3 sm:px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors flex items-center text-sm sm:text-base min-h-[44px]"
+                className="px-3 sm:px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 disabled:bg-blue-300 dark:disabled:bg-blue-800 disabled:cursor-not-allowed transition-colors flex items-center text-sm sm:text-base min-h-[44px]"
               >
                 {isCreating ? (
                   <>

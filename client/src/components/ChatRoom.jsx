@@ -9,7 +9,6 @@ import {
   WifiOff,
   Clock,
   Lock,
-  Share2,
   X,
   Phone,
   PhoneOff,
@@ -20,7 +19,6 @@ import {
   UserCheck, // Add UserCheck icon
   UserX // Add UserX icon
 } from 'lucide-react';
-import InviteLinkModal from './InviteLinkModal';
 import socketManager from '../socket-simple';
 import JoinRoomModal from './JoinRoomModal';
 import MessageList from './MessageList';
@@ -28,6 +26,7 @@ import UserList from './UserList';
 import AudioCallModal from './AudioCallModal';
 import webRTCService, { CallState } from '../webrtc';
 import { encryptMessage, decryptMessage } from '../utils/security'; // Import E2EE helpers
+import ThemeToggle from './ThemeToggle';
 
 const ChatRoom = () => {
   const { roomCode } = useParams();
@@ -45,7 +44,6 @@ const ChatRoom = () => {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState(null);
   const [inviteToken, setInviteToken] = useState(null);
-  const [showInviteModal, setShowInviteModal] = useState(false);
   const [showCallModal, setShowCallModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [callState, setCallState] = useState({ state: CallState.IDLE });
@@ -571,9 +569,9 @@ const ChatRoom = () => {
 
   if (error && !isJoined) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-50">
+      <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
         <div className="text-center">
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded mb-4">
             <p className="font-bold">Error</p>
             <p>{error}</p>
           </div>
@@ -593,20 +591,19 @@ const ChatRoom = () => {
       isWaitingForHost={isWaitingForHost}
     />
   );
-  if (showInviteModal) return <InviteLinkModal isOpen={showInviteModal} onClose={() => setShowInviteModal(false)} roomCode={roomCode} />;
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      <div className="bg-white border-b border-gray-200 px-4 py-3">
+    <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 transition-colors duration-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <button onClick={() => navigate('/')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5" /></button>
+            <button onClick={() => navigate('/')} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300"><ArrowLeft className="w-5 h-5" /></button>
             <div>
               <div className="flex items-center space-x-2">
-                <h1 className="text-lg font-semibold truncate">Room {roomCode}</h1>
-                <button onClick={copyRoomCode} className="p-1 hover:bg-gray-100 rounded transition-colors"><Copy className="w-4 h-4 text-gray-500" /></button>
+                <h1 className="text-lg font-semibold truncate text-gray-900 dark:text-white">Room {roomCode}</h1>
+                <button onClick={copyRoomCode} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"><Copy className="w-4 h-4 text-gray-500 dark:text-gray-400" /></button>
               </div>
-              <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
+              <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
                 <div className="flex items-center space-x-1">
                   {isConnected ? <Wifi className="w-4 h-4 text-green-500" /> : <WifiOff className="w-4 h-4 text-red-500" />}
                   <span>{isConnected ? 'Connected' : 'Disconnected'}</span>
@@ -617,28 +614,31 @@ const ChatRoom = () => {
               </div>
             </div>
           </div>
+          <div className="flex items-center space-x-2">
+             <ThemeToggle />
+          </div>
         </div>
       </div>
 
-      {error && <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-3"><p className="text-sm">{error}</p></div>}
+      {error && <div className="bg-red-100 dark:bg-red-900 border-l-4 border-red-500 text-red-700 dark:text-red-200 p-3"><p className="text-sm">{error}</p></div>}
 
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 flex flex-col">
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
             <MessageList messages={messages} currentUser={currentUser} messageTTL={room?.settings?.messageTTL} />
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="border-t border-gray-200 p-4 bg-white">
+          <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-800 transition-colors duration-200">
               <form onSubmit={handleSendMessage} className="flex items-center space-x-3">
                 {isRecording ? (
-                  <div className="flex-1 flex items-center justify-between bg-red-50 rounded-lg px-4 py-2 animate-in fade-in duration-200">
+                  <div className="flex-1 flex items-center justify-between bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-2 animate-in fade-in duration-200">
                     <div className="flex items-center space-x-3">
                       <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                      <span className="text-red-600 font-medium font-mono">{formatDuration(recordingDuration)} / 0:30</span>
+                      <span className="text-red-600 dark:text-red-400 font-medium font-mono">{formatDuration(recordingDuration)} / 0:30</span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <button type="button" onClick={handleCancelRecording} className="p-2 hover:bg-red-100 rounded-full text-red-500 transition-colors" title="Cancel">
+                      <button type="button" onClick={handleCancelRecording} className="p-2 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-full text-red-500 transition-colors" title="Cancel">
                         <Trash2 className="w-5 h-5" />
                       </button>
                       <button type="button" onClick={handleStopRecording} className="p-2 bg-red-500 hover:bg-red-600 rounded-full text-white transition-colors shadow-sm" title="Send">
@@ -649,17 +649,17 @@ const ChatRoom = () => {
                 ) : (
                   <>
                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" id="image-upload" />
-                    <button type="button" onClick={() => fileInputRef.current?.click()} disabled={!isConnected || isUploading} className="p-3 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50">{isUploading ? <Loader2 className="w-5 h-5 text-gray-500 animate-spin" /> : <ImageIcon className="w-5 h-5 text-gray-500" />}</button>
-                    <button type="button" onClick={handleStartCall} disabled={!isConnected || users.length < 2} className="p-3 rounded-lg hover:bg-green-50 transition-colors disabled:opacity-50"><Phone className="w-5 h-5 text-green-500" /></button>
-                    <button type="button" onClick={startRecording} disabled={!isConnected} className="p-3 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"><Mic className="w-5 h-5 text-red-500" /></button>
-                    <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Type your message..." className="flex-1 input-field py-3 px-4" disabled={!isConnected || isSending} maxLength={500} />
+                    <button type="button" onClick={() => fileInputRef.current?.click()} disabled={!isConnected || isUploading} className="p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"><Loader2 className={`w-5 h-5 text-gray-500 dark:text-gray-400 ${isUploading ? 'animate-spin' : ''}`} style={{ display: isUploading ? 'block' : 'none' }} /><ImageIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" style={{ display: isUploading ? 'none' : 'block' }} /></button>
+                    <button type="button" onClick={handleStartCall} disabled={!isConnected || users.length < 2} className="p-3 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors disabled:opacity-50"><Phone className="w-5 h-5 text-green-500" /></button>
+                    <button type="button" onClick={startRecording} disabled={!isConnected} className="p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"><Mic className="w-5 h-5 text-red-500" /></button>
+                    <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Type your message..." className="flex-1 input-field py-3 px-4 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600" disabled={!isConnected || isSending} maxLength={500} />
                     <button type="submit" disabled={!newMessage.trim() || !isConnected || isSending} className="btn-primary px-4 py-3"><Send className="w-5 h-5" /></button>
                   </>
                 )}
               </form>
           </div>
         </div>
-        <div className="hidden lg:block w-64 border-l border-gray-200 bg-white">
+        <div className="hidden lg:block w-64 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200">
           <UserList 
             users={users} 
             currentUser={currentUser} 

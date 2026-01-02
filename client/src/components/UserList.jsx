@@ -36,31 +36,31 @@ const UserList = ({ users, currentUser, pendingGuests = [], isHost = false, onAp
     <div className="h-full flex flex-col">
       {/* Pending Guests Section (Host Only) */}
       {isHost && pendingGuests.length > 0 && (
-        <div className="p-4 border-b border-gray-200 bg-yellow-50">
-          <h3 className="font-medium text-yellow-800 mb-3 text-xs uppercase tracking-wider flex items-center">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-yellow-50 dark:bg-yellow-900/20 transition-colors duration-200">
+          <h3 className="font-medium text-yellow-800 dark:text-yellow-400 mb-3 text-xs uppercase tracking-wider flex items-center">
             <Users className="w-3 h-3 mr-1" />
             Waiting Room ({pendingGuests.length})
           </h3>
-          <div className="space-y-2 max-h-40 overflow-y-auto">
+          <div className="space-y-2 max-h-40 overflow-y-auto scrollbar-thin">
             {pendingGuests.map(guest => (
-              <div key={guest.socketId} className="flex items-center justify-between bg-white p-2 rounded border border-yellow-100 shadow-sm">
+              <div key={guest.socketId} className="flex items-center justify-between bg-white dark:bg-gray-800 p-2 rounded border border-yellow-100 dark:border-yellow-900/30 shadow-sm transition-colors duration-200">
                 <div className="flex items-center space-x-2 overflow-hidden">
                   <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium ${getAvatarColor(guest.nickname)}`}>
                     {getInitials(guest.nickname)}
                   </div>
-                  <span className="font-medium text-sm truncate">{guest.nickname}</span>
+                  <span className="font-medium text-sm truncate text-gray-900 dark:text-gray-200">{guest.nickname}</span>
                 </div>
                 <div className="flex space-x-1 flex-shrink-0">
                   <button 
                     onClick={() => onApprove(guest.socketId)} 
-                    className="p-1.5 bg-green-100 text-green-600 rounded hover:bg-green-200 transition-colors"
+                    className="p-1.5 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
                     title="Approve"
                   >
                     <Check className="w-3 h-3" />
                   </button>
                   <button 
                     onClick={() => onDeny(guest.socketId)} 
-                    className="p-1.5 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
+                    className="p-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
                     title="Deny"
                   >
                     <X className="w-3 h-3" />
@@ -73,19 +73,19 @@ const UserList = ({ users, currentUser, pendingGuests = [], isHost = false, onAp
       )}
 
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700 transition-colors duration-200">
         <div className="flex items-center space-x-2">
-          <Users className="w-5 h-5 text-gray-600" />
-          <h3 className="font-medium text-gray-900">
+          <Users className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+          <h3 className="font-medium text-gray-900 dark:text-white">
             Participants ({users.length})
           </h3>
         </div>
       </div>
 
       {/* User List */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
         {users.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
+          <div className="text-center text-gray-500 dark:text-gray-400 py-8">
             <User className="w-8 h-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">No users online</p>
           </div>
@@ -98,35 +98,24 @@ const UserList = ({ users, currentUser, pendingGuests = [], isHost = false, onAp
               return (
                 <div
                   key={user.socketId || user.id || index}
-                  className={`flex items-center space-x-3 p-2 rounded-lg ${isCurrentUser ? 'bg-primary-50 border border-primary-200' : 'hover:bg-gray-50'
-                    }`}
+                  className={`flex items-center space-x-3 p-2 rounded-lg transition-colors duration-200 ${
+                    isCurrentUser ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
                 >
-                  {/* Avatar */}
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${getAvatarColor(user.nickname)}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm text-white font-medium shadow-sm ${getAvatarColor(user.nickname)}`}>
                     {getInitials(user.nickname)}
                   </div>
-
-                  {/* User Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2">
-                      <p className={`text-sm font-medium truncate ${isCurrentUser ? 'text-primary-900' : 'text-gray-900'
-                        }`}>
+                    <div className="flex items-center">
+                      <p className={`text-sm font-medium truncate ${
+                        isCurrentUser ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-gray-200'
+                      }`}>
                         {user.nickname}
-                        {isCurrentUser && (
-                          <span className="text-xs text-primary-600 ml-1">(You)</span>
-                        )}
+                        {isCurrentUser && ' (You)'}
                       </p>
-
-                      {/* Room creator indicator */}
                       {isFirstUser && (
-                        <Crown className="w-3 h-3 text-yellow-500" title="Room Creator" />
+                        <Crown className="w-3 h-3 text-yellow-500 ml-1.5 flex-shrink-0" />
                       )}
-                    </div>
-
-                    {/* Online status */}
-                    <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="text-xs text-gray-500">Online</span>
                     </div>
                   </div>
                 </div>
@@ -134,15 +123,6 @@ const UserList = ({ users, currentUser, pendingGuests = [], isHost = false, onAp
             })}
           </div>
         )}
-      </div>
-
-      {/* Footer Info */}
-      <div className="p-4 border-t border-gray-200 bg-gray-50">
-        <div className="text-xs text-gray-600 space-y-1">
-          <p>• Users are anonymous</p>
-          <p>• No data is stored permanently</p>
-          <p>• Room expires after inactivity</p>
-        </div>
       </div>
     </div>
   );

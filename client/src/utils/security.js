@@ -55,12 +55,14 @@ export function isValidNickname(nickname) {
 
 /**
  * Generate a random room key for E2EE
- * @returns {string} Hex string of the key
+ * @returns {string} Base64URL string of the key
  */
 export function generateRoomKey() {
   const array = new Uint8Array(32); // 256 bits
   crypto.getRandomValues(array);
-  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+  // Convert to Base64URL for shorter URLs
+  const base64 = btoa(String.fromCharCode(...array));
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 /**
