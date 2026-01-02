@@ -16,7 +16,9 @@ import {
   Image as ImageIcon,
   Loader2,
   Trash2,
-  Mic
+  Mic,
+  UserCheck, // Add UserCheck icon
+  UserX // Add UserX icon
 } from 'lucide-react';
 import InviteLinkModal from './InviteLinkModal';
 import socketManager from '../socket-simple';
@@ -25,6 +27,7 @@ import MessageList from './MessageList';
 import UserList from './UserList';
 import AudioCallModal from './AudioCallModal';
 import webRTCService, { CallState } from '../webrtc';
+import { encryptMessage, decryptMessage } from '../utils/security'; // Import E2EE helpers
 
 const ChatRoom = () => {
   const { roomCode } = useParams();
@@ -49,9 +52,17 @@ const ChatRoom = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   
+  // Knock-to-Join & Host State
+  const [isWaitingForHost, setIsWaitingForHost] = useState(false);
+  const [pendingGuests, setPendingGuests] = useState([]);
+  const [isHost, setIsHost] = useState(false);
+  const [joinParams, setJoinParams] = useState(null);
+  const [roomKey, setRoomKey] = useState(null);
+
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
+  const joinParamsRef = useRef(null);
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -66,7 +77,70 @@ const ChatRoom = () => {
     } else if (tokenFromUrl) {
       setInviteToken(tokenFromUrl);
     }
+
+    // Extract E2EE key from hash
+    const hash = window.location.hash.substring(1);
+    if (hash) {
+      setRoomKey(hash);
+    }
   }, [location]);
+
+  // Helper to perform the actual join after approval
+  const performJoin = useCallback((params) => {
+    const { nickname, password, capToken, inviteToken } = params;
+    
+    const joinData = {
+      roomCode,
+      nickname,
+      password,
+      capToken
+    };
+    if (inviteToken) joinData.inviteToken = inviteToken;
+
+    socketManager.emit('join-room', joinData, async (response) => {
+      if (!response) {
+        setError('No response from server');
+        setIsProcessingInvite(false);
+        return;
+      }
+      if (response.redirect) {
+        navigate(`/room/${response.roomCode}`, {
+          state: { fromInvite: true, nickname, inviteToken }
+        });
+        return;
+      }
+      if (response.success) {
+        setRoom(response.room);
+        
+        let msgs = response.messages || [];
+        if (roomKey) {
+            msgs = await Promise.all(msgs.map(async (msg) => {
+                if (msg.isEncrypted) {
+                    try {
+                        const decrypted = await decryptMessage(msg.content, msg.iv, roomKey);
+                        return { ...msg, content: decrypted };
+                    } catch (e) {
+                        return { ...msg, content: '⚠️ Decryption failed' };
+                    }
+                }
+                return msg;
+            }));
+        }
+        setMessages(msgs);
+        
+        setUsers(response.room?.users || []);
+        setCurrentUser({ id: socketManager.socket?.id, nickname: response.nickname, isAdmin: false });
+        setIsJoined(true);
+        setShowJoinModal(false);
+        setIsProcessingInvite(false);
+        setIsWaitingForHost(false);
+        return;
+      }
+      setError(response.error || 'Failed to join room');
+      setIsProcessingInvite(false);
+      setIsWaitingForHost(false);
+    });
+  }, [roomCode, navigate, roomKey]);
 
   useEffect(() => {
     const socket = socketManager.connect();
@@ -84,10 +158,26 @@ const ChatRoom = () => {
       }
     };
 
-    const handleRoomJoined = (data) => {
+    const handleRoomJoined = async (data) => {
       setRoom(data.room);
       setUsers(data.users || []);
-      setMessages(data.messages || []);
+      
+      let msgs = data.messages || [];
+      if (roomKey) {
+          msgs = await Promise.all(msgs.map(async (msg) => {
+              if (msg.isEncrypted) {
+                  try {
+                      const decrypted = await decryptMessage(msg.content, msg.iv, roomKey);
+                      return { ...msg, content: decrypted };
+                  } catch (e) {
+                      return { ...msg, content: '⚠️ Decryption failed' };
+                  }
+              }
+              return msg;
+          }));
+      }
+      setMessages(msgs);
+
       setCurrentUser({
         id: socketManager.socket?.id,
         nickname: data.nickname,
@@ -98,7 +188,15 @@ const ChatRoom = () => {
       setError(null);
     };
 
-    const handleNewMessage = (message) => {
+    const handleNewMessage = async (message) => {
+      if (message.isEncrypted && roomKey) {
+          try {
+              const decrypted = await decryptMessage(message.content, message.iv, roomKey);
+              message.content = decrypted;
+          } catch (e) {
+              message.content = '⚠️ Decryption failed';
+          }
+      }
       setMessages(prev => [...prev, message]);
     };
 
@@ -136,6 +234,39 @@ const ChatRoom = () => {
       }
     };
 
+    // Knock-to-Join Events
+    const handleKnockApproved = ({ isHost }) => {
+      setIsWaitingForHost(false);
+      if (isHost) setIsHost(true);
+      
+      if (joinParamsRef.current) {
+        performJoin(joinParamsRef.current);
+      }
+    };
+
+    const handleKnockDenied = ({ reason }) => {
+      setIsWaitingForHost(false);
+      setError(reason || 'Entry denied');
+      setIsProcessingInvite(false);
+    };
+
+    const handleUserKnocking = (guest) => {
+      setPendingGuests(prev => {
+        if (prev.find(g => g.socketId === guest.socketId)) return prev;
+        return [...prev, guest];
+      });
+    };
+
+    const handlePromotedToHost = () => {
+      setIsHost(true);
+      setMessages(prev => [...prev, {
+        id: `system_${Date.now()}`,
+        type: 'system',
+        content: 'You are now the host of this room',
+        timestamp: new Date().toISOString()
+      }]);
+    };
+
     socketManager.on('connect', handleConnect);
     socketManager.on('disconnect', handleDisconnect);
     socketManager.on('room-joined', handleRoomJoined);
@@ -143,6 +274,12 @@ const ChatRoom = () => {
     socketManager.on('user-joined', handleUserJoined);
     socketManager.on('user-left', handleUserLeft);
     socketManager.on('error', handleError);
+    
+    // Register new events
+    socketManager.on('knock-approved', handleKnockApproved);
+    socketManager.on('knock-denied', handleKnockDenied);
+    socketManager.on('user-knocking', handleUserKnocking);
+    socketManager.on('promoted-to-host', handlePromotedToHost);
 
     return () => {
       socketManager.off('connect', handleConnect);
@@ -152,11 +289,17 @@ const ChatRoom = () => {
       socketManager.off('user-joined', handleUserJoined);
       socketManager.off('user-left', handleUserLeft);
       socketManager.off('error', handleError);
+      
+      socketManager.off('knock-approved', handleKnockApproved);
+      socketManager.off('knock-denied', handleKnockDenied);
+      socketManager.off('user-knocking', handleUserKnocking);
+      socketManager.off('promoted-to-host', handlePromotedToHost);
+
       if (process.env.NODE_ENV !== 'development') {
         socketManager.disconnect();
       }
     };
-  }, [roomCode]);
+  }, [roomCode, performJoin]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -172,52 +315,36 @@ const ChatRoom = () => {
 
     setIsProcessingInvite(true);
     setError(null);
+    setIsWaitingForHost(true); // Show waiting UI
 
-    const joinTimeout = setTimeout(() => {
-      if (!isJoined) {
-        setError('Connection timed out. Please try again.');
-        setIsProcessingInvite(false);
-      }
-    }, 10000);
+    // Store params for later use
+    joinParamsRef.current = params;
 
     try {
-      const joinData = {
+      const knockData = {
         roomCode,
         nickname: nickname.trim(),
         password: password.trim(),
         capToken: capToken
       };
-      if (inviteToken) joinData.inviteToken = inviteToken;
+      if (inviteToken) knockData.inviteToken = inviteToken;
 
-      socketManager.emit('join-room', joinData, (response) => {
-        clearTimeout(joinTimeout);
-        if (!response) {
-          setError('No response from server');
-          setIsProcessingInvite(false);
-          return;
+      // Emit knock event
+      socketManager.emit('knock', knockData);
+      
+      // We don't use a callback here because the server emits events back
+      // But we should set a timeout in case the server doesn't respond
+      setTimeout(() => {
+        if (isWaitingForHost) {
+           // Still waiting? Maybe server is down or logic failed.
+           // But we stay in waiting state as per user request "Waiting for host..."
         }
-        if (response.redirect) {
-          navigate(`/room/${response.roomCode}`, {
-            state: { fromInvite: true, nickname: nickname.trim(), inviteToken: inviteToken || undefined }
-          });
-          return;
-        }
-        if (response.success) {
-          setRoom(response.room);
-          setMessages(response.messages || []);
-          setUsers(response.room?.users || []);
-          setCurrentUser({ id: socketManager.socket?.id, nickname: response.nickname, isAdmin: false });
-          setIsJoined(true);
-          setShowJoinModal(false);
-          setIsProcessingInvite(false);
-          return;
-        }
-        setError(response.error || 'Failed to join room');
-        setIsProcessingInvite(false);
-      });
+      }, 10000);
+
     } catch (err) {
       setError('Failed to join room. Please try again.');
       setIsProcessingInvite(false);
+      setIsWaitingForHost(false);
     }
   };
 
@@ -227,12 +354,37 @@ const ChatRoom = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleApproveGuest = (guestId) => {
+    socketManager.emit('approve-guest', { guestId, roomCode });
+    setPendingGuests(prev => prev.filter(g => g.socketId !== guestId));
+  };
+
+  const handleDenyGuest = (guestId) => {
+    socketManager.emit('deny-guest', { guestId, roomCode });
+    setPendingGuests(prev => prev.filter(g => g.socketId !== guestId));
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || isSending || !isConnected) return;
     setIsSending(true);
     try {
-      socketManager.emit('send-message', { content: newMessage.trim() });
+      let content = newMessage.trim();
+      let isEncrypted = false;
+      let iv = null;
+
+      if (roomKey) {
+          const result = await encryptMessage(content, roomKey);
+          content = result.encrypted;
+          iv = result.iv;
+          isEncrypted = true;
+      }
+
+      socketManager.emit('send-message', { 
+          content,
+          isEncrypted,
+          iv
+      });
       socketManager.emit('user-activity');
       setNewMessage('');
     } catch (error) {
@@ -431,7 +583,16 @@ const ChatRoom = () => {
     );
   }
 
-  if (showJoinModal) return <JoinRoomModal roomCode={roomCode} onJoin={handleJoinRoom} onCancel={() => navigate('/')} error={error} />;
+  if (showJoinModal) return (
+    <JoinRoomModal 
+      roomCode={roomCode} 
+      onJoin={handleJoinRoom} 
+      onCancel={() => navigate('/')} 
+      error={error} 
+      isProcessingInvite={isProcessingInvite}
+      isWaitingForHost={isWaitingForHost}
+    />
+  );
   if (showInviteModal) return <InviteLinkModal isOpen={showInviteModal} onClose={() => setShowInviteModal(false)} roomCode={roomCode} />;
 
   return (
@@ -498,7 +659,16 @@ const ChatRoom = () => {
               </form>
           </div>
         </div>
-        <div className="hidden lg:block w-64 border-l border-gray-200 bg-white"><UserList users={users} currentUser={currentUser} /></div>
+        <div className="hidden lg:block w-64 border-l border-gray-200 bg-white">
+          <UserList 
+            users={users} 
+            currentUser={currentUser} 
+            pendingGuests={pendingGuests}
+            isHost={isHost}
+            onApprove={handleApproveGuest}
+            onDeny={handleDenyGuest}
+          />
+        </div>
       </div>
       {showCallModal && <AudioCallModal isOpen={showCallModal} onClose={() => setShowCallModal(false)} roomCode={roomCode} />}
     </div>

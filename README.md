@@ -12,30 +12,53 @@
 
 ## ✨ Features
 
-### Core Features
-- **Instant Room Creation**: Generate unique chat rooms instantly with 6-digit codes
-- **Anonymous Participation**: No accounts or personal information required
-- **Real-Time Messaging**: Lightning-fast message delivery using WebSockets
+### 💬 Rich Messaging
+- **Real-Time Messaging**: Lightning-fast message delivery using Socket.io
+- **📞 Voice Calls**: Crystal clear peer-to-peer audio calls using WebRTC
+- **🎤 Voice Notes**: Record and send short audio messages
+- **📸 Image Sharing**: Share images securely with view-once capability
 - **Self-Destructing Messages**: Messages disappear after being read or after a set time
-- **Auto-Cleanup**: Rooms automatically close after inactivity
-- **Progressive Web App**: Install on any device for native-like experience
 
-### Security & Privacy
-- **End-to-End Security**: Secure message transmission with rate limiting
-- **No Message Persistence**: Messages are never stored on the server
-- **Secure Room Links**: Unique, unguessable room URLs with optional passwords
-- **🔒 Inactivity Timeout**: Automatic logout after 10 minutes of inactivity
-- **🔐 Secure Credentials**: bcrypt password hashing for protected rooms
+### 🏠 Room Management
+- **Instant Room Creation**: Generate unique chat rooms instantly with 6-digit codes
+- **🚪 Knock-to-Join System**: Guests enter a lobby and must be approved by the host
+- **👑 Host Controls**: Room creators can approve or deny entry to pending guests
+- **🔄 Host Handover**: Automatic ownership transfer if the host leaves
+- **Anonymous Participation**: No accounts or personal information required
+- **Auto-Cleanup**: Rooms automatically close after inactivity
+
+### 🛡️ Security & Privacy
+- **🔐 Client-Side Encryption (E2EE)**: Messages are encrypted in the browser using AES-GCM. The key is in the URL hash and never reaches the server.
+- **No Message Persistence**: Messages are never stored permanently on the server
+- **🔒 Password Protection**: Optional password protection for rooms
+- **🤖 Bot Protection**: Integrated Proof-of-Work CAPTCHA to prevent spam
 - **🛡️ Brute Force Protection**: Failed attempt tracking and automatic lockout
-- **🎫 Invite Token System**: Secure, time-limited room access tokens
 - **✅ Input Validation**: XSS prevention and credential sanitization
 
-### PWA Features
-- **📱 Installable**: Add to home screen on any device
-- **🔄 Offline Support**: Works without internet connection
-- **⚡ Fast Loading**: Service worker caching for instant access
-- **📲 Native Feel**: App-like experience with splash screen and theme colors
-- **🔄 Auto-Updates**: Always runs the latest version
+### 📱 Progressive Web App (PWA)
+- **Installable**: Add to home screen on any device
+- **Native Feel**: App-like experience with splash screen and theme colors
+- **Offline Capable**: Core shell works offline
+
+## 🛠️ Tech Stack
+
+### Frontend
+- **React**: UI library
+- **Vite**: Build tool and dev server
+- **Tailwind CSS**: Utility-first CSS framework
+- **Socket.io Client**: Real-time communication
+- **WebRTC**: Peer-to-peer audio calls
+- **Lucide React**: Beautiful icons
+
+### Backend
+- **Node.js & Express**: Server runtime and framework
+- **Socket.io**: Real-time event-based communication
+- **@cap.js**: Proof-of-Work CAPTCHA system
+- **Redis** (Optional): For scaling across multiple instances
+
+### PWA
+- **Vite PWA Plugin**: PWA generation and management
+- **Workbox**: Service worker libraries
 
 ## 🚀 Quick Start
 
@@ -73,6 +96,7 @@
    MAX_FAILED_ATTEMPTS=5
    LOCKOUT_DURATION_MINUTES=10
    ROOM_CODE_SALT=your-secure-salt-here
+   CAP_SECRET=your-captcha-secret-key
 
    # Room Settings
    ROOM_EXPIRY_MINUTES=60
@@ -106,15 +130,7 @@ Your chat application is a fully-featured PWA that can be installed on any devic
 - **Auto-updates** - Always runs the latest version
 - **Fast loading** - Cached assets for instant access
 
-## 🛠 Built With
-
-- **Frontend**: React 18, Vite, Tailwind CSS, TypeScript
-- **Backend**: Node.js, Express, Socket.IO, bcryptjs
-- **PWA**: Vite PWA Plugin, Workbox, Web App Manifest
-- **Database**: In-memory storage (Redis optional for production)
-- **Deployment**: Render
-
-## 📚 Documentation
+##  Documentation
 
 ### User Documentation
 - [User Guide](docs/USER_GUIDE.md) - Complete guide for end users

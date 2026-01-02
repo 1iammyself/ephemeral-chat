@@ -1,7 +1,7 @@
 import React from 'react';
-import { Users, Crown, User } from 'lucide-react';
+import { Users, Crown, User, Check, X } from 'lucide-react';
 
-const UserList = ({ users, currentUser }) => {
+const UserList = ({ users, currentUser, pendingGuests = [], isHost = false, onApprove, onDeny }) => {
   const getInitials = (nickname) => {
     return nickname
       .split(' ')
@@ -34,6 +34,44 @@ const UserList = ({ users, currentUser }) => {
 
   return (
     <div className="h-full flex flex-col">
+      {/* Pending Guests Section (Host Only) */}
+      {isHost && pendingGuests.length > 0 && (
+        <div className="p-4 border-b border-gray-200 bg-yellow-50">
+          <h3 className="font-medium text-yellow-800 mb-3 text-xs uppercase tracking-wider flex items-center">
+            <Users className="w-3 h-3 mr-1" />
+            Waiting Room ({pendingGuests.length})
+          </h3>
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {pendingGuests.map(guest => (
+              <div key={guest.socketId} className="flex items-center justify-between bg-white p-2 rounded border border-yellow-100 shadow-sm">
+                <div className="flex items-center space-x-2 overflow-hidden">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium ${getAvatarColor(guest.nickname)}`}>
+                    {getInitials(guest.nickname)}
+                  </div>
+                  <span className="font-medium text-sm truncate">{guest.nickname}</span>
+                </div>
+                <div className="flex space-x-1 flex-shrink-0">
+                  <button 
+                    onClick={() => onApprove(guest.socketId)} 
+                    className="p-1.5 bg-green-100 text-green-600 rounded hover:bg-green-200 transition-colors"
+                    title="Approve"
+                  >
+                    <Check className="w-3 h-3" />
+                  </button>
+                  <button 
+                    onClick={() => onDeny(guest.socketId)} 
+                    className="p-1.5 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
+                    title="Deny"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center space-x-2">

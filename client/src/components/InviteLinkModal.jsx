@@ -42,7 +42,12 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
       });
       
       if (result.success) {
-        setInviteLink(result.url);
+        let url = result.url;
+        const hash = window.location.hash;
+        if (hash) {
+            url += hash;
+        }
+        setInviteLink(url);
         toast.success('Invite link generated!');
       } else {
         throw new Error(result.error || 'Failed to generate invite link');

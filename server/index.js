@@ -162,6 +162,9 @@ if (process.env.NODE_ENV === 'production') {
 // Rate limiting storage
 const rateLimits = new Map();
 
+// Room metadata for Lobby/Host logic
+const roomData = {}; // { [roomId]: { hostId: string, lobbyLimit: number, lobbyCount: number } }
+
 // Initialize Redis client (optional)
 let redisClient = null;
 let roomManager;
@@ -452,10 +455,115 @@ io.on('connection', (socket) => {
       }
 
       const roomCode = await roomManager.createRoom(settings);
+      
+      // Initialize room metadata for Lobby/Host logic
+      roomData[roomCode] = {
+        hostId: socket.id,
+        lobbyLimit: (settings.maxUsers || 50) * 2, // Default 2x max users
+        lobbyCount: 0
+      };
+
       callback({ success: true, roomCode });
     } catch (error) {
       logger.error('Error creating room:', error);
       callback({ success: false, error: 'Failed to create room' });
+    }
+  });
+
+  // Knock-to-Join Logic
+  socket.on('knock', ({ roomCode, nickname, password, inviteToken, capToken }) => {
+    // 1. Check if room exists in our metadata
+    let room = roomData[roomCode];
+    
+    // Check if room exists in socket adapter (active room)
+    const socketRoom = io.sockets.adapter.rooms.get(roomCode);
+    const userCount = socketRoom ? socketRoom.size : 0;
+
+    // If room is empty or doesn't exist, user becomes host automatically
+    if (userCount === 0) {
+      // Initialize roomData if missing
+      if (!room) {
+        roomData[roomCode] = {
+          hostId: socket.id,
+          lobbyLimit: 100, // Default
+          lobbyCount: 0
+        };
+      } else {
+        room.hostId = socket.id;
+      }
+      
+      // Auto-approve
+      return socket.emit('knock-approved', { isHost: true });
+    }
+
+    // If room exists but we don't have metadata (e.g. server restart or API creation)
+    if (!room) {
+      // Pick the first user as host
+      const firstUser = Array.from(socketRoom)[0];
+      room = {
+        hostId: firstUser,
+        lobbyLimit: 100,
+        lobbyCount: 0
+      };
+      roomData[roomCode] = room;
+    }
+
+    // 2. Check Lobby Limit
+    if (room.lobbyCount >= room.lobbyLimit) {
+      return socket.emit('knock-denied', { reason: 'Lobby is full' });
+    }
+
+    // 3. Notify Host
+    const hostId = room.hostId;
+    const hostSocket = io.sockets.sockets.get(hostId);
+
+    if (!hostSocket) {
+      // Host might have disconnected without us knowing?
+      // Trigger handover logic or just let them in?
+      // Let's try to find a new host
+      const remainingMembers = Array.from(socketRoom || []);
+      if (remainingMembers.length > 0) {
+        room.hostId = remainingMembers[0];
+        io.to(room.hostId).emit('promoted-to-host');
+        io.to(room.hostId).emit('user-knocking', {
+          socketId: socket.id,
+          nickname: nickname
+        });
+      } else {
+        // No one left, they become host
+        room.hostId = socket.id;
+        return socket.emit('knock-approved', { isHost: true });
+      }
+    } else {
+      room.lobbyCount++;
+      hostSocket.emit('user-knocking', {
+        socketId: socket.id,
+        nickname: nickname
+      });
+    }
+    
+    socket.emit('knock-pending');
+  });
+
+  socket.on('approve-guest', ({ guestId, roomCode }) => {
+    // Verify requester is host
+    if (roomData[roomCode]?.hostId !== socket.id) return;
+
+    const guestSocket = io.sockets.sockets.get(guestId);
+    if (guestSocket) {
+      if (roomData[roomCode].lobbyCount > 0) roomData[roomCode].lobbyCount--;
+      guestSocket.emit('knock-approved', { isHost: false });
+    }
+  });
+
+  socket.on('deny-guest', ({ guestId, roomCode }) => {
+    // Verify requester is host
+    if (roomData[roomCode]?.hostId !== socket.id) return;
+
+    const guestSocket = io.sockets.sockets.get(guestId);
+    if (guestSocket) {
+      if (roomData[roomCode].lobbyCount > 0) roomData[roomCode].lobbyCount--;
+      guestSocket.emit('knock-denied', { reason: 'Host denied entry' });
     }
   });
 
@@ -792,6 +900,27 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', async () => {
     // logger.info(`🔌 User disconnected: ${socket.id}`);
+
+    // Host Handover Logic
+    if (socket.roomCode) {
+      const room = roomData[socket.roomCode];
+      if (room && room.hostId === socket.id) {
+        // Host is leaving
+        const socketRoom = io.sockets.adapter.rooms.get(socket.roomCode);
+        const remainingMembers = Array.from(socketRoom || []).filter(id => id !== socket.id);
+        
+        if (remainingMembers.length > 0) {
+          // Promote next user
+          const newHostId = remainingMembers[0];
+          room.hostId = newHostId;
+          io.to(newHostId).emit('promoted-to-host');
+          // logger.info(`Host handover in room ${socket.roomCode} to ${newHostId}`);
+        } else {
+          // Room empty
+          delete roomData[socket.roomCode];
+        }
+      }
+    }
 
     // Clear user activity tracking
     securityManager.clearUserActivity(socket.id);

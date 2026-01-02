@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { X, Settings, Clock, Lock, Copy, Check, Users, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import '@cap.js/widget';
+import { generateRoomKey } from '../utils/security';
 
 const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '';
@@ -22,6 +23,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
     inviteLink: false
   });
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
+  const [roomKey, setRoomKey] = useState(null);
   const navigate = useNavigate();
 
   // Use callback ref to ensure listener is attached when element mounts
@@ -93,6 +95,10 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
     setIsCreating(true);
 
     try {
+      // Generate E2EE Key
+      const key = generateRoomKey();
+      setRoomKey(key);
+
       const response = await fetch(`${API_BASE}/api/rooms`, {
         method: 'POST',
         headers: {
@@ -122,7 +128,10 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
         });
 
         // Generate invite link automatically
-        await generateInviteLink(data.roomCode, settings.password.trim() || undefined);
+        const link = await generateInviteLink(data.roomCode, settings.password.trim() || undefined);
+        if (link) {
+          setInviteLink(`${link}#${key}`);
+        }
       } else {
         throw new Error(data.error || 'Failed to create room');
       }
@@ -143,6 +152,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
 
   const handleJoinRoom = () => {
     if (createdRoom) {
+      if (roomKey) window.location.hash = roomKey;
       onRoomCreated(createdRoom.roomCode);
     }
   };

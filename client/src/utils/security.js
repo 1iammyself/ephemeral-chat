@@ -48,9 +48,93 @@ export function isValidRoomCode(roomCode) {
  */
 export function isValidNickname(nickname) {
   return typeof nickname === 'string' && 
-         nickname.length >= 1 && 
-         nickname.length <= 50 &&
-         /^[a-zA-Z0-9_\-\s]+$/.test(nickname);
+         nickname.trim().length >= 2 && 
+         nickname.trim().length <= 20 &&
+         /^[a-zA-Z0-9_-]+$/.test(nickname);
+}
+
+/**
+ * Generate a random room key for E2EE
+ * @returns {string} Hex string of the key
+ */
+export function generateRoomKey() {
+  const array = new Uint8Array(32); // 256 bits
+  crypto.getRandomValues(array);
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Encrypt a message using AES-GCM
+ * @param {string} text - Message text
+ * @param {string} keyString - Hex string of the key
+ * @returns {Promise<{encrypted: string, iv: string}>} Encrypted data and IV
+ */
+export async function encryptMessage(text, keyString) {
+  try {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(text);
+    
+    // Convert hex key string to key material
+    // We hash it first to ensure it's the right length/format for importKey if it's not raw bytes
+    // But if we generated 32 bytes hex, we can just import it? 
+    // The user's example uses SHA-256 digest of the keyString. Let's follow that for robustness.
+    const keyData = encoder.encode(keyString);
+    const hash = await crypto.subtle.digest('SHA-256', keyData);
+    const key = await crypto.subtle.importKey('raw', hash, 'AES-GCM', false, ['encrypt']);
+    
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encryptedBuffer = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
+    
+    // Convert to base64 for transport
+    const encryptedArray = new Uint8Array(encryptedBuffer);
+    const encryptedBase64 = btoa(String.fromCharCode(...encryptedArray));
+    const ivBase64 = btoa(String.fromCharCode(...iv));
+    
+    return { encrypted: encryptedBase64, iv: ivBase64 };
+  } catch (error) {
+    console.error('Encryption error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Decrypt a message using AES-GCM
+ * @param {string} encryptedBase64 - Encrypted text (base64)
+ * @param {string} ivBase64 - IV (base64)
+ * @param {string} keyString - Hex string of the key
+ * @returns {Promise<string>} Decrypted text
+ */
+export async function decryptMessage(encryptedBase64, ivBase64, keyString) {
+  try {
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(keyString);
+    const hash = await crypto.subtle.digest('SHA-256', keyData);
+    const key = await crypto.subtle.importKey('raw', hash, 'AES-GCM', false, ['decrypt']);
+    
+    const encryptedString = atob(encryptedBase64);
+    const encryptedArray = new Uint8Array(encryptedString.length);
+    for (let i = 0; i < encryptedString.length; i++) {
+      encryptedArray[i] = encryptedString.charCodeAt(i);
+    }
+    
+    const ivString = atob(ivBase64);
+    const ivArray = new Uint8Array(ivString.length);
+    for (let i = 0; i < ivString.length; i++) {
+      ivArray[i] = ivString.charCodeAt(i);
+    }
+    
+    const decryptedBuffer = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: ivArray },
+      key,
+      encryptedArray
+    );
+    
+    const decoder = new TextDecoder();
+    return decoder.decode(decryptedBuffer);
+  } catch (error) {
+    console.error('Decryption error:', error);
+    return '⚠️ Decryption failed';
+  }
 }
 
 /**
@@ -286,5 +370,8 @@ export default {
   clearAllSensitiveData,
   formatTimeRemaining,
   checkBrowserSecuritySupport,
-  rateLimit
+  rateLimit,
+  generateRoomKey,
+  encryptMessage,
+  decryptMessage
 };

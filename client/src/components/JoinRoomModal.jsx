@@ -3,7 +3,7 @@ import { MessageCircle, Lock, Users, AlertCircle, Check, Loader2, Shield, Clock,
 import { useLocation, useNavigate } from 'react-router-dom';
 import '@cap.js/widget';
 
-const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite = false }) => {
+const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite = false, isWaitingForHost = false }) => {
   const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '';
   const location = useLocation();
   const navigate = useNavigate();
@@ -165,6 +165,26 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
 
     onJoin(joinData);
   };
+
+  if (isWaitingForHost) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-lg p-6 flex flex-col items-center max-w-md w-full text-center">
+          <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
+          <h3 className="text-xl font-bold mb-2">Waiting for Host</h3>
+          <p className="text-gray-600 mb-6">
+            The host has been notified of your arrival. Please wait for them to let you in.
+          </p>
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            Cancel Request
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
