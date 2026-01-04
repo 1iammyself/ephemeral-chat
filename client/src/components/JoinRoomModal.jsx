@@ -23,9 +23,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
   // Use callback ref to ensure listener is attached when element mounts
   const setCapWidgetRef = useCallback((node) => {
     if (node) {
-      console.log('Cap widget mounted (Join), attaching listeners');
       const handleSuccess = (event) => {
-        console.log('Cap event captured (Join):', event.type, event.detail);
         if (event.detail && event.detail.token) {
           setCapToken(event.detail.token);
           setIsCapVerified(true);
@@ -242,7 +240,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Nickname
@@ -262,16 +260,28 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
             {requiresPassword && !inviteValid && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Room Password
+                  Room Access Key
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
-                    type="password"
+                    type="text" /* text to avoid password manager prompts */
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="input-field w-full p-2 pl-9 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                    placeholder="Enter room password"
+                    inputMode="none"
+                    autoComplete="off"
+                    spellCheck={false}
+                    data-ms-formignored="true"
+                    data-ms-editor="false"
+                    data-lpignore="true"
+                    data-1p-ignore="true"
+                    data-form-type="other"
+                    name="room-access-key-join"
+                    onCopy={(e) => e.preventDefault()}
+                    onCut={(e) => e.preventDefault()}
+                    onPaste={(e) => e.preventDefault()}
+                    className="input-field input-no-echo w-full p-2 pl-9 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                    placeholder="Enter room access key"
                     required
                     disabled={isJoining || isProcessingInvite}
                   />

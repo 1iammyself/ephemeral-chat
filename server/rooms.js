@@ -21,6 +21,7 @@ class RoomManager {
     this.inviteTokens = new Map(); // token -> { roomCode, timeoutId, isPermanent: boolean }
     this.roomToTokens = new Map(); // roomCode -> Set of tokens (for cleanup)
     this._io = null; // socket.io reference for broadcasts
+    this.joinLocks = new Map(); // roomCode -> Promise (Mutex for joining)
 
     // Start garbage collector for in-memory messages
     if (!this.redis) {
@@ -136,6 +137,15 @@ class RoomManager {
    * @returns {Promise<{success: boolean, room: Object}>} Result of the join operation
    */
   async joinRoom(roomCode, userId, nickname, password = '', inviteToken = null, socketId = null) {
+    // Mutex to prevent race conditions (duplicate nicknames)
+    while (this.joinLocks.has(roomCode)) {
+      await this.joinLocks.get(roomCode);
+    }
+    
+    let resolveLock;
+    const lockPromise = new Promise(resolve => resolveLock = resolve);
+    this.joinLocks.set(roomCode, lockPromise);
+
     try {
       // console.log(`Attempting to join room ${roomCode} with token:`, inviteToken);
       const room = await this.getRoom(roomCode);
@@ -143,6 +153,9 @@ class RoomManager {
         // console.error(`Room ${roomCode} not found`);
         return { success: false, error: 'Room not found' };
       }
+      
+      // Ensure users array exists
+      if (!room.users) room.users = [];
 
       // Check if room has expired
       if (new Date(room.expiresAt) < new Date()) {
@@ -150,8 +163,20 @@ class RoomManager {
         throw new Error('This room has expired');
       }
 
-      // Sanitize nickname
+      // Sanitize nickname and normalize for case-insensitive comparison
       const sanitizedNickname = sanitizeInput(nickname);
+      const normalizedNickname = sanitizedNickname.toLowerCase().trim();
+
+      // Check if nickname is already taken by another user (case-insensitive)
+      const isNicknameTaken = room.users.some(u => {
+        const existingNormalized = (u.nickname || '').toLowerCase().trim();
+        return existingNormalized === normalizedNickname && u.socketId !== socketId;
+      });
+      
+      if (isNicknameTaken) {
+        // console.log(`Nickname collision: ${sanitizedNickname} is already taken in room ${roomCode}`);
+        throw new Error('This nickname is already taken in this room');
+      }
 
       // Check if user is already in the room with this socket
       const existingUserIndex = room.users.findIndex(u => u.socketId === socketId);
@@ -245,6 +270,10 @@ class RoomManager {
     } catch (error) {
       // console.error('Error joining room:', error);
       return { success: false, error: error.message };
+    } finally {
+      // Release lock
+      this.joinLocks.delete(roomCode);
+      if (resolveLock) resolveLock();
     }
   }
 
@@ -280,6 +309,11 @@ class RoomManager {
       message.content = sanitizeInput(message.content);
     }
     message.timestamp = new Date().toISOString();
+    
+    // Initialize viewedBy array for view-once messages
+    if (message.isViewOnce) {
+      message.viewedBy = [];
+    }
 
     // Handle message TTL with Redis
     if (this.redis && room.settings.messageTTL > 0) {
@@ -300,50 +334,85 @@ class RoomManager {
   }
 
   /**
+   * Remove a message from a room by id
+   */
+  async removeMessage(roomCode, messageId) {
+    const room = await this.getRoom(roomCode);
+    if (!room || !room.messages) return false;
+
+    const originalLen = room.messages.length;
+    room.messages = room.messages.filter(m => m.id !== messageId);
+
+    if (room.messages.length !== originalLen) {
+      await this.saveRoom(roomCode, room);
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Get messages for a room
    * @param {string} roomCode - Room code
+   * @param {string} [userId] - Optional user ID to filter private messages
    * @returns {Promise<Array>} Array of messages
    */
-  async getMessages(roomCode) {
+  async getMessages(roomCode, userId = null) {
     const room = await this.getRoom(roomCode);
     if (!room) return [];
+
+    let messages = [];
 
     if (this.redis && room.settings.messageTTL > 0) {
       // Get messages from Redis with TTL
       const messageKeys = await this.redis.keys(`message:${roomCode}:*`);
-      const messages = [];
-
+      
       for (const key of messageKeys) {
         const messageData = await this.redis.get(key);
         if (messageData) {
           messages.push(JSON.parse(messageData));
         }
       }
-
-      return messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-    }
-
-    // In-memory: Filter out expired messages on read
-    if (room.settings.messageTTL > 0) {
-      const now = new Date();
-      const ttlMs = room.settings.messageTTL * 1000;
       
-      // Filter messages that haven't expired
-      const validMessages = room.messages.filter(msg => {
-        const msgTime = new Date(msg.timestamp);
-        return (now - msgTime) < ttlMs;
-      });
-      
-      // If we filtered anything out, update the room storage immediately
-      if (validMessages.length !== room.messages.length) {
-        room.messages = validMessages;
-        await this.saveRoom(roomCode, room);
+      messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    } else {
+      // In-memory: Filter out expired messages on read
+      if (room.settings.messageTTL > 0) {
+        const now = new Date();
+        const ttlMs = room.settings.messageTTL * 1000;
+        
+        // Filter messages that haven't expired
+        const validMessages = room.messages.filter(msg => {
+          const msgTime = new Date(msg.timestamp);
+          return (now - msgTime) < ttlMs;
+        });
+        
+        // If we filtered anything out, update the room storage immediately
+        if (validMessages.length !== room.messages.length) {
+          room.messages = validMessages;
+          await this.saveRoom(roomCode, room);
+        }
+        
+        messages = validMessages;
+      } else {
+        messages = room.messages || [];
       }
-      
-      return validMessages;
     }
 
-    return room.messages || [];
+    // Filter private messages if userId is provided
+    if (userId) {
+      messages = messages.filter(msg => {
+        // If no recipients defined, it's a broadcast message (everyone sees it)
+        if (!msg.recipients || msg.recipients.length === 0) return true;
+        
+        // If I am the sender, I can see it
+        if (msg.sender.socketId === userId || msg.sender.id === userId) return true;
+        
+        // If I am in the recipients list, I can see it
+        return msg.recipients.includes(userId);
+      });
+    }
+
+    return messages;
   }
 
   /**
@@ -382,23 +451,31 @@ class RoomManager {
   }
 
   /**
-   * Mark a message as viewed (immediate) and remove stored media path if any
+   * Mark a message as viewed by a specific user
    */
-  async markMessageViewed(messageId) {
+  async markMessageViewed(messageId, userId) {
     for (const [roomCode, room] of this.rooms.entries()) {
       const idx = (room.messages || []).findIndex(m => m.id === messageId);
       if (idx >= 0) {
         const msg = room.messages[idx];
-        msg.hasBeenViewed = true;
-        // Remove any direct storage references to prevent further access
-        if (msg.storagePath) {
-          try { require('fs').unlinkSync(msg.storagePath); } catch (e) { /* ignore */ }
-          msg.storagePath = null;
+        
+        if (!msg.viewedBy) msg.viewedBy = [];
+        
+        // Add user to viewed list if not already present
+        if (!msg.viewedBy.includes(userId)) {
+          msg.viewedBy.push(userId);
+          await this.saveRoom(roomCode, room);
+          
+          // Broadcast via socket.io if available
+          if (this._io) {
+            this._io.to(roomCode).emit('message-viewed', { 
+              messageId, 
+              userId 
+            });
+          }
+          return true;
         }
-        await this.saveRoom(roomCode, room);
-        // Broadcast via socket.io if available
-        if (this._io) this._io.to(roomCode).emit('message-viewed', { messageId });
-        return true;
+        return false;
       }
     }
     return false;

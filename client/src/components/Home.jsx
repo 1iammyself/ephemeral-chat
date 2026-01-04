@@ -112,6 +112,7 @@ const Home = ({ children }) => {
                     <input
                       type="text"
                       id="roomCode"
+                      data-allow-copy="true"
                       value={roomCode}
                       onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
                       maxLength={10}

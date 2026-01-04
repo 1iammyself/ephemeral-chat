@@ -64,8 +64,7 @@ const ImageViewer = ({ isOpen, onClose, imageUrl, duration = 20 }) => {
 
   if (!isOpen) return null;
 
-  // DEBUG: Log the imageUrl to understand what's being passed
-  console.log('ImageViewer - isOpen:', isOpen, 'imageUrl length:', imageUrl?.length, 'imageUrl starts with:', imageUrl?.substring(0, 50));
+  // Debug logging removed to avoid leaking base64 and cluttering console
 
   // Calculate progress percentage for timer ring
   const progressPercentage = (timeLeft / duration) * 100;

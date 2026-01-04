@@ -658,7 +658,8 @@ io.on('connection', (socket) => {
         });
 
         // Send room data to user
-        const messages = await roomManager.getMessages(roomCode);
+        // Pass socket.id to filter private messages correctly
+        const messages = await roomManager.getMessages(roomCode, socket.id);
         callback({
           success: true,
           room: result.room,
@@ -670,8 +671,12 @@ io.on('connection', (socket) => {
 
         // Notify others
         socket.to(roomCode).emit('user-joined', {
-          nickname: userNickname,
-          userCount: result.room.users.length
+          user: {
+            socketId: socket.id,
+            id: socket.id,
+            nickname: userNickname
+          },
+          roomUsers: result.room.users
         });
 
         // logger.info(`👤 ${userNickname} joined room ${roomCode}`);
@@ -731,7 +736,7 @@ io.on('connection', (socket) => {
       }
 
       // Support for text, image and audio messages
-      const { content, messageType = 'text', isViewOnce = false, imageData } = data;
+      const { content, messageType = 'text', isViewOnce = false, imageData, recipients = [] } = data;
 
       // For text messages, validate content
       if (messageType === 'text') {
@@ -785,6 +790,7 @@ io.on('connection', (socket) => {
         content: messageContent,
         messageType,
         isViewOnce,
+        recipients, // Store recipients
         hasBeenViewed: false,
         sender: {
           socketId: socket.id,
@@ -798,10 +804,29 @@ io.on('connection', (socket) => {
         // logger.info(`📷 Image message created - ID: ${message.id}, content length: ${message.content?.length}`);
       }
 
+      // Initialize viewedBy array for view-once messages
+      if (isViewOnce) {
+        message.viewedBy = [];
+      }
+
       await roomManager.addMessage(socket.roomCode, message);
 
-      // Broadcast to all users in room
-      io.to(socket.roomCode).emit('new-message', message);
+      // Broadcast logic
+      if (recipients && recipients.length > 0) {
+        // Targeted delivery
+        
+        // 1. Send to sender (so they see their own message)
+        socket.emit('new-message', message);
+        
+        // 2. Send to each recipient
+        recipients.forEach(recipientId => {
+          io.to(recipientId).emit('new-message', message);
+        });
+        
+      } else {
+        // Broadcast to all users in room (default)
+        io.to(socket.roomCode).emit('new-message', message);
+      }
 
     } catch (error) {
       logger.error('Error sending message:', error);
@@ -817,17 +842,25 @@ io.on('connection', (socket) => {
       // logger.info(`👁️ Message ${messageId} viewed by ${socket.nickname}`);
 
       // Mark message as viewed in room manager
-      const result = await roomManager.markMessageViewed(messageId);
+      // Use socket.id as the unique identifier for the session
+      await roomManager.markMessageViewed(messageId, socket.id);
 
-      if (result) {
-        // Broadcast to all users in room that message was viewed
-        io.to(socket.roomCode).emit('message-viewed', {
-          messageId,
-          viewedBy: socket.nickname
-        });
-      }
     } catch (error) {
       logger.error('Error marking message as viewed:', error);
+    }
+  });
+
+  // Explicit delete for view-once audio after first play completion
+  socket.on('delete-message', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+
+      const removed = await roomManager.removeMessage(socket.roomCode, messageId);
+      if (removed) {
+        io.to(socket.roomCode).emit('message-deleted', { messageId });
+      }
+    } catch (error) {
+      logger.error('Error deleting message:', error);
     }
   });
 
@@ -933,7 +966,8 @@ io.on('connection', (socket) => {
 
       // Notify others
       socket.to(socket.roomCode).emit('user-left', {
-        nickname: socket.nickname
+        nickname: socket.nickname,
+        socketId: socket.id
       });
 
       // logger.info(`👤 ${socket.nickname} left room ${socket.roomCode}`);

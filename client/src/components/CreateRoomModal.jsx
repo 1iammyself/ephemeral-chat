@@ -30,7 +30,6 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const setCapWidgetRef = useCallback((node) => {
     if (node) {
       const handleSuccess = (event) => {
-        console.log('Cap event captured:', event.type, event.detail);
         if (event.detail && event.detail.token) {
           setCapToken(event.detail.token);
           setIsCapVerified(true);
@@ -112,13 +111,6 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
         }),
       });
 
-      console.log('Sending room creation data:', {
-        messageTTL: settings.messageTTL !== 'none' ? settings.messageTTL : undefined,
-        password: settings.password.trim() || undefined,
-        maxUsers: settings.maxUsers,
-        hasCapToken: !!capToken
-      });
-
       const data = await response.json();
 
       if (response.ok && data.roomCode) {
@@ -192,7 +184,8 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                     type="text"
                     readOnly
                     value={createdRoom.roomCode}
-                    className="flex-1 p-2 border rounded-l-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white font-mono"
+                     data-allow-copy="true"
+                     className="flex-1 p-2 border rounded-l-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white font-mono"
                   />
                   <button
                     onClick={() => copyToClipboard(createdRoom.roomCode, 'roomCode')}
@@ -205,20 +198,24 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
 
               {createdRoom.password && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Access Key</label>
                   <div className="flex items-center">
                     <input
-                      type="text"
+                      type="text" /* keep password managers from treating this as a password */
                       readOnly
+                      inputMode="none"
+                      autoComplete="off"
+                      spellCheck={false}
+                      data-ms-formignored="true"
+                      data-ms-editor="false"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                      data-form-type="other"
+                      onCopy={(e) => e.preventDefault()}
+                      onCut={(e) => e.preventDefault()}
                       value={createdRoom.password}
-                      className="flex-1 p-2 border rounded-l-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white font-mono"
+                      className="flex-1 p-2 border rounded-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white font-mono input-no-echo"
                     />
-                    <button
-                      onClick={() => copyToClipboard(createdRoom.password, 'password')}
-                      className="bg-blue-500 dark:bg-blue-600 text-white p-2 rounded-r-md hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors"
-                    >
-                      {isCopied.password ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
-                    </button>
                   </div>
                 </div>
               )}
@@ -230,7 +227,8 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                     type="text"
                     readOnly
                     value={inviteLink || 'Generating...'}
-                    className="flex-1 p-2 border rounded-l-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm truncate"
+                     data-allow-copy="true"
+                     className="flex-1 p-2 border rounded-l-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm truncate"
                   />
                   <button
                     onClick={() => inviteLink && copyToClipboard(inviteLink, 'inviteLink')}
@@ -281,7 +279,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
             Create a New Room
           </h2>
 
-          <form onSubmit={handleCreate} className="space-y-4 sm:space-y-6">
+          <form onSubmit={handleCreate} autoComplete="off" className="space-y-4 sm:space-y-6">
             {/* Message TTL Setting */}
             <div>
               <div className="flex items-center space-x-2 mb-2 sm:mb-3">
@@ -324,18 +322,30 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
               <div className="flex items-center space-x-2 mb-2 sm:mb-3">
                 <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
                 <label className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">
-                  Room Password (Optional)
+                  Room Access Key (Optional)
                 </label>
               </div>
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 sm:mb-3">
-                Set a password to restrict access to your room
+                Set a private access key to restrict your room (not saved by the browser)
               </p>
               <input
-                type="password"
-                placeholder="Enter password (optional)"
+                type="text" /* text to avoid password manager hooks */
+                inputMode="none"
+                autoComplete="off"
+                spellCheck={false}
+                data-ms-formignored="true"
+                data-ms-editor="false"
+                data-lpignore="true"
+                data-1p-ignore="true"
+                data-form-type="other"
+                name="room-access-key-create"
+                placeholder="Enter access key (optional)"
                 value={settings.password}
                 onChange={(e) => setSettings(prev => ({ ...prev, password: e.target.value }))}
-                className="input-field text-sm sm:text-base py-2 sm:py-3 px-3 sm:px-4 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                onCopy={(e) => e.preventDefault()}
+                onCut={(e) => e.preventDefault()}
+                onPaste={(e) => e.preventDefault()}
+                className="input-field input-no-echo text-sm sm:text-base py-2 sm:py-3 px-3 sm:px-4 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
                 maxLength={50}
               />
             </div>
@@ -382,7 +392,6 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                     value={settings.maxUsers}
                     onChange={(e) => {
                       const value = parseInt(e.target.value);
-                      console.log('Max users slider changed to:', value);
                       setSettings(prev => ({ ...prev, maxUsers: value }));
                     }}
                     className="flex-1 h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer slider"

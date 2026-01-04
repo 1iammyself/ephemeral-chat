@@ -56,6 +56,8 @@ const ChatRoom = () => {
   const [isHost, setIsHost] = useState(false);
   const [joinParams, setJoinParams] = useState(null);
   const [roomKey, setRoomKey] = useState(null);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [selectedRecipients, setSelectedRecipients] = useState([]);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -126,8 +128,8 @@ const ChatRoom = () => {
         }
         setMessages(msgs);
         
-        setUsers(response.room?.users || []);
-        setCurrentUser({ id: socketManager.socket?.id, nickname: response.nickname, isAdmin: false });
+  setUsers(response.room?.users || []);
+  setCurrentUser({ id: socketManager.socket?.id, socketId: socketManager.socket?.id, nickname: response.nickname, isAdmin: false });
         setIsJoined(true);
         setShowJoinModal(false);
         setIsProcessingInvite(false);
@@ -178,6 +180,7 @@ const ChatRoom = () => {
 
       setCurrentUser({
         id: socketManager.socket?.id,
+        socketId: socketManager.socket?.id,
         nickname: data.nickname,
         isAdmin: data.isAdmin
       });
@@ -198,30 +201,42 @@ const ChatRoom = () => {
       setMessages(prev => [...prev, message]);
     };
 
-    const handleUserJoined = ({ nickname, userCount }) => {
-      setMessages(prev => [...prev, {
-        id: `system_${Date.now()}`,
-        type: 'system',
-        content: `${nickname} joined the room`,
-        timestamp: new Date().toISOString()
-      }]);
-      setUsers(prev => {
-        const newUsers = [...prev];
-        while (newUsers.length < userCount) {
-          newUsers.push({ id: `user_${Date.now()}_${newUsers.length}`, nickname: 'User' });
-        }
-        return newUsers.slice(0, userCount);
-      });
+    const handleMessageDeleted = ({ messageId }) => {
+      setMessages(prev => prev.filter(m => m.id !== messageId));
     };
 
-    const handleUserLeft = ({ nickname, userCount }) => {
+    const handleUserJoined = ({ user, roomUsers }) => {
+      const displayName = user?.nickname || 'Someone';
       setMessages(prev => [...prev, {
         id: `system_${Date.now()}`,
         type: 'system',
-        content: `${nickname} left the room`,
+        content: `${displayName} joined the room`,
         timestamp: new Date().toISOString()
       }]);
-      setUsers(prev => prev.slice(0, userCount));
+
+      if (Array.isArray(roomUsers)) {
+        setUsers(roomUsers);
+      } else if (user?.socketId) {
+        setUsers(prev => {
+          if (prev.some(u => u.socketId === user.socketId)) return prev;
+          return [...prev, user];
+        });
+      }
+    };
+
+    const handleUserLeft = ({ nickname, socketId, userCount }) => {
+      setMessages(prev => [...prev, {
+        id: `system_${Date.now()}`,
+        type: 'system',
+        content: `${nickname || 'A user'} left the room`,
+        timestamp: new Date().toISOString()
+      }]);
+
+      if (socketId) {
+        setUsers(prev => prev.filter(u => u.socketId !== socketId));
+      } else if (typeof userCount === 'number') {
+        setUsers(prev => prev.slice(0, userCount));
+      }
     };
 
     const handleError = ({ message }) => {
@@ -269,6 +284,7 @@ const ChatRoom = () => {
     socketManager.on('disconnect', handleDisconnect);
     socketManager.on('room-joined', handleRoomJoined);
     socketManager.on('new-message', handleNewMessage);
+  socketManager.on('message-deleted', handleMessageDeleted);
     socketManager.on('user-joined', handleUserJoined);
     socketManager.on('user-left', handleUserLeft);
     socketManager.on('error', handleError);
@@ -284,6 +300,7 @@ const ChatRoom = () => {
       socketManager.off('disconnect', handleDisconnect);
       socketManager.off('room-joined', handleRoomJoined);
       socketManager.off('new-message', handleNewMessage);
+  socketManager.off('message-deleted', handleMessageDeleted);
       socketManager.off('user-joined', handleUserJoined);
       socketManager.off('user-left', handleUserLeft);
       socketManager.off('error', handleError);
@@ -381,7 +398,8 @@ const ChatRoom = () => {
       socketManager.emit('send-message', { 
           content,
           isEncrypted,
-          iv
+          iv,
+          recipients: selectedRecipients
       });
       socketManager.emit('user-activity');
       setNewMessage('');
@@ -407,7 +425,12 @@ const ChatRoom = () => {
     try {
       const reader = new FileReader();
       reader.onload = (e) => {
-        socketManager.emit('send-message', { messageType: 'image', imageData: e.target.result, isViewOnce: true });
+        socketManager.emit('send-message', { 
+          messageType: 'image', 
+          imageData: e.target.result, 
+          isViewOnce: true,
+          recipients: selectedRecipients
+        });
         setIsUploading(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
       };
@@ -416,7 +439,7 @@ const ChatRoom = () => {
       setError('Failed to upload image');
       setIsUploading(false);
     }
-  }, []);
+  }, [selectedRecipients]);
 
   const handleStartCall = useCallback(async () => {
     if (users.length < 2) {
@@ -435,7 +458,27 @@ const ChatRoom = () => {
   }, [users, currentUser, roomCode]);
 
   const startRecording = async () => {
+    // iOS/Safari: getUserMedia must be called directly in the tap handler, with no async hops before.
+    // Also feature-detect MediaRecorder and pick a supported mime type (iOS often prefers audio/mp4).
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError('Audio recording is not supported in this browser.');
+        return;
+      }
+
+      if (typeof window.MediaRecorder === 'undefined') {
+        setError('Audio recording is not supported on this device.');
+        return;
+      }
+
+      // Choose the first supported mime type in priority order
+      const preferredTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4'
+      ];
+      const selectedMimeType = preferredTypes.find(type => MediaRecorder.isTypeSupported(type)) || '';
+
       // Optimize constraints for voice: Mono, lower sample rate
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -446,14 +489,8 @@ const ChatRoom = () => {
         } 
       });
       
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-        ? 'audio/webm;codecs=opus' 
-        : 'audio/webm';
-
-      // AGGRESSIVE COMPRESSION: 
-      // 16kbps is very efficient for voice while maintaining clarity
       const options = {
-        mimeType,
+        mimeType: selectedMimeType,
         audioBitsPerSecond: 16000 
       };
 
@@ -479,7 +516,14 @@ const ChatRoom = () => {
       }, 1000);
 
     } catch (err) {
-      setError('Could not access microphone.');
+      // Surface more actionable errors on iOS (NotAllowedError / NotSupportedError)
+      if (err?.name === 'NotAllowedError') {
+        setError('Microphone access was denied. Please allow mic access in Safari settings and try again.');
+      } else if (err?.name === 'NotSupportedError') {
+        setError('Audio recording is not supported on this device/browser.');
+      } else {
+        setError('Could not access microphone.');
+      }
     }
   };
 
@@ -538,12 +582,12 @@ const ChatRoom = () => {
       }
       const base64Audio = btoa(binary);
 
-      console.log('🚀 Sending sanitized audio. Length:', base64Audio.length);
 
       socketManager.emit('send-message', { 
         messageType: 'audio', 
         content: base64Audio, // Sending raw base64 ONLY
-        isViewOnce: true 
+        isViewOnce: true,
+        recipients: selectedRecipients
       });
     };
   };
@@ -565,6 +609,16 @@ const ChatRoom = () => {
     if (ttl < 60) return `${ttl}s`;
     if (ttl < 3600) return `${Math.floor(ttl / 60)}m`;
     return `${Math.floor(ttl / 3600)}h`;
+  };
+
+  const toggleRecipient = (socketId) => {
+    setSelectedRecipients(prev => {
+      if (prev.includes(socketId)) {
+        return prev.filter(id => id !== socketId);
+      } else {
+        return [...prev, socketId];
+      }
+    });
   };
 
   if (error && !isJoined) {
@@ -600,7 +654,7 @@ const ChatRoom = () => {
             <button onClick={() => navigate('/')} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300"><ArrowLeft className="w-5 h-5" /></button>
             <div>
               <div className="flex items-center space-x-2">
-                <h1 className="text-lg font-semibold truncate text-gray-900 dark:text-white">Room {roomCode}</h1>
+                <h1 className="text-lg font-semibold truncate text-gray-900 dark:text-white" data-allow-copy="true">Room {roomCode}</h1>
                 <button onClick={copyRoomCode} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"><Copy className="w-4 h-4 text-gray-500 dark:text-gray-400" /></button>
               </div>
               <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
@@ -616,6 +670,15 @@ const ChatRoom = () => {
           </div>
           <div className="flex items-center space-x-2">
              <ThemeToggle />
+             <button 
+               onClick={() => setShowMobileMenu(true)}
+               className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 relative"
+             >
+               <Users className="w-5 h-5" />
+               {isHost && pendingGuests.length > 0 && (
+                 <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-gray-800" />
+               )}
+             </button>
           </div>
         </div>
       </div>
@@ -629,7 +692,22 @@ const ChatRoom = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-800 transition-colors duration-200">
+          <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200">
+              {selectedRecipients.length > 0 && (
+                <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800 flex items-center justify-between animate-in slide-in-from-bottom-2 duration-200">
+                  <span className="text-xs text-blue-600 dark:text-blue-300 font-medium flex items-center">
+                    <Users className="w-3 h-3 mr-1.5" />
+                    Sending to {selectedRecipients.length} specific user{selectedRecipients.length !== 1 ? 's' : ''}
+                  </span>
+                  <button 
+                    onClick={() => setSelectedRecipients([])}
+                    className="text-xs text-blue-500 hover:text-blue-700 dark:hover:text-blue-200 underline"
+                  >
+                    Clear selection (Send to all)
+                  </button>
+                </div>
+              )}
+              <div className="p-4">
               <form onSubmit={handleSendMessage} className="flex items-center space-x-3">
                 {isRecording ? (
                   <div className="flex-1 flex items-center justify-between bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-2 animate-in fade-in duration-200">
@@ -652,11 +730,23 @@ const ChatRoom = () => {
                     <button type="button" onClick={() => fileInputRef.current?.click()} disabled={!isConnected || isUploading} className="p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"><Loader2 className={`w-5 h-5 text-gray-500 dark:text-gray-400 ${isUploading ? 'animate-spin' : ''}`} style={{ display: isUploading ? 'block' : 'none' }} /><ImageIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" style={{ display: isUploading ? 'none' : 'block' }} /></button>
                     <button type="button" onClick={handleStartCall} disabled={!isConnected || users.length < 2} className="p-3 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors disabled:opacity-50"><Phone className="w-5 h-5 text-green-500" /></button>
                     <button type="button" onClick={startRecording} disabled={!isConnected} className="p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"><Mic className="w-5 h-5 text-red-500" /></button>
-                    <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Type your message..." className="flex-1 input-field py-3 px-4 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600" disabled={!isConnected || isSending} maxLength={500} />
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      onCopy={(e) => e.preventDefault()}
+                      onCut={(e) => e.preventDefault()}
+                      onPaste={(e) => e.preventDefault()}
+                      placeholder="Type your message..."
+                      className="flex-1 input-field py-3 px-4 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                      disabled={!isConnected || isSending}
+                      maxLength={500}
+                    />
                     <button type="submit" disabled={!newMessage.trim() || !isConnected || isSending} className="btn-primary px-4 py-3"><Send className="w-5 h-5" /></button>
                   </>
                 )}
               </form>
+              </div>
           </div>
         </div>
         <div className="hidden lg:block w-64 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200">
@@ -667,9 +757,47 @@ const ChatRoom = () => {
             isHost={isHost}
             onApprove={handleApproveGuest}
             onDeny={handleDenyGuest}
+            selectedRecipients={selectedRecipients}
+            onToggleRecipient={toggleRecipient}
           />
         </div>
       </div>
+
+      {/* Mobile User List Overlay */}
+      {showMobileMenu && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowMobileMenu(false)}
+          />
+          {/* Drawer */}
+          <div className="absolute right-0 top-0 bottom-0 w-80 max-w-[85vw] bg-white dark:bg-gray-800 shadow-xl transform transition-transform duration-200 ease-in-out flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Room Details</h2>
+              <button 
+                onClick={() => setShowMobileMenu(false)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+               <UserList 
+                users={users} 
+                currentUser={currentUser} 
+                pendingGuests={pendingGuests}
+                isHost={isHost}
+                onApprove={handleApproveGuest}
+                onDeny={handleDenyGuest}
+                selectedRecipients={selectedRecipients}
+                onToggleRecipient={toggleRecipient}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {showCallModal && <AudioCallModal isOpen={showCallModal} onClose={() => setShowCallModal(false)} roomCode={roomCode} />}
     </div>
   );

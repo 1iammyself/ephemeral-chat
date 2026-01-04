@@ -9,6 +9,26 @@ import InviteHandler from './components/InviteHandler.jsx';
 const InstallPrompt = () => null;
 
 function App() {
+  // Global copy/cut/paste guard with a small whitelist
+  useEffect(() => {
+    const handler = (e) => {
+      const allowed = e.target?.closest && e.target.closest('[data-allow-copy="true"]');
+      if (!allowed) {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener('copy', handler);
+    document.addEventListener('cut', handler);
+    document.addEventListener('paste', handler);
+
+    return () => {
+      document.removeEventListener('copy', handler);
+      document.removeEventListener('cut', handler);
+      document.removeEventListener('paste', handler);
+    };
+  }, []);
+
   // Check for service worker updates
   useEffect(() => {
     if ('serviceWorker' in navigator && import.meta.env.PROD) {

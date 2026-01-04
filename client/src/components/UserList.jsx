@@ -1,7 +1,7 @@
 import React from 'react';
 import { Users, Crown, User, Check, X } from 'lucide-react';
 
-const UserList = ({ users, currentUser, pendingGuests = [], isHost = false, onApprove, onDeny }) => {
+const UserList = ({ users, currentUser, pendingGuests = [], isHost = false, onApprove, onDeny, selectedRecipients = [], onToggleRecipient }) => {
   const getInitials = (nickname) => {
     return nickname
       .split(' ')
@@ -92,18 +92,32 @@ const UserList = ({ users, currentUser, pendingGuests = [], isHost = false, onAp
         ) : (
           <div className="space-y-3">
             {users.map((user, index) => {
-              const isCurrentUser = currentUser && user.socketId === currentUser.socketId;
+              const isCurrentUser = currentUser && (user.socketId === currentUser.socketId || user.socketId === currentUser.id || user.id === currentUser.id);
               const isFirstUser = index === 0; // First user is considered room creator
 
               return (
                 <div
                   key={user.socketId || user.id || index}
-                  className={`flex items-center space-x-3 p-2 rounded-lg transition-colors duration-200 ${
-                    isCurrentUser ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                  className={`flex items-center space-x-3 p-2 rounded-lg transition-colors duration-200 cursor-pointer ${
+                    isCurrentUser 
+                      ? 'bg-indigo-50 dark:bg-indigo-900/20' 
+                      : selectedRecipients.includes(user.socketId)
+                        ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
+                        : 'hover:bg-gray-50 dark:hover:bg-gray-800 border border-transparent'
                   }`}
+                  onClick={() => !isCurrentUser && onToggleRecipient && onToggleRecipient(user.socketId)}
                 >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm text-white font-medium shadow-sm ${getAvatarColor(user.nickname)}`}>
-                    {getInitials(user.nickname)}
+                  <div className="relative">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm text-white font-medium shadow-sm ${getAvatarColor(user.nickname)}`}>
+                      {getInitials(user.nickname)}
+                    </div>
+                    {!isCurrentUser && onToggleRecipient && (
+                      <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center ${
+                        selectedRecipients.includes(user.socketId) ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-600'
+                      }`}>
+                        {selectedRecipients.includes(user.socketId) && <Check className="w-2.5 h-2.5 text-white" />}
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center">

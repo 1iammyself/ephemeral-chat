@@ -13,8 +13,13 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
 
   // Listen for message-viewed events from server
   useEffect(() => {
-    const handleMessageViewed = ({ messageId }) => {
-      setViewedMessages(prev => new Set([...prev, messageId]));
+    const handleMessageViewed = ({ messageId, userId }) => {
+      // console.log(`Event: message-viewed`, { messageId, userId, currentUserId: currentUser?.id, currentUserSocket: currentUser?.socketId });
+      
+      // Only mark as viewed locally if WE viewed it
+      if (currentUser && (userId === currentUser.id || userId === currentUser.socketId)) {
+        setViewedMessages(prev => new Set([...prev, messageId]));
+      }
     };
 
     socketManager.on('message-viewed', handleMessageViewed);
@@ -22,7 +27,7 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
     return () => {
       socketManager.off('message-viewed', handleMessageViewed);
     };
-  }, []);
+  }, [currentUser]);
 
   useEffect(() => {
     // Set up timers for messages with TTL
@@ -94,8 +99,17 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
   };
 
   const isMessageViewed = useCallback((message) => {
-    return message.hasBeenViewed || viewedMessages.has(message.id);
-  }, [viewedMessages]);
+    // Check if we have viewed it locally OR if the server says we viewed it
+    const myId = currentUser?.id || currentUser?.socketId;
+    const serverSaysViewed = message.viewedBy && Array.isArray(message.viewedBy) && message.viewedBy.includes(myId);
+    
+    // Debug logging
+    // if (message.isViewOnce) {
+    //   console.log(`Msg ${message.id} check: MyID=${myId}, ViewedBy=${JSON.stringify(message.viewedBy)}, ServerSays=${serverSaysViewed}, Local=${viewedMessages.has(message.id)}`);
+    // }
+
+    return viewedMessages.has(message.id) || serverSaysViewed;
+  }, [viewedMessages, currentUser]);
 
   const handleImageClick = useCallback((message) => {
     // Don't allow viewing if already viewed
@@ -120,15 +134,16 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
 
   const handleAudioPlay = useCallback((message) => {
     if (isMessageViewed(message)) return;
-    
-    // Set this audio as playing to reveal the player
     setPlayingAudioId(message.id);
-    
-    // Don't mark as viewed immediately, wait for playback to start or end?
-    // For now, let's mark as viewed when they click to listen, similar to image
-    socketManager.emit('message-viewed', { messageId: message.id });
-    setViewedMessages(prev => new Set([...prev, message.id]));
   }, [isMessageViewed]);
+
+  const handleAudioEnded = useCallback((message) => {
+    // Mark viewed and request deletion for view-once audio once playback finishes
+    socketManager.emit('message-viewed', { messageId: message.id });
+    socketManager.emit('delete-message', { messageId: message.id });
+    setViewedMessages(prev => new Set([...prev, message.id]));
+    setPlayingAudioId(null);
+  }, []);
 
   const handleViewerClose = useCallback(() => {
     setViewingImage(null);
@@ -184,30 +199,18 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
 
           // View-once content that has been viewed
           // For audio, we keep showing the player if it's currently playing (or just unlocked for this session)
-          if ((isImage || isAudio) && isViewOnce && hasBeenViewed) {
-            // If it's audio and we are currently playing it, don't show the "viewed" placeholder yet
-            if (isAudio && playingAudioId === message.id) {
-               // Pass through to render the player
-            } else {
+          if ((isImage || isAudio) && isViewOnce) {
+            // If I sent it, I can't view it
+            if (isOwnMessage) {
               return (
                 <div
                   key={message.id}
-                  className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+                  className={`flex justify-end`}
                 >
-                  <div
-                    className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${isOwnMessage
-                      ? 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-200'
-                      : 'bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300'
-                      }`}
-                  >
-                    {!isOwnMessage && (
-                      <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                        {message.sender.nickname}
-                      </div>
-                    )}
+                  <div className="max-w-xs lg:max-w-md px-4 py-3 rounded-lg bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-200">
                     <div className="flex items-center space-x-2 text-sm italic">
                       {isImage ? <Eye className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                      <span>This {isImage ? 'image' : 'audio'} has been viewed</span>
+                      <span>View Once {isImage ? 'Photo' : 'Audio'} Sent</span>
                     </div>
                     <div className={`flex items-center justify-between mt-2 text-xs text-gray-500 dark:text-gray-400`}>
                       <span>{formatTime(message.timestamp)}</span>
@@ -219,6 +222,38 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
                   </div>
                 </div>
               );
+            }
+
+            // If I viewed it, show placeholder for images; for audio we rely on deletion on end
+            if (hasBeenViewed) {
+              // If it's audio and we are currently playing it, don't show the "viewed" placeholder yet
+              if (isAudio && playingAudioId === message.id) {
+                 // Pass through to render the player
+              } else if (!isAudio) {
+                return (
+                  <div
+                    key={message.id}
+                    className={`flex justify-start`}
+                  >
+                    <div className="max-w-xs lg:max-w-md px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300">
+                      <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        {message.sender.nickname}
+                      </div>
+                      <div className="flex items-center space-x-2 text-sm italic">
+                        {isImage ? <Eye className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                        <span>This {isImage ? 'image' : 'audio'} has been viewed</span>
+                      </div>
+                      <div className={`flex items-center justify-between mt-2 text-xs text-gray-500 dark:text-gray-400`}>
+                        <span>{formatTime(message.timestamp)}</span>
+                        <div className="flex items-center space-x-1">
+                          <Lock className="w-3 h-3 text-green-500" />
+                          <span>View once</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
             }
           }
 
@@ -241,7 +276,7 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
                 )}
 
                 {/* Message content */}
-                <div className="break-words">
+                <div className="break-words no-copy" onCopy={(e) => e.preventDefault()} onCut={(e) => e.preventDefault()} onPaste={(e) => e.preventDefault()}>
                   {isImage ? (
                     // Image message
                     <div
@@ -287,14 +322,17 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
                             <p className="text-xs opacity-70">Tap to listen (View Once)</p>
                           </div>
                         </div>
+                      ) : isOwnMessage && isViewOnce ? (
+                        // Sender cannot play their own view-once audio
+                        <div className="px-3 py-2 rounded-lg bg-gray-200/60 dark:bg-gray-700/60 text-xs text-gray-700 dark:text-gray-200">
+                          You sent a view-once voice note
+                        </div>
                       ) : (
                         <AudioPlayer 
                           src={message.content} 
                           isOwnMessage={isOwnMessage}
                           autoPlay={playingAudioId === message.id}
-                          onEnded={() => {
-                            // Optional: do something when audio ends
-                          }}
+                          onEnded={() => handleAudioEnded(message)}
                         />
                       )}
                     </div>

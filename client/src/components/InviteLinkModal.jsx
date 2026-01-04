@@ -182,6 +182,7 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
                     type="text"
                     readOnly
                     value={inviteLink}
+                    data-allow-copy="true"
                     className="flex-1 min-w-0 block w-full px-3 py-2 rounded-l-md border border-r-0 border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                     onClick={(e) => e.target.select()}
                   />

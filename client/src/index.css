@@ -28,6 +28,48 @@
   .card {
     @apply bg-white rounded-xl shadow-sm border border-gray-200;
   }
+
+  .no-copy {
+    user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    -moz-user-select: none;
+  }
+
+  /* Hide password echo (no dots) while keeping placeholder visible */
+  .input-no-echo {
+    color: transparent;
+    text-shadow: 0 0 0 transparent;
+    caret-color: transparent;
+    -webkit-text-fill-color: transparent !important; /* Chromium/Edge */
+    /* Prevent reveal on selection (light or dark themes) */
+    user-select: text;
+  }
+
+  .input-no-echo::selection {
+    color: transparent;
+    background: transparent;
+  }
+
+  .input-no-echo::-moz-selection {
+    color: transparent;
+    background: transparent;
+  }
+
+  /* Guard against autofill or forced colors in Chromium/Edge */
+  .input-no-echo:-webkit-autofill,
+  .input-no-echo:-webkit-autofill:hover,
+  .input-no-echo:-webkit-autofill:focus,
+  .input-no-echo:-webkit-autofill:active {
+    -webkit-text-fill-color: transparent !important;
+    caret-color: transparent;
+    transition: background-color 9999s ease-in-out 0s;
+  }
+
+  .input-no-echo::placeholder {
+    /* Match default placeholder colors */
+    @apply text-gray-400 dark:text-gray-500;
+  }
 }
 
 /* Custom scrollbar */
