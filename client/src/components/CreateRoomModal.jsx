@@ -177,24 +177,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
             </h2>
 
             <div className="space-y-4 mb-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Room Code</label>
-                <div className="flex items-center">
-                  <input
-                    type="text"
-                    readOnly
-                    value={createdRoom.roomCode}
-                     data-allow-copy="true"
-                     className="flex-1 p-2 border rounded-l-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white font-mono"
-                  />
-                  <button
-                    onClick={() => copyToClipboard(createdRoom.roomCode, 'roomCode')}
-                    className="bg-blue-500 dark:bg-blue-600 text-white p-2 rounded-r-md hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors"
-                  >
-                    {isCopied.roomCode ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
-                  </button>
-                </div>
-              </div>
+              {/* Room Code display removed to enforce link-only joining */}
 
               {createdRoom.password && (
                 <div>

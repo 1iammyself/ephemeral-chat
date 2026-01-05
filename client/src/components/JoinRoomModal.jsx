@@ -213,10 +213,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
           </h2>
 
           <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm text-gray-500 dark:text-gray-400">Room Code</span>
-              <span className="font-mono font-bold text-lg dark:text-white">{roomCode}</span>
-            </div>
+            {/* Room Code display removed for security */}
             {roomInfo && (
               <>
                 <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mb-1">
@@ -249,6 +246,10 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
                 type="text"
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
+                autoComplete="off"
+                name={`nickname_${Math.random().toString(36).substring(7)}`}
+                data-lpignore="true"
+                data-form-type="other"
                 className="input-field w-full p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
                 placeholder="Enter your nickname"
                 maxLength={20}

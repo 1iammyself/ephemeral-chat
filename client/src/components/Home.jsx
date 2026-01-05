@@ -103,55 +103,18 @@ const Home = ({ children }) => {
 
             {/* Join Room Form */}
             <div className="mt-10 max-w-md mx-auto bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden p-4 sm:p-6 transition-colors duration-200">
-              <form onSubmit={handleJoinRoom} className="space-y-4 sm:space-y-6">
-                <div>
-                  <label htmlFor="roomCode" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Room Code
-                  </label>
-                  <div className="mt-1 flex rounded-md shadow-sm">
-                    <input
-                      type="text"
-                      id="roomCode"
-                      data-allow-copy="true"
-                      value={roomCode}
-                      onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                      maxLength={10}
-                      placeholder="ABCDEFGHIJ"
-                      className="flex-1 min-w-0 block w-full px-3 py-2 sm:py-3 text-sm sm:text-base rounded-none rounded-l-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-indigo-500 focus:ring-indigo-500"
-                    />
-                    <button
-                      type="submit"
-                      disabled={isJoining}
-                      className="inline-flex items-center px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base font-medium rounded-r-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 min-h-[44px]"
-                    >
-                      {isJoining ? 'Joining...' : 'Join Room'}
-                    </button>
-                  </div>
-                  <p className="mt-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                    Enter a 10-character room code to join an existing room
-                  </p>
-                </div>
-              </form>
-
+              
               <div className="mt-4 sm:mt-6">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-300 dark:border-gray-600" />
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">Or</span>
-                  </div>
-                </div>
-
-                <div className="mt-4 sm:mt-6">
-                  <button
-                    onClick={() => setShowCreateModal(true)}
-                    className="w-full flex justify-center items-center px-4 py-3 text-sm sm:text-base font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 min-h-[44px]"
-                  >
-                    <Plus className="-ml-1 mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-                    Create New Room
-                  </button>
-                </div>
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="w-full flex justify-center items-center px-4 py-3 text-sm sm:text-base font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 min-h-[44px]"
+                >
+                  <Plus className="-ml-1 mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                  Create New Room
+                </button>
+                <p className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                  To join a room, please use the invite link shared by the host.
+                </p>
               </div>
             </div>
 

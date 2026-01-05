@@ -654,8 +654,7 @@ const ChatRoom = () => {
             <button onClick={() => navigate('/')} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300"><ArrowLeft className="w-5 h-5" /></button>
             <div>
               <div className="flex items-center space-x-2">
-                <h1 className="text-lg font-semibold truncate text-gray-900 dark:text-white" data-allow-copy="true">Room {roomCode}</h1>
-                <button onClick={copyRoomCode} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"><Copy className="w-4 h-4 text-gray-500 dark:text-gray-400" /></button>
+                <h1 className="text-lg font-semibold truncate text-gray-900 dark:text-white">Secure Chat</h1>
               </div>
               <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
                 <div className="flex items-center space-x-1">
