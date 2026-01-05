@@ -7,6 +7,7 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
   const [duration, setDuration] = useState(0);
   const [audioUrl, setAudioUrl] = useState(null);
   const audioRef = useRef(null);
+  const mimeTypeRef = useRef(null);
 
   useEffect(() => {
     let objectUrl = null;
@@ -46,6 +47,8 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
             }
           }
 
+          mimeTypeRef.current = mimeType;
+
           // Create the blob with the detected type
           const blob = new Blob([bytes], { type: mimeType });
           objectUrl = URL.createObjectURL(blob);
@@ -53,6 +56,7 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
         } else {
           // Fallback for standard URLs or existing data URIs
           setAudioUrl(src);
+          mimeTypeRef.current = null;
         }
       } catch (err) {
         console.error("Audio reconstruction failed:", err);
@@ -96,7 +100,9 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
       if (isFinite(audio.duration)) {
         setDuration(audio.duration);
       } else {
-        // Fix for WebM duration bugs (often seen in recorded voice notes)
+        // Fix for WebM duration bugs (only apply for WebM)
+        if (mimeTypeRef.current && !mimeTypeRef.current.includes('webm')) return;
+
         setDuration(0); 
         audio.currentTime = 1e101; // Seek to end to force duration calculation
         audio.ontimeupdate = function() {
