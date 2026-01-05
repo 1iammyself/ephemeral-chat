@@ -26,6 +26,7 @@ import UserList from './UserList';
 import AudioCallModal from './AudioCallModal';
 import webRTCService, { CallState } from '../webrtc';
 import { encryptMessage, decryptMessage } from '../utils/security'; // Import E2EE helpers
+import { WavRecorder } from '../utils/audioRecorder';
 import ThemeToggle from './ThemeToggle';
 
 const ChatRoom = () => {
@@ -60,6 +61,7 @@ const ChatRoom = () => {
   const [selectedRecipients, setSelectedRecipients] = useState([]);
 
   const mediaRecorderRef = useRef(null);
+  const wavRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
   const joinParamsRef = useRef(null);
@@ -458,52 +460,48 @@ const ChatRoom = () => {
   }, [users, currentUser, roomCode]);
 
   const startRecording = async () => {
-    // iOS/Safari: getUserMedia must be called directly in the tap handler, with no async hops before.
-    // Also feature-detect MediaRecorder and pick a supported mime type (iOS often prefers audio/mp4).
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
         setError('Audio recording is not supported in this browser.');
         return;
       }
 
-      if (typeof window.MediaRecorder === 'undefined') {
-        setError('Audio recording is not supported on this device.');
-        return;
+      // Check if we can record MP4 (Safari/iOS)
+      // If supported, use MediaRecorder (native MP4).
+      // If NOT supported (Chrome/Firefox), use WavRecorder (WAV) which plays everywhere.
+      const canRecordMp4 = typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/mp4');
+
+      if (canRecordMp4) {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true
+          } 
+        });
+        
+        const options = {
+          mimeType: 'audio/mp4',
+          audioBitsPerSecond: 32000 
+        };
+
+        mediaRecorderRef.current = new MediaRecorder(stream, options);
+        audioChunksRef.current = [];
+        
+        mediaRecorderRef.current.ondataavailable = (event) => {
+          if (event.data.size > 0) audioChunksRef.current.push(event.data);
+        };
+
+        mediaRecorderRef.current.start();
+      } else {
+        // Fallback to WAV for Chrome/Firefox to ensure iOS compatibility
+        wavRecorderRef.current = new WavRecorder();
+        wavRecorderRef.current.onStop = (blob) => {
+          if (blob.size > 0) sendAudioMessage(blob);
+        };
+        await wavRecorderRef.current.start();
       }
 
-      // Choose the first supported mime type in priority order
-      // Prioritize MP4/AAC for better iOS compatibility if supported by the browser
-      const preferredTypes = [
-        'audio/mp4',
-        'audio/mp4;codecs=aac',
-        'audio/webm;codecs=opus',
-        'audio/webm'
-      ];
-      const selectedMimeType = preferredTypes.find(type => MediaRecorder.isTypeSupported(type)) || '';
-
-      // Optimize constraints for voice: Mono
-      // Removed explicit sampleRate to let the device choose its native rate (prevents iOS playback issues)
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true
-        } 
-      });
-      
-      const options = {
-        mimeType: selectedMimeType,
-        audioBitsPerSecond: 16000 
-      };
-
-      mediaRecorderRef.current = new MediaRecorder(stream, options);
-      audioChunksRef.current = [];
-      
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        if (event.data.size > 0) audioChunksRef.current.push(event.data);
-      };
-
-      mediaRecorderRef.current.start();
       setIsRecording(true);
       setRecordingDuration(0);
       
@@ -518,11 +516,9 @@ const ChatRoom = () => {
       }, 1000);
 
     } catch (err) {
-      // Surface more actionable errors on iOS (NotAllowedError / NotSupportedError)
+      console.error(err);
       if (err?.name === 'NotAllowedError') {
-        setError('Microphone access was denied. Please allow mic access in Safari settings and try again.');
-      } else if (err?.name === 'NotSupportedError') {
-        setError('Audio recording is not supported on this device/browser.');
+        setError('Microphone access was denied. Please allow mic access and try again.');
       } else {
         setError('Could not access microphone.');
       }
@@ -530,7 +526,9 @@ const ChatRoom = () => {
   };
 
   const handleStopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+    if (wavRecorderRef.current && wavRecorderRef.current.recording) {
+      wavRecorderRef.current.stop();
+    } else if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.onstop = () => {
         // Create the final blob with a guaranteed mime type
         const audioBlob = new Blob(audioChunksRef.current, { 
@@ -551,7 +549,10 @@ const ChatRoom = () => {
   };
 
   const handleCancelRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+    if (wavRecorderRef.current) {
+      wavRecorderRef.current.stop();
+      wavRecorderRef.current.onStop = null;
+    } else if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.onstop = () => {
              mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
         };
