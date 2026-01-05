@@ -472,18 +472,20 @@ const ChatRoom = () => {
       }
 
       // Choose the first supported mime type in priority order
+      // Prioritize MP4/AAC for better iOS compatibility if supported by the browser
       const preferredTypes = [
+        'audio/mp4',
+        'audio/mp4;codecs=aac',
         'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/mp4'
+        'audio/webm'
       ];
       const selectedMimeType = preferredTypes.find(type => MediaRecorder.isTypeSupported(type)) || '';
 
-      // Optimize constraints for voice: Mono, lower sample rate
+      // Optimize constraints for voice: Mono
+      // Removed explicit sampleRate to let the device choose its native rate (prevents iOS playback issues)
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           channelCount: 1,
-          sampleRate: 22050, // Lower sample rate for voice
           echoCancellation: true,
           noiseSuppression: true
         } 

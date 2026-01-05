@@ -23,8 +23,26 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
             bytes[i] = binaryString.charCodeAt(i);
           }
 
-          // Create the blob with the specific codec your logs showed
-          const blob = new Blob([bytes], { type: 'audio/webm;codecs=opus' });
+          // Detect MIME type from file signature (Magic Numbers)
+          let mimeType = 'audio/webm;codecs=opus'; // Default fallback
+          
+          if (bytes.length > 12) {
+            // Check for WebM/EBML signature: 1A 45 DF A3
+            if (bytes[0] === 0x1A && bytes[1] === 0x45 && bytes[2] === 0xDF && bytes[3] === 0xA3) {
+              mimeType = 'audio/webm;codecs=opus';
+            }
+            // Check for MP4/M4A (iOS recording) - 'ftyp' at offset 4
+            else if (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
+              mimeType = 'audio/mp4';
+            }
+            // Check for Ogg (Firefox sometimes) - 'OggS'
+            else if (bytes[0] === 0x4F && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) {
+              mimeType = 'audio/ogg';
+            }
+          }
+
+          // Create the blob with the detected type
+          const blob = new Blob([bytes], { type: mimeType });
           objectUrl = URL.createObjectURL(blob);
           setAudioUrl(objectUrl);
         } else {
