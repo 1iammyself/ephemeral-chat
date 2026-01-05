@@ -265,22 +265,23 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
-                    type="text" /* text to avoid password manager prompts */
+                    type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    inputMode="none"
                     autoComplete="off"
                     spellCheck={false}
                     data-ms-formignored="true"
                     data-ms-editor="false"
                     data-lpignore="true"
                     data-1p-ignore="true"
+                    data-bwignore="true"
                     data-form-type="other"
-                    name="room-access-key-join"
+                    name={`room_key_${Math.random().toString(36).substring(7)}`}
+                    id="room-access-key-field"
                     onCopy={(e) => e.preventDefault()}
                     onCut={(e) => e.preventDefault()}
                     onPaste={(e) => e.preventDefault()}
-                    className="input-field input-no-echo w-full p-2 pl-9 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                    className="input-field w-full p-2 pl-9 dark:bg-gray-700 dark:border-gray-600 text-transparent dark:text-transparent placeholder:text-gray-500 dark:placeholder:text-gray-400 caret-blue-500 selection:bg-transparent selection:text-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter room access key"
                     required
                     disabled={isJoining || isProcessingInvite}

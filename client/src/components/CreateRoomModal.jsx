@@ -329,23 +329,24 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 Set a private access key to restrict your room (not saved by the browser)
               </p>
               <input
-                type="text" /* text to avoid password manager hooks */
-                inputMode="none"
+                type="password"
                 autoComplete="off"
                 spellCheck={false}
                 data-ms-formignored="true"
                 data-ms-editor="false"
                 data-lpignore="true"
                 data-1p-ignore="true"
+                data-bwignore="true"
                 data-form-type="other"
-                name="room-access-key-create"
+                name={`new_room_key_${Math.random().toString(36).substring(7)}`}
+                id="create-room-key-field"
                 placeholder="Enter access key (optional)"
                 value={settings.password}
                 onChange={(e) => setSettings(prev => ({ ...prev, password: e.target.value }))}
                 onCopy={(e) => e.preventDefault()}
                 onCut={(e) => e.preventDefault()}
                 onPaste={(e) => e.preventDefault()}
-                className="input-field input-no-echo text-sm sm:text-base py-2 sm:py-3 px-3 sm:px-4 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                className="input-field text-sm sm:text-base py-2 sm:py-3 px-3 sm:px-4 dark:bg-gray-700 dark:border-gray-600 text-transparent dark:text-transparent placeholder:text-gray-500 dark:placeholder:text-gray-400 caret-blue-500 selection:bg-transparent selection:text-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                 maxLength={50}
               />
             </div>
@@ -357,7 +358,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 </label>
               </div>
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 sm:mb-3">
-                Set the maximum number of people who can join this room (1-200)
+                Set the maximum number of people who can join this room (1-7)
               </p>
               <div className="px-2 sm:px-3">
                 {/* +/- buttons with current value */}
@@ -375,8 +376,8 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                   </span>
                   <button
                     type="button"
-                    onClick={() => setSettings(prev => ({ ...prev, maxUsers: Math.min(200, prev.maxUsers + 1) }))}
-                    disabled={settings.maxUsers >= 200}
+                    onClick={() => setSettings(prev => ({ ...prev, maxUsers: Math.min(7, prev.maxUsers + 1) }))}
+                    disabled={settings.maxUsers >= 7}
                     className="w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-300 dark:disabled:text-gray-600 rounded-full text-xl font-bold transition-colors dark:text-white"
                   >
                     +
@@ -388,7 +389,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                   <input
                     type="range"
                     min="1"
-                    max="200"
+                    max="7"
                     value={settings.maxUsers}
                     onChange={(e) => {
                       const value = parseInt(e.target.value);
@@ -396,7 +397,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                     }}
                     className="flex-1 h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
                   />
-                  <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">200</span>
+                  <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">7</span>
                 </div>
               </div>
             </div>
