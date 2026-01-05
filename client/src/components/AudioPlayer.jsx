@@ -41,6 +41,11 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
                      bytes[8] === 0x57 && bytes[9] === 0x41 && bytes[10] === 0x56 && bytes[11] === 0x45) {
               mimeType = 'audio/wav';
             }
+            // Check for MP3 (ID3 or sync header)
+            else if ((bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) || // ID3
+                     (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0)) { // Frame sync
+              mimeType = 'audio/mp3';
+            }
             // Check for Ogg (Firefox sometimes) - 'OggS'
             else if (bytes[0] === 0x4F && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) {
               mimeType = 'audio/ogg';

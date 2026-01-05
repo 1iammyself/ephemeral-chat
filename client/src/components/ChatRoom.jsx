@@ -26,7 +26,7 @@ import UserList from './UserList';
 import AudioCallModal from './AudioCallModal';
 import webRTCService, { CallState } from '../webrtc';
 import { encryptMessage, decryptMessage } from '../utils/security'; // Import E2EE helpers
-import { WavRecorder } from '../utils/audioRecorder';
+import { Mp3Recorder } from '../utils/mp3Recorder';
 import ThemeToggle from './ThemeToggle';
 
 const ChatRoom = () => {
@@ -61,7 +61,7 @@ const ChatRoom = () => {
   const [selectedRecipients, setSelectedRecipients] = useState([]);
 
   const mediaRecorderRef = useRef(null);
-  const wavRecorderRef = useRef(null);
+  const mp3RecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
   const joinParamsRef = useRef(null);
@@ -494,12 +494,13 @@ const ChatRoom = () => {
 
         mediaRecorderRef.current.start();
       } else {
-        // Fallback to WAV for Chrome/Firefox to ensure iOS compatibility
-        wavRecorderRef.current = new WavRecorder();
-        wavRecorderRef.current.onStop = (blob) => {
+        // Fallback to MP3 for Chrome/Firefox to ensure iOS compatibility
+        // MP3 is universally supported (Plan B)
+        mp3RecorderRef.current = new Mp3Recorder();
+        mp3RecorderRef.current.onStop = (blob) => {
           if (blob.size > 0) sendAudioMessage(blob);
         };
-        await wavRecorderRef.current.start();
+        await mp3RecorderRef.current.start();
       }
 
       setIsRecording(true);
@@ -526,8 +527,8 @@ const ChatRoom = () => {
   };
 
   const handleStopRecording = () => {
-    if (wavRecorderRef.current && wavRecorderRef.current.recording) {
-      wavRecorderRef.current.stop();
+    if (mp3RecorderRef.current && mp3RecorderRef.current.recording) {
+      mp3RecorderRef.current.stop();
     } else if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.onstop = () => {
         // Create the final blob with a guaranteed mime type
@@ -549,9 +550,9 @@ const ChatRoom = () => {
   };
 
   const handleCancelRecording = () => {
-    if (wavRecorderRef.current) {
-      wavRecorderRef.current.stop();
-      wavRecorderRef.current.onStop = null;
+    if (mp3RecorderRef.current) {
+      mp3RecorderRef.current.stop();
+      mp3RecorderRef.current.onStop = null;
     } else if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.onstop = () => {
              mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
