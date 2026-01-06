@@ -46,9 +46,10 @@ async function convertAudioToAAC(base64Audio) {
 
             // Probe input file
             ffmpeg.ffprobe(inputPath, (err, metadata) => {
+                let audioStream = null;
                 if (!err) {
                     console.log('[AudioConverter] Input metadata:', JSON.stringify(metadata.format, null, 2));
-                    const audioStream = metadata.streams.find(s => s.codec_type === 'audio');
+                    audioStream = metadata.streams.find(s => s.codec_type === 'audio');
                     if (audioStream) {
                         console.log('[AudioConverter] Input Audio Stream:', JSON.stringify(audioStream, null, 2));
                     }
