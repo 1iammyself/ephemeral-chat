@@ -50,7 +50,7 @@ const ChatRoom = () => {
   const [callState, setCallState] = useState({ state: CallState.IDLE });
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
-  
+
   // Knock-to-Join & Host State
   const [isWaitingForHost, setIsWaitingForHost] = useState(false);
   const [pendingGuests, setPendingGuests] = useState([]);
@@ -90,7 +90,7 @@ const ChatRoom = () => {
   // Helper to perform the actual join after approval
   const performJoin = useCallback((params) => {
     const { nickname, password, capToken, inviteToken } = params;
-    
+
     const joinData = {
       roomCode,
       nickname,
@@ -113,25 +113,25 @@ const ChatRoom = () => {
       }
       if (response.success) {
         setRoom(response.room);
-        
+
         let msgs = response.messages || [];
         if (roomKey) {
-            msgs = await Promise.all(msgs.map(async (msg) => {
-                if (msg.isEncrypted) {
-                    try {
-                        const decrypted = await decryptMessage(msg.content, msg.iv, roomKey);
-                        return { ...msg, content: decrypted };
-                    } catch (e) {
-                        return { ...msg, content: '⚠️ Decryption failed' };
-                    }
-                }
-                return msg;
-            }));
+          msgs = await Promise.all(msgs.map(async (msg) => {
+            if (msg.isEncrypted) {
+              try {
+                const decrypted = await decryptMessage(msg.content, msg.iv, roomKey);
+                return { ...msg, content: decrypted };
+              } catch (e) {
+                return { ...msg, content: '⚠️ Decryption failed' };
+              }
+            }
+            return msg;
+          }));
         }
         setMessages(msgs);
-        
-  setUsers(response.room?.users || []);
-  setCurrentUser({ id: socketManager.socket?.id, socketId: socketManager.socket?.id, nickname: response.nickname, isAdmin: false });
+
+        setUsers(response.room?.users || []);
+        setCurrentUser({ id: socketManager.socket?.id, socketId: socketManager.socket?.id, nickname: response.nickname, isAdmin: false });
         setIsJoined(true);
         setShowJoinModal(false);
         setIsProcessingInvite(false);
@@ -163,20 +163,20 @@ const ChatRoom = () => {
     const handleRoomJoined = async (data) => {
       setRoom(data.room);
       setUsers(data.users || []);
-      
+
       let msgs = data.messages || [];
       if (roomKey) {
-          msgs = await Promise.all(msgs.map(async (msg) => {
-              if (msg.isEncrypted) {
-                  try {
-                      const decrypted = await decryptMessage(msg.content, msg.iv, roomKey);
-                      return { ...msg, content: decrypted };
-                  } catch (e) {
-                      return { ...msg, content: '⚠️ Decryption failed' };
-                  }
-              }
-              return msg;
-          }));
+        msgs = await Promise.all(msgs.map(async (msg) => {
+          if (msg.isEncrypted) {
+            try {
+              const decrypted = await decryptMessage(msg.content, msg.iv, roomKey);
+              return { ...msg, content: decrypted };
+            } catch (e) {
+              return { ...msg, content: '⚠️ Decryption failed' };
+            }
+          }
+          return msg;
+        }));
       }
       setMessages(msgs);
 
@@ -193,12 +193,12 @@ const ChatRoom = () => {
 
     const handleNewMessage = async (message) => {
       if (message.isEncrypted && roomKey) {
-          try {
-              const decrypted = await decryptMessage(message.content, message.iv, roomKey);
-              message.content = decrypted;
-          } catch (e) {
-              message.content = '⚠️ Decryption failed';
-          }
+        try {
+          const decrypted = await decryptMessage(message.content, message.iv, roomKey);
+          message.content = decrypted;
+        } catch (e) {
+          message.content = '⚠️ Decryption failed';
+        }
       }
       setMessages(prev => [...prev, message]);
     };
@@ -253,7 +253,7 @@ const ChatRoom = () => {
     const handleKnockApproved = ({ isHost }) => {
       setIsWaitingForHost(false);
       if (isHost) setIsHost(true);
-      
+
       if (joinParamsRef.current) {
         performJoin(joinParamsRef.current);
       }
@@ -286,11 +286,11 @@ const ChatRoom = () => {
     socketManager.on('disconnect', handleDisconnect);
     socketManager.on('room-joined', handleRoomJoined);
     socketManager.on('new-message', handleNewMessage);
-  socketManager.on('message-deleted', handleMessageDeleted);
+    socketManager.on('message-deleted', handleMessageDeleted);
     socketManager.on('user-joined', handleUserJoined);
     socketManager.on('user-left', handleUserLeft);
     socketManager.on('error', handleError);
-    
+
     // Register new events
     socketManager.on('knock-approved', handleKnockApproved);
     socketManager.on('knock-denied', handleKnockDenied);
@@ -302,11 +302,11 @@ const ChatRoom = () => {
       socketManager.off('disconnect', handleDisconnect);
       socketManager.off('room-joined', handleRoomJoined);
       socketManager.off('new-message', handleNewMessage);
-  socketManager.off('message-deleted', handleMessageDeleted);
+      socketManager.off('message-deleted', handleMessageDeleted);
       socketManager.off('user-joined', handleUserJoined);
       socketManager.off('user-left', handleUserLeft);
       socketManager.off('error', handleError);
-      
+
       socketManager.off('knock-approved', handleKnockApproved);
       socketManager.off('knock-denied', handleKnockDenied);
       socketManager.off('user-knocking', handleUserKnocking);
@@ -348,13 +348,13 @@ const ChatRoom = () => {
 
       // Emit knock event
       socketManager.emit('knock', knockData);
-      
+
       // We don't use a callback here because the server emits events back
       // But we should set a timeout in case the server doesn't respond
       setTimeout(() => {
         if (isWaitingForHost) {
-           // Still waiting? Maybe server is down or logic failed.
-           // But we stay in waiting state as per user request "Waiting for host..."
+          // Still waiting? Maybe server is down or logic failed.
+          // But we stay in waiting state as per user request "Waiting for host..."
         }
       }, 10000);
 
@@ -391,17 +391,17 @@ const ChatRoom = () => {
       let iv = null;
 
       if (roomKey) {
-          const result = await encryptMessage(content, roomKey);
-          content = result.encrypted;
-          iv = result.iv;
-          isEncrypted = true;
+        const result = await encryptMessage(content, roomKey);
+        content = result.encrypted;
+        iv = result.iv;
+        isEncrypted = true;
       }
 
-      socketManager.emit('send-message', { 
-          content,
-          isEncrypted,
-          iv,
-          recipients: selectedRecipients
+      socketManager.emit('send-message', {
+        content,
+        isEncrypted,
+        iv,
+        recipients: selectedRecipients
       });
       socketManager.emit('user-activity');
       setNewMessage('');
@@ -427,9 +427,9 @@ const ChatRoom = () => {
     try {
       const reader = new FileReader();
       reader.onload = (e) => {
-        socketManager.emit('send-message', { 
-          messageType: 'image', 
-          imageData: e.target.result, 
+        socketManager.emit('send-message', {
+          messageType: 'image',
+          imageData: e.target.result,
           isViewOnce: true,
           recipients: selectedRecipients
         });
@@ -444,20 +444,33 @@ const ChatRoom = () => {
   }, [selectedRecipients]);
 
   const handleStartCall = useCallback(async () => {
-    if (users.length < 2) {
-      setError('Need at least 2 users to start a call');
+    let recipients = [];
+    if (selectedRecipients.length > 0) {
+      // Call selected users
+      recipients = users.filter(u => selectedRecipients.includes(u.socketId) || selectedRecipients.includes(u.id));
+    } else {
+      // Call everyone else (broadcast behavior)
+      recipients = users.filter(u => u.socketId !== currentUser?.id && u.id !== currentUser?.id);
+    }
+
+    if (recipients.length === 0) {
+      setError('No users to call');
       return;
     }
-    const otherUser = users.find(u => u.socketId !== currentUser?.id && u.id !== currentUser?.id);
-    if (otherUser) {
-      try {
-        await webRTCService.startCall(roomCode, otherUser.nickname);
-        setShowCallModal(true);
-      } catch (err) {
-        setError('Failed to start call. Please check microphone permissions.');
-      }
+
+    try {
+      const recipientList = recipients.map(u => ({
+        id: u.socketId || u.id,
+        nickname: u.nickname
+      }));
+
+      await webRTCService.startCall(roomCode, recipientList);
+      setShowCallModal(true);
+    } catch (err) {
+      console.error('Call failed:', err);
+      setError('Failed to start call. Please check microphone permissions.');
     }
-  }, [users, currentUser, roomCode]);
+  }, [users, currentUser, roomCode, selectedRecipients]);
 
   const startRecording = async () => {
     try {
@@ -466,16 +479,16 @@ const ChatRoom = () => {
         return;
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true
-        } 
+        }
       });
 
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                   (navigator.userAgent.includes("Mac") && "ontouchend" in document);
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.userAgent.includes("Mac") && "ontouchend" in document);
 
       const mimeType = isIOS
         ? 'audio/mp4'
@@ -483,7 +496,7 @@ const ChatRoom = () => {
 
       // Use a consistent MediaRecorder approach for all platforms
       const options = { mimeType };
-      
+
       // Safety check: if the preferred mime type isn't supported, 
       // let the browser use its default (or fallback logic could be added)
       if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(mimeType)) {
@@ -494,7 +507,7 @@ const ChatRoom = () => {
       }
 
       audioChunksRef.current = [];
-      
+
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0) audioChunksRef.current.push(event.data);
       };
@@ -503,10 +516,10 @@ const ChatRoom = () => {
 
       setIsRecording(true);
       setRecordingDuration(0);
-      
+
       recordingTimerRef.current = setInterval(() => {
         setRecordingDuration(prev => {
-          if (prev >= 29) { 
+          if (prev >= 29) {
             handleStopRecording();
             return 30;
           }
@@ -530,14 +543,14 @@ const ChatRoom = () => {
     } else if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.onstop = () => {
         // Create the final blob with a guaranteed mime type
-        const audioBlob = new Blob(audioChunksRef.current, { 
-          type: mediaRecorderRef.current.mimeType 
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: mediaRecorderRef.current.mimeType
         });
-        
+
         if (audioBlob.size > 0) {
           sendAudioMessage(audioBlob);
         }
-        
+
         // Clean up tracks immediately
         mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
       };
@@ -552,10 +565,10 @@ const ChatRoom = () => {
       mp3RecorderRef.current.stop();
       mp3RecorderRef.current.onStop = null;
     } else if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.onstop = () => {
-             mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-        };
-        mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.onstop = () => {
+        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      };
+      mediaRecorderRef.current.stop();
     }
     setIsRecording(false);
     setRecordingDuration(0);
@@ -571,11 +584,11 @@ const ChatRoom = () => {
 
     const reader = new FileReader();
     reader.readAsArrayBuffer(audioBlob); // Read as raw binary
-    
+
     reader.onloadend = () => {
       const arrayBuffer = reader.result;
       const uint8Array = new Uint8Array(arrayBuffer);
-      
+
       // Efficiently convert binary to base64 string
       let binary = '';
       const len = uint8Array.byteLength;
@@ -585,8 +598,8 @@ const ChatRoom = () => {
       const base64Audio = btoa(binary);
 
 
-      socketManager.emit('send-message', { 
-        messageType: 'audio', 
+      socketManager.emit('send-message', {
+        messageType: 'audio',
         content: base64Audio, // Sending raw base64 ONLY
         isViewOnce: true,
         recipients: selectedRecipients
@@ -638,11 +651,11 @@ const ChatRoom = () => {
   }
 
   if (showJoinModal) return (
-    <JoinRoomModal 
-      roomCode={roomCode} 
-      onJoin={handleJoinRoom} 
-      onCancel={() => navigate('/')} 
-      error={error} 
+    <JoinRoomModal
+      roomCode={roomCode}
+      onJoin={handleJoinRoom}
+      onCancel={() => navigate('/')}
+      error={error}
       isProcessingInvite={isProcessingInvite}
       isWaitingForHost={isWaitingForHost}
     />
@@ -670,16 +683,16 @@ const ChatRoom = () => {
             </div>
           </div>
           <div className="flex items-center space-x-2">
-             <ThemeToggle />
-             <button 
-               onClick={() => setShowMobileMenu(true)}
-               className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 relative"
-             >
-               <Users className="w-5 h-5" />
-               {isHost && pendingGuests.length > 0 && (
-                 <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-gray-800" />
-               )}
-             </button>
+            <ThemeToggle />
+            <button
+              onClick={() => setShowMobileMenu(true)}
+              className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 relative"
+            >
+              <Users className="w-5 h-5" />
+              {isHost && pendingGuests.length > 0 && (
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-gray-800" />
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -694,21 +707,21 @@ const ChatRoom = () => {
           </div>
 
           <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200">
-              {selectedRecipients.length > 0 && (
-                <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800 flex items-center justify-between animate-in slide-in-from-bottom-2 duration-200">
-                  <span className="text-xs text-blue-600 dark:text-blue-300 font-medium flex items-center">
-                    <Users className="w-3 h-3 mr-1.5" />
-                    Sending to {selectedRecipients.length} specific user{selectedRecipients.length !== 1 ? 's' : ''}
-                  </span>
-                  <button 
-                    onClick={() => setSelectedRecipients([])}
-                    className="text-xs text-blue-500 hover:text-blue-700 dark:hover:text-blue-200 underline"
-                  >
-                    Clear selection (Send to all)
-                  </button>
-                </div>
-              )}
-              <div className="p-4">
+            {selectedRecipients.length > 0 && (
+              <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800 flex items-center justify-between animate-in slide-in-from-bottom-2 duration-200">
+                <span className="text-xs text-blue-600 dark:text-blue-300 font-medium flex items-center">
+                  <Users className="w-3 h-3 mr-1.5" />
+                  Sending to {selectedRecipients.length} specific user{selectedRecipients.length !== 1 ? 's' : ''}
+                </span>
+                <button
+                  onClick={() => setSelectedRecipients([])}
+                  className="text-xs text-blue-500 hover:text-blue-700 dark:hover:text-blue-200 underline"
+                >
+                  Clear selection (Send to all)
+                </button>
+              </div>
+            )}
+            <div className="p-4">
               <form onSubmit={handleSendMessage} className="flex items-center space-x-3">
                 {isRecording ? (
                   <div className="flex-1 flex items-center justify-between bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-2 animate-in fade-in duration-200">
@@ -747,13 +760,13 @@ const ChatRoom = () => {
                   </>
                 )}
               </form>
-              </div>
+            </div>
           </div>
         </div>
         <div className="hidden lg:block w-64 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200">
-          <UserList 
-            users={users} 
-            currentUser={currentUser} 
+          <UserList
+            users={users}
+            currentUser={currentUser}
             pendingGuests={pendingGuests}
             isHost={isHost}
             onApprove={handleApproveGuest}
@@ -768,7 +781,7 @@ const ChatRoom = () => {
       {showMobileMenu && (
         <div className="fixed inset-0 z-50 lg:hidden">
           {/* Backdrop */}
-          <div 
+          <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => setShowMobileMenu(false)}
           />
@@ -776,7 +789,7 @@ const ChatRoom = () => {
           <div className="absolute right-0 top-0 bottom-0 w-80 max-w-[85vw] bg-white dark:bg-gray-800 shadow-xl transform transition-transform duration-200 ease-in-out flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Room Details</h2>
-              <button 
+              <button
                 onClick={() => setShowMobileMenu(false)}
                 className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400"
               >
@@ -784,9 +797,9 @@ const ChatRoom = () => {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto">
-               <UserList 
-                users={users} 
-                currentUser={currentUser} 
+              <UserList
+                users={users}
+                currentUser={currentUser}
                 pendingGuests={pendingGuests}
                 isHost={isHost}
                 onApprove={handleApproveGuest}

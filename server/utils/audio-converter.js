@@ -46,11 +46,7 @@ async function convertAudioToAAC(base64Audio) {
             ffmpeg.ffprobe(inputPath, (err, metadata) => {
                 let audioStream = null;
                 if (!err) {
-                    console.log('[AudioConverter] Input metadata:', JSON.stringify(metadata.format, null, 2));
                     audioStream = metadata.streams.find(s => s.codec_type === 'audio');
-                    if (audioStream) {
-                        console.log('[AudioConverter] Input Audio Stream:', JSON.stringify(audioStream, null, 2));
-                    }
                 } else {
                     console.warn('[AudioConverter] FFprobe failed on input:', err.message);
                 }
@@ -63,10 +59,8 @@ async function convertAudioToAAC(base64Audio) {
                     .outputOptions('-movflags +faststart'); // Web optimization always
 
                 if (isAAC) {
-                    console.log('[AudioConverter] Input is already AAC. Using stream copy.');
                     command.audioCodec('copy');
                 } else {
-                    console.log('[AudioConverter] Input is not AAC. Re-encoding.');
                     command
                         .audioCodec('aac')
                         // Robust options for compatibility
@@ -79,10 +73,9 @@ async function convertAudioToAAC(base64Audio) {
 
                 command
                     .on('start', (commandLine) => {
-                        console.log('[AudioConverter] Spawned Ffmpeg with command: ' + commandLine);
+                        // console.log('[AudioConverter] Spawned Ffmpeg with command: ' + commandLine);
                     })
                     .on('end', () => {
-                        console.log('[AudioConverter] Conversion finished');
                         // 4. Read output file
                         fs.readFile(outputPath, (err, data) => {
                             if (err) {
@@ -92,21 +85,13 @@ async function convertAudioToAAC(base64Audio) {
                                 return reject(new Error(`Failed to read converted file: ${err.message}`));
                             }
 
-                            console.log(`[AudioConverter] Output file read, Size: ${data.length} bytes`);
-
                             // Probe output file to check duration/integrity
                             ffmpeg.ffprobe(outputPath, (probeErr, probeData) => {
                                 // Cleanup temp files
                                 fs.unlink(inputPath, () => { });
                                 fs.unlink(outputPath, () => { });
 
-                                if (!probeErr) {
-                                    console.log('[AudioConverter] Output metadata:', JSON.stringify(probeData.format, null, 2));
-                                    const outStream = probeData.streams.find(s => s.codec_type === 'audio');
-                                    if (outStream) {
-                                        console.log('[AudioConverter] Output Audio Stream:', JSON.stringify(outStream, null, 2));
-                                    }
-                                } else {
+                                if (probeErr) {
                                     console.warn('[AudioConverter] FFprobe failed on output:', probeErr.message);
                                 }
 

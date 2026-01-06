@@ -889,14 +889,20 @@ io.on('connection', (socket) => {
     if (!socket.roomCode) return;
 
     // logger.info(`📞 Call offer from ${socket.nickname} (${socket.id}) in room ${socket.roomCode}`);
-    // logger.info(`   Target: ${data.targetNickname}, Video: ${data.includeVideo}`);
 
-    // Broadcast offer to other participants in the room
-    socket.to(socket.roomCode).emit('call-offer', {
+    const payload = {
       ...data,
       fromNickname: socket.nickname,
       fromSocketId: socket.id
-    });
+    };
+
+    if (data.to) {
+      // Targeted offer
+      io.to(data.to).emit('call-offer', payload);
+    } else {
+      // Broadcast offer to other participants in the room (legacy/group behavior)
+      socket.to(socket.roomCode).emit('call-offer', payload);
+    }
   });
 
   // Handle call answer
@@ -905,22 +911,33 @@ io.on('connection', (socket) => {
 
     // logger.info(`📞 Call answer from ${socket.nickname} (${socket.id}) in room ${socket.roomCode}`);
 
-    // Broadcast answer to other participants
-    socket.to(socket.roomCode).emit('call-answer', {
+    const payload = {
       ...data,
-      fromNickname: socket.nickname
-    });
+      fromNickname: socket.nickname,
+      fromSocketId: socket.id
+    };
+
+    if (data.to) {
+      io.to(data.to).emit('call-answer', payload);
+    } else {
+      socket.to(socket.roomCode).emit('call-answer', payload);
+    }
   });
 
   // Handle ICE candidate exchange
   socket.on('call-ice-candidate', (data) => {
     if (!socket.roomCode) return;
 
-    // Forward ICE candidate to other participants
-    socket.to(socket.roomCode).emit('call-ice-candidate', {
+    const payload = {
       ...data,
       fromSocketId: socket.id
-    });
+    };
+
+    if (data.to) {
+      io.to(data.to).emit('call-ice-candidate', payload);
+    } else {
+      socket.to(socket.roomCode).emit('call-ice-candidate', payload);
+    }
   });
 
   // Handle call rejected
@@ -929,11 +946,17 @@ io.on('connection', (socket) => {
 
     // logger.info(`📞 Call rejected by ${socket.nickname} in room ${socket.roomCode}`);
 
-    // Notify caller that call was rejected
-    socket.to(socket.roomCode).emit('call-rejected', {
+    const payload = {
       ...data,
-      rejectedBy: socket.nickname
-    });
+      rejectedBy: socket.nickname,
+      fromSocketId: socket.id
+    };
+
+    if (data.to) {
+      io.to(data.to).emit('call-rejected', payload);
+    } else {
+      socket.to(socket.roomCode).emit('call-rejected', payload);
+    }
   });
 
   // Handle call ended
@@ -942,11 +965,17 @@ io.on('connection', (socket) => {
 
     // logger.info(`📞 Call ended by ${socket.nickname} in room ${socket.roomCode}`);
 
-    // Notify other participants that call ended
-    socket.to(socket.roomCode).emit('call-ended', {
+    const payload = {
       ...data,
-      endedBy: socket.nickname
-    });
+      endedBy: socket.nickname,
+      fromSocketId: socket.id
+    };
+
+    if (data.to) {
+      io.to(data.to).emit('call-ended', payload);
+    } else {
+      socket.to(socket.roomCode).emit('call-ended', payload);
+    }
   });
 
   socket.on('disconnect', async () => {

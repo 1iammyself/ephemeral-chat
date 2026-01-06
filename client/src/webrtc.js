@@ -18,10 +18,10 @@ export const CallState = {
 
 class WebRTCService {
     constructor() {
-        this.peerConnection = null;
+        this.peers = new Map(); // socketId -> { connection, stream }
         this.localStream = null;
-        this.remoteStream = null;
         this.callStateHandlers = new Map();
+        this.currentRoomCode = null;
 
         this.currentCallState = {
             isCallActive: false,
@@ -29,13 +29,13 @@ class WebRTCService {
             isOutgoingCall: false,
             isCalling: false,
             isConnected: false,
-            remoteNickname: null,
+            remoteNickname: null, // Keep for backward compat (display name of caller/callee)
             callId: null,
-            state: CallState.IDLE // Mapped for backward compatibility
+            state: CallState.IDLE,
+            remoteStreams: new Map() // socketId -> stream
         };
 
         // ICE servers for NAT traversal
-        // Try to load from environment variable first
         let configuredIceServers = [];
         try {
             if (import.meta.env.VITE_ICE_SERVERS) {
@@ -46,9 +46,7 @@ class WebRTCService {
         }
 
         this.iceServers = configuredIceServers.length > 0 ? configuredIceServers : [
-            {
-                urls: "stun:stun.relay.metered.ca:80"
-            },
+            { urls: "stun:stun.relay.metered.ca:80" },
             {
                 urls: "turn:global.relay.metered.ca:80",
                 username: "55d4dca65d669e7f334fd513",
@@ -78,7 +76,6 @@ class WebRTCService {
      * Set up Socket.IO event handlers for call signaling
      */
     setupSocketHandlers() {
-        // Wait for socket to be ready
         const setupHandlers = () => {
             if (!socketManager.socket) {
                 setTimeout(setupHandlers, 100);
@@ -97,25 +94,21 @@ class WebRTCService {
 
     /**
      * Subscribe to call state changes
-     * @param {Function} handler - Callback function
-     * @returns {Function} Unsubscribe function
      */
     onCallStateChange(handler) {
         const id = Math.random().toString(36).substr(2, 9);
         this.callStateHandlers.set(id, handler);
-        // Immediately call with current state
         handler(this.currentCallState);
         return () => this.callStateHandlers.delete(id);
     }
 
     /**
      * Update call state and notify all handlers
-     * @param {Object} updates - State updates
      */
     updateCallState(updates) {
         this.currentCallState = { ...this.currentCallState, ...updates };
 
-        // Map boolean flags to state string for backward compatibility with UI
+        // Map boolean flags to state string for backward compatibility
         if (this.currentCallState.isIncomingCall) this.currentCallState.state = CallState.INCOMING;
         else if (this.currentCallState.isCalling) this.currentCallState.state = CallState.CALLING;
         else if (this.currentCallState.isConnected) this.currentCallState.state = CallState.CONNECTED;
@@ -125,29 +118,30 @@ class WebRTCService {
         this.callStateHandlers.forEach(handler => handler(this.currentCallState));
     }
 
-    /**
-     * Get current call state
-     * @returns {Object} Current call state
-     */
     getCurrentCallState() {
         return this.currentCallState;
     }
 
     /**
-     * Start an outgoing call
-     * @param {string} roomCode - Room code
-     * @param {string} remoteNickname - Target user's nickname
+     * Start an outgoing call to multiple recipients
+     * @param {string} roomCode 
+     * @param {Array<{id: string, nickname: string}>} recipients 
      */
-    async startCall(roomCode, remoteNickname) {
+    async startCall(roomCode, recipients) {
         try {
-            console.log('📞 Starting call to:', remoteNickname);
+            console.log('📞 Starting call to:', recipients.map(r => r.nickname));
             this.currentRoomCode = roomCode;
+            const callId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+            // Display name: if 1 person, use nickname. If multiple, use "Group Call" or similar.
+            const remoteNickname = recipients.length === 1 ? recipients[0].nickname : `${recipients.length} people`;
 
             this.updateCallState({
                 isOutgoingCall: true,
                 isCalling: true,
                 remoteNickname,
-                callId: `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+                callId,
+                remoteStreams: new Map()
             });
 
             // Get local media stream
@@ -160,26 +154,31 @@ class WebRTCService {
                 video: false
             });
 
-            // Create peer connection
-            await this.createPeerConnection();
+            // Initiate connection for each recipient
+            for (const recipient of recipients) {
+                await this.createPeerConnection(recipient.id);
 
-            // Add local tracks to peer connection
-            this.localStream.getTracks().forEach(track => {
-                if (this.peerConnection && this.localStream) {
-                    this.peerConnection.addTrack(track, this.localStream);
-                }
-            });
+                // Add local tracks
+                this.localStream.getTracks().forEach(track => {
+                    const peer = this.peers.get(recipient.id);
+                    if (peer && peer.connection) {
+                        peer.connection.addTrack(track, this.localStream);
+                    }
+                });
 
-            // Create and send offer
-            const offer = await this.peerConnection.createOffer();
-            await this.peerConnection.setLocalDescription(offer);
+                // Create and send offer
+                const pc = this.peers.get(recipient.id).connection;
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
 
-            socketManager.emit('call-offer', {
-                roomCode,
-                callId: this.currentCallState.callId,
-                offer,
-                targetNickname: remoteNickname
-            });
+                socketManager.emit('call-offer', {
+                    roomCode,
+                    callId,
+                    offer,
+                    targetNickname: recipient.nickname,
+                    to: recipient.id
+                });
+            }
 
         } catch (error) {
             console.error('Failed to start call:', error);
@@ -190,7 +189,7 @@ class WebRTCService {
 
     /**
      * Accept an incoming call
-     * @param {string} callId - Call ID to accept
+     * @param {string} callId 
      */
     async acceptCall(callId) {
         try {
@@ -200,37 +199,41 @@ class WebRTCService {
                 callId
             });
 
-            // Get local media stream
-            this.localStream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true
-                },
-                video: false
-            });
-
-            // Add local tracks to existing peer connection
-            // Note: In reference, peerConnection might not exist yet if handleCallOffer created it?
-            // Actually handleCallOffer creates it.
-
-            if (this.peerConnection && this.localStream) {
-                this.localStream.getTracks().forEach(track => {
-                    if (this.peerConnection && this.localStream) {
-                        this.peerConnection.addTrack(track, this.localStream);
-                    }
-                });
-
-                // Create and send answer
-                const answer = await this.peerConnection.createAnswer();
-                await this.peerConnection.setLocalDescription(answer);
-
-                socketManager.emit('call-answer', {
-                    roomCode: this.currentRoomCode,
-                    callId,
-                    answer
+            // Get local media stream if not already available
+            if (!this.localStream) {
+                this.localStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    },
+                    video: false
                 });
             }
+
+            const callerId = this.currentCallState.incomingCallerId;
+            if (!callerId || !this.peers.has(callerId)) {
+                throw new Error('No pending call found');
+            }
+
+            const peer = this.peers.get(callerId);
+            const pc = peer.connection;
+
+            // Add local tracks
+            this.localStream.getTracks().forEach(track => {
+                pc.addTrack(track, this.localStream);
+            });
+
+            // Create and send answer
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+
+            socketManager.emit('call-answer', {
+                roomCode: this.currentRoomCode,
+                callId,
+                answer,
+                to: callerId
+            });
 
         } catch (error) {
             console.error('Failed to accept call:', error);
@@ -241,43 +244,45 @@ class WebRTCService {
 
     /**
      * Reject an incoming call
-     * @param {string} callId - Call ID to reject
      */
     rejectCall(callId) {
-        socketManager.emit('call-rejected', {
-            roomCode: this.currentRoomCode,
-            callId
-        });
+        const callerId = this.currentCallState.incomingCallerId;
+        if (callerId) {
+            socketManager.emit('call-rejected', {
+                roomCode: this.currentRoomCode,
+                callId,
+                to: callerId
+            });
+        }
         this.endCall();
     }
 
     /**
-     * End the current call
+     * End the current call (all peers)
      */
     endCall() {
+        // Notify all peers
         if (this.currentCallState.callId && this.currentRoomCode) {
-            socketManager.emit('call-ended', {
-                roomCode: this.currentRoomCode,
-                callId: this.currentCallState.callId
+            this.peers.forEach((peer, socketId) => {
+                socketManager.emit('call-ended', {
+                    roomCode: this.currentRoomCode,
+                    callId: this.currentCallState.callId,
+                    to: socketId
+                });
             });
         }
 
-        // Clean up streams
+        // Clean up local stream
         if (this.localStream) {
             this.localStream.getTracks().forEach(track => track.stop());
             this.localStream = null;
         }
 
-        if (this.remoteStream) {
-            this.remoteStream.getTracks().forEach(track => track.stop());
-            this.remoteStream = null;
-        }
-
-        // Close peer connection
-        if (this.peerConnection) {
-            this.peerConnection.close();
-            this.peerConnection = null;
-        }
+        // Close all peer connections
+        this.peers.forEach(peer => {
+            if (peer.connection) peer.connection.close();
+        });
+        this.peers.clear();
 
         this.currentRoomCode = null;
         this.updateCallState({
@@ -287,67 +292,102 @@ class WebRTCService {
             isCalling: false,
             isConnected: false,
             remoteNickname: null,
-            callId: null
+            callId: null,
+            incomingCallerId: null,
+            remoteStreams: new Map()
         });
     }
 
     /**
-     * Create RTCPeerConnection
-     * @private
+     * Create RTCPeerConnection for a specific peer
      */
-    async createPeerConnection() {
-        this.peerConnection = new RTCPeerConnection({
+    async createPeerConnection(socketId) {
+        const pc = new RTCPeerConnection({
             iceServers: this.iceServers
         });
 
         // Handle ICE candidates
-        this.peerConnection.onicecandidate = (event) => {
+        pc.onicecandidate = (event) => {
             if (event.candidate && this.currentCallState.callId) {
                 socketManager.emit('call-ice-candidate', {
                     roomCode: this.currentRoomCode,
                     callId: this.currentCallState.callId,
-                    candidate: event.candidate
+                    candidate: event.candidate,
+                    to: socketId
                 });
             }
         };
 
         // Handle remote stream
-        this.peerConnection.ontrack = (event) => {
-            console.log('📞 Remote track received');
-            this.remoteStream = event.streams[0];
-            this.updateCallState({ isConnected: true });
+        pc.ontrack = (event) => {
+            console.log(`📞 Remote track received from ${socketId}`);
+            const stream = event.streams[0];
+
+            // Update peers map
+            const peer = this.peers.get(socketId);
+            if (peer) {
+                peer.stream = stream;
+            }
+
+            // Update state
+            const newStreams = new Map(this.currentCallState.remoteStreams);
+            newStreams.set(socketId, stream);
+
+            this.updateCallState({
+                isConnected: true,
+                remoteStreams: newStreams
+            });
         };
 
         // Handle connection state changes
-        this.peerConnection.onconnectionstatechange = () => {
-            if (this.peerConnection) {
-                const state = this.peerConnection.connectionState;
-                if (state === 'failed' || state === 'disconnected' || state === 'closed') {
+        pc.onconnectionstatechange = () => {
+            const state = pc.connectionState;
+            console.log(`Connection state for ${socketId}: ${state}`);
+            if (state === 'failed' || state === 'disconnected' || state === 'closed') {
+                // Remove this peer
+                this.peers.delete(socketId);
+
+                const newStreams = new Map(this.currentCallState.remoteStreams);
+                newStreams.delete(socketId);
+                this.updateCallState({ remoteStreams: newStreams });
+
+                // If no peers left, end call?
+                if (this.peers.size === 0) {
                     this.endCall();
                 }
             }
         };
+
+        this.peers.set(socketId, { connection: pc, stream: null });
+        return pc;
     }
 
     /**
      * Handle incoming call offer
-     * @private
      */
     async handleCallOffer(data) {
         try {
-            this.currentRoomCode = data.roomCode;
+            // If busy, reject
+            if (this.currentCallState.isCallActive || this.currentCallState.isIncomingCall) {
+                socketManager.emit('call-rejected', {
+                    roomCode: data.roomCode,
+                    callId: data.callId,
+                    to: data.fromSocketId,
+                    reason: 'busy'
+                });
+                return;
+            }
 
+            this.currentRoomCode = data.roomCode;
             this.updateCallState({
                 isIncomingCall: true,
                 remoteNickname: data.fromNickname,
-                callId: data.callId
+                callId: data.callId,
+                incomingCallerId: data.fromSocketId
             });
 
-            // Create peer connection
-            await this.createPeerConnection();
-
-            // Set remote description
-            await this.peerConnection.setRemoteDescription(data.offer);
+            const pc = await this.createPeerConnection(data.fromSocketId);
+            await pc.setRemoteDescription(data.offer);
 
         } catch (error) {
             console.error('Failed to handle call offer:', error);
@@ -357,32 +397,35 @@ class WebRTCService {
 
     /**
      * Handle call answer
-     * @private
      */
     async handleCallAnswer(data) {
         try {
-            if (this.peerConnection) {
-                await this.peerConnection.setRemoteDescription(data.answer);
-                this.updateCallState({
-                    isOutgoingCall: false,
-                    isCalling: false,
-                    isCallActive: true
-                });
+            const peer = this.peers.get(data.fromSocketId);
+            if (peer && peer.connection) {
+                await peer.connection.setRemoteDescription(data.answer);
+
+                // If this is the first answer, set active
+                if (!this.currentCallState.isCallActive) {
+                    this.updateCallState({
+                        isOutgoingCall: false,
+                        isCalling: false,
+                        isCallActive: true
+                    });
+                }
             }
         } catch (error) {
             console.error('Failed to handle call answer:', error);
-            this.endCall();
         }
     }
 
     /**
      * Handle ICE candidate
-     * @private
      */
     async handleIceCandidate(data) {
         try {
-            if (this.peerConnection) {
-                await this.peerConnection.addIceCandidate(data.candidate);
+            const peer = this.peers.get(data.fromSocketId);
+            if (peer && peer.connection) {
+                await peer.connection.addIceCandidate(data.candidate);
             }
         } catch (error) {
             console.error('Failed to handle ICE candidate:', error);
@@ -391,26 +434,37 @@ class WebRTCService {
 
     /**
      * Handle call rejected
-     * @private
      */
     handleCallRejected(data) {
-        this.endCall();
+        console.log(`Call rejected by ${data.fromSocketId}. Reason: ${data.reason || 'unknown'}`);
+
+        // If specific peer rejected, remove them
+        const peer = this.peers.get(data.fromSocketId);
+        if (peer) {
+            if (peer.connection) peer.connection.close();
+            this.peers.delete(data.fromSocketId);
+        }
+
+        // If no peers left (or if it was the only one we were calling), end call
+        if (this.peers.size === 0) {
+            this.endCall();
+        }
     }
 
     /**
      * Handle call ended
-     * @private
      */
     handleCallEnded(data) {
-        this.endCall();
+        // Same as rejected, remove specific peer
+        this.handleCallRejected(data);
     }
 
     getLocalStream() {
         return this.localStream;
     }
 
-    getRemoteStream() {
-        return this.remoteStream;
+    getRemoteStreams() {
+        return this.currentCallState.remoteStreams;
     }
 
     toggleMute() {

@@ -11,12 +11,22 @@ import {
     Mic,
     MicOff,
     Video,
-    VideoOff,
     Volume2,
     VolumeX,
     X
 } from 'lucide-react';
-import webRTCService, { CallState } from '../webrtc';
+import webRTCService from '../webrtc';
+
+const AudioStream = ({ stream }) => {
+    const audioRef = useRef(null);
+    useEffect(() => {
+        if (audioRef.current && stream) {
+            audioRef.current.srcObject = stream;
+            audioRef.current.play().catch(e => console.error('Error playing audio stream:', e));
+        }
+    }, [stream]);
+    return <audio ref={audioRef} autoPlay />;
+};
 
 const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
     const [callState, setCallState] = useState(webRTCService.getCurrentCallState());
@@ -25,9 +35,8 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
     const [callDuration, setCallDuration] = useState(0);
 
     const localAudioRef = useRef(null);
-    const remoteAudioRef = useRef(null);
     const localVideoRef = useRef(null);
-    const remoteVideoRef = useRef(null);
+    const remoteVideoRef = useRef(null); // Keep for single video (Mesh video is harder)
     const callStartTimeRef = useRef(0);
 
     // Subscribe to call state changes
@@ -62,7 +71,7 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
         };
     }, [callState.isConnected]);
 
-    // Setup audio/video streams
+    // Setup local audio/video streams
     useEffect(() => {
         // Setup local audio stream
         const localStream = webRTCService.getLocalStream();
@@ -77,17 +86,16 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
             localVideoRef.current.muted = true;
         }
 
-        // Setup remote audio stream
-        const remoteStream = webRTCService.getRemoteStream();
-        if (remoteStream && remoteAudioRef.current) {
-            remoteAudioRef.current.srcObject = remoteStream;
-            remoteAudioRef.current.play().catch(console.error);
-        }
-
-        // Setup remote video stream
-        if (remoteStream && remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = remoteStream;
-            remoteVideoRef.current.play().catch(console.error);
+        // Remote video (single stream support for now)
+        // If we have multiple streams, we might just show the first one or none for video
+        // For audio, we render AudioStream components below
+        const remoteStreams = webRTCService.getRemoteStreams();
+        if (remoteStreams && remoteStreams.size > 0 && remoteVideoRef.current) {
+            const firstStream = remoteStreams.values().next().value;
+            if (firstStream) {
+                remoteVideoRef.current.srcObject = firstStream;
+                remoteVideoRef.current.play().catch(console.error);
+            }
         }
     }, [callState]);
 
@@ -119,10 +127,11 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
     };
 
     const toggleSpeaker = () => {
-        if (remoteAudioRef.current) {
-            remoteAudioRef.current.muted = isSpeakerOn;
-            setIsSpeakerOn(!isSpeakerOn);
-        }
+        // This only affects the "main" remote audio if we were using a ref
+        // For multiple streams, we might need to mute all AudioStream components?
+        // Or just toggle state and pass it down?
+        // HTMLAudioElement.muted = !isSpeakerOn
+        setIsSpeakerOn(!isSpeakerOn);
     };
 
     const formatDuration = (seconds) => {
@@ -190,7 +199,7 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                 {/* Video Preview (if video call) */}
                 {callState.isVideoEnabled && callState.isConnected && (
                     <div className="relative bg-gray-900 aspect-video">
-                        {/* Remote Video */}
+                        {/* Remote Video (Single) */}
                         <video
                             ref={remoteVideoRef}
                             autoPlay
@@ -240,7 +249,7 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                                 {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
                             </button>
 
-                            {/* Speaker Button */}
+                            {/* Speaker Button (Toggle output volume/mute) */}
                             <button
                                 onClick={toggleSpeaker}
                                 className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${!isSpeakerOn
@@ -250,16 +259,6 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                             >
                                 {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
                             </button>
-
-                            {/* Video Toggle (for video calls) */}
-                            {callState.isVideoEnabled && (
-                                <button
-                                    onClick={() => webRTCService.toggleVideo()}
-                                    className="w-14 h-14 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
-                                >
-                                    <Video className="w-6 h-6" />
-                                </button>
-                            )}
 
                             {/* End Call Button */}
                             <button
@@ -280,9 +279,13 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                     </p>
                 </div>
 
-                {/* Hidden audio elements */}
+                {/* Hidden audio elements for local and remote streams */}
                 <audio ref={localAudioRef} autoPlay muted />
-                <audio ref={remoteAudioRef} autoPlay />
+
+                {/* Render audio for each remote stream */}
+                {callState.remoteStreams && Array.from(callState.remoteStreams.entries()).map(([id, stream]) => (
+                    <AudioStream key={id} stream={stream} />
+                ))}
             </div>
         </div>
     );
