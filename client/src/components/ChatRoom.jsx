@@ -466,42 +466,40 @@ const ChatRoom = () => {
         return;
       }
 
-      // Check if we can record MP4 (Safari/iOS)
-      // If supported, use MediaRecorder (native MP4).
-      // If NOT supported (Chrome/Firefox), use WavRecorder (WAV) which plays everywhere.
-      const canRecordMp4 = typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/mp4');
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true
+        } 
+      });
 
-      if (canRecordMp4) {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          audio: {
-            channelCount: 1,
-            echoCancellation: true,
-            noiseSuppression: true
-          } 
-        });
-        
-        const options = {
-          mimeType: 'audio/mp4',
-          audioBitsPerSecond: 32000 
-        };
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                   (navigator.userAgent.includes("Mac") && "ontouchend" in document);
 
+      const mimeType = isIOS
+        ? 'audio/mp4'
+        : 'audio/webm;codecs=opus';
+
+      // Use a consistent MediaRecorder approach for all platforms
+      const options = { mimeType };
+      
+      // Safety check: if the preferred mime type isn't supported, 
+      // let the browser use its default (or fallback logic could be added)
+      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(mimeType)) {
         mediaRecorderRef.current = new MediaRecorder(stream, options);
-        audioChunksRef.current = [];
-        
-        mediaRecorderRef.current.ondataavailable = (event) => {
-          if (event.data.size > 0) audioChunksRef.current.push(event.data);
-        };
-
-        mediaRecorderRef.current.start();
       } else {
-        // Fallback to MP3 for Chrome/Firefox to ensure iOS compatibility
-        // MP3 is universally supported (Plan B)
-        mp3RecorderRef.current = new Mp3Recorder();
-        mp3RecorderRef.current.onStop = (blob) => {
-          if (blob.size > 0) sendAudioMessage(blob);
-        };
-        await mp3RecorderRef.current.start();
+        console.warn(`Preferred mimeType ${mimeType} not supported, using default options.`);
+        mediaRecorderRef.current = new MediaRecorder(stream);
       }
+
+      audioChunksRef.current = [];
+      
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorderRef.current.start();
 
       setIsRecording(true);
       setRecordingDuration(0);

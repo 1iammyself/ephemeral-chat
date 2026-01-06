@@ -66,6 +66,16 @@ app.use((req, res, next) => {
   next();
 });
 
+// Middleware for Safari Audio compatibility
+app.use((req, res, next) => {
+  if (req.path.endsWith('.mp4')) {
+    res.setHeader('Content-Type', 'audio/mp4');
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Cache-Control', 'no-store');
+  }
+  next();
+});
+
 // Detect environment
 const isProduction = process.env.NODE_ENV === 'production';
 const isRender = process.env.RENDER === 'true';
