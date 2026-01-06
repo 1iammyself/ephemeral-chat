@@ -42,8 +42,6 @@ async function convertAudioToAAC(base64Audio) {
         fs.writeFile(inputPath, buffer, (err) => {
             if (err) return reject(new Error(`Failed to write temp file: ${err.message}`));
 
-            console.log(`[AudioConverter] Input file written: ${inputPath}, Size: ${buffer.length} bytes`);
-
             // Probe input file
             ffmpeg.ffprobe(inputPath, (err, metadata) => {
                 let audioStream = null;

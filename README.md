@@ -15,7 +15,8 @@
 ### 💬 Rich Messaging
 - **Real-Time Messaging**: Lightning-fast message delivery using Socket.io
 - **📞 Voice Calls**: Crystal clear peer-to-peer audio calls using WebRTC
-- **🎤 Voice Notes**: Record and send short audio messages
+- **🎤 Universal Voice Notes**: Record audio on any device (iOS, Android, Desktop) and play it anywhere.
+    - *Technical Feat*: Server-side conversion to AAC (.m4a) ensures seamless playback on Safari and all modern browsers.
 - **📸 Image Sharing**: Share images securely with view-once capability
 - **Self-Destructing Messages**: Messages disappear after being read or after a set time
 
@@ -53,8 +54,14 @@
 ### Backend
 - **Node.js & Express**: Server runtime and framework
 - **Socket.io**: Real-time event-based communication
+- **FFmpeg**: Audio processing and conversion (with static binaries)
 - **@cap.js**: Proof-of-Work CAPTCHA system
 - **Redis** (Optional): For scaling across multiple instances
+
+### Audio Processing
+- **Universal Compatibility**: Automated conversion of WebM/Ogg (Android/Chrome) to AAC (iOS/Safari).
+- **Smart Copy**: Intelligent detection of AAC inputs to avoid unnecessary re-encoding.
+- **Robust Normalization**: Auto-correction of sample rates and timestamps for glitch-free playback.
 
 ### PWA
 - **Vite PWA Plugin**: PWA generation and management
