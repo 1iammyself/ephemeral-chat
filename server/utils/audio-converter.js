@@ -57,16 +57,28 @@ async function convertAudioToAAC(base64Audio) {
                 }
 
                 // 3. Convert using ffmpeg
-                ffmpeg(inputPath)
+                const isAAC = audioStream && audioStream.codec_name === 'aac';
+
+                let command = ffmpeg(inputPath)
                     .toFormat('mp4')
-                    .audioCodec('aac')
-                    // Robust options for Safari/Mobile compatibility
-                    .outputOptions([
-                        '-movflags +faststart', // Web optimization
-                        '-ac 2',                // Force stereo (normalization)
-                        '-ar 44100',            // Force 44.1kHz (normalization)
-                        '-af aresample=async=1' // Fix timestamp issues
-                    ])
+                    .outputOptions('-movflags +faststart'); // Web optimization always
+
+                if (isAAC) {
+                    console.log('[AudioConverter] Input is already AAC. Using stream copy.');
+                    command.audioCodec('copy');
+                } else {
+                    console.log('[AudioConverter] Input is not AAC. Re-encoding.');
+                    command
+                        .audioCodec('aac')
+                        // Robust options for compatibility
+                        .outputOptions([
+                            '-ac 2',                // Force stereo
+                            '-ar 44100',            // Force 44.1kHz
+                            '-af aresample=async=1' // Fix timestamp issues
+                        ]);
+                }
+
+                command
                     .on('start', (commandLine) => {
                         console.log('[AudioConverter] Spawned Ffmpeg with command: ' + commandLine);
                     })
