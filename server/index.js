@@ -24,6 +24,7 @@ const {
   generateInviteLink,
   logger
 } = require('./utils');
+const { convertAudioToAAC } = require('./utils/audio-converter');
 
 // Initialize Cap.js for proof-of-work CAPTCHA
 const cap = new Cap({
@@ -465,7 +466,7 @@ io.on('connection', (socket) => {
       }
 
       const roomCode = await roomManager.createRoom(settings);
-      
+
       // Initialize room metadata for Lobby/Host logic
       roomData[roomCode] = {
         hostId: socket.id,
@@ -484,7 +485,7 @@ io.on('connection', (socket) => {
   socket.on('knock', ({ roomCode, nickname, password, inviteToken, capToken }) => {
     // 1. Check if room exists in our metadata
     let room = roomData[roomCode];
-    
+
     // Check if room exists in socket adapter (active room)
     const socketRoom = io.sockets.adapter.rooms.get(roomCode);
     const userCount = socketRoom ? socketRoom.size : 0;
@@ -501,7 +502,7 @@ io.on('connection', (socket) => {
       } else {
         room.hostId = socket.id;
       }
-      
+
       // Auto-approve
       return socket.emit('knock-approved', { isHost: true });
     }
@@ -551,7 +552,7 @@ io.on('connection', (socket) => {
         nickname: nickname
       });
     }
-    
+
     socket.emit('knock-pending');
   });
 
@@ -788,9 +789,16 @@ io.on('connection', (socket) => {
       if (messageType === 'image') {
         messageContent = imageData;
       } else if (messageType === 'audio') {
-        // CRITICAL: Do NOT use sanitizeInput on audio content.
-        // Sanitization is for text and will destroy binary Base64 data.
-        messageContent = content;
+        try {
+          // Convert audio to AAC
+          // logger.info('Converting audio to AAC...');
+          messageContent = await convertAudioToAAC(content);
+          // logger.info('Audio conversion successful');
+        } catch (error) {
+          logger.error('Audio conversion failed:', error);
+          socket.emit('error', { message: 'Failed to process audio message' });
+          return;
+        }
       } else {
         messageContent = sanitizeInput(content.trim());
       }
@@ -824,15 +832,15 @@ io.on('connection', (socket) => {
       // Broadcast logic
       if (recipients && recipients.length > 0) {
         // Targeted delivery
-        
+
         // 1. Send to sender (so they see their own message)
         socket.emit('new-message', message);
-        
+
         // 2. Send to each recipient
         recipients.forEach(recipientId => {
           io.to(recipientId).emit('new-message', message);
         });
-        
+
       } else {
         // Broadcast to all users in room (default)
         io.to(socket.roomCode).emit('new-message', message);
@@ -951,7 +959,7 @@ io.on('connection', (socket) => {
         // Host is leaving
         const socketRoom = io.sockets.adapter.rooms.get(socket.roomCode);
         const remainingMembers = Array.from(socketRoom || []).filter(id => id !== socket.id);
-        
+
         if (remainingMembers.length > 0) {
           // Promote next user
           const newHostId = remainingMembers[0];

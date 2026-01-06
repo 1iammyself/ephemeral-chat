@@ -26,7 +26,7 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
 
           // Detect MIME type from file signature (Magic Numbers)
           let mimeType = 'audio/webm;codecs=opus'; // Default fallback
-          
+
           if (bytes.length > 12) {
             // Check for WebM/EBML signature: 1A 45 DF A3
             if (bytes[0] === 0x1A && bytes[1] === 0x45 && bytes[2] === 0xDF && bytes[3] === 0xA3) {
@@ -38,12 +38,12 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
             }
             // Check for WAV (RIFF....WAVE)
             else if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
-                     bytes[8] === 0x57 && bytes[9] === 0x41 && bytes[10] === 0x56 && bytes[11] === 0x45) {
+              bytes[8] === 0x57 && bytes[9] === 0x41 && bytes[10] === 0x56 && bytes[11] === 0x45) {
               mimeType = 'audio/wav';
             }
             // Check for MP3 (ID3 or sync header)
             else if ((bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) || // ID3
-                     (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0)) { // Frame sync
+              (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0)) { // Frame sync
               mimeType = 'audio/mp3';
             }
             // Check for Ogg (Firefox sometimes) - 'OggS'
@@ -108,10 +108,10 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
         // Fix for WebM duration bugs (only apply for WebM)
         if (mimeTypeRef.current && !mimeTypeRef.current.includes('webm')) return;
 
-        setDuration(0); 
+        setDuration(0);
         audio.currentTime = 1e101; // Seek to end to force duration calculation
-        audio.ontimeupdate = function() {
-          this.ontimeupdate = () => {};
+        audio.ontimeupdate = function () {
+          this.ontimeupdate = () => { };
           audio.currentTime = 0;
           setDuration(audio.duration);
         };
@@ -158,28 +158,24 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
     <div className="flex items-center space-x-3 min-w-[200px] py-1">
       <button
         onClick={togglePlay}
-        className={`p-2 rounded-full transition-colors ${
-          isOwnMessage 
-            ? 'bg-white/20 hover:bg-white/30 text-white' 
-            : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200'
-        }`}
+        className={`p-2 rounded-full transition-colors ${isOwnMessage
+          ? 'bg-white/20 hover:bg-white/30 text-white'
+          : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200'
+          }`}
       >
         {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
       </button>
       <div className="flex-1 flex flex-col justify-center">
-        <div className={`h-1 rounded-full overflow-hidden ${
-          isOwnMessage ? 'bg-white/30' : 'bg-gray-200 dark:bg-gray-700'
-        }`}>
-          <div 
-            className={`h-full transition-all duration-100 ${
-              isOwnMessage ? 'bg-white' : 'bg-primary-500 dark:bg-primary-400'
-            }`}
+        <div className={`h-1 rounded-full overflow-hidden ${isOwnMessage ? 'bg-white/30' : 'bg-gray-200 dark:bg-gray-700'
+          }`}>
+          <div
+            className={`h-full transition-all duration-100 ${isOwnMessage ? 'bg-white' : 'bg-primary-500 dark:bg-primary-400'
+              }`}
             style={{ width: `${progress}%` }}
           />
         </div>
-        <div className={`flex justify-between text-[10px] mt-1 ${
-          isOwnMessage ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'
-        }`}>
+        <div className={`flex justify-between text-[10px] mt-1 ${isOwnMessage ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'
+          }`}>
           <span>{formatTime(audioRef.current?.currentTime || 0)}</span>
           <span>{duration ? formatTime(duration) : '--:--'}</span>
         </div>
