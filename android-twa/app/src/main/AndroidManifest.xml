@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="true"
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Twa">
+
+        <!-- TWA entrypoint -->
+        <activity
+            android:name=".LauncherActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Required by AndroidX Browser for TWA notifications/management (kept minimal). -->
+        <service
+            android:name="androidx.browser.trusted.TrustedWebActivityService"
+            android:exported="false" />
+
+        <!-- Digital Asset Links statements are embedded for convenience; you must still host
+             https://<your-domain>/.well-known/assetlinks.json for verification. -->
+        <meta-data
+            android:name="asset_statements"
+            android:value="${assetStatements}" />
+
+    </application>
+
+</manifest>

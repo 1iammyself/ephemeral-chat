@@ -57,6 +57,14 @@ android-app/manifest-checksum.txt
 *.iml
 .idea/
 
+# Android TWA wrapper
+android-twa/local.properties
+android-twa/.gradle/
+android-twa/build/
+android-twa/app/build/
+android-twa/app/release/
+android-twa/.idea/
+
 # Root Android files (from root directory)
 /build.gradle
 /gradle.properties
