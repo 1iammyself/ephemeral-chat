@@ -4,49 +4,53 @@ import { Lock } from 'lucide-react';
 /**
  * PrivacyOverlay Component
  * Renders a black screen when the app is not in focus or visible.
- * This prevents sensitive content from being visible in the app switcher or task manager.
+ * Optimized for iOS Safari to prevent sensitive snapshots in the app switcher.
  */
 const PrivacyOverlay = () => {
     const [isLocked, setIsLocked] = useState(false);
 
     useEffect(() => {
+        const lock = () => {
+            setIsLocked(true);
+            document.body.classList.add('protected-mode');
+        };
+
+        const unlock = () => {
+            // Small delay when returning to prevent flickering
+            setTimeout(() => {
+                setIsLocked(false);
+                document.body.classList.remove('protected-mode');
+            }, 50);
+        };
+
         const handleVisibilityChange = () => {
             if (document.hidden) {
-                setIsLocked(true);
-                document.body.classList.add('protected-mode');
+                lock();
             } else {
-                // Small delay when returning to prevent flickering
-                setTimeout(() => {
-                    setIsLocked(false);
-                    document.body.classList.remove('protected-mode');
-                }, 50);
+                unlock();
             }
         };
 
-        const handleBlur = () => {
-            setIsLocked(true);
-            document.body.classList.add('protected-mode');
-        };
-
-        const handleFocus = () => {
-            setIsLocked(false);
-            document.body.classList.remove('protected-mode');
-        };
-
+        // Standard events
+        window.addEventListener('blur', lock);
+        window.addEventListener('focus', unlock);
         document.addEventListener('visibilitychange', handleVisibilityChange);
-        window.addEventListener('blur', handleBlur);
-        window.addEventListener('focus', handleFocus);
+
+        // iOS Safari specific lifecycle events
+        window.addEventListener('pagehide', lock);
+        window.addEventListener('pageshow', unlock);
 
         // Initial check
         if (document.hidden) {
-            setIsLocked(true);
-            document.body.classList.add('protected-mode');
+            lock();
         }
 
         return () => {
+            window.removeEventListener('blur', lock);
+            window.removeEventListener('focus', unlock);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
-            window.removeEventListener('blur', handleBlur);
-            window.removeEventListener('focus', handleFocus);
+            window.removeEventListener('pagehide', lock);
+            window.removeEventListener('pageshow', unlock);
             document.body.classList.remove('protected-mode');
         };
     }, []);
@@ -55,7 +59,7 @@ const PrivacyOverlay = () => {
 
     return (
         <div
-            className="fixed inset-0 z-[9999] bg-black flex flex-col items-center justify-center p-6 text-center"
+            className="fixed inset-0 z-[1000000] bg-black flex flex-col items-center justify-center p-6 text-center"
             style={{ pointerEvents: 'all' }}
         >
             <div className="bg-gray-900/50 backdrop-blur-xl p-8 rounded-3xl border border-white/10 flex flex-col items-center max-w-sm w-full shadow-2xl">

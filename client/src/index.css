@@ -106,13 +106,23 @@
 
 /* This class makes content impossible to read instantly when focus is lost */
 .protected-mode {
-  filter: blur(25px) grayscale(100%);
-  transition: filter 0.1s ease;
-  /* Makes the fog-up nearly instant */
+  filter: blur(30px) grayscale(100%) !important;
+  transition: none !important;
+  /* Instant blur for snapshots */
   user-select: none;
   /* Prevents highlighting text */
   pointer-events: none;
   /* Prevents interaction while blurred */
+}
+
+/* Instant black screen for iOS snapshots - faster than React render */
+.protected-mode::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 999998;
+  display: block;
 }
 
 /* Message Micro-interactions */
