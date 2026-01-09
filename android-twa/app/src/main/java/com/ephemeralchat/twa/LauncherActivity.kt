@@ -38,13 +38,12 @@ class LauncherActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Find the best browser that supports Custom Tabs (not just Chrome)
+        // Find the best browser that supports Custom Tabs
         val packageName = CustomTabsClient.getPackageName(this, null)
 
         if (packageName == null) {
-            // No browser on this device supports Custom Tabs. 
-            // We could fallback to a WebView, but for a TWA, we'll close.
-            finish()
+            // FALLBACK: No TWA-capable browser found. Use internal WebView.
+            launchWebViewFallback()
             return
         }
 
@@ -56,8 +55,14 @@ class LauncherActivity : AppCompatActivity() {
         )
 
         if (!ok) {
-            finish()
+            launchWebViewFallback()
         }
+    }
+
+    private fun launchWebViewFallback() {
+        val intent = android.content.Intent(this, WebViewActivity::class.java)
+        startActivity(intent)
+        finish()
     }
 
     private fun launchTwaIfPossible() {
