@@ -4,6 +4,7 @@ import android.net.Uri
 import android.os.Bundle
 import com.ephemeralchat.twa.BuildConfig
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.net.toUri
 import androidx.browser.customtabs.CustomTabsClient
 import androidx.browser.customtabs.CustomTabsServiceConnection
 import androidx.browser.customtabs.CustomTabsSession
@@ -37,15 +38,23 @@ class LauncherActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Bind Custom Tabs so we can create a session for TWA.
-        // This avoids the overload mismatch you hit previously.
+        // Find the best browser that supports Custom Tabs (not just Chrome)
+        val packageName = CustomTabsClient.getPackageName(this, null)
+
+        if (packageName == null) {
+            // No browser on this device supports Custom Tabs. 
+            // We could fallback to a WebView, but for a TWA, we'll close.
+            finish()
+            return
+        }
+
+        // Bind to the discovered browser service
         val ok = CustomTabsClient.bindCustomTabsService(
             this,
-            "com.android.chrome",
+            packageName,
             connection
         )
 
-        // If Chrome isn't available, we can't do a verified TWA. Close the activity.
         if (!ok) {
             finish()
         }
@@ -53,7 +62,7 @@ class LauncherActivity : AppCompatActivity() {
 
     private fun launchTwaIfPossible() {
         val session = customTabsSession ?: return
-        val launchUri = Uri.parse(BuildConfig.TWA_LAUNCH_URL)
+        val launchUri = BuildConfig.TWA_LAUNCH_URL.toUri()
 
         val twaIntent: TrustedWebActivityIntent = TrustedWebActivityIntentBuilder(launchUri)
             .build(session)
