@@ -22,6 +22,7 @@ class RoomManager {
     this.roomToTokens = new Map(); // roomCode -> Set of tokens (for cleanup)
     this._io = null; // socket.io reference for broadcasts
     this.joinLocks = new Map(); // roomCode -> Promise (Mutex for joining)
+    this.viewTokens = new Map(); // token -> { messageId, userId, expiresAt, watermarkSeed }
 
     // Start garbage collector for in-memory messages
     if (!this.redis) {
@@ -141,7 +142,7 @@ class RoomManager {
     while (this.joinLocks.has(roomCode)) {
       await this.joinLocks.get(roomCode);
     }
-    
+
     let resolveLock;
     const lockPromise = new Promise(resolve => resolveLock = resolve);
     this.joinLocks.set(roomCode, lockPromise);
@@ -153,7 +154,7 @@ class RoomManager {
         // console.error(`Room ${roomCode} not found`);
         return { success: false, error: 'Room not found' };
       }
-      
+
       // Ensure users array exists
       if (!room.users) room.users = [];
 
@@ -172,7 +173,7 @@ class RoomManager {
         const existingNormalized = (u.nickname || '').toLowerCase().trim();
         return existingNormalized === normalizedNickname && u.socketId !== socketId;
       });
-      
+
       if (isNicknameTaken) {
         // console.log(`Nickname collision: ${sanitizedNickname} is already taken in room ${roomCode}`);
         throw new Error('This nickname is already taken in this room');
@@ -309,7 +310,7 @@ class RoomManager {
       message.content = sanitizeInput(message.content);
     }
     message.timestamp = new Date().toISOString();
-    
+
     // Initialize viewedBy array for view-once messages
     if (message.isViewOnce) {
       message.viewedBy = [];
@@ -321,12 +322,12 @@ class RoomManager {
       await this.redis.setex(messageKey, room.settings.messageTTL, JSON.stringify(message));
     } else {
       room.messages.push(message);
-      
+
       // Safety cap: prevent memory exhaustion (keep last 500 messages max)
       if (room.messages.length > 500) {
         room.messages = room.messages.slice(-500);
       }
-      
+
       await this.saveRoom(roomCode, room);
     }
 
@@ -365,33 +366,33 @@ class RoomManager {
     if (this.redis && room.settings.messageTTL > 0) {
       // Get messages from Redis with TTL
       const messageKeys = await this.redis.keys(`message:${roomCode}:*`);
-      
+
       for (const key of messageKeys) {
         const messageData = await this.redis.get(key);
         if (messageData) {
           messages.push(JSON.parse(messageData));
         }
       }
-      
+
       messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     } else {
       // In-memory: Filter out expired messages on read
       if (room.settings.messageTTL > 0) {
         const now = new Date();
         const ttlMs = room.settings.messageTTL * 1000;
-        
+
         // Filter messages that haven't expired
         const validMessages = room.messages.filter(msg => {
           const msgTime = new Date(msg.timestamp);
           return (now - msgTime) < ttlMs;
         });
-        
+
         // If we filtered anything out, update the room storage immediately
         if (validMessages.length !== room.messages.length) {
           room.messages = validMessages;
           await this.saveRoom(roomCode, room);
         }
-        
+
         messages = validMessages;
       } else {
         messages = room.messages || [];
@@ -403,10 +404,10 @@ class RoomManager {
       messages = messages.filter(msg => {
         // If no recipients defined, it's a broadcast message (everyone sees it)
         if (!msg.recipients || msg.recipients.length === 0) return true;
-        
+
         // If I am the sender, I can see it
         if (msg.sender.socketId === userId || msg.sender.id === userId) return true;
-        
+
         // If I am in the recipients list, I can see it
         return msg.recipients.includes(userId);
       });
@@ -421,12 +422,12 @@ class RoomManager {
    */
   pruneExpiredMessages() {
     const now = new Date();
-    
+
     for (const [roomCode, room] of this.rooms.entries()) {
       if (room.settings.messageTTL > 0) {
         const ttlMs = room.settings.messageTTL * 1000;
         const originalCount = room.messages.length;
-        
+
         room.messages = room.messages.filter(msg => {
           const msgTime = new Date(msg.timestamp);
           return (now - msgTime) < ttlMs;
@@ -458,19 +459,19 @@ class RoomManager {
       const idx = (room.messages || []).findIndex(m => m.id === messageId);
       if (idx >= 0) {
         const msg = room.messages[idx];
-        
+
         if (!msg.viewedBy) msg.viewedBy = [];
-        
+
         // Add user to viewed list if not already present
         if (!msg.viewedBy.includes(userId)) {
           msg.viewedBy.push(userId);
           await this.saveRoom(roomCode, room);
-          
+
           // Broadcast via socket.io if available
           if (this._io) {
-            this._io.to(roomCode).emit('message-viewed', { 
-              messageId, 
-              userId 
+            this._io.to(roomCode).emit('message-viewed', {
+              messageId,
+              userId
             });
           }
           return true;
@@ -777,6 +778,48 @@ class RoomManager {
     };
   }
 
+  /**
+   * Generate a short-lived view token for a specific message
+   * @param {string} messageId - The message ID
+   * @param {string} userId - The user ID requesting the token
+   * @returns {Object} { token, watermarkSeed }
+   */
+  generateViewToken(messageId, userId) {
+    const token = crypto.randomBytes(16).toString('hex');
+    const watermarkSeed = `${userId}:${messageId}:${Date.now()}`;
+    const expiresAt = Date.now() + 30 * 1000; // 30 seconds expiry
+
+    this.viewTokens.set(token, {
+      messageId,
+      userId,
+      expiresAt,
+      watermarkSeed
+    });
+
+    // Auto-cleanup
+    setTimeout(() => {
+      this.viewTokens.delete(token);
+    }, 35 * 1000);
+
+    return { token, watermarkSeed };
+  }
+
+  /**
+   * Validate a view token and return the message data
+   * @param {string} token - The view token
+   * @returns {Object|null} The token data if valid
+   */
+  validateViewToken(token) {
+    const data = this.viewTokens.get(token);
+    if (!data) return null;
+
+    if (Date.now() > data.expiresAt) {
+      this.viewTokens.delete(token);
+      return null;
+    }
+
+    return data;
+  }
 
 }
 
