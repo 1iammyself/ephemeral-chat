@@ -6,10 +6,13 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Clock, Eye, AlertTriangle } from 'lucide-react';
+import ImageReveal from './ImageReveal';
+import socketManager from '../socket-simple';
 
 const ImageViewer = ({ isOpen, onClose, imageUrl, duration = 20 }) => {
   const [timeLeft, setTimeLeft] = useState(duration);
   const [isVisible, setIsVisible] = useState(false);
+  const [revealData, setRevealData] = useState({ viewToken: null, watermarkSeed: null });
 
   // Handle visibility change (tab switching)
   const handleVisibilityChange = useCallback(() => {
@@ -59,8 +62,21 @@ const ImageViewer = ({ isOpen, onClose, imageUrl, duration = 20 }) => {
     } else {
       setIsVisible(false);
       setTimeLeft(duration);
+      setRevealData({ viewToken: null, watermarkSeed: null });
     }
   }, [isOpen, duration, onClose, handleVisibilityChange, handleKeyDown]);
+
+  // Request reveal token when opened
+  useEffect(() => {
+    if (isOpen && imageUrl && imageUrl.startsWith('msg_')) {
+      // imageUrl here is actually the messageId passed from MessageList
+      socketManager.emit('request-view-token', { messageId: imageUrl }, (res) => {
+        if (res.success) {
+          setRevealData({ viewToken: res.token, watermarkSeed: res.watermarkSeed });
+        }
+      });
+    }
+  }, [isOpen, imageUrl]);
 
   if (!isOpen) return null;
 
@@ -129,21 +145,30 @@ const ImageViewer = ({ isOpen, onClose, imageUrl, duration = 20 }) => {
 
       {/* Image Content */}
       {isVisible && imageUrl && (
-        <img
-          src={imageUrl}
-          alt="View once image"
-          className="max-w-[90vw] max-h-[80vh] object-contain rounded-lg shadow-2xl"
-          style={{
-            userSelect: 'none',
-            WebkitUserSelect: 'none',
-            MozUserSelect: 'none',
-            msUserSelect: 'none',
-            pointerEvents: 'none'
-          }}
-          onDragStart={(e) => e.preventDefault()}
-          onContextMenu={(e) => e.preventDefault()}
-          onClick={(e) => e.stopPropagation()}
-        />
+        <div className="w-full h-full max-w-[90vw] max-h-[80vh] flex items-center justify-center">
+          {imageUrl.startsWith('msg_') ? (
+            <ImageReveal
+              viewToken={revealData.viewToken}
+              watermarkSeed={revealData.watermarkSeed}
+            />
+          ) : (
+            <img
+              src={imageUrl}
+              alt="View once image"
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+              style={{
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                MozUserSelect: 'none',
+                msUserSelect: 'none',
+                pointerEvents: 'none'
+              }}
+              onDragStart={(e) => e.preventDefault()}
+              onContextMenu={(e) => e.preventDefault()}
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
+        </div>
       )}
 
       {/* Warning Banner */}

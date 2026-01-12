@@ -442,6 +442,46 @@ app.get('/api/rooms/:roomCode', async (req, res) => {
   }
 });
 
+/**
+ * Ephemeral image reveal endpoint
+ * POST /api/reveal-image
+ * Body: { viewToken }
+ */
+app.post('/api/reveal-image', async (req, res) => {
+  try {
+    const { viewToken } = req.body;
+    if (!viewToken) return res.status(400).json({ error: 'Missing view token' });
+
+    const tokenData = roomManager.validateViewToken(viewToken);
+    if (!tokenData) return res.status(401).json({ error: 'Invalid or expired view token' });
+
+    const { messageId } = tokenData;
+    const msgResult = roomManager.getMessageById(messageId);
+
+    if (!msgResult || !msgResult.message) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+
+    const { message } = msgResult;
+    if (message.messageType !== 'image') {
+      return res.status(400).json({ error: 'Not an image message' });
+    }
+
+    // content is base64 data URI: data:image/png;base64,...
+    const base64Data = message.content.split(',')[1];
+    const imgBuffer = Buffer.from(base64Data, 'base64');
+    const mimeType = message.content.split(';')[0].split(':')[1];
+
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(imgBuffer);
+
+  } catch (error) {
+    logger.error('Error revealing image:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 io.on('connection', (socket) => {
   // logger.info(`🔌 User connected: ${socket.id}`);
 
@@ -865,6 +905,19 @@ io.on('connection', (socket) => {
 
     } catch (error) {
       logger.error('Error marking message as viewed:', error);
+    }
+  });
+
+  // Handle ephemeral view token requests
+  socket.on('request-view-token', async ({ messageId }, callback) => {
+    try {
+      if (!socket.roomCode || !messageId) return callback({ error: 'Invalid request' });
+
+      const tokenData = roomManager.generateViewToken(messageId, socket.id);
+      callback({ success: true, ...tokenData });
+    } catch (error) {
+      logger.error('Error generating view token:', error);
+      callback({ error: 'Failed to generate token' });
     }
   });
 

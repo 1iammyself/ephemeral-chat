@@ -113,6 +113,15 @@ const logger = {
   }
 };
 
+/**
+ * Generate a short hash from a seed string
+ * @param {string} seed - The seed to hash
+ * @returns {string} A short alphanumeric hash
+ */
+function shortHash(seed) {
+  return crypto.createHash('sha256').update(seed).digest('hex').substring(0, 12).toUpperCase();
+}
+
 module.exports = {
   generateRoomCode,
   generateRandomNickname,
@@ -120,5 +129,6 @@ module.exports = {
   isValidRoomCode,
   isValidNickname,
   getTTLOptions,
-  logger
+  logger,
+  shortHash
 };
