@@ -402,11 +402,11 @@ const ChatRoom = () => {
       return;
     }
     const reader = new FileReader();
-    reader.readAsArrayBuffer(audioBlob);
     reader.onloadend = () => {
-      const base64Audio = btoa(String.fromCharCode(...new Uint8Array(reader.result)));
+      const base64Audio = reader.result.split(',')[1];
       socketManager.emit('send-message', { messageType: 'audio', content: base64Audio, isViewOnce: true, recipients: selectedRecipients });
     };
+    reader.readAsDataURL(audioBlob);
   };
 
   useEffect(() => {
