@@ -1,3 +1,27 @@
+
+## 🎥 Demo Video
+
+[![Demo Video](screenshots/chatroompic.png)](https://youtu.be/gnvoWkvkkho)
+
+Watch a quick demo of Ephemeral Chat in action!
+
+---
+
+## 📸 Screenshots
+
+Here’s a sneak peek at the app interface:
+
+<p align="center">
+   <img src="screenshots/homepage_picture.png" alt="Home Screen" width="400"/>
+   <img src="screenshots/join room pic.png" alt="Join Room UI" width="400"/>
+</p>
+
+## 🔒 CI/CD & Code Quality
+
+- **GitHub Actions**: Automated workflows for building, testing, and analyzing code.
+- **CodeQL**: Security analysis for JavaScript/Node.js and Java/Android code.
+- **Gradle Build**: Ensures Android app builds successfully on every push.
+
 <div align="center">
   <h1>Ephemeral Chat</h1>
 
@@ -6,6 +30,7 @@
   [![Live Demo](https://img.shields.io/badge/🌐-Live_Demo-2ea44f)](https://ephemeral-chat-7j66.onrender.com/)
 
   <p>A secure, anonymous, and ephemeral chat application with self-destructing messages. Installable as a Progressive Web App (PWA) for native-like experience.</p>
+   <p>A secure, anonymous, and ephemeral chat application with self-destructing messages. Installable as a Progressive Web App (PWA) for native-like experience. <strong>Can also be distributed as a Trusted Web Activity (TWA) for Android via the Play Store.</strong></p>
 
   [Report Bug](https://github.com/cLLeB/ephemeral-chat/issues) · [Request Feature](https://github.com/cLLeB/ephemeral-chat/issues/new?assignees=&labels=enhancement&template=feature_request.md&title=)
 </div>
@@ -43,6 +68,7 @@
 
 ## 🛠️ Tech Stack
 
+
 ### Frontend
 - **React**: UI library
 - **Vite**: Build tool and dev server
@@ -50,6 +76,9 @@
 - **Socket.io Client**: Real-time communication
 - **WebRTC**: Peer-to-peer audio calls
 - **Lucide React**: Beautiful icons
+
+### Android Distribution
+- **Trusted Web Activity (TWA)**: The project includes an `android/` directory with a Gradle project, allowing the PWA to be packaged and distributed as a native Android app on the Google Play Store.
 
 ### Backend
 - **Node.js & Express**: Server runtime and framework
@@ -180,11 +209,16 @@ Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
 
 ```
 ephemeral-chat/
-├── client/                    # React frontend (Vite + PWA)
+├── android/                  # Android TWA project (wraps the PWA for Play Store distribution)
+│   ├── app/                  # Android app module
+│   ├── build.gradle          # Gradle build files
+│   ├── gradlew, gradlew.bat  # Gradle wrapper scripts
+│   └── ...                   # Other Android/Gradle files
+├── client/                   # React frontend (Vite + PWA)
 │   ├── public/               # PWA assets & manifest
 │   │   ├── manifest.json     # Web app manifest
-│   │   ├── sw.js            # Service worker
-│   │   └── *.png            # PWA icons
+│   │   ├── sw.js             # Service worker
+│   │   └── *.png             # PWA icons
 │   ├── src/                  # React source code
 │   │   ├── components/       # Reusable UI components
 │   │   ├── hooks/            # Custom React hooks
@@ -195,18 +229,32 @@ ephemeral-chat/
 │
 ├── server/                   # Express + Socket.IO backend
 │   ├── auth-utils.js         # Authentication utilities
-│   ├── index.js             # Server entry point
-│   ├── rooms.js             # Room management
-│   ├── security.js          # Security middleware
-│   └── utils.js             # Utility functions
+│   ├── index.js              # Server entry point
+│   ├── rooms.js              # Room management
+│   ├── security.js           # Security middleware
+│   └── utils.js              # Utility functions
 │
-├── docs/                    # Documentation
-│   └── USER_GUIDE.md       # User guide
+├── docs/                     # Documentation
+│   └── USER_GUIDE.md         # User guide
 │
-├── .env                    # Environment variables
-├── package.json           # Root dependencies
+├── .env                      # Environment variables
+├── package.json              # Root dependencies
 └── README.md
 ```
+
+## 📱 Android TWA Distribution
+
+This project can be distributed as a native Android app using Trusted Web Activity (TWA). The `android/` directory contains a Gradle project that wraps the PWA, allowing you to publish the app on the Google Play Store for a seamless, native-like experience.
+
+### Building the Android App
+
+```bash
+cd android
+./gradlew assembleDebug  # or assembleRelease for production
+```
+The output APK will be in `android/app/build/outputs/apk/`.
+
+You can customize the TWA settings and assets in the `android/` directory as needed.
 
 ## ⚙️ Configuration
 
