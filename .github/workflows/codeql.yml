@@ -51,6 +51,7 @@ jobs:
       if: matrix.build-mode == 'manual'
       shell: bash
       run: |
+        cd android
         chmod +x gradlew
         ./gradlew assemble -x test
 
