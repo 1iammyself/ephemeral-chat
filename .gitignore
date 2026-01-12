@@ -1,196 +1,55 @@
-# Dependencies
+# Node.js
 node_modules/
+*~
+*.iml
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-# Production builds
-/client/dist/
-/client/build/
-
-# Environment variables
+.pnpm-debug.log*
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# Logs
-logs
-*.log
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
-coverage/
-
-# nyc test coverage
-.nyc_output
-
-# Dependency directories
-jspm_packages/
-
-# Optional npm cache directory
-.npm
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# Android
-android-app/local.properties
-android-app/.gradle/
-android-app/build/
-android-app/app/build/
-android-app/.idea/
-android-app/app-release-signed.apk.idsig
-android-app/manifest-checksum.txt
-*.iml
-.idea/
-
-# Android TWA wrapper
-android-twa/local.properties
-android-twa/.gradle/
-android-twa/build/
-android-twa/app/build/
-android-twa/app/release/
-android-twa/.idea/
-
-# Root Android files (from root directory)
-/build.gradle
-/gradle.properties
-/settings.gradle
-/gradlew
-/gradlew.bat
-/gradle/
-
-# Keystore files
-*.keystore
-*.jks
-*.p12
-android.keystore
-
-# Build artifacts
+# Build outputs
+dist/
 build/
-.gradle/
-
-# VSCode
-.vscode/
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Temporary files
-*.tmp
-*.temp
-
-keystore/
-
-# Capacitor
-/android/
-/ios/
-/.capacitor/
-
-# Android
-*.apk
-*.aab
-*.keystore
-*.jks
-
-# Vite specific
+out/
+.next/
 .cache/
-.temp/
-
-# Environment files (uncomment and modify as needed)
-# .env
-# .env.*
-# !.env.example
-
-# IDE specific
-.vscode/*
-!.vscode/extensions.json
-!.vscode/launch.json
-.idea/
-*.sublime-workspace
-*.sublime-project
-
-# Testing
-/coverage/
-/cypress/
-
-# Production
-/build/
-/dist/
-
-# Debug logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Local development
-.DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
+.parcel-cache/
 .eslintcache
+.stylelintcache
 
-# Optional REPL history
-.node_repl_history
+# Android specific
+.gradle/
+local.properties
+*.apk
+*.aar
+*.jks
+*.keystore
+captures/
+.externalNativeBuild/
+.cxx/
+android/app/build/
+android/build/
+android/plugins/
 
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# dotenv environment variables file (keep .env for template)
-# .env
-
-# IDE files
-.vscode/
+# IDEs and Editors
 .idea/
+.vscode/
 *.swp
 *.swo
-*~
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+*.launch
+.factorypath
 
-# OS generated files
+# OS specific
 .DS_Store
 .DS_Store?
 ._*
@@ -199,6 +58,8 @@ yarn-error.log*
 ehthumbs.db
 Thumbs.db
 
-# Temporary files
-*.tmp
-*.temp
+# Misc
+.DS_Store
+*.log
+tmp/
+temp/
