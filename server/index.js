@@ -138,8 +138,20 @@ const io = socketIo(server, {
       // In production, check against the environment-configured allowedOrigins
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('onrender.com')) {
-        return callback(null, true);
+      try {
+        const url = new URL(origin);
+        const hostname = url.hostname;
+
+        if (
+          allowedOrigins.indexOf(origin) !== -1 ||
+          hostname === 'onrender.com' ||
+          hostname.endsWith('.onrender.com')
+        ) {
+          return callback(null, true);
+        }
+      } catch (e) {
+        // If origin is not a valid URL, reject it
+        return callback(new Error('Not allowed by CORS'));
       }
 
       callback(new Error('Not allowed by CORS'));
