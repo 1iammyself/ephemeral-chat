@@ -25,19 +25,11 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
           }
 
           // Detect MIME type from file signature (Magic Numbers)
-          let mimeType = 'audio/webm;codecs=opus'; // Default fallback
+          let mimeType = 'audio/wav'; // Prefer WAV for Safari compatibility
 
           if (bytes.length > 12) {
-            // Check for WebM/EBML signature: 1A 45 DF A3
-            if (bytes[0] === 0x1A && bytes[1] === 0x45 && bytes[2] === 0xDF && bytes[3] === 0xA3) {
-              mimeType = 'audio/webm;codecs=opus';
-            }
-            // Check for MP4/M4A (iOS recording) - 'ftyp' at offset 4
-            else if (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
-              mimeType = 'audio/mp4';
-            }
             // Check for WAV (RIFF....WAVE)
-            else if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+            if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
               bytes[8] === 0x57 && bytes[9] === 0x41 && bytes[10] === 0x56 && bytes[11] === 0x45) {
               mimeType = 'audio/wav';
             }
@@ -45,6 +37,14 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
             else if ((bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) || // ID3
               (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0)) { // Frame sync
               mimeType = 'audio/mp3';
+            }
+            // Check for WebM/EBML signature: 1A 45 DF A3
+            else if (bytes[0] === 0x1A && bytes[1] === 0x45 && bytes[2] === 0xDF && bytes[3] === 0xA3) {
+              mimeType = 'audio/webm;codecs=opus';
+            }
+            // Check for MP4/M4A (iOS recording) - 'ftyp' at offset 4
+            else if (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
+              mimeType = 'audio/mp4';
             }
             // Check for Ogg (Firefox sometimes) - 'OggS'
             else if (bytes[0] === 0x4F && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) {
@@ -76,6 +76,8 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
   // Handle auto-play logic
   useEffect(() => {
     if (autoPlay && audioRef.current && audioUrl) {
+      // Safari: force reload by resetting srcObject
+      audioRef.current.load && audioRef.current.load();
       const timer = setTimeout(() => {
         if (audioRef.current) {
           const playPromise = audioRef.current.play();

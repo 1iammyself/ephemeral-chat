@@ -335,6 +335,20 @@ class WebRTCService {
             console.log(`📞 Remote track received from ${socketId}`);
             const stream = event.streams[0];
 
+            // Attach and play remote audio stream for this peer
+            if (stream && event.track && event.track.kind === 'audio') {
+                let audioElem = document.getElementById(`remote-audio-${socketId}`);
+                if (!audioElem) {
+                    audioElem = document.createElement('audio');
+                    audioElem.id = `remote-audio-${socketId}`;
+                    audioElem.autoplay = true;
+                    audioElem.style.display = 'none';
+                    document.body.appendChild(audioElem);
+                }
+                audioElem.srcObject = stream;
+                audioElem.play().catch(e => console.warn('Remote audio play failed:', e));
+            }
+
             // Update peers map
             const peer = this.peers.get(socketId);
             if (peer) {
