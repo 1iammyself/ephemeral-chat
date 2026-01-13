@@ -4,22 +4,9 @@
 
 import { io } from 'socket.io-client';
 
+// Only allow the primary production host
 const isAllowedHostname = (hostname) => {
-  if (!hostname) {
-    return false;
-  }
-
-  // Allow the primary production host
-  if (hostname === 'chat.kyere.me') {
-    return true;
-  }
-
-  // Allow Render-hosted environments: onrender.com and its subdomains
-  if (hostname === 'onrender.com' || hostname.endsWith('.onrender.com')) {
-    return true;
-  }
-
-  return false;
+  return hostname === 'chat.kyere.me';
 };
 
 // Get the current hostname and protocol
@@ -31,9 +18,9 @@ const getServerUrl = () => {
 
   // In browser environment
   if (typeof window !== 'undefined') {
-    const { protocol, hostname, port } = window.location;
+    const { protocol, hostname } = window.location;
     
-    // For production environments on Render
+    // Only allow chat.kyere.me as production
     if (isAllowedHostname(hostname)) {
       return `${protocol}//${hostname}`;
     }
