@@ -34,14 +34,15 @@ async function verifyPassword(password, hash) {
 /**
  * Create a client-side hash for password transmission
  * This allows passwords to be hashed on client before sending
+ * NOTE: Uses bcrypt to ensure sufficient computational effort.
  * @param {string} password - Plain text password
  * @param {string} salt - Salt (can be room code or a challenge)
  * @returns {string} Client-side hash
  */
 function createClientHash(password, salt) {
-  return crypto.createHash('sha256')
-    .update(password + salt)
-    .digest('hex');
+  const saltRounds = 12;
+  // Derive an expensive hash of the password and salt combination
+  return bcrypt.hashSync(password + salt, saltRounds);
 }
 
 /**
@@ -52,12 +53,9 @@ function createClientHash(password, salt) {
  * @returns {boolean} True if valid
  */
 function verifyClientHash(clientHash, password, salt) {
-  const computed = createClientHash(password, salt);
   try {
-    return crypto.timingSafeEqual(
-      Buffer.from(clientHash, 'hex'),
-      Buffer.from(computed, 'hex')
-    );
+    // Compare the supplied hash against a bcrypt hash of password+salt
+    return bcrypt.compareSync(password + salt, clientHash);
   } catch (error) {
     return false;
   }
