@@ -191,10 +191,20 @@ public class UrlNavigation {
      * exported components in other applications.
      */
     private boolean isTrustedExternalActivity(@NonNull String packageName, @NonNull String className) {
-        // Allow only activities in this app's own package.
-        // Additional trusted packages or specific classes can be added here if needed.
+        // Only allow launching explicitly whitelisted activities within this app's package.
         String ownPackage = mainActivity.getPackageName();
-        return ownPackage.equals(packageName);
+        if (!ownPackage.equals(packageName)) {
+            return false;
+        }
+
+        // Whitelist of activities that are safe to launch from external "intent:" URLs.
+        // Add additional fully-qualified class names here as needed.
+        if (MainActivity.class.getName().equals(className)) {
+            return true;
+        }
+
+        // Default: disallow launching arbitrary in-app activities.
+        return false;
     }
 
     public boolean shouldOverrideUrlLoading(GoNativeWebviewInterface view, String url) {
@@ -303,7 +313,22 @@ public class UrlNavigation {
                                         resolveInfo.activityInfo.name
                                 );
                                 Intent safeIntent = new Intent(intent);
+
+                                // Constrain action and categories to safe values for external "intent:" URLs.
+                                // Default to VIEW if no action is set.
+                                if (safeIntent.getAction() == null) {
+                                    safeIntent.setAction(Intent.ACTION_VIEW);
+                                }
                                 safeIntent.setComponent(resolvedComponent);
+
+                                // Strip any URI permission or persistable flags that could escalate privileges.
+                                int flags = safeIntent.getFlags();
+                                flags &= ~Intent.FLAG_GRANT_READ_URI_PERMISSION;
+                                flags &= ~Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+                                flags &= ~Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION;
+                                flags &= ~Intent.FLAG_GRANT_PREFIX_URI_PERMISSION;
+                                safeIntent.setFlags(flags);
+
                                 safeIntent.addCategory(Intent.CATEGORY_BROWSABLE);
                                 mainActivity.startActivity(safeIntent);
                             } else {
@@ -501,7 +526,8 @@ public class UrlNavigation {
         // Prefer explicit component if set
         ComponentName componentName = intent.getComponent();
         if (componentName != null) {
-            return myPackage.equals(componentName.getPackageName());
+            // Only allow explicitly whitelisted in-app activities.
+            return isTrustedExternalActivity(componentName.getPackageName(), componentName.getClassName());
         }
 
         // Fall back to resolving the activity via PackageManager
@@ -510,11 +536,22 @@ public class UrlNavigation {
                     mainActivity.getPackageManager().resolveActivity(intent, 0);
             if (resolveInfo != null && resolveInfo.activityInfo != null) {
                 String resolvedPackage = resolveInfo.activityInfo.packageName;
-                return myPackage.equals(resolvedPackage);
+                String resolvedClass = resolveInfo.activityInfo.name;
+                if (!myPackage.equals(resolvedPackage)) {
+                    return false;
+                }
+                // Require that the resolved activity is explicitly trusted.
+                return isTrustedExternalActivity(resolvedPackage, resolvedClass);
             }
         } catch (Exception e) {
             // Conservatively treat resolution failures as unsafe
             GNLog.getInstance().logError(TAG, "Failed to resolve intent for safety check", e);
+        // Additionally, restrict to safe actions when launching from external URLs.
+        String action = intent.getAction();
+        if (action != null && !Intent.ACTION_VIEW.equals(action)) {
+            return false;
+        }
+
         }
 
         return false;
