@@ -371,31 +371,8 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
                           autoPlay={playingAudioId === message.id}
                           onEnded={() => handleAudioEnded(message)}
                         />
+// ...existing code...
 // --- Utility: Fix audio content for Safari/desktop playback ---
-function fixAudioContentForPlayback(content) {
-  // If already a data URL or blob, return as is
-  if (typeof content !== 'string' || content.startsWith('http') || content.startsWith('blob:') || content.startsWith('data:')) {
-    return content;
-  }
-  // Try to detect and wrap as data URL with best guess at MIME type
-  // Default to WAV for Safari, WebM for others
-  let mimeType = 'audio/webm;codecs=opus';
-  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-  if (isSafari) {
-    mimeType = 'audio/wav';
-  }
-  // Heuristic: if base64 starts with 'UklGR' it's likely WAV
-  if (content.startsWith('UklGR')) {
-    mimeType = 'audio/wav';
-  } else if (content.startsWith('SUQz')) {
-    mimeType = 'audio/mp3';
-  } else if (content.startsWith('AAAA')) {
-    mimeType = 'audio/mp4';
-  } else if (content.startsWith('T2dn')) {
-    mimeType = 'audio/ogg';
-  }
-  return `data:${mimeType};base64,${content}`;
-}
                       )}
                     </div>
                   ) : (
@@ -441,3 +418,29 @@ function fixAudioContentForPlayback(content) {
 };
 
 export default MessageList;
+
+// --- Utility: Fix audio content for Safari/desktop playback ---
+function fixAudioContentForPlayback(content) {
+  // If already a data URL or blob, return as is
+  if (typeof content !== 'string' || content.startsWith('http') || content.startsWith('blob:') || content.startsWith('data:')) {
+    return content;
+  }
+  // Try to detect and wrap as data URL with best guess at MIME type
+  // Default to WAV for Safari, WebM for others
+  let mimeType = 'audio/webm;codecs=opus';
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  if (isSafari) {
+    mimeType = 'audio/wav';
+  }
+  // Heuristic: if base64 starts with 'UklGR' it's likely WAV
+  if (content.startsWith('UklGR')) {
+    mimeType = 'audio/wav';
+  } else if (content.startsWith('SUQz')) {
+    mimeType = 'audio/mp3';
+  } else if (content.startsWith('AAAA')) {
+    mimeType = 'audio/mp4';
+  } else if (content.startsWith('T2dn')) {
+    mimeType = 'audio/ogg';
+  }
+  return `data:${mimeType};base64,${content}`;
+}
