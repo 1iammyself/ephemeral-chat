@@ -107,8 +107,21 @@ const getCorsOptions = () => {
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('onrender.com')) {
-        return callback(null, true);
+      try {
+        const parsed = new URL(origin);
+        const hostname = parsed.hostname;
+
+        const isExplicitlyAllowed = allowedOrigins.indexOf(origin) !== -1;
+        const isRenderHost =
+          hostname === 'onrender.com' ||
+          hostname.endsWith('.onrender.com');
+
+        if (isExplicitlyAllowed || isRenderHost) {
+          return callback(null, true);
+        }
+      } catch (e) {
+        // If the origin is not a valid URL, reject it
+        return callback(new Error('Not allowed by CORS'));
       }
 
       callback(new Error('Not allowed by CORS'));
