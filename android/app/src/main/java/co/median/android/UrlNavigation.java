@@ -6,6 +6,7 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.location.LocationManager;
 import android.net.Uri;
@@ -274,7 +275,21 @@ public class UrlNavigation {
                 try {
                     if ("intent".equals(uri.getScheme())) {
                         intent = Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME);
-                        mainActivity.startActivity(intent);
+                        if (isSafeIntent(intent)) {
+                            mainActivity.startActivity(intent);
+                        } else {
+                            // Unsafe intent target; try fallback URL if available
+                            String fallbackUrl = intent.getStringExtra("browser_fallback_url");
+                            if (!TextUtils.isEmpty(fallbackUrl)) {
+                                mainActivity.loadUrl(fallbackUrl);
+                            } else {
+                                Toast.makeText(mainActivity, R.string.app_not_installed, Toast.LENGTH_LONG).show();
+                                GNLog.getInstance().logError(TAG,
+                                        mainActivity.getString(R.string.app_not_installed),
+                                        null,
+                                        GNLog.TYPE_TOAST_ERROR);
+                            }
+                        }
                     } else if ("http".equals(uri.getScheme()) || "https".equals(uri.getScheme())) {
                         mainActivity.openExternalBrowser(uri);
                     } else {
@@ -428,6 +443,36 @@ public class UrlNavigation {
             // if we are here, either the policy is reload and we are reloading the page, or policy is never but we are going to a different page. So take ownership of the webview.
             webViewPool.disownWebview(view);
             this.mainActivity.isPoolWebview = false;
+        }
+
+        return false;
+    }
+
+    /**
+     * Allow only intents that resolve to this application's package.
+     */
+    private boolean isSafeIntent(Intent intent) {
+        if (intent == null) return false;
+
+        String myPackage = mainActivity.getPackageName();
+
+        // Prefer explicit component if set
+        ComponentName componentName = intent.getComponent();
+        if (componentName != null) {
+            return myPackage.equals(componentName.getPackageName());
+        }
+
+        // Fall back to resolving the activity via PackageManager
+        try {
+            android.content.pm.ResolveInfo resolveInfo =
+                    mainActivity.getPackageManager().resolveActivity(intent, 0);
+            if (resolveInfo != null && resolveInfo.activityInfo != null) {
+                String resolvedPackage = resolveInfo.activityInfo.packageName;
+                return myPackage.equals(resolvedPackage);
+            }
+        } catch (Exception e) {
+            // Conservatively treat resolution failures as unsafe
+            GNLog.getInstance().logError(TAG, "Failed to resolve intent for safety check", e);
         }
 
         return false;
