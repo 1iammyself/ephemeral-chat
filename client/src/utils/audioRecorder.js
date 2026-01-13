@@ -25,8 +25,8 @@ export class WavRecorder {
 
     this.audioInput = this.audioContext.createMediaStreamSource(this.mediaStream);
     
-    // Buffer size 4096 provides a good balance between latency and performance
-    this.scriptProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
+  // Buffer size 16384 to address Safari truncation issues
+  this.scriptProcessor = this.audioContext.createScriptProcessor(16384, 1, 1);
 
     this.scriptProcessor.onaudioprocess = (event) => {
       if (!this.recording) return;

@@ -40,22 +40,42 @@ export class Mp3Recorder {
 
     this.audioInput = this.audioContext.createMediaStreamSource(this.mediaStream);
     
-    // Buffer size 4096 (standard for script processor)
-    this.scriptProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
+  // Buffer size 16384 to address Safari truncation issues
+  this.scriptProcessor = this.audioContext.createScriptProcessor(16384, 1, 1);
 
+    // Safari-specific workaround: always process at least one chunk after stop
+    this._safariLastChunk = null;
     this.scriptProcessor.onaudioprocess = (event) => {
-      if (!this.recording) return;
-
-      const inputData = event.inputBuffer.getChannelData(0);
-      
-      // Convert Float32 to Int16
-      const mp3Input = this.convertBuffer(inputData);
-      
-      // Encode
-      const mp3Data = this.encoder.encodeBuffer(mp3Input);
-      if (mp3Data.length > 0) {
-        this.dataBuffer.push(mp3Data);
+      if (!this.recording) {
+        // Safari workaround: process one last chunk after stop
+        if (this._safariLastChunk) {
+          const mp3Input = this.convertBuffer(this._safariLastChunk);
+          const mp3Data = this.encoder.encodeBuffer(mp3Input);
+          if (mp3Data.length > 0) {
+            this.dataBuffer.push(mp3Data);
+          }
+          this._safariLastChunk = null;
+        }
+        return;
       }
+      const inputData = event.inputBuffer.getChannelData(0);
+      // Safari workaround: keep a reference to the last chunk
+      if (this._isSafari()) {
+        this._safariLastChunk = new Float32Array(inputData);
+      } else {
+        // Convert Float32 to Int16
+        const mp3Input = this.convertBuffer(inputData);
+        // Encode
+        const mp3Data = this.encoder.encodeBuffer(mp3Input);
+        if (mp3Data.length > 0) {
+          this.dataBuffer.push(mp3Data);
+        }
+      }
+    };
+
+    // If Safari, push the last chunk on stop
+    this._isSafari = function() {
+      return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
     };
 
     this.audioInput.connect(this.scriptProcessor);
@@ -67,6 +87,15 @@ export class Mp3Recorder {
   stop() {
     if (!this.recording) return;
     this.recording = false;
+    // Safari workaround: push last chunk if present
+    if (this._isSafari && this._safariLastChunk) {
+      const mp3Input = this.convertBuffer(this._safariLastChunk);
+      const mp3Data = this.encoder.encodeBuffer(mp3Input);
+      if (mp3Data.length > 0) {
+        this.dataBuffer.push(mp3Data);
+      }
+      this._safariLastChunk = null;
+    }
     
     // Cleanup WebAudio nodes
     if (this.mediaStream) {
