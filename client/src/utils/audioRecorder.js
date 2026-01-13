@@ -12,27 +12,32 @@ export class WavRecorder {
   async start() {
     this.chunks = [];
     this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // Safari Fix: Ensure context is running before connecting nodes
     if (this.audioContext.state === 'suspended') {
       await this.audioContext.resume();
     }
     
     try {
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+            echoCancellation: true,
+            noiseSuppression: true
+        } 
+      });
     } catch (err) {
       console.error("Error accessing microphone:", err);
       throw err;
     }
 
     this.audioInput = this.audioContext.createMediaStreamSource(this.mediaStream);
-    
-    // Buffer size 4096 provides a good balance between latency and performance
     this.scriptProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
 
     this.scriptProcessor.onaudioprocess = (event) => {
       if (!this.recording) return;
       const inputBuffer = event.inputBuffer;
       const inputData = inputBuffer.getChannelData(0);
-      // Clone the data to avoid reference issues
+      // Clone the data immediately
       this.chunks.push(new Float32Array(inputData));
     };
 
@@ -43,33 +48,31 @@ export class WavRecorder {
   }
 
   stop() {
+    if (!this.recording) return;
     this.recording = false;
     
-    // Stop all tracks
     if (this.mediaStream) {
       this.mediaStream.getTracks().forEach(track => track.stop());
     }
     
-    // Disconnect nodes
     if (this.audioInput) this.audioInput.disconnect();
     if (this.scriptProcessor) this.scriptProcessor.disconnect();
     
-    // Process data
     if (this.chunks.length > 0 && this.audioContext) {
-      const blob = this.exportWAV(this.chunks);
+      // Pass the CURRENT sample rate to export
+      const blob = this.exportWAV(this.chunks, this.audioContext.sampleRate);
       if (this.onStop) {
         this.onStop(blob);
       }
     }
 
-    // Close context
     if (this.audioContext) {
       this.audioContext.close();
       this.audioContext = null;
     }
   }
 
-  exportWAV(chunks) {
+  exportWAV(chunks, sampleRate) {
     const bufferLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
     const buffer = new Float32Array(bufferLength);
     let offset = 0;
@@ -78,7 +81,6 @@ export class WavRecorder {
       offset += chunk.length;
     }
 
-    const sampleRate = this.audioContext.sampleRate;
     return this.encodeWAV(buffer, sampleRate);
   }
 
@@ -86,31 +88,18 @@ export class WavRecorder {
     const buffer = new ArrayBuffer(44 + samples.length * 2);
     const view = new DataView(buffer);
 
-    /* RIFF identifier */
     this.writeString(view, 0, 'RIFF');
-    /* RIFF chunk length */
     view.setUint32(4, 36 + samples.length * 2, true);
-    /* RIFF type */
     this.writeString(view, 8, 'WAVE');
-    /* format chunk identifier */
     this.writeString(view, 12, 'fmt ');
-    /* format chunk length */
     view.setUint32(16, 16, true);
-    /* sample format (raw) */
     view.setUint16(20, 1, true);
-    /* channel count */
     view.setUint16(22, 1, true);
-    /* sample rate */
     view.setUint32(24, sampleRate, true);
-    /* byte rate (sample rate * block align) */
     view.setUint32(28, sampleRate * 2, true);
-    /* block align (channel count * bytes per sample) */
     view.setUint16(32, 2, true);
-    /* bits per sample */
     view.setUint16(34, 16, true);
-    /* data chunk identifier */
     this.writeString(view, 36, 'data');
-    /* data chunk length */
     view.setUint32(40, samples.length * 2, true);
 
     this.floatTo16BitPCM(view, 44, samples);

@@ -14,8 +14,9 @@ export class Mp3Recorder {
 
   async start() {
     this.dataBuffer = [];
-    // Force 44.1kHz to ensure lamejs compatibility regardless of hardware native rate
-    this.audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+    
+    // FIX: Do not force sampleRate to 44100. Let Safari decide the native hardware rate (often 48000).
+    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
     
     if (this.audioContext.state === 'suspended') {
       await this.audioContext.resume();
@@ -26,7 +27,9 @@ export class Mp3Recorder {
         audio: {
           channelCount: 1,
           echoCancellation: true,
-          noiseSuppression: true
+          noiseSuppression: true,
+          // FIX: explicitly ask for high quality to prevent fallback codecs
+          sampleSize: 16 
         } 
       });
     } catch (err) {
@@ -34,13 +37,12 @@ export class Mp3Recorder {
       throw err;
     }
 
-    // Initialize encoder: 1 channel, context sample rate (44100), 128kbps
-    // We use context.sampleRate because WebAudio automatically resamples input to match context
-    this.encoder = new lamejs.Mp3Encoder(1, this.audioContext.sampleRate, 128);
-
     this.audioInput = this.audioContext.createMediaStreamSource(this.mediaStream);
     
-    // Buffer size 4096 (standard for script processor)
+    // FIX: Initialize encoder with the ACTUAL context sample rate
+    const sampleRate = this.audioContext.sampleRate;
+    this.encoder = new lamejs.Mp3Encoder(1, sampleRate, 128);
+
     this.scriptProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
 
     this.scriptProcessor.onaudioprocess = (event) => {
@@ -68,10 +70,12 @@ export class Mp3Recorder {
     if (!this.recording) return;
     this.recording = false;
     
-    // Cleanup WebAudio nodes
+    // Stop all tracks
     if (this.mediaStream) {
       this.mediaStream.getTracks().forEach(track => track.stop());
     }
+    
+    // Disconnect nodes
     if (this.audioInput) this.audioInput.disconnect();
     if (this.scriptProcessor) this.scriptProcessor.disconnect();
     
@@ -81,6 +85,7 @@ export class Mp3Recorder {
       if (mp3Data.length > 0) {
         this.dataBuffer.push(mp3Data);
       }
+      this.encoder = null;
     }
 
     // Create final blob
@@ -98,9 +103,8 @@ export class Mp3Recorder {
   }
 
   convertBuffer(arrayBuffer) {
-    const data = new Float32Array(arrayBuffer);
     const out = new Int16Array(arrayBuffer.length);
-    this.floatTo16BitPCM(data, out);
+    this.floatTo16BitPCM(arrayBuffer, out);
     return out;
   }
 
