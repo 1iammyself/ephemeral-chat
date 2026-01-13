@@ -102,11 +102,16 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
     };
 
     const handleLoadedMetadata = () => {
-      if (isFinite(audio.duration)) {
+      if (isFinite(audio.duration) && audio.duration > 0.1) {
         setDuration(audio.duration);
       } else {
-        // Fix for WebM duration bugs (only apply for WebM)
-        if (mimeTypeRef.current && !mimeTypeRef.current.includes('webm')) return;
+        // Fix for duration bugs in WebM and MP4/M4A (Safari)
+        const needsDurationFix = mimeTypeRef.current && (
+          mimeTypeRef.current.includes('webm') ||
+          mimeTypeRef.current.includes('mp4') ||
+          mimeTypeRef.current.includes('m4a')
+        );
+        if (!needsDurationFix) return;
 
         setDuration(0);
         audio.currentTime = 1e101; // Seek to end to force duration calculation

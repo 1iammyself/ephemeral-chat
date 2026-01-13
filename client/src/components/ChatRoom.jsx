@@ -354,9 +354,27 @@ const ChatRoom = () => {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
-      const mimeType = isIOS ? 'audio/mp4' : 'audio/webm;codecs=opus';
-      mediaRecorderRef.current = new MediaRecorder(stream, { mimeType });
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      let mimeType = '';
+      // Robust MIME type selection
+      if (isSafari) {
+        if (MediaRecorder.isTypeSupported('audio/wav')) {
+          mimeType = 'audio/wav';
+        } else if (MediaRecorder.isTypeSupported('audio/mp3')) {
+          mimeType = 'audio/mp3';
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          mimeType = 'audio/mp4';
+        }
+      } else {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          mimeType = 'audio/webm;codecs=opus';
+        } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+          mimeType = 'audio/webm';
+        } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+          mimeType = 'audio/ogg';
+        }
+      }
+      mediaRecorderRef.current = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       audioChunksRef.current = [];
       mediaRecorderRef.current.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       mediaRecorderRef.current.start();
@@ -377,7 +395,19 @@ const ChatRoom = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorderRef.current.mimeType });
-        if (audioBlob.size > 0) sendAudioMessage(audioBlob);
+        // Check for empty or truncated blob
+        if (audioBlob.size === 0) {
+          setError('Recorded audio is empty. Please try again.');
+          mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+          return;
+        }
+        // Warn if blob is suspiciously small (<1KB)
+        if (audioBlob.size < 1024) {
+          setError('Audio recording may be too short or truncated.');
+          mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+          return;
+        }
+        sendAudioMessage(audioBlob);
         mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
       };
       mediaRecorderRef.current.stop();
