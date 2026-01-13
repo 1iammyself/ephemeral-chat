@@ -12,7 +12,7 @@
     "server": "node server/index.js",
     "simple": "node server/simple-server.js",
     "client": "cd client && npm run dev",
-    "build": "cd client && npm run build",
+  "build": "cd client && npm install && npm run build",
     "start": "node server/index.js",
     "test": "echo \"No tests specified\" && exit 0"
   },
