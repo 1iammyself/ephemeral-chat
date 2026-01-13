@@ -645,8 +645,8 @@ class RoomManager {
     let baseUrl;
 
     if (process.env.NODE_ENV === 'production') {
-      // In production, prefer BASE_URL, fallback to Render's external hostname
-      baseUrl = process.env.BASE_URL ||
+  // In production, prefer BASE_URL (chat.kyere.me), fallback to Render only if Koyeb is down
+  baseUrl = process.env.BASE_URL ||
         (process.env.RENDER_EXTERNAL_HOSTNAME ? `https://${process.env.RENDER_EXTERNAL_HOSTNAME}` : null);
     } else {
       // In development, use localhost

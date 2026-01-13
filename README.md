@@ -1,3 +1,71 @@
+## Secure Credential Setup
+
+All sensitive credentials (ExpressTURN, Agora, Metered) are now loaded from environment variables using a `.env` file in the `client/` directory. Never commit your real `.env` to version control.
+
+1. Copy `client/.env.example` to `client/.env` and fill in your real credentials:
+
+   ```bash
+   cp client/.env.example client/.env
+   # Edit client/.env and set your real TURN and Agora credentials
+   ```
+
+2. The app will automatically use these variables at runtime. For production, set these as environment variables in your deployment environment.
+
+3. **Do not hardcode credentials in source files.**
+
+### Example .env
+
+```
+VITE_EXPRESS_TURN_USER=your_expressturn_user
+VITE_EXPRESS_TURN_PASS=your_expressturn_pass
+VITE_AGORA_APP_ID=your_agora_app_id
+VITE_AGORA_TOKEN=your_agora_token
+VITE_AGORA_UID=your_agora_uid
+VITE_METERED_USER=your_metered_user
+VITE_METERED_PASS=your_metered_pass
+```
+
+**Note:** The app will fall back to demo credentials if environment variables are not set, but you should always use your own for production.
+# Hybrid Call Routing: State Machine Architecture
+
+This project uses a sophisticated hybrid architecture for call routing:
+
+1. **Primary Mode (P2P):** Uses WebRTC with Google STUN and ExpressTURN. Metered TURN is present but only as a redundant backup.
+2. **Fallback Mode (Agora):** Uses Agora SDK for ultra-reliable, server-based calls when P2P fails or for group/poor network scenarios.
+
+## ICE Server Configuration
+
+The ICE server array is prioritized as follows:
+
+```
+[
+   { urls: "stun:stun.l.google.com:19302" },
+   { urls: "turn:free.expressturn.com:3478?transport=udp", username: "efPU52K4SLOQ34W2QY", credential: "1TJPNFxHKXrZfelz" },
+   { urls: "turn:free.expressturn.com:3478?transport=tcp", username: "efPU52K4SLOQ34W2QY", credential: "1TJPNFxHKXrZfelz" },
+   { urls: "turn:relay.metered.ca:80", username: "YOUR_METERED_USER", credential: "YOUR_METERED_PASS" }
+]
+```
+
+## State Machine Logic
+
+- **1-on-1 calls:** Use P2P (WebRTC) unless connection fails or is blocked, then switch to Agora.
+- **Group calls (>3 participants):** Use Agora from the start.
+- **Poor network (packet loss > 5%):** Auto-switch to Agora.
+- **Metered TURN:** Only used if all other ICE servers fail.
+
+## Credentials
+
+ExpressTURN and Agora credentials are stored securely and accessed at runtime. See `client/src/utils/credentials.js` for details.
+
+## Developer Checklist
+
+- Update ICE server config as above.
+- Remove all Metered logic except for ICE config.
+- Implement participant count check before call.
+- Add ICE connection state watcher.
+- Add network quality monitor (packet loss).
+- Implement `switchToAgora()` handover function.
+- Document the state machine and failover logic.
 
 ## 🎥 Demo Video
 
@@ -27,7 +95,7 @@ Here’s a sneak peek at the app interface:
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/cLLeB/ephemeral-chat/issues)
-  [![Live Demo](https://img.shields.io/badge/🌐-Live_Demo-2ea44f)](https://ephemeral-chat-7j66.onrender.com/)
+   [![Live Demo](https://img.shields.io/badge/🌐-Live_Demo-2ea44f)](https://chat.kyere.me/)
 
   <p>A secure, anonymous, and ephemeral chat application with self-destructing messages. Installable as a Progressive Web App (PWA) for native-like experience.</p>
    <p>A secure, anonymous, and ephemeral chat application with self-destructing messages. Installable as a Progressive Web App (PWA) for native-like experience. <strong>Can also be distributed as a Trusted Web Activity (TWA) for Android via the Play Store.</strong></p>
@@ -191,7 +259,7 @@ Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
 ## 📞 Contact
 
 - **Project Link**: [https://github.com/cLLeB/ephemeral-chat](https://github.com/cLLeB/ephemeral-chat)
-- **Live Demo**: [https://ephemeral-chat-7j66.onrender.com/](https://ephemeral-chat-7j66.onrender.com/)
+- **Live Demo**: [https://chat.kyere.me/](https://chat.kyere.me/)
 - **Email**: kyereboatengcaleb@gmail.com
 
 ## 🙏 Acknowledgments
@@ -317,7 +385,7 @@ The application is currently deployed on **Render**:
 
 - **Frontend**: Static site deployment
 - **Backend**: Web service
-- **URL**: https://ephemeral-chat-7j66.onrender.com/
+- **URL**: https://chat.kyere.me/
 
 ### Deployment Configuration
 The deployment uses the `render.yaml` configuration for automatic builds and deployments.

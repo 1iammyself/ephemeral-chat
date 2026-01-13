@@ -84,7 +84,7 @@ const isRender = process.env.RENDER === 'true';
 // Allowed origins can be provided as a comma-separated list via env
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : ['https://ephemeral-chat-7j66.onrender.com'];
+  : ['https://chat.kyere.me'];
 
 // Configure CORS options
 const getCorsOptions = () => {
@@ -106,7 +106,8 @@ const getCorsOptions = () => {
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('onrender.com')) {
+  // Allow fallback to Render only if Koyeb is down
+  if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('chat.kyere.me') || origin.includes('onrender.com')) {
         return callback(null, true);
       }
 
@@ -137,7 +138,8 @@ const io = socketIo(server, {
       // In production, check against the environment-configured allowedOrigins
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('onrender.com')) {
+  // Allow fallback to Render only if Koyeb is down
+  if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('chat.kyere.me') || origin.includes('onrender.com')) {
         return callback(null, true);
       }
 
