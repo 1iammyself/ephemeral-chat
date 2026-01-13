@@ -193,7 +193,7 @@ export function sanitizeInput(input) {
   
   return input
     .replace(/[<>]/g, '') // Remove < and >
-    .replace(/javascript:/gi, '') // Remove javascript: protocol
+    .replace(/\b(?:javascript|data|vbscript):/gi, '') // Remove potentially dangerous URL protocols
     .replace(/on\w+=/gi, '') // Remove event handlers
     .trim()
     .substring(0, 500); // Limit length
