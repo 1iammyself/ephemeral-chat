@@ -182,6 +182,21 @@ public class UrlNavigation {
                 (host.equals(initialHost) || host.endsWith("." + initialHost));
     }
 
+    /**
+     * Determine whether the resolved external activity is trusted to be started from
+     * user-controlled data (for example, URLs or incoming intents).
+     *
+     * Currently this only allows activities that belong to this application package.
+     * This prevents the app from being used as a generic trampoline to arbitrary
+     * exported components in other applications.
+     */
+    private boolean isTrustedExternalActivity(@NonNull String packageName, @NonNull String className) {
+        // Allow only activities in this app's own package.
+        // Additional trusted packages or specific classes can be added here if needed.
+        String ownPackage = mainActivity.getPackageName();
+        return ownPackage.equals(packageName);
+    }
+
     public boolean shouldOverrideUrlLoading(GoNativeWebviewInterface view, String url) {
         return shouldOverrideUrlLoading(view, url, false, false);
     }
@@ -279,7 +294,9 @@ public class UrlNavigation {
                             // Resolve the activity to ensure the target is exported and valid
                             android.content.pm.PackageManager pm = mainActivity.getPackageManager();
                             android.content.pm.ResolveInfo resolveInfo = pm.resolveActivity(intent, 0);
-                            if (resolveInfo != null && resolveInfo.activityInfo != null && resolveInfo.activityInfo.exported) {
+                            if (resolveInfo != null && resolveInfo.activityInfo != null && resolveInfo.activityInfo.exported
+                                    && isTrustedExternalActivity(resolveInfo.activityInfo.packageName,
+                                    resolveInfo.activityInfo.name)) {
                                 // Use the resolved component to avoid trusting user-specified component extras
                                 ComponentName resolvedComponent = new ComponentName(
                                         resolveInfo.activityInfo.packageName,
@@ -290,7 +307,7 @@ public class UrlNavigation {
                                 safeIntent.addCategory(Intent.CATEGORY_BROWSABLE);
                                 mainActivity.startActivity(safeIntent);
                             } else {
-                                // Unsafe or unresolvable intent target; try fallback URL if available
+                                // Unsafe, untrusted, or unresolvable intent target; try fallback URL if available
                                 String fallbackUrl = intent.getStringExtra("browser_fallback_url");
                                 if (!TextUtils.isEmpty(fallbackUrl)) {
                                     mainActivity.loadUrl(fallbackUrl);
