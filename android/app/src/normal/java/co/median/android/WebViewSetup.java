@@ -2,6 +2,7 @@ package co.median.android;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
 import android.os.Message;
 import android.text.TextUtils;
 import android.webkit.CookieManager;
@@ -144,9 +145,7 @@ public class WebViewSetup {
     public static void setupWebviewGlobals(Context context) {
         // WebView debugging
         if(!AppConfig.getInstance(context).geckoViewEnabled) {
-            Map<String,Object> installation = Installation.getInfo(context);
-            String dist = (String)installation.get("distribution");
-            if (dist != null && (dist.equals("debug") || dist.equals("adhoc"))) {
+            if ((context.getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
                 WebView.setWebContentsDebuggingEnabled(true);
             }
         }

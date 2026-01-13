@@ -2,6 +2,8 @@
  * Utility functions for the Ephemeral Chat application
  */
 
+const sanitizeHtml = require('sanitize-html');
+
 /**
  * Generate a unique 6-character room code
  * @returns {string} 6-character alphanumeric code
@@ -45,10 +47,12 @@ function generateRandomNickname() {
 function sanitizeInput(input) {
   if (typeof input !== 'string') return '';
 
-  return input
-    .replace(/[<>]/g, '') // Remove < and > characters
-    .replace(/javascript:/gi, '') // Remove javascript: protocol
-    .replace(/on\w+=/gi, '') // Remove event handlers
+  const sanitized = sanitizeHtml(input, {
+    allowedTags: [],
+    allowedAttributes: {}
+  });
+
+  return sanitized
     .trim()
     .substring(0, 500); // Limit length
 }

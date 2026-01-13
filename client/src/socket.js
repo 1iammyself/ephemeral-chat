@@ -4,6 +4,24 @@
 
 import { io } from 'socket.io-client';
 
+const isAllowedHostname = (hostname) => {
+  if (!hostname) {
+    return false;
+  }
+
+  // Allow the primary production host
+  if (hostname === 'chat.kyere.me') {
+    return true;
+  }
+
+  // Allow Render-hosted environments: onrender.com and its subdomains
+  if (hostname === 'onrender.com' || hostname.endsWith('.onrender.com')) {
+    return true;
+  }
+
+  return false;
+};
+
 // Get the current hostname and protocol
 const getServerUrl = () => {
   // Use VITE_API_URL if explicitly set
@@ -16,7 +34,7 @@ const getServerUrl = () => {
     const { protocol, hostname, port } = window.location;
     
     // For production environments on Render
-  if (hostname.includes('chat.kyere.me') || hostname.includes('onrender.com')) {
+    if (isAllowedHostname(hostname)) {
       return `${protocol}//${hostname}`;
     }
     

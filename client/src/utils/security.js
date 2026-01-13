@@ -190,11 +190,20 @@ export function validatePasswordStrength(password) {
  */
 export function sanitizeInput(input) {
   if (typeof input !== 'string') return '';
-  
-  return input
-    .replace(/[<>]/g, '') // Remove < and >
-    .replace(/javascript:/gi, '') // Remove javascript: protocol
-    .replace(/on\w+=/gi, '') // Remove event handlers
+
+  let sanitized = input;
+  let previous;
+
+  // Repeatedly remove dangerous patterns until the string stabilizes
+  do {
+    previous = sanitized;
+    sanitized = sanitized
+      .replace(/[<>]/g, '') // Remove < and >
+      .replace(/\b(?:javascript|data|vbscript):/gi, '') // Remove potentially dangerous URL protocols
+      .replace(/on\w+=/gi, ''); // Remove event handlers
+  } while (sanitized !== previous);
+
+  return sanitized
     .trim()
     .substring(0, 500); // Limit length
 }

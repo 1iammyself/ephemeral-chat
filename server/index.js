@@ -15,6 +15,7 @@ const RoomManager = require('./rooms');
 const SecurityManager = require('./security');
 const authUtils = require('./auth-utils');
 const Cap = require('@cap.js/server');
+const RateLimit = require('express-rate-limit');
 const {
   generateRandomNickname,
   sanitizeInput,
@@ -105,12 +106,19 @@ const getCorsOptions = () => {
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
-
-  // Allow fallback to Render only if Koyeb is down
-  if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('chat.kyere.me') || origin.includes('onrender.com')) {
-        return callback(null, true);
+      try {
+        const parsed = new URL(origin);
+        const hostname = parsed.hostname;
+        const isExplicitlyAllowed = allowedOrigins.indexOf(origin) !== -1;
+        const isKoyeb = hostname === 'chat.kyere.me';
+        const isRenderHost = hostname === 'onrender.com' || hostname.endsWith('.onrender.com');
+        if (isExplicitlyAllowed || isKoyeb || isRenderHost) {
+          return callback(null, true);
+        }
+      } catch (e) {
+        // If the origin is not a valid URL, reject it
+        return callback(new Error('Not allowed by CORS'));
       }
-
       callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
@@ -138,23 +146,30 @@ const io = socketIo(server, {
       // In production, check against the environment-configured allowedOrigins
       if (!origin) return callback(null, true);
 
-  // Allow fallback to Render only if Koyeb is down
-  if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('chat.kyere.me') || origin.includes('onrender.com')) {
-        return callback(null, true);
+  cors: {
+    origin: (origin, callback) => {
+      // Allow all in development
+      if (!isProduction) return callback(null, true);
+      // In production, check against the environment-configured allowedOrigins
+      if (!origin) return callback(null, true);
+      try {
+        const url = new URL(origin);
+        const hostname = url.hostname;
+        const isExplicitlyAllowed = allowedOrigins.indexOf(origin) !== -1;
+        const isKoyeb = hostname === 'chat.kyere.me';
+        const isRenderHost = hostname === 'onrender.com' || hostname.endsWith('.onrender.com');
+        if (isExplicitlyAllowed || isKoyeb || isRenderHost) {
+          return callback(null, true);
+        }
+      } catch (e) {
+        // If origin is not a valid URL, reject it
+        return callback(new Error('Not allowed by CORS'));
       }
-
-      callback(new Error('Not allowed by CORS'));
+  maxHttpBufferSize: 1e7, // 10MB to accommodate large audio/image strings
     },
     methods: ['GET', 'POST'],
     credentials: true
   },
-  transports: ['websocket', 'polling'],
-  allowUpgrades: true,
-  maxHttpBufferSize: 1e7, // 10MB to accommodate large audio/image strings
-  pingTimeout: 60000, // 60 seconds
-  pingInterval: 25000, // 25 seconds
-  cookie: false,
-  serveClient: false,
   allowEIO3: true, // Enable Socket.IO v3 compatibility
   perMessageDeflate: false // Disable to prevent Base64 corruption
 });
@@ -525,6 +540,16 @@ io.on('connection', (socket) => {
 
   // Knock-to-Join Logic
   socket.on('knock', ({ roomCode, nickname, password, inviteToken, capToken }) => {
+    // Reject clearly unsafe room codes that could lead to prototype pollution
+    if (
+      typeof roomCode !== 'string' ||
+      roomCode === '__proto__' ||
+      roomCode === 'constructor' ||
+      roomCode === 'prototype'
+    ) {
+      return socket.emit('knock-denied', { reason: 'Invalid room code' });
+    }
+
     // 1. Check if room exists in our metadata
     let room = roomData[roomCode];
 
@@ -1081,7 +1106,12 @@ io.on('connection', (socket) => {
 });
 
 // Catch-all route to serve index.html for client-side routing
-app.get('*', (req, res) => {
+const indexLimiter = RateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+});
+
+app.get('*', indexLimiter, (req, res) => {
   if (process.env.NODE_ENV === 'production') {
     res.sendFile(path.join(__dirname, '../client/dist/index.html'));
   } else {
