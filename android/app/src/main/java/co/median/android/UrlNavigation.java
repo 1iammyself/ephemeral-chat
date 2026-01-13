@@ -312,24 +312,32 @@ public class UrlNavigation {
                                         resolveInfo.activityInfo.packageName,
                                         resolveInfo.activityInfo.name
                                 );
-                                Intent safeIntent = new Intent(intent);
-
-                                // Constrain action and categories to safe values for external "intent:" URLs.
-                                // Default to VIEW if no action is set.
-                                if (safeIntent.getAction() == null) {
-                                    safeIntent.setAction(Intent.ACTION_VIEW);
-                                }
+                                // 1. Create a FRESH, empty Intent instead of copying the untrusted one
+                                Intent safeIntent = new Intent();
+                                // 2. ONLY allow VIEW action
+                                safeIntent.setAction(Intent.ACTION_VIEW);
+                                // 3. SET the component explicitly (using the 'resolvedComponent' you already validated)
                                 safeIntent.setComponent(resolvedComponent);
-
-                                // Strip any URI permission or persistable flags that could escalate privileges.
-                                int flags = safeIntent.getFlags();
+                                // 4. LOCK the package to your own app
+                                safeIntent.setPackage(mainActivity.getPackageName());
+                                // 5. SANITIZE the data: Only allow specific web/store schemes
+                                Uri originalData = intent.getData();
+                                if (originalData != null) {
+                                    String scheme = originalData.getScheme();
+                                    if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme) || "market".equalsIgnoreCase(scheme)) {
+                                        safeIntent.setData(originalData);
+                                    }
+                                }
+                                // 6. STRIP all dangerous flags
+                                int flags = intent.getFlags();
                                 flags &= ~Intent.FLAG_GRANT_READ_URI_PERMISSION;
                                 flags &= ~Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
                                 flags &= ~Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION;
                                 flags &= ~Intent.FLAG_GRANT_PREFIX_URI_PERMISSION;
                                 safeIntent.setFlags(flags);
-
+                                // 7. CLEAR all categories and add ONLY Browsable
                                 safeIntent.addCategory(Intent.CATEGORY_BROWSABLE);
+                                // 8. Launch the now "Sealed" Intent
                                 mainActivity.startActivity(safeIntent);
                             } else {
                                 // Unsafe, untrusted, or unresolvable intent target; try fallback URL if available
@@ -546,15 +554,17 @@ public class UrlNavigation {
         } catch (Exception e) {
             // Conservatively treat resolution failures as unsafe
             GNLog.getInstance().logError(TAG, "Failed to resolve intent for safety check", e);
-        // Additionally, restrict to safe actions when launching from external URLs.
-        String action = intent.getAction();
-        if (action != null && !Intent.ACTION_VIEW.equals(action)) {
             return false;
         }
 
+        // Additionally, restrict to safe actions when launching from external URLs.
+        String action = intent.getAction();
+        if (action != null && !Intent.ACTION_VIEW.equals(action)) {
+            return false; // If the action isn't VIEW, it's unsafe.
         }
 
-        return false;
+        // If it survived all the checks above (package name, class name, action type)...
+        return true; // Then it IS safe!
     }
 
     public boolean shouldOverrideUrlLoading(final GoNativeWebviewInterface view, String url,
