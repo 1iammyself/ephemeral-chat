@@ -16,7 +16,7 @@ const getServerUrl = () => {
     const { protocol, hostname, port } = window.location;
     
     // For production environments on Render
-    if (hostname.includes('onrender.com')) {
+  if (hostname.includes('chat.kyere.me') || hostname.includes('onrender.com')) {
       return `${protocol}//${hostname}`;
     }
     

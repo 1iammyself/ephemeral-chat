@@ -8,11 +8,11 @@ export default defineConfig(({ mode }) => {
   
   // Determine base URL based on environment
   const isProd = mode === 'production';
-  let baseUrl = process.env.VITE_BASE_URL || '/';
+  let baseUrl = process.env.VITE_BASE_URL || 'https://chat.kyere.me';
   
   // For production on Render
   if (isProd && process.env.RENDER) {
-    baseUrl = 'https://ephemeral-chat-7j66.onrender.com';
+  baseUrl = 'https://chat.kyere.me'; // fallback to Render only if Koyeb is down
   }
 
   return {
