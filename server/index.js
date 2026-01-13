@@ -127,7 +127,7 @@ const io = socketIo(server, {
   maxHttpBufferSize: 1e7 // 10MB to accommodate large audio/image strings
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 8000;
 
 // Apply JSON middleware
 app.use(express.json());
