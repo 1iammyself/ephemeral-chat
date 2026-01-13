@@ -79,99 +79,52 @@ app.use((req, res, next) => {
 });
 
 // Detect environment
-const isProduction = process.env.NODE_ENV === 'production';
-const isRender = process.env.RENDER === 'true';
 
-// Allowed origins can be provided as a comma-separated list via env
+// Always use a whitelist for CORS, even in development
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : ['https://chat.kyere.me'];
+  : [];
 
-// Configure CORS options
-const getCorsOptions = () => {
-  // Allow all origins in development
-  if (!isProduction) {
-    return {
-      origin: true, // Reflect the request origin
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-      exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
-      maxAge: 86400 // 24 hours
-    };
-  }
-
-  // In production, use the environment-configured allowedOrigins array
-  return {
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-      try {
-        const parsed = new URL(origin);
-        const hostname = parsed.hostname;
-        const isExplicitlyAllowed = allowedOrigins.indexOf(origin) !== -1;
-        const isKoyeb = hostname === 'chat.kyere.me';
-        const isRenderHost = hostname === 'onrender.com' || hostname.endsWith('.onrender.com');
-        if (isExplicitlyAllowed || isKoyeb || isRenderHost) {
-          return callback(null, true);
-        }
-      } catch (e) {
-        // If the origin is not a valid URL, reject it
-        return callback(new Error('Not allowed by CORS'));
-      }
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
       callback(new Error('Not allowed by CORS'));
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
-    maxAge: 86400 // 24 hours
-  };
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
+  maxAge: 86400 // 24 hours
 };
 
-// Get CORS options
-const corsOptions = getCorsOptions();
-
-// Apply CORS middleware to Express
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
 // Configure WebSocket with CORS and additional settings
 const io = socketIo(server, {
   cors: {
-    origin: (origin, callback) => {
-      // Allow all in development
-      if (!isProduction) return callback(null, true);
-
-      // In production, check against the environment-configured allowedOrigins
+    origin: function (origin, callback) {
       if (!origin) return callback(null, true);
-
-  cors: {
-    origin: (origin, callback) => {
-      // Allow all in development
-      if (!isProduction) return callback(null, true);
-      // In production, check against the environment-configured allowedOrigins
-      if (!origin) return callback(null, true);
-      try {
-        const url = new URL(origin);
-        const hostname = url.hostname;
-        const isExplicitlyAllowed = allowedOrigins.indexOf(origin) !== -1;
-        const isKoyeb = hostname === 'chat.kyere.me';
-        const isRenderHost = hostname === 'onrender.com' || hostname.endsWith('.onrender.com');
-        if (isExplicitlyAllowed || isKoyeb || isRenderHost) {
-          return callback(null, true);
-        }
-      } catch (e) {
-        // If origin is not a valid URL, reject it
-        return callback(new Error('Not allowed by CORS'));
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
       }
-  maxHttpBufferSize: 1e7, // 10MB to accommodate large audio/image strings
     },
+    credentials: true,
     methods: ['GET', 'POST'],
-    credentials: true
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
+    maxAge: 86400 // 24 hours
   },
   allowEIO3: true, // Enable Socket.IO v3 compatibility
-  perMessageDeflate: false // Disable to prevent Base64 corruption
+  perMessageDeflate: false, // Disable to prevent Base64 corruption
+  maxHttpBufferSize: 1e7 // 10MB to accommodate large audio/image strings
 });
 
 const PORT = process.env.PORT || 3001;
