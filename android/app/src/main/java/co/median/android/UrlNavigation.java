@@ -275,11 +275,36 @@ public class UrlNavigation {
                 try {
                     if ("intent".equals(uri.getScheme())) {
                         intent = Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME);
-                        if (isSafeIntent(intent)) {
-                            mainActivity.startActivity(intent);
+                        if (intent != null && isSafeIntent(intent)) {
+                            // Resolve the activity to ensure the target is exported and valid
+                            android.content.pm.PackageManager pm = mainActivity.getPackageManager();
+                            android.content.pm.ResolveInfo resolveInfo = pm.resolveActivity(intent, 0);
+                            if (resolveInfo != null && resolveInfo.activityInfo != null && resolveInfo.activityInfo.exported) {
+                                // Use the resolved component to avoid trusting user-specified component extras
+                                ComponentName resolvedComponent = new ComponentName(
+                                        resolveInfo.activityInfo.packageName,
+                                        resolveInfo.activityInfo.name
+                                );
+                                Intent safeIntent = new Intent(intent);
+                                safeIntent.setComponent(resolvedComponent);
+                                safeIntent.addCategory(Intent.CATEGORY_BROWSABLE);
+                                mainActivity.startActivity(safeIntent);
+                            } else {
+                                // Unsafe or unresolvable intent target; try fallback URL if available
+                                String fallbackUrl = intent.getStringExtra("browser_fallback_url");
+                                if (!TextUtils.isEmpty(fallbackUrl)) {
+                                    mainActivity.loadUrl(fallbackUrl);
+                                } else {
+                                    Toast.makeText(mainActivity, R.string.app_not_installed, Toast.LENGTH_LONG).show();
+                                    GNLog.getInstance().logError(TAG,
+                                            mainActivity.getString(R.string.app_not_installed),
+                                            null,
+                                            GNLog.TYPE_TOAST_ERROR);
+                                }
+                            }
                         } else {
                             // Unsafe intent target; try fallback URL if available
-                            String fallbackUrl = intent.getStringExtra("browser_fallback_url");
+                            String fallbackUrl = intent != null ? intent.getStringExtra("browser_fallback_url") : null;
                             if (!TextUtils.isEmpty(fallbackUrl)) {
                                 mainActivity.loadUrl(fallbackUrl);
                             } else {
