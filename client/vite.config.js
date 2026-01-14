@@ -6,14 +6,8 @@ export default defineConfig(({ mode }) => {
   // Load environment variables based on the current mode
   const env = loadEnv(mode, process.cwd(), '');
   
-  // Determine base URL based on environment
-  const isProd = mode === 'production';
+  // Determine base URL from environment variable or default to '/'
   let baseUrl = process.env.VITE_BASE_URL || '/';
-  
-  // For production on Render
-  if (isProd && process.env.RENDER) {
-    baseUrl = 'https://ephemeral-chat-7j66.onrender.com';
-  }
 
   return {
     plugins: [
