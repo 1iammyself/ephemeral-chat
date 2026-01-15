@@ -15,6 +15,7 @@ const RoomManager = require('./rooms');
 const SecurityManager = require('./security');
 const authUtils = require('./auth-utils');
 const Cap = require('@cap.js/server');
+const rateLimit = require('express-rate-limit');
 const {
   generateRandomNickname,
   sanitizeInput,
@@ -1090,7 +1091,14 @@ io.on('connection', (socket) => {
 });
 
 // Catch-all route to serve index.html for client-side routing
-app.get('*', (req, res) => {
+const staticRouteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // limit each IP to 1000 requests per 15 minutes for the catch-all route
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.get('*', staticRouteLimiter, (req, res) => {
   if (process.env.NODE_ENV === 'production') {
     res.sendFile(path.join(__dirname, '../client/dist/index.html'));
   } else {
