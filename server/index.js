@@ -92,47 +92,34 @@ const getCorsOptions = () => {
   // Allow all origins in development
   if (!isProduction) {
     return {
-      origin: true, // Reflect the request origin
+      origin: true,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-      exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
-      maxAge: 86400 // 24 hours
+      exposedHeaders: ['Content-Length'],
+      maxAge: 86400
     };
   }
 
-  // In production, use the environment-configured allowedOrigins array
+  // In production, strictly use the allowedOrigins array
   return {
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl requests)
+      // Allow requests with no origin (like mobile apps or curl)
       if (!origin) return callback(null, true);
 
-      // First, check exact allowed origins
+      // Check against allowed origins list
       if (allowedOrigins.indexOf(origin) !== -1) {
         return callback(null, true);
       }
 
-      // Then, allow only onrender.com and its subdomains
-      try {
-        const parsed = new URL(origin);
-        const hostname = parsed.hostname;
-        const isOnrenderHost =
-          hostname === 'onrender.com' || hostname.endsWith('.onrender.com');
-
-        if (isOnrenderHost) {
-          return callback(null, true);
-        }
-      } catch (e) {
-        // Invalid origin URL, fall through to error
-      }
-
+      // Deny everything else
       callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
-    maxAge: 86400 // 24 hours
+    exposedHeaders: ['Content-Length'],
+    maxAge: 86400
   };
 };
 
@@ -150,21 +137,11 @@ const io = socketIo(server, {
       // Allow all in development
       if (!isProduction) return callback(null, true);
 
-      // In production, check against the environment-configured allowedOrigins
+      // Allow no origin (server-to-server)
       if (!origin) return callback(null, true);
 
-      let isRenderOrigin = false;
-      try {
-        const parsed = new URL(origin);
-        const hostname = parsed.hostname;
-        isRenderOrigin =
-          hostname === 'onrender.com' ||
-          hostname.endsWith('.onrender.com');
-      } catch (e) {
-        isRenderOrigin = false;
-      }
-
-      if (allowedOrigins.indexOf(origin) !== -1 || isRenderOrigin) {
+      // Check against allowed origins list
+      if (allowedOrigins.indexOf(origin) !== -1) {
         return callback(null, true);
       }
 
@@ -173,7 +150,9 @@ const io = socketIo(server, {
     methods: ['GET', 'POST'],
     credentials: true
   },
+
   transports: ['websocket', 'polling'],
+
   allowUpgrades: true,
   maxHttpBufferSize: 1e7, // 10MB to accommodate large audio/image strings
   pingTimeout: 120000, // 120 seconds (increased for mobile users)
