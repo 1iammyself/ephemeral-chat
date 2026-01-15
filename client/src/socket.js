@@ -16,7 +16,8 @@ const getServerUrl = () => {
     const { protocol, hostname, port } = window.location;
     
     // For production environments on Render
-    if (hostname.includes('onrender.com')) {
+    const isRenderHost = hostname === 'onrender.com' || hostname.endsWith('.onrender.com');
+    if (isRenderHost) {
       return `${protocol}//${hostname}`;
     }
     
