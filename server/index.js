@@ -153,7 +153,18 @@ const io = socketIo(server, {
       // In production, check against the environment-configured allowedOrigins
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('onrender.com')) {
+      let isRenderOrigin = false;
+      try {
+        const parsed = new URL(origin);
+        const hostname = parsed.hostname;
+        isRenderOrigin =
+          hostname === 'onrender.com' ||
+          hostname.endsWith('.onrender.com');
+      } catch (e) {
+        isRenderOrigin = false;
+      }
+
+      if (allowedOrigins.indexOf(origin) !== -1 || isRenderOrigin) {
         return callback(null, true);
       }
 
