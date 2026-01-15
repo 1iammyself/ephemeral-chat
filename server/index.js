@@ -149,8 +149,8 @@ const io = socketIo(server, {
   transports: ['websocket', 'polling'],
   allowUpgrades: true,
   maxHttpBufferSize: 1e7, // 10MB to accommodate large audio/image strings
-  pingTimeout: 60000, // 60 seconds
-  pingInterval: 25000, // 25 seconds
+  pingTimeout: 120000, // 120 seconds (increased for mobile users)
+  pingInterval: 45000, // 45 seconds
   cookie: false,
   serveClient: false,
   allowEIO3: true, // Enable Socket.IO v3 compatibility
@@ -340,13 +340,13 @@ app.post('/api/rooms/:roomCode/invite', async (req, res) => {
     // Generate the invite link using the generateInviteLink method
     const invite = await roomManager.generateInviteLink(roomCode, {
       isPermanent: false,
-      expiryMs: 5 * 60 * 1000 // 5 minutes
+      expiryMs: 25 * 60 * 1000 // 25 minutes
     });
 
     res.json({
       success: true,
       inviteLink: invite.url,
-      expiresIn: '5 minutes'
+      expiresIn: '25 minutes'
     });
 
   } catch (error) {

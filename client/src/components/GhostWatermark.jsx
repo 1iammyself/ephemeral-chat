@@ -3,37 +3,45 @@ import React, { useState, useEffect, useRef } from 'react';
 /**
  * GhostWatermark Component
  * Implements a forensic, theme-agnostic, and tamper-proof watermark system.
+ * 
+ * Watermark format: hashed_username | timestamp
+ * - Username is normalized to lowercase and SHA-256 hashed
+ * - Timestamp is in plaintext
+ * - For verification: hash the suspected username and compare with watermark
  */
-const GhostWatermark = ({ userSessionInfo }) => {
-    const [traceId, setTraceId] = useState('');
-    const [timestamp] = useState(new Date().toISOString().split('T')[0]);
+const GhostWatermark = ({ nickname }) => {
+    const [hashedUsername, setHashedUsername] = useState('');
+    const [timestamp] = useState(new Date().toISOString().replace('T', ' ').substring(0, 19));
     const layerRef = useRef(null);
 
-    // Generate a SHA-256 Hash for the Trace ID
-    const generateTraceId = async (inputData) => {
+    // Generate a SHA-256 Hash for the username
+    const hashUsername = async (username) => {
         try {
+            // Ensure username is lowercase for consistent hashing
+            const normalizedUsername = (username || 'anonymous').toLowerCase();
             const encoder = new TextEncoder();
-            const data = encoder.encode(inputData);
+            const data = encoder.encode(normalizedUsername);
             const hashBuffer = await crypto.subtle.digest('SHA-256', data);
             const hashArray = Array.from(new Uint8Array(hashBuffer));
-            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 10).toUpperCase();
+            // Return first 12 characters of the hash in uppercase for readability
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 12).toUpperCase();
         } catch (err) {
-            console.error('Failed to generate trace ID:', err);
+            console.error('Failed to hash username:', err);
             return 'UNKNOWN';
         }
     };
 
     useEffect(() => {
         const init = async () => {
-            const id = await generateTraceId(userSessionInfo || 'ANONYMOUS_SESSION');
-            setTraceId(id);
+            const hash = await hashUsername(nickname);
+            setHashedUsername(hash);
         };
         init();
-    }, [userSessionInfo]);
+    }, [nickname]);
 
     useEffect(() => {
         // Only start observing once the watermark is actually rendered
-        if (!traceId || !layerRef.current) return;
+        if (!hashedUsername || !layerRef.current) return;
 
         const securityObserver = new MutationObserver((mutations) => {
             const layer = layerRef.current;
@@ -52,11 +60,12 @@ const GhostWatermark = ({ userSessionInfo }) => {
         securityObserver.observe(document.body, { childList: true, subtree: true, attributes: true });
 
         return () => securityObserver.disconnect();
-    }, [traceId]);
+    }, [hashedUsername]);
 
-    if (!traceId) return null;
+    if (!hashedUsername) return null;
 
-    const displayText = `TRACE: ${traceId} | ${timestamp}`;
+    // Format: hashed_username | timestamp
+    const displayText = `${hashedUsername} | ${timestamp}`;
 
     // Create 150 items to fill the oversized grid
     const items = Array.from({ length: 150 }).map((_, i) => (

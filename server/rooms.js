@@ -13,7 +13,7 @@ class RoomManager {
     this.rooms = new Map(); // In-memory fallback
     this.roomTimers = new Map(); // For room expiry timers
     this.ROOM_EXPIRY_MS = (process.env.ROOM_EXPIRY_MINUTES || 10) * 60 * 1000;
-    this.INVITE_TOKEN_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes expiry for invite tokens
+    this.INVITE_TOKEN_EXPIRY_MS = 25 * 60 * 1000; // 25 minutes expiry for invite tokens
     this.ROOM_DEFAULT_LIFETIME_MS = 2 * 60 * 60 * 1000; // 2 hours default room lifetime
     this.ROOM_DEFAULT_LIFETIME_MINUTES = 120; // 2 hours in minutes
 

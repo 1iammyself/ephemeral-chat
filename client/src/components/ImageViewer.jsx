@@ -145,11 +145,15 @@ const ImageViewer = ({ isOpen, onClose, imageUrl, duration = 20 }) => {
 
       {/* Image Content */}
       {isVisible && imageUrl && (
-        <div className="w-full h-full max-w-[90vw] max-h-[80vh] flex items-center justify-center">
+        <div
+          className="w-full h-full max-w-[90vw] max-h-[80vh] flex items-center justify-center"
+          onClick={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+          onMouseUp={(e) => e.stopPropagation()}
+        >
           {imageUrl.startsWith('msg_') ? (
             <ImageReveal
               viewToken={revealData.viewToken}
-              watermarkSeed={revealData.watermarkSeed}
             />
           ) : (
             <img

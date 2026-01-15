@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { X, Settings, Clock, Lock, Copy, Check, Users, Shield } from 'lucide-react';
+import { X, Settings, Clock, Lock, Copy, Check, Users, Shield, Share2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import '@cap.js/widget';
 import { generateRoomKey } from '../utils/security';
@@ -142,6 +142,32 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
     }, 2000);
   };
 
+  const handleShare = async () => {
+    if (!inviteLink) return;
+
+    const shareData = {
+      title: 'Join my Ephemeral Chat',
+      text: 'Join my private, secure chat room',
+      url: inviteLink
+    };
+
+    // Check if Web Share API is available (mainly mobile browsers)
+    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        // User cancelled or share failed - fallback to copy
+        if (err.name !== 'AbortError') {
+          copyToClipboard(inviteLink, 'inviteLink');
+        }
+      }
+    } else {
+      // Fallback: copy to clipboard on desktop
+      copyToClipboard(inviteLink, 'inviteLink');
+      alert('Link copied to clipboard! Paste it to share.');
+    }
+  };
+
   const handleJoinRoom = () => {
     if (createdRoom) {
       if (roomKey) window.location.hash = roomKey;
@@ -204,21 +230,30 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
               )}
 
               <div className="pt-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Invite Link (Expires in 5 min)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Invite Link (Expires in 25 min)</label>
                 <div className="flex items-center">
                   <input
                     type="text"
                     readOnly
                     value={inviteLink || 'Generating...'}
-                     data-allow-copy="true"
-                     className="flex-1 p-2 border rounded-l-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm truncate"
+                    data-allow-copy="true"
+                    className="flex-1 p-2 border rounded-l-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm truncate"
                   />
                   <button
                     onClick={() => inviteLink && copyToClipboard(inviteLink, 'inviteLink')}
                     disabled={!inviteLink}
-                    className={`p-2 rounded-r-md transition-colors ${inviteLink ? 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700' : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'}`}
+                    className={`p-2 transition-colors ${inviteLink ? 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700' : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'}`}
+                    title="Copy link"
                   >
                     {isCopied.inviteLink ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+                  </button>
+                  <button
+                    onClick={handleShare}
+                    disabled={!inviteLink}
+                    className={`p-2 rounded-r-md transition-colors ${inviteLink ? 'bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700' : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'}`}
+                    title="Share link"
+                  >
+                    <Share2 className="w-5 h-5" />
                   </button>
                 </div>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Share this link with others to join easily</p>

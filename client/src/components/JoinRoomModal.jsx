@@ -150,9 +150,10 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
 
     setIsJoining(true);
 
-    // Prepare join data
+    // Prepare join data - normalize nickname to lowercase for consistent watermark hashing
+    const normalizedNickname = nickname.trim().toLowerCase();
     const joinData = {
-      nickname: nickname.trim(),
+      nickname: normalizedNickname,
       password: password.trim(),
       capToken: capToken
     };
