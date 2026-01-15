@@ -523,6 +523,17 @@ io.on('connection', (socket) => {
 
   // Knock-to-Join Logic
   socket.on('knock', ({ roomCode, nickname, password, inviteToken, capToken }) => {
+    // Prevent prototype pollution via malicious room codes
+    if (
+      typeof roomCode !== 'string' ||
+      roomCode === '__proto__' ||
+      roomCode === 'constructor' ||
+      roomCode === 'prototype'
+    ) {
+      socket.emit('knock-denied', { reason: 'Invalid room code' });
+      return;
+    }
+
     // 1. Check if room exists in our metadata
     let room = roomData[roomCode];
 
