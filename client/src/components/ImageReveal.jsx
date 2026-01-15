@@ -5,9 +5,9 @@ import { ShieldAlert } from 'lucide-react';
 /**
  * ImageReveal Component
  * Securely renders an image on a canvas only while the user is pressing.
- * Includes a dynamic watermark.
+ * Watermark is handled by the global GhostWatermark component for consistency.
  */
-const ImageReveal = ({ viewToken, watermarkSeed }) => {
+const ImageReveal = ({ viewToken }) => {
     const canvasRef = useRef(null);
     const [revealActive, setRevealActive] = useState(false);
     const [imageBitmap, setImageBitmap] = useState(null);
@@ -23,7 +23,7 @@ const ImageReveal = ({ viewToken, watermarkSeed }) => {
         }
     }, []);
 
-    const drawImageWithWatermark = useCallback((bitmap, seed) => {
+    const drawImage = useCallback((bitmap) => {
         const canvas = canvasRef.current;
         if (!canvas || !bitmap) return;
 
@@ -51,23 +51,8 @@ const ImageReveal = ({ viewToken, watermarkSeed }) => {
         }
 
         ctx.drawImage(bitmap, x, y, drawWidth, drawHeight);
-
-        // Draw Watermark
-        const watermarkText = seed.substring(0, 12).toUpperCase(); // Simplified hash for display
-        ctx.save();
-        ctx.globalAlpha = 0.05; // 5% opacity
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 20px Inter, sans-serif';
-        ctx.translate(width / 2, height / 2);
-        ctx.rotate(-Math.PI / 4);
-
-        // Draw repeated diagonal text
-        for (let i = -10; i < 10; i++) {
-            for (let j = -10; j < 10; j++) {
-                ctx.fillText(watermarkText, i * 150, j * 50);
-            }
-        }
-        ctx.restore();
+        // Note: Watermark is now handled by the global GhostWatermark component
+        // which displays consistently across the entire app including image view
     }, []);
 
     const startReveal = useCallback(async (e) => {
@@ -92,7 +77,7 @@ const ImageReveal = ({ viewToken, watermarkSeed }) => {
 
             // Use requestAnimationFrame for timing guarantee
             requestAnimationFrame(() => {
-                drawImageWithWatermark(bitmap, watermarkSeed);
+                drawImage(bitmap);
             });
         } catch (err) {
             console.error('Reveal error:', err);
@@ -100,7 +85,7 @@ const ImageReveal = ({ viewToken, watermarkSeed }) => {
         } finally {
             setIsLoading(false);
         }
-    }, [viewToken, watermarkSeed, revealActive, isLoading, drawImageWithWatermark]);
+    }, [viewToken, revealActive, isLoading, drawImage]);
 
     const stopReveal = useCallback((e) => {
         if (e) e.stopPropagation();

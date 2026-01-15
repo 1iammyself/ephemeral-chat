@@ -557,7 +557,7 @@ const ChatRoom = () => {
       <PrivacyOverlay />
       {isJoined && currentUser && (
         <GhostWatermark
-          userSessionInfo={`USER_${currentUser.nickname}_${currentUser.socketId || currentUser.id}_${new Date().getFullYear()}`}
+          nickname={currentUser.nickname}
         />
       )}
     </div>
