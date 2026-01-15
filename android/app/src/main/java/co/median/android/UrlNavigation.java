@@ -182,6 +182,31 @@ public class UrlNavigation {
                 (host.equals(initialHost) || host.endsWith("." + initialHost));
     }
 
+    /**
+     * Determine whether the resolved external activity is trusted to be started from
+     * user-controlled data (for example, URLs or incoming intents).
+     *
+     * Currently this only allows activities that belong to this application package.
+     * This prevents the app from being used as a generic trampoline to arbitrary
+     * exported components in other applications.
+     */
+    private boolean isTrustedExternalActivity(@NonNull String packageName, @NonNull String className) {
+        // Only allow launching explicitly whitelisted activities within this app's package.
+        String ownPackage = mainActivity.getPackageName();
+        if (!ownPackage.equals(packageName)) {
+            return false;
+        }
+
+        // Whitelist of activities that are safe to launch from external "intent:" URLs.
+        // Add additional fully-qualified class names here as needed.
+        if (MainActivity.class.getName().equals(className)) {
+            return true;
+        }
+
+        // Default: disallow launching arbitrary in-app activities.
+        return false;
+    }
+
     public boolean shouldOverrideUrlLoading(GoNativeWebviewInterface view, String url) {
         return shouldOverrideUrlLoading(view, url, false, false);
     }
@@ -275,11 +300,61 @@ public class UrlNavigation {
                 try {
                     if ("intent".equals(uri.getScheme())) {
                         intent = Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME);
-                        if (isSafeIntent(intent)) {
-                            mainActivity.startActivity(intent);
+                        if (intent != null && isSafeIntent(intent)) {
+                            // Resolve the activity to ensure the target is exported and valid
+                            android.content.pm.PackageManager pm = mainActivity.getPackageManager();
+                            android.content.pm.ResolveInfo resolveInfo = pm.resolveActivity(intent, 0);
+                            if (resolveInfo != null && resolveInfo.activityInfo != null && resolveInfo.activityInfo.exported
+                                    && isTrustedExternalActivity(resolveInfo.activityInfo.packageName,
+                                    resolveInfo.activityInfo.name)) {
+                                // Use the resolved component to avoid trusting user-specified component extras
+                                ComponentName resolvedComponent = new ComponentName(
+                                        resolveInfo.activityInfo.packageName,
+                                        resolveInfo.activityInfo.name
+                                );
+                                // 1. Create a FRESH, empty Intent instead of copying the untrusted one
+                                Intent safeIntent = new Intent();
+                                // 2. ONLY allow VIEW action
+                                safeIntent.setAction(Intent.ACTION_VIEW);
+                                // 3. SET the component explicitly (using the 'resolvedComponent' you already validated)
+                                safeIntent.setComponent(resolvedComponent);
+                                // 4. LOCK the package to your own app
+                                safeIntent.setPackage(mainActivity.getPackageName());
+                                // 5. SANITIZE the data: Only allow specific web/store schemes
+                                Uri originalData = intent.getData();
+                                if (originalData != null) {
+                                    String scheme = originalData.getScheme();
+                                    if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme) || "market".equalsIgnoreCase(scheme)) {
+                                        safeIntent.setData(originalData);
+                                    }
+                                }
+                                // 6. STRIP all dangerous flags
+                                int flags = intent.getFlags();
+                                flags &= ~Intent.FLAG_GRANT_READ_URI_PERMISSION;
+                                flags &= ~Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+                                flags &= ~Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION;
+                                flags &= ~Intent.FLAG_GRANT_PREFIX_URI_PERMISSION;
+                                safeIntent.setFlags(flags);
+                                // 7. CLEAR all categories and add ONLY Browsable
+                                safeIntent.addCategory(Intent.CATEGORY_BROWSABLE);
+                                // 8. Launch the now "Sealed" Intent
+                                mainActivity.startActivity(safeIntent);
+                            } else {
+                                // Unsafe, untrusted, or unresolvable intent target; try fallback URL if available
+                                String fallbackUrl = intent.getStringExtra("browser_fallback_url");
+                                if (!TextUtils.isEmpty(fallbackUrl)) {
+                                    mainActivity.loadUrl(fallbackUrl);
+                                } else {
+                                    Toast.makeText(mainActivity, R.string.app_not_installed, Toast.LENGTH_LONG).show();
+                                    GNLog.getInstance().logError(TAG,
+                                            mainActivity.getString(R.string.app_not_installed),
+                                            null,
+                                            GNLog.TYPE_TOAST_ERROR);
+                                }
+                            }
                         } else {
                             // Unsafe intent target; try fallback URL if available
-                            String fallbackUrl = intent.getStringExtra("browser_fallback_url");
+                            String fallbackUrl = intent != null ? intent.getStringExtra("browser_fallback_url") : null;
                             if (!TextUtils.isEmpty(fallbackUrl)) {
                                 mainActivity.loadUrl(fallbackUrl);
                             } else {
@@ -459,7 +534,8 @@ public class UrlNavigation {
         // Prefer explicit component if set
         ComponentName componentName = intent.getComponent();
         if (componentName != null) {
-            return myPackage.equals(componentName.getPackageName());
+            // Only allow explicitly whitelisted in-app activities.
+            return isTrustedExternalActivity(componentName.getPackageName(), componentName.getClassName());
         }
 
         // Fall back to resolving the activity via PackageManager
@@ -468,14 +544,27 @@ public class UrlNavigation {
                     mainActivity.getPackageManager().resolveActivity(intent, 0);
             if (resolveInfo != null && resolveInfo.activityInfo != null) {
                 String resolvedPackage = resolveInfo.activityInfo.packageName;
-                return myPackage.equals(resolvedPackage);
+                String resolvedClass = resolveInfo.activityInfo.name;
+                if (!myPackage.equals(resolvedPackage)) {
+                    return false;
+                }
+                // Require that the resolved activity is explicitly trusted.
+                return isTrustedExternalActivity(resolvedPackage, resolvedClass);
             }
         } catch (Exception e) {
             // Conservatively treat resolution failures as unsafe
             GNLog.getInstance().logError(TAG, "Failed to resolve intent for safety check", e);
+            return false;
         }
 
-        return false;
+        // Additionally, restrict to safe actions when launching from external URLs.
+        String action = intent.getAction();
+        if (action != null && !Intent.ACTION_VIEW.equals(action)) {
+            return false; // If the action isn't VIEW, it's unsafe.
+        }
+
+        // If it survived all the checks above (package name, class name, action type)...
+        return true; // Then it IS safe!
     }
 
     public boolean shouldOverrideUrlLoading(final GoNativeWebviewInterface view, String url,
