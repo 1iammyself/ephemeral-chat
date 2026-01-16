@@ -1,6 +1,6 @@
 # 📱 Ephemeral Chat - Comprehensive User Guide
 
-Welcome to **Ephemeral Chat**, the secure, anonymous, and ephemeral messaging application. This guide will take you through every feature of the app, ensuring you can communicate privately and effectively.
+Welcome to **Ephemeral Chat**, the secure, anonymous, and ephemeral messaging application. This guide will take you through every available feature of the app, ensuring you can communicate privately and effectively.
 
 ## 📚 Table of Contents
 1.  [Getting Started](#getting-started)
