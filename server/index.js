@@ -394,7 +394,8 @@ app.get('/api/tokens/agora/rtm', (req, res) => {
     if (AccessToken2 && ServiceRtm) {
       const token = new AccessToken2(appId, appCertificate, currentTimestamp, expirationTimeInSeconds);
       const serviceRtm = new ServiceRtm(userId);
-      serviceRtm.addPrivilege(ServiceRtm.kPrivilegeLogin, expirationTimeInSeconds);
+      // Privilege expiration must be an absolute timestamp, not a duration
+      serviceRtm.addPrivilege(ServiceRtm.kPrivilegeLogin, privilegeExpiredTs);
       token.addService(serviceRtm);
       const tokenStr = token.build();
       res.json({ token: tokenStr });

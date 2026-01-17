@@ -28,6 +28,18 @@ class AgoraRTMService {
      */
     async initialize(userId, nickname) {
         try {
+            // If already connected with same info, just return
+            if (this.client && this.isConnected && this.userId === userId) {
+                console.log('🔄 Agora RTM already connected');
+                this.nickname = nickname; // Update nickname just in case
+                return true;
+            }
+
+            // If connected with different info, disconnect first
+            if (this.client || this.isConnected) {
+                await this.disconnect();
+            }
+
             console.log('🔌 Initializing Agora RTM client...');
 
             this.userId = userId;
