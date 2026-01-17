@@ -26,7 +26,6 @@
   "author": "Ephemeral Chat Team",
   "license": "GPL-3.0-or-later",
   "dependencies": {
-    "@cap.js/server": "^4.0.4",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@ffprobe-installer/ffprobe": "^2.1.2",
     "bcryptjs": "^2.4.3",

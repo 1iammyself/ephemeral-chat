@@ -11,7 +11,8 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
-    "@cap.js/widget": "^0.1.32",
+    "agora-rtc-sdk-ng": "^4.21.0",
+    "agora-rtm-sdk": "^2.2.0",
     "axios": "^1.11.0",
     "lucide-react": "^0.279.0",
     "react": "^18.2.0",

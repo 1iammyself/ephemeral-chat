@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MessageCircle, Lock, Users, AlertCircle, Check, Loader2, Shield, Clock, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import '@cap.js/widget';
 
 const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite = false, isWaitingForHost = false }) => {
   const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '';
@@ -17,30 +16,6 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
   const [isCheckingInvite, setIsCheckingInvite] = useState(false);
   const [inviteToken, setInviteToken] = useState(null);
   const [requiresPassword, setRequiresPassword] = useState(false);
-  const [capToken, setCapToken] = useState(null);
-  const [isCapVerified, setIsCapVerified] = useState(false);
-
-  // Use callback ref to ensure listener is attached when element mounts
-  const setCapWidgetRef = useCallback((node) => {
-    if (node) {
-      const handleSuccess = (event) => {
-        if (event.detail && event.detail.token) {
-          setCapToken(event.detail.token);
-          setIsCapVerified(true);
-        }
-      };
-      const handleError = (e) => console.error('Cap widget error:', e);
-
-      // Listen for various possible event names to be safe
-      node.addEventListener('cap:success', handleSuccess);
-      node.addEventListener('success', handleSuccess);
-      node.addEventListener('solve', handleSuccess);
-      node.addEventListener('token', handleSuccess);
-
-      node.addEventListener('cap:error', handleError);
-      node.addEventListener('error', handleError);
-    }
-  }, []);
 
   // Check for invite token in URL or location state
   useEffect(() => {
@@ -139,23 +114,13 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
-    if (!isCapVerified && !capToken) {
-      // If we have an invite token, maybe we skip captcha? 
-      // But for now let's enforce it unless logic says otherwise.
-      // Assuming invite token bypasses password but maybe not captcha?
-      // Let's enforce captcha for all joins to be safe.
-      return;
-    }
-
     setIsJoining(true);
 
     // Prepare join data - normalize nickname to lowercase for consistent watermark hashing
     const normalizedNickname = nickname.trim().toLowerCase();
     const joinData = {
       nickname: normalizedNickname,
-      password: password.trim(),
-      capToken: capToken
+      password: password.trim()
     };
 
     if (fromInvite && inviteValid) {
@@ -299,37 +264,11 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
               </div>
             )}
 
-            {/* Cap Verification Widget */}
-            <div className="mb-6">
-              <div className="flex items-center space-x-2 mb-2">
-                <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Verification
-                </label>
-              </div>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                Complete this quick verification to prove you're human
-              </p>
-              <div className="flex justify-center">
-                <cap-widget
-                  ref={setCapWidgetRef}
-                  data-cap-api-endpoint={`${API_BASE}/api/cap/`}
-                  className="w-full"
-                />
-              </div>
-              {isCapVerified && (
-                <div className="mt-2 flex items-center justify-center text-green-600 dark:text-green-400 text-sm">
-                  <Check className="w-4 h-4 mr-1" />
-                  Verified
-                </div>
-              )}
-            </div>
-
             <div className="flex flex-col space-y-3">
               <button
                 type="submit"
-                disabled={isJoining || isProcessingInvite || (!isCapVerified && !capToken)}
-                className={`w-full py-2 px-4 rounded-lg font-medium text-white ${isJoining || isProcessingInvite || (!isCapVerified && !capToken) ? 'bg-blue-400 dark:bg-blue-500' : 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700'
+                disabled={isJoining || isProcessingInvite}
+                className={`w-full py-2 px-4 rounded-lg font-medium text-white ${isJoining || isProcessingInvite ? 'bg-blue-400 dark:bg-blue-500' : 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700'
                   } transition-colors flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed`}
               >
                 {isJoining || isProcessingInvite ? (

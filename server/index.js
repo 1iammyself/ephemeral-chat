@@ -14,7 +14,7 @@ const { createClient } = require('redis');
 const RoomManager = require('./rooms');
 const SecurityManager = require('./security');
 const authUtils = require('./auth-utils');
-const Cap = require('@cap.js/server');
+// Cap.js removed - no CAPTCHA verification per user request
 const rateLimit = require('express-rate-limit');
 const {
   generateRandomNickname,
@@ -27,12 +27,7 @@ const {
 } = require('./utils');
 const { convertAudioToAAC } = require('./utils/audio-converter');
 
-// Initialize Cap.js for proof-of-work CAPTCHA
-const cap = new Cap({
-  tokens_per_challenge: 1,
-  // Use environment variable for secret in production
-  secret: process.env.CAP_SECRET || 'ephemeral-chat-cap-secret-change-in-production'
-});
+// Cap.js CAPTCHA removed per user request - all rooms/joins work without verification
 
 // Initialize in-memory storage
 logger.info('🔌 Using in-memory storage for rooms and messages');
@@ -260,62 +255,7 @@ app.get('/api/invite/:token', async (req, res) => {
   }
 });
 
-// Cap.js API endpoints for proof-of-work CAPTCHA
-app.post('/api/cap/challenge', async (req, res) => {
-  // console.log('Received Cap challenge request');
-  try {
-    const challenge = await cap.createChallenge();
-    // console.log('Generated challenge:', challenge);
-    res.json(challenge);
-  } catch (error) {
-    console.error('Error generating Cap challenge:', error);
-    res.status(500).json({ error: 'Failed to generate challenge' });
-  }
-});
-
-app.post('/api/cap/redeem', async (req, res) => {
-  // console.log('Received Cap redeem request');
-  // console.log('Request body:', req.body);
-  try {
-    const { token, solution } = req.body;
-    // The widget might send 'token' or 'solution' or both.
-    // Let's try to validate using the available data.
-
-    // Check if we should use redeemChallenge or validateToken
-    // Based on prototype, redeemChallenge exists.
-
-    // Try validateToken first (as we did)
-    // const result = await cap.validateToken(token);
-
-    // Let's try redeemChallenge if validateToken failed or as primary
-    // Assuming the widget sends the token it received + solution?
-    // Or maybe just the token?
-
-    // If the widget sends { token: '...' }, let's try passing that.
-
-    let result;
-    if (cap.redeemChallenge) {
-      // Note: redeemChallenge might be the correct method for the server-side check
-      // It might expect the token and the solution?
-      // Let's assume it takes the object sent by the widget.
-      result = await cap.redeemChallenge(req.body);
-    } else {
-      result = await cap.validateToken(token);
-    }
-
-    // console.log('Verification result:', result);
-
-    // If result is an object, send it directly. If boolean, wrap it.
-    if (typeof result === 'object') {
-      res.json(result);
-    } else {
-      res.json({ success: result });
-    }
-  } catch (error) {
-    console.error('Error redeeming Cap token:', error);
-    res.status(500).json({ success: false, error: 'Failed to verify token' });
-  }
-});
+// Cap.js endpoints removed - no CAPTCHA verification
 
 /**
  * Generate an invite token for a room
@@ -366,18 +306,9 @@ app.post('/api/rooms/:roomCode/invite', async (req, res) => {
 
 app.post('/api/rooms', async (req, res) => {
   try {
-    const { messageTTL, password, maxUsers, capToken } = req.body;
+    const { messageTTL, password, maxUsers } = req.body;
 
-    // console.log('HTTP room creation request:', { messageTTL, password, maxUsers, hasCapToken: !!capToken });
-
-    // Validate Cap token (proof-of-work verification)
-    if (capToken) {
-      const isValid = await cap.validateToken(capToken);
-      if (!isValid) {
-        console.error('Invalid Cap token');
-        return res.status(400).json({ error: 'Verification failed. Please try again.' });
-      }
-    }
+    // console.log('HTTP room creation request:', { messageTTL, password, maxUsers });
 
     const settings = {};
     if (messageTTL && getTTLOptions()[messageTTL] !== undefined) {
@@ -637,7 +568,7 @@ io.on('connection', (socket) => {
 
   socket.on('join-room', async (data, callback) => {
     try {
-      const { roomCode, nickname, password, inviteToken, capToken } = data;
+      const { roomCode, nickname, password, inviteToken } = data;
       const userId = socket.id; // Use socket ID as user ID
 
       // Validate credentials
@@ -645,15 +576,6 @@ io.on('connection', (socket) => {
       if (!validation.valid) {
         logger.error(`Invalid credentials: ${validation.errors.join(', ')}`);
         return callback({ success: false, error: validation.errors[0] });
-      }
-
-      // Verify Cap token (proof-of-work verification)
-      if (capToken) {
-        const isValid = await cap.validateToken(capToken);
-        if (!isValid) {
-          logger.error(`Invalid Cap token for room ${roomCode}`);
-          return callback({ success: false, error: 'Verification failed. Please try again.' });
-        }
       }
 
       // Check if user is locked out due to failed attempts

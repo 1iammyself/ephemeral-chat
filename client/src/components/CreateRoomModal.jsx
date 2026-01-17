@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { X, Settings, Clock, Lock, Copy, Check, Users, Shield, Share2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import '@cap.js/widget';
 import { generateRoomKey } from '../utils/security';
 
 const CreateRoomModal = ({ onClose, onRoomCreated }) => {
@@ -12,8 +11,6 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
     password: '',
     maxUsers: 1
   });
-  const [capToken, setCapToken] = useState(null);
-  const [isCapVerified, setIsCapVerified] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createdRoom, setCreatedRoom] = useState(null);
   const [inviteLink, setInviteLink] = useState('');
@@ -25,28 +22,6 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
   const [roomKey, setRoomKey] = useState(null);
   const navigate = useNavigate();
-
-  // Use callback ref to ensure listener is attached when element mounts
-  const setCapWidgetRef = useCallback((node) => {
-    if (node) {
-      const handleSuccess = (event) => {
-        if (event.detail && event.detail.token) {
-          setCapToken(event.detail.token);
-          setIsCapVerified(true);
-        }
-      };
-      const handleError = (e) => console.error('Cap widget error:', e);
-
-      // Listen for various possible event names to be safe
-      node.addEventListener('cap:success', handleSuccess);
-      node.addEventListener('success', handleSuccess);
-      node.addEventListener('solve', handleSuccess);
-      node.addEventListener('token', handleSuccess);
-
-      node.addEventListener('cap:error', handleError);
-      node.addEventListener('error', handleError);
-    }
-  }, []);
 
   const ttlOptions = [
     { value: 'none', label: 'Never (Default)', description: 'Messages stay until room expires' },
@@ -85,12 +60,6 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
 
   const handleCreate = async (e) => {
     e.preventDefault();
-
-    if (!isCapVerified && !capToken) {
-      alert('Please complete the verification first.');
-      return;
-    }
-
     setIsCreating(true);
 
     try {
@@ -106,8 +75,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
         body: JSON.stringify({
           messageTTL: settings.messageTTL !== 'none' ? settings.messageTTL : undefined,
           password: settings.password.trim() || undefined,
-          maxUsers: settings.maxUsers,
-          capToken: capToken
+          maxUsers: settings.maxUsers
         }),
       });
 
@@ -188,8 +156,6 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
       password: '',
       maxUsers: 1
     });
-    setCapToken(null);
-    setIsCapVerified(false);
   };
 
   // If room was created, show success message with invite options
@@ -418,30 +384,6 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                   <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">7</span>
                 </div>
               </div>
-            </div>
-            <div>
-              <div className="flex items-center space-x-2 mb-2 sm:mb-3">
-                <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400" />
-                <label className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">
-                  Verification
-                </label>
-              </div>
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 sm:mb-3">
-                Complete this quick verification to prove you're human
-              </p>
-              <div className="flex justify-center">
-                <cap-widget
-                  ref={setCapWidgetRef}
-                  data-cap-api-endpoint={`${API_BASE}/api/cap/`}
-                  className="w-full"
-                />
-              </div>
-              {isCapVerified && (
-                <div className="mt-2 flex items-center justify-center text-green-600 dark:text-green-400 text-sm">
-                  <Check className="w-4 h-4 mr-1" />
-                  Verified
-                </div>
-              )}
             </div>
 
             {/* Actions */}
