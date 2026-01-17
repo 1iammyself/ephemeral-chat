@@ -136,7 +136,7 @@ Here’s a sneak peek at the app interface:
 
    # Room Settings
    ROOM_EXPIRY_MINUTES=60
-   INVITE_TOKEN_EXPIRY_MINUTES=5
+   INVITE_TOKEN_EXPIRY_MINUTES=25
    MAX_MESSAGES_PER_MINUTE=30
    ```
 
