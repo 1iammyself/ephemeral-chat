@@ -20,11 +20,12 @@ import {
   UserX
 } from 'lucide-react';
 import socketManager from '../socket-simple';
+import agoraRTMService from '../services/agora-rtm';
 import JoinRoomModal from './JoinRoomModal';
 import MessageList from './MessageList';
 import UserList from './UserList';
 import AudioCallModal from './AudioCallModal';
-import webRTCService, { CallState } from '../webrtc';
+import agoraRTCService, { CallState } from '../services/agora-rtc';
 import { encryptMessage, decryptMessage } from '../utils/security';
 import { Mp3Recorder } from '../utils/mp3Recorder';
 import ThemeToggle from './ThemeToggle';
@@ -60,6 +61,7 @@ const ChatRoom = () => {
   const [roomKey, setRoomKey] = useState(null);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [selectedRecipients, setSelectedRecipients] = useState([]);
+  const [isRtmConnected, setIsRtmConnected] = useState(false);
 
   const mediaRecorderRef = useRef(null);
   const mp3RecorderRef = useRef(null);
@@ -122,6 +124,18 @@ const ChatRoom = () => {
         setShowJoinModal(false);
         setIsProcessingInvite(false);
         setIsWaitingForHost(false);
+
+        // Initialize Agora RTM for messaging
+        try {
+          const rtmUserId = socketManager.socket?.id || `user_${Date.now()}`;
+          await agoraRTMService.initialize(rtmUserId, response.nickname);
+          await agoraRTMService.joinChannel(roomCode);
+          setIsRtmConnected(true);
+          console.log('✅ Agora RTM connected for room:', roomCode);
+        } catch (rtmError) {
+          console.error('Failed to connect Agora RTM:', rtmError);
+          // Continue without RTM - fall back to Socket.IO
+        }
         return;
       }
       setError(response.error || 'Failed to join room');
@@ -177,6 +191,18 @@ const ChatRoom = () => {
 
     const handleMessageDeleted = ({ messageId }) => setMessages(prev => prev.filter(m => m.id !== messageId));
 
+    const handleMessageViewed = ({ messageId, userId }) => {
+      setMessages(prev => prev.map(msg => {
+        if (msg.id === messageId) {
+          const viewedBy = msg.viewedBy || [];
+          if (!viewedBy.includes(userId)) {
+            return { ...msg, viewedBy: [...viewedBy, userId] };
+          }
+        }
+        return msg;
+      }));
+    };
+
     const handleUserJoined = ({ user, roomUsers }) => {
       const displayName = user?.nickname || 'Someone';
       setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: `${displayName} joined the room`, timestamp: new Date().toISOString() }]);
@@ -220,6 +246,7 @@ const ChatRoom = () => {
     socketManager.on('room-joined', handleRoomJoined);
     socketManager.on('new-message', handleNewMessage);
     socketManager.on('message-deleted', handleMessageDeleted);
+    socketManager.on('message-viewed', handleMessageViewed);
     socketManager.on('user-joined', handleUserJoined);
     socketManager.on('user-left', handleUserLeft);
     socketManager.on('error', handleError);
@@ -228,12 +255,41 @@ const ChatRoom = () => {
     socketManager.on('user-knocking', handleUserKnocking);
     socketManager.on('promoted-to-host', handlePromotedToHost);
 
+    // Subscribe to Agora RTM messages
+    const unsubscribeRtm = agoraRTMService.onMessage(async (message) => {
+      // Handle signals
+      if (message.messageType === 'signal') {
+        if (message.action === 'viewed') {
+          handleMessageViewed({ messageId: message.messageId, userId: message.sender.id });
+        } else if (message.action === 'deleted') {
+          handleMessageDeleted({ messageId: message.messageId });
+        }
+        return;
+      }
+
+      // Handle incoming RTM message
+      let content = message.content;
+      if (message.isEncrypted && roomKey) {
+        try {
+          content = await decryptMessage(message.content, message.iv, roomKey);
+        } catch (e) {
+          content = '⚠️ Decryption failed';
+        }
+      }
+      setMessages(prev => [...prev, {
+        ...message,
+        content,
+        sender: message.sender
+      }]);
+    });
+
     return () => {
       socketManager.off('connect', handleConnect);
       socketManager.off('disconnect', handleDisconnect);
       socketManager.off('room-joined', handleRoomJoined);
       socketManager.off('new-message', handleNewMessage);
       socketManager.off('message-deleted', handleMessageDeleted);
+      socketManager.off('message-viewed', handleMessageViewed);
       socketManager.off('user-joined', handleUserJoined);
       socketManager.off('user-left', handleUserLeft);
       socketManager.off('error', handleError);
@@ -241,6 +297,11 @@ const ChatRoom = () => {
       socketManager.off('knock-denied', handleKnockDenied);
       socketManager.off('user-knocking', handleUserKnocking);
       socketManager.off('promoted-to-host', handlePromotedToHost);
+
+      // Cleanup RTM
+      unsubscribeRtm();
+      agoraRTMService.disconnect();
+
       if (process.env.NODE_ENV !== 'development') socketManager.disconnect();
     };
   }, [roomCode, performJoin, roomKey]);
@@ -302,7 +363,29 @@ const ChatRoom = () => {
         iv = result.iv;
         isEncrypted = true;
       }
-      socketManager.emit('send-message', { content, isEncrypted, iv, recipients: selectedRecipients });
+
+      // Try Agora RTM first, fallback to Socket.IO
+      if (isRtmConnected) {
+        try {
+          const sentMessage = await agoraRTMService.sendMessage({
+            content,
+            isEncrypted,
+            iv,
+            recipients: selectedRecipients
+          });
+          // Add own message to local state (RTM doesn't echo back to sender)
+          setMessages(prev => [...prev, {
+            ...sentMessage,
+            sender: { id: currentUser?.id, nickname: currentUser?.nickname }
+          }]);
+        } catch (rtmError) {
+          console.error('RTM send failed, using Socket.IO:', rtmError);
+          socketManager.emit('send-message', { content, isEncrypted, iv, recipients: selectedRecipients });
+        }
+      } else {
+        socketManager.emit('send-message', { content, isEncrypted, iv, recipients: selectedRecipients });
+      }
+
       socketManager.emit('user-activity');
       setNewMessage('');
     } catch (error) {
@@ -325,31 +408,60 @@ const ChatRoom = () => {
     }
     setIsUploading(true);
     const reader = new FileReader();
-    reader.onload = (e) => {
-      socketManager.emit('send-message', { messageType: 'image', imageData: e.target.result, isViewOnce: true, recipients: selectedRecipients });
+    reader.onload = async (e) => {
+      // Try Agora RTM first
+      if (isRtmConnected) {
+        try {
+          const sentMessage = await agoraRTMService.sendImage(e.target.result, { isViewOnce: true });
+          setMessages(prev => [...prev, {
+            ...sentMessage,
+            sender: { id: currentUser?.id, nickname: currentUser?.nickname }
+          }]);
+        } catch (rtmError) {
+          console.error('RTM image send failed, using Socket.IO:', rtmError);
+          socketManager.emit('send-message', { messageType: 'image', imageData: e.target.result, isViewOnce: true, recipients: selectedRecipients });
+        }
+      } else {
+        socketManager.emit('send-message', { messageType: 'image', imageData: e.target.result, isViewOnce: true, recipients: selectedRecipients });
+      }
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     };
     reader.readAsDataURL(file);
-  }, [selectedRecipients]);
+  }, [selectedRecipients, isRtmConnected, currentUser]);
+
+  const handleViewMessage = useCallback((messageId) => {
+    if (isRtmConnected) {
+      agoraRTMService.sendMessage({
+        messageType: 'signal',
+        action: 'viewed',
+        messageId
+      }).catch(err => console.error('Failed to send view signal via RTM', err));
+    }
+    socketManager.emit('message-viewed', { messageId });
+  }, [isRtmConnected]);
+
+  const handleDeleteMessage = useCallback((messageId) => {
+    if (isRtmConnected) {
+      agoraRTMService.sendMessage({
+        messageType: 'signal',
+        action: 'deleted',
+        messageId
+      }).catch(err => console.error('Failed to send delete signal via RTM', err));
+    }
+    socketManager.emit('delete-message', { messageId });
+  }, [isRtmConnected]);
 
   const handleStartCall = useCallback(async () => {
-    let recipients = selectedRecipients.length > 0
-      ? users.filter(u => selectedRecipients.includes(u.socketId) || selectedRecipients.includes(u.id))
-      : users.filter(u => u.socketId !== currentUser?.id && u.id !== currentUser?.id);
-
-    if (recipients.length === 0) {
-      setError('No users to call');
-      return;
-    }
     try {
-      const recipientList = recipients.map(u => ({ id: u.socketId || u.id, nickname: u.nickname }));
-      await webRTCService.startCall(roomCode, recipientList);
+      // With Agora, we join the channel using room code
+      // Everyone in the room can join the same Agora channel
+      await agoraRTCService.startCall(`${roomCode}_call`, currentUser?.nickname || 'User');
       setShowCallModal(true);
     } catch (err) {
       setError('Failed to start call. Please check microphone permissions.');
     }
-  }, [users, currentUser, roomCode, selectedRecipients]);
+  }, [roomCode, currentUser]);
 
   const startRecording = async () => {
     try {
@@ -410,7 +522,7 @@ const ChatRoom = () => {
   };
 
   useEffect(() => {
-    const unsubscribe = webRTCService.onCallStateChange((state) => {
+    const unsubscribe = agoraRTCService.onCallStateChange((state) => {
       setCallState(state);
       if (state.state === CallState.INCOMING) setShowCallModal(true);
       if (state.state === CallState.IDLE && showCallModal) setTimeout(() => setShowCallModal(false), 1000);
@@ -474,7 +586,13 @@ const ChatRoom = () => {
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 flex flex-col">
           <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
-            <MessageList messages={messages} currentUser={currentUser} messageTTL={room?.settings?.messageTTL} />
+            <MessageList
+              messages={messages}
+              currentUser={currentUser}
+              messageTTL={room?.settings?.messageTTL}
+              onView={handleViewMessage}
+              onDelete={handleDeleteMessage}
+            />
             <div ref={messagesEndRef} />
           </div>
           <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">

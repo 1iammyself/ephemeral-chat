@@ -4,7 +4,7 @@ import ImageViewer from './ImageViewer';
 import AudioPlayer from './AudioPlayer';
 import socketManager from '../socket-simple';
 
-const MessageList = ({ messages, currentUser, messageTTL }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onView, onDelete }) => {
   const [messageTimers, setMessageTimers] = useState(new Map());
   const [viewingImage, setViewingImage] = useState(null);
   const [currentImageUrl, setCurrentImageUrl] = useState(null); // Save image URL separately
@@ -13,22 +13,19 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
   const [newMessages, setNewMessages] = useState(new Set());
 
   // Listen for message-viewed events from server
-  useEffect(() => {
-    const handleMessageViewed = ({ messageId, userId }) => {
-      // console.log(`Event: message-viewed`, { messageId, userId, currentUserId: currentUser?.id, currentUserSocket: currentUser?.socketId });
-
-      // Only mark as viewed locally if WE viewed it
-      if (currentUser && (userId === currentUser.id || userId === currentUser.socketId)) {
-        setViewedMessages(prev => new Set([...prev, messageId]));
-      }
-    };
-
-    socketManager.on('message-viewed', handleMessageViewed);
-
-    return () => {
-      socketManager.off('message-viewed', handleMessageViewed);
-    };
-  }, [currentUser]);
+  // Listen for message-viewed events from server - MOVED TO PARENT
+  // useEffect(() => {
+  //   const handleMessageViewed = ({ messageId, userId }) => {
+  //     // Only mark as viewed locally if WE viewed it
+  //     if (currentUser && (userId === currentUser.id || userId === currentUser.socketId)) {
+  //       setViewedMessages(prev => new Set([...prev, messageId]));
+  //     }
+  //   };
+  //   socketManager.on('message-viewed', handleMessageViewed);
+  //   return () => {
+  //     socketManager.off('message-viewed', handleMessageViewed);
+  //   };
+  // }, [currentUser]);
 
   useEffect(() => {
     // Set up timers for messages with TTL
@@ -156,15 +153,15 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
     setViewingImage(message);
     setCurrentImageUrl(message.isViewOnce ? message.id : imageUrl);
 
-    // Emit message-viewed event to server
-    socketManager.emit('message-viewed', { messageId: message.id });
+    // Emit message-viewed event
+    if (onView) onView(message.id);
 
     // Mark as viewed locally
     setViewedMessages(prev => new Set([...prev, message.id]));
 
     // If it's view-once, we'll trigger the vanish animation when the viewer closes
     // or immediately if it's not an image
-  }, [isMessageViewed]);
+  }, [isMessageViewed, onView]);
 
   const handleAudioPlay = useCallback((message) => {
     if (isMessageViewed(message)) return;
@@ -173,8 +170,8 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
 
   const handleAudioEnded = useCallback((message) => {
     // Mark viewed and request deletion for view-once audio once playback finishes
-    socketManager.emit('message-viewed', { messageId: message.id });
-    socketManager.emit('delete-message', { messageId: message.id });
+    if (onView) onView(message.id);
+    if (onDelete) onDelete(message.id);
     setViewedMessages(prev => new Set([...prev, message.id]));
     setPlayingAudioId(null);
 

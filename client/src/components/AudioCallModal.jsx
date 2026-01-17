@@ -1,7 +1,6 @@
 /**
  * AudioCallModal Component
- * Displays the audio/video call UI with controls
- * Re-implemented based on reference implementation
+ * Displays the audio call UI with controls - Using Agora RTC
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -10,38 +9,23 @@ import {
     PhoneOff,
     Mic,
     MicOff,
-    Video,
     Volume2,
     VolumeX,
     X
 } from 'lucide-react';
-import webRTCService from '../webrtc';
-
-const AudioStream = ({ stream }) => {
-    const audioRef = useRef(null);
-    useEffect(() => {
-        if (audioRef.current && stream) {
-            audioRef.current.srcObject = stream;
-            audioRef.current.play().catch(e => console.error('Error playing audio stream:', e));
-        }
-    }, [stream]);
-    return <audio ref={audioRef} autoPlay />;
-};
+import agoraRTCService, { CallState } from '../services/agora-rtc';
 
 const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
-    const [callState, setCallState] = useState(webRTCService.getCurrentCallState());
+    const [callState, setCallState] = useState(agoraRTCService.getCurrentCallState());
     const [isMuted, setIsMuted] = useState(false);
     const [isSpeakerOn, setIsSpeakerOn] = useState(true);
     const [callDuration, setCallDuration] = useState(0);
 
-    const localAudioRef = useRef(null);
-    const localVideoRef = useRef(null);
-    const remoteVideoRef = useRef(null); // Keep for single video (Mesh video is harder)
     const callStartTimeRef = useRef(0);
 
     // Subscribe to call state changes
     useEffect(() => {
-        const unsubscribe = webRTCService.onCallStateChange(setCallState);
+        const unsubscribe = agoraRTCService.onCallStateChange(setCallState);
         return unsubscribe;
     }, []);
 
@@ -71,67 +55,30 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
         };
     }, [callState.isConnected]);
 
-    // Setup local audio/video streams
-    useEffect(() => {
-        // Setup local audio stream
-        const localStream = webRTCService.getLocalStream();
-        if (localStream && localAudioRef.current) {
-            localAudioRef.current.srcObject = localStream;
-            localAudioRef.current.muted = true; // Always mute local audio
-        }
-
-        // Setup local video stream (if video enabled)
-        if (localStream && localVideoRef.current) {
-            localVideoRef.current.srcObject = localStream;
-            localVideoRef.current.muted = true;
-        }
-
-        // Remote video (single stream support for now)
-        // If we have multiple streams, we might just show the first one or none for video
-        // For audio, we render AudioStream components below
-        const remoteStreams = webRTCService.getRemoteStreams();
-        if (remoteStreams && remoteStreams.size > 0 && remoteVideoRef.current) {
-            const firstStream = remoteStreams.values().next().value;
-            if (firstStream) {
-                remoteVideoRef.current.srcObject = firstStream;
-                remoteVideoRef.current.play().catch(console.error);
-            }
-        }
-    }, [callState]);
-
-    const handleAcceptCall = async () => {
-        if (callState.callId) {
-            try {
-                await webRTCService.acceptCall(callState.callId);
-            } catch (error) {
-                console.error('Failed to accept call:', error);
-            }
+    const handleJoinCall = async () => {
+        // With Agora, joining a call is the same as starting one (join the channel)
+        try {
+            await agoraRTCService.joinCall(roomCode, 'Audio Call');
+        } catch (error) {
+            console.error('Failed to join call:', error);
         }
     };
 
-    const handleRejectCall = () => {
-        if (callState.callId) {
-            webRTCService.rejectCall(callState.callId);
-        }
-        onClose();
-    };
-
-    const handleEndCall = () => {
-        webRTCService.endCall();
+    const handleEndCall = async () => {
+        await agoraRTCService.endCall();
         onClose();
     };
 
     const toggleMute = () => {
-        const isNowMuted = webRTCService.toggleMute();
+        const isNowMuted = agoraRTCService.toggleMute();
         setIsMuted(isNowMuted);
     };
 
     const toggleSpeaker = () => {
-        // This only affects the "main" remote audio if we were using a ref
-        // For multiple streams, we might need to mute all AudioStream components?
-        // Or just toggle state and pass it down?
-        // HTMLAudioElement.muted = !isSpeakerOn
+        // Toggle speaker output
         setIsSpeakerOn(!isSpeakerOn);
+        // Note: With Agora RTC, remote audio plays automatically
+        // To mute speaker, we'd need to pause remote audio tracks
     };
 
     const formatDuration = (seconds) => {
@@ -159,11 +106,11 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
 
     return (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden relative">
                 {/* Close Button */}
                 <button
                     onClick={handleEndCall}
-                    className="absolute top-4 right-4 w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                    className="absolute top-4 right-4 w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors z-10"
                 >
                     <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                 </button>
@@ -172,14 +119,12 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                 <div className="bg-gradient-to-b from-blue-500 to-blue-600 px-6 py-8 text-center">
                     {/* Avatar */}
                     <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-white/30">
-                        <span className="text-3xl font-bold text-white">
-                            {callState.remoteNickname?.charAt(0)?.toUpperCase() || '?'}
-                        </span>
+                        <Phone className="w-10 h-10 text-white" />
                     </div>
 
-                    {/* Name */}
+                    {/* Room/Call Name */}
                     <h3 className="text-xl font-semibold text-white mb-2">
-                        {callState.remoteNickname || 'Unknown'}
+                        {callState.remoteNickname || `Room: ${roomCode}`}
                     </h3>
 
                     {/* Status */}
@@ -194,43 +139,23 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                             {formatDuration(callDuration)}
                         </p>
                     )}
-                </div>
 
-                {/* Video Preview (if video call) */}
-                {callState.isVideoEnabled && callState.isConnected && (
-                    <div className="relative bg-gray-900 aspect-video">
-                        {/* Remote Video (Single) */}
-                        <video
-                            ref={remoteVideoRef}
-                            autoPlay
-                            playsInline
-                            className="w-full h-full object-cover"
-                        />
-                        {/* Local Video PIP */}
-                        <video
-                            ref={localVideoRef}
-                            autoPlay
-                            playsInline
-                            muted
-                            className="absolute bottom-4 right-4 w-24 h-32 object-cover rounded-lg border-2 border-white shadow-lg"
-                        />
-                    </div>
-                )}
+                    {/* Remote Users Count */}
+                    {callState.remoteStreams && callState.remoteStreams.size > 0 && (
+                        <p className="text-white/70 text-sm mt-2">
+                            {callState.remoteStreams.size} participant{callState.remoteStreams.size !== 1 ? 's' : ''} in call
+                        </p>
+                    )}
+                </div>
 
                 {/* Call Controls */}
                 <div className="px-6 py-6">
-                    {callState.isIncomingCall ? (
-                        // Incoming call controls
-                        <div className="flex justify-center space-x-6">
+                    {!callState.isCallActive && !callState.isConnected ? (
+                        // Join call button when not in a call
+                        <div className="flex justify-center">
                             <button
-                                onClick={handleRejectCall}
-                                className="w-16 h-16 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
-                            >
-                                <PhoneOff className="w-7 h-7" />
-                            </button>
-                            <button
-                                onClick={handleAcceptCall}
-                                className="w-16 h-16 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center text-white shadow-lg hover:shadow-xl transition-all transform hover:scale-105 animate-pulse"
+                                onClick={handleJoinCall}
+                                className="w-16 h-16 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center text-white shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
                             >
                                 <Phone className="w-7 h-7" />
                             </button>
@@ -249,7 +174,7 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                                 {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
                             </button>
 
-                            {/* Speaker Button (Toggle output volume/mute) */}
+                            {/* Speaker Button */}
                             <button
                                 onClick={toggleSpeaker}
                                 className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${!isSpeakerOn
@@ -275,17 +200,9 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                 <div className="bg-green-50 dark:bg-green-900/20 border-t border-green-100 dark:border-green-800 px-4 py-3 text-center">
                     <p className="text-green-700 dark:text-green-400 text-sm flex items-center justify-center space-x-1">
                         <span>🔒</span>
-                        <span>End-to-end encrypted call</span>
+                        <span>Call powered by Agora RTC</span>
                     </p>
                 </div>
-
-                {/* Hidden audio elements for local and remote streams */}
-                <audio ref={localAudioRef} autoPlay muted />
-
-                {/* Render audio for each remote stream */}
-                {callState.remoteStreams && Array.from(callState.remoteStreams.entries()).map(([id, stream]) => (
-                    <AudioStream key={id} stream={stream} />
-                ))}
             </div>
         </div>
     );
