@@ -62,15 +62,14 @@ class AgoraRTMService {
 
             // Create RTM client instance (SDK 2.x)
             this.client = new AgoraRTM.RTM(dynamicAppId, userId, {
-                token: token,
                 logLevel: 'warn'
             });
 
             // Set up global event listeners
             this.setupEventListeners();
 
-            // Login to RTM
-            await this.client.login();
+            // Login to RTM with token and uid
+            await this.client.login({ token, uid: userId });
             this.isConnected = true;
 
             console.log('✅ Agora RTM connected');

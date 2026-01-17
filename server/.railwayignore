@@ -1,0 +1,5 @@
+# Ignore everything outside this folder explicitly
+../../**/Android/
+../../**/AppData/
+**/adb.exe
+node_modules/
