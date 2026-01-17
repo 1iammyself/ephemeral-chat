@@ -14,6 +14,7 @@ const { createClient } = require('redis');
 const RoomManager = require('./rooms');
 const SecurityManager = require('./security');
 const authUtils = require('./auth-utils');
+const { RtcTokenBuilder, RtmTokenBuilder, RtcRole } = require('agora-token');
 // Cap.js removed - no CAPTCHA verification per user request
 const rateLimit = require('express-rate-limit');
 const {
@@ -337,6 +338,63 @@ app.post('/api/rooms', async (req, res) => {
   } catch (error) {
     console.error('Error creating room via HTTP:', error);
     res.status(500).json({ error: 'Failed to create room' });
+  }
+});
+
+/**
+ * Agora Token Generation Endpoints
+ */
+app.get('/api/tokens/agora/rtc', (req, res) => {
+  const channelName = req.query.channelName;
+  const uid = req.query.uid || 0;
+  const role = RtcRole.PUBLISHER;
+  const expirationTimeInSeconds = 3600;
+  const currentTimestamp = Math.floor(Date.now() / 1000);
+  const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
+
+  const appId = process.env.AGORA_APP_ID;
+  const appCertificate = process.env.AGORA_APP_CERTIFICATE;
+
+  if (!appId || !appCertificate) {
+    return res.status(500).json({ error: 'Agora credentials not configured on server' });
+  }
+
+  if (!channelName) {
+    return res.status(400).json({ error: 'channelName is required' });
+  }
+
+  try {
+    const token = RtcTokenBuilder.buildTokenWithUid(appId, appCertificate, channelName, uid, role, privilegeExpiredTs);
+    res.json({ token });
+  } catch (error) {
+    console.error('Error generating RTC token:', error);
+    res.status(500).json({ error: 'Failed to generate token' });
+  }
+});
+
+app.get('/api/tokens/agora/rtm', (req, res) => {
+  const userId = req.query.userId;
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  const appId = process.env.AGORA_APP_ID;
+  const appCertificate = process.env.AGORA_APP_CERTIFICATE;
+
+  if (!appId || !appCertificate) {
+    return res.status(500).json({ error: 'Agora credentials not configured on server' });
+  }
+
+  const expirationTimeInSeconds = 3600;
+  const currentTimestamp = Math.floor(Date.now() / 1000);
+  const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
+
+  try {
+    const token = RtmTokenBuilder.buildToken(appId, appCertificate, userId, privilegeExpiredTs);
+    res.json({ token });
+  } catch (error) {
+    console.error('Error generating RTM token:', error);
+    res.status(500).json({ error: 'Failed to generate token' });
   }
 });
 

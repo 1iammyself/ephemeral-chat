@@ -4,6 +4,7 @@
  */
 
 import AgoraRTC from 'agora-rtc-sdk-ng';
+import { SERVER_URL } from '../socket';
 
 // Agora App ID from environment
 const APP_ID = import.meta.env.VITE_AGORA_APP_ID || '735073b2cbd64774be053647ca7b2a1b';
@@ -158,8 +159,23 @@ class AgoraRTCService {
                 remoteStreams: new Map()
             });
 
+            // Fetch token if not provided
+            let rtcToken = token;
+            if (!rtcToken) {
+                try {
+                    const response = await fetch(`${SERVER_URL}/api/tokens/agora/rtc?channelName=${channelName}`);
+                    const data = await response.json();
+                    if (data.token) {
+                        rtcToken = data.token;
+                        console.log('📞 Received RTC token from server');
+                    }
+                } catch (tokenError) {
+                    console.warn('⚠️ Failed to fetch RTC token, will attempt to join without it:', tokenError);
+                }
+            }
+
             // Join the Agora channel
-            const uid = await this.client.join(APP_ID, channelName, token, null);
+            const uid = await this.client.join(APP_ID, channelName, rtcToken, null);
             console.log(`📞 Joined channel with UID: ${uid}`);
             this.currentChannel = channelName;
 

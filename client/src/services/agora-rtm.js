@@ -4,6 +4,7 @@
  */
 
 import AgoraRTM from 'agora-rtm-sdk';
+import { SERVER_URL } from '../socket';
 
 // Agora App ID from environment
 const APP_ID = import.meta.env.VITE_AGORA_APP_ID || '735073b2cbd64774be053647ca7b2a1b';
@@ -32,8 +33,22 @@ class AgoraRTMService {
             this.userId = userId;
             this.nickname = nickname;
 
+            // Fetch Token for login
+            let token = null;
+            try {
+                const response = await fetch(`${SERVER_URL}/api/tokens/agora/rtm?userId=${userId}`);
+                const data = await response.json();
+                if (data.token) {
+                    token = data.token;
+                    console.log('🔌 Received RTM token from server');
+                }
+            } catch (tokenError) {
+                console.warn('⚠️ Failed to fetch RTM token, attempting login without it:', tokenError);
+            }
+
             // Create RTM client instance (SDK 2.x)
             this.client = new AgoraRTM.RTM(APP_ID, userId, {
+                token: token,
                 logLevel: 'warn'
             });
 
