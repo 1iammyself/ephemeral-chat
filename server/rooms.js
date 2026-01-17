@@ -645,8 +645,10 @@ class RoomManager {
     let baseUrl;
 
     if (process.env.NODE_ENV === 'production') {
-      // In production, prefer BASE_URL, fallback to Render's external hostname
+      // Prioritize BASE_URL (set to https://message.kyere.me)
+      // Fallback to Railway's RAILWAY_PUBLIC_DOMAIN or Render
       baseUrl = process.env.BASE_URL ||
+        (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null) ||
         (process.env.RENDER_EXTERNAL_HOSTNAME ? `https://${process.env.RENDER_EXTERNAL_HOSTNAME}` : null);
     } else {
       // In development, use localhost
