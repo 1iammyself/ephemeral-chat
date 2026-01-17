@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, Users, Clock, Shield, Plus, ArrowRight, Zap, Wifi, User, Edit, Lock } from 'lucide-react';
+import { SERVER_URL } from '../socket';
 import CreateRoomModal from './CreateRoomModal';
 import ThemeToggle from './ThemeToggle';
 
@@ -20,7 +21,7 @@ const Home = ({ children }) => {
     setIsJoining(true);
     try {
       // Check if room exists
-      const response = await fetch(`/api/rooms/${roomCode.toUpperCase()}`);
+      const response = await fetch(`${SERVER_URL}/api/rooms/${roomCode.toUpperCase()}`);
       const data = await response.json();
 
       if (response.ok && data.exists) {
@@ -103,7 +104,7 @@ const Home = ({ children }) => {
 
             {/* Join Room Form */}
             <div className="mt-10 max-w-md mx-auto bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden p-4 sm:p-6 transition-colors duration-200">
-              
+
               <div className="mt-4 sm:mt-6">
                 <button
                   onClick={() => setShowCreateModal(true)}

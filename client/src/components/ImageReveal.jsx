@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldAlert } from 'lucide-react';
+import { SERVER_URL } from '../socket';
 
 /**
  * ImageReveal Component
@@ -63,7 +64,7 @@ const ImageReveal = ({ viewToken }) => {
         setRevealActive(true);
 
         try {
-            const res = await fetch('/api/reveal-image', {
+            const res = await fetch(`${SERVER_URL}/api/reveal-image`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ viewToken })

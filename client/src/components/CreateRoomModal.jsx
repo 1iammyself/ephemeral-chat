@@ -2,9 +2,10 @@ import React, { useState, useCallback } from 'react';
 import { X, Settings, Clock, Lock, Copy, Check, Users, Shield, Share2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { generateRoomKey } from '../utils/security';
+import { SERVER_URL } from '../socket';
 
 const CreateRoomModal = ({ onClose, onRoomCreated }) => {
-  const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '';
+  const API_BASE = SERVER_URL;
 
   const [settings, setSettings] = useState({
     messageTTL: 'none',

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { SERVER_URL } from '../socket';
 import { Loader2 } from 'lucide-react';
 
 /**
@@ -23,10 +24,10 @@ function InviteHandler() {
     const processInvite = async () => {
       try {
         setStatus('Validating invite token...');
-        
+
         // Exchange the token for room credentials
-        const response = await axios.get(`/api/invite/${token}`);
-        
+        const response = await axios.get(`${SERVER_URL}/api/invite/${token}`);
+
         if (response.data?.success && response.data.roomCode) {
           // Automatically redirect to the room page
           // The JoinRoomModal there will handle nickname and captcha
@@ -54,7 +55,7 @@ function InviteHandler() {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full text-center">
         <h2 className="text-xl font-bold mb-4 dark:text-white">Joining Room</h2>
-        
+
         {error ? (
           <div className="text-red-600 dark:text-red-400 mb-4">
             <p>{error}</p>
