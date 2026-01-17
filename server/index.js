@@ -470,7 +470,7 @@ io.on('connection', (socket) => {
   });
 
   // Knock-to-Join Logic
-  socket.on('knock', ({ roomCode, nickname, password, inviteToken, capToken }) => {
+  socket.on('knock', ({ roomCode, nickname, password, inviteToken }) => {
     // Prevent prototype pollution via malicious room codes
     if (
       typeof roomCode !== 'string' ||

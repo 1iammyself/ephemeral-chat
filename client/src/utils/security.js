@@ -36,9 +36,9 @@ export function generateSecureToken(length = 32) {
  * @returns {boolean} True if valid
  */
 export function isValidRoomCode(roomCode) {
-  return typeof roomCode === 'string' && 
-         roomCode.length === 10 && 
-         /^[A-Z0-9]+$/.test(roomCode);
+  return typeof roomCode === 'string' &&
+    roomCode.length === 10 &&
+    /^[A-Z0-9]+$/.test(roomCode);
 }
 
 /**
@@ -47,10 +47,10 @@ export function isValidRoomCode(roomCode) {
  * @returns {boolean} True if valid
  */
 export function isValidNickname(nickname) {
-  return typeof nickname === 'string' && 
-         nickname.trim().length >= 2 && 
-         nickname.trim().length <= 20 &&
-         /^[a-zA-Z0-9_-]+$/.test(nickname);
+  return typeof nickname === 'string' &&
+    nickname.trim().length >= 2 &&
+    nickname.trim().length <= 20 &&
+    /^[a-zA-Z0-9_-]+$/.test(nickname);
 }
 
 /**
@@ -75,7 +75,7 @@ export async function encryptMessage(text, keyString) {
   try {
     const encoder = new TextEncoder();
     const data = encoder.encode(text);
-    
+
     // Convert hex key string to key material
     // We hash it first to ensure it's the right length/format for importKey if it's not raw bytes
     // But if we generated 32 bytes hex, we can just import it? 
@@ -83,15 +83,15 @@ export async function encryptMessage(text, keyString) {
     const keyData = encoder.encode(keyString);
     const hash = await crypto.subtle.digest('SHA-256', keyData);
     const key = await crypto.subtle.importKey('raw', hash, 'AES-GCM', false, ['encrypt']);
-    
+
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const encryptedBuffer = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
-    
+
     // Convert to base64 for transport
     const encryptedArray = new Uint8Array(encryptedBuffer);
     const encryptedBase64 = btoa(String.fromCharCode(...encryptedArray));
     const ivBase64 = btoa(String.fromCharCode(...iv));
-    
+
     return { encrypted: encryptedBase64, iv: ivBase64 };
   } catch (error) {
     console.error('Encryption error:', error);
@@ -112,25 +112,25 @@ export async function decryptMessage(encryptedBase64, ivBase64, keyString) {
     const keyData = encoder.encode(keyString);
     const hash = await crypto.subtle.digest('SHA-256', keyData);
     const key = await crypto.subtle.importKey('raw', hash, 'AES-GCM', false, ['decrypt']);
-    
+
     const encryptedString = atob(encryptedBase64);
     const encryptedArray = new Uint8Array(encryptedString.length);
     for (let i = 0; i < encryptedString.length; i++) {
       encryptedArray[i] = encryptedString.charCodeAt(i);
     }
-    
+
     const ivString = atob(ivBase64);
     const ivArray = new Uint8Array(ivString.length);
     for (let i = 0; i < ivString.length; i++) {
       ivArray[i] = ivString.charCodeAt(i);
     }
-    
+
     const decryptedBuffer = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: ivArray },
       key,
       encryptedArray
     );
-    
+
     const decoder = new TextDecoder();
     return decoder.decode(decryptedBuffer);
   } catch (error) {
@@ -234,14 +234,6 @@ export async function prepareCredentials(credentials) {
     prepared.inviteToken = credentials.inviteToken;
   }
 
-  if (credentials.captchaAnswer) {
-    prepared.captchaAnswer = credentials.captchaAnswer;
-  }
-
-  if (credentials.captchaProblem) {
-    prepared.captchaProblem = credentials.captchaProblem;
-  }
-
   return prepared;
 }
 
@@ -308,7 +300,7 @@ export function formatTimeRemaining(ms) {
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-  
+
   if (minutes > 0) {
     return `${minutes}m ${seconds}s`;
   }
@@ -350,7 +342,7 @@ export function rateLimit(func, delay = 1000) {
   let timeout = null;
   let lastCall = 0;
 
-  return function(...args) {
+  return function (...args) {
     const now = Date.now();
     const timeSinceLastCall = now - lastCall;
 

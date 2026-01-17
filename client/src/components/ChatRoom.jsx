@@ -85,8 +85,8 @@ const ChatRoom = () => {
   }, [location]);
 
   const performJoin = useCallback((params) => {
-    const { nickname, password, capToken, inviteToken } = params;
-    const joinData = { roomCode, nickname, password, capToken };
+    const { nickname, password, inviteToken } = params;
+    const joinData = { roomCode, nickname, password };
     if (inviteToken) joinData.inviteToken = inviteToken;
 
     socketManager.emit('join-room', joinData, async (response) => {
@@ -323,7 +323,7 @@ const ChatRoom = () => {
     setIsWaitingForHost(true);
     joinParamsRef.current = params;
     try {
-      const knockData = { roomCode, nickname: nickname.trim(), password: params.password?.trim(), capToken: params.capToken };
+      const knockData = { roomCode, nickname: nickname.trim(), password: params.password?.trim() };
       if (params.inviteToken) knockData.inviteToken = params.inviteToken;
       socketManager.emit('knock', knockData);
     } catch (err) {
