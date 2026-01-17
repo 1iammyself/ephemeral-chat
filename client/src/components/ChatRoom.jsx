@@ -62,6 +62,7 @@ const ChatRoom = () => {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [selectedRecipients, setSelectedRecipients] = useState([]);
   const [isRtmConnected, setIsRtmConnected] = useState(false);
+  const [isCalling, setIsCalling] = useState(false); // To prevent double calling
 
   const mediaRecorderRef = useRef(null);
   const mp3RecorderRef = useRef(null);
@@ -255,6 +256,16 @@ const ChatRoom = () => {
     socketManager.on('user-knocking', handleUserKnocking);
     socketManager.on('promoted-to-host', handlePromotedToHost);
 
+    const handleIncomingCall = (data) => {
+      console.log('📞 Incoming call signal via Socket.IO:', data);
+      agoraRTCService.updateCallState({
+        isIncomingCall: true,
+        remoteNickname: data.nickname,
+        callId: data.callId
+      });
+    };
+    socketManager.on('incoming-call', handleIncomingCall);
+
     // Subscribe to Agora RTM messages
     const unsubscribeRtm = agoraRTMService.onMessage(async (message) => {
       // Handle signals
@@ -263,6 +274,13 @@ const ChatRoom = () => {
           handleMessageViewed({ messageId: message.messageId, userId: message.sender.id });
         } else if (message.action === 'deleted') {
           handleMessageDeleted({ messageId: message.messageId });
+        } else if (message.action === 'call') {
+          // Notify RTC service of incoming call
+          agoraRTCService.updateCallState({
+            isIncomingCall: true,
+            remoteNickname: message.sender.nickname,
+            callId: message.callId
+          });
         }
         return;
       }
@@ -297,6 +315,7 @@ const ChatRoom = () => {
       socketManager.off('knock-denied', handleKnockDenied);
       socketManager.off('user-knocking', handleUserKnocking);
       socketManager.off('promoted-to-host', handlePromotedToHost);
+      socketManager.off('incoming-call', handleIncomingCall);
 
       // Cleanup RTM
       unsubscribeRtm();
@@ -456,8 +475,23 @@ const ChatRoom = () => {
     try {
       // With Agora, we join the channel using room code
       // Everyone in the room can join the same Agora channel
-      await agoraRTCService.startCall(`${roomCode}_call`, currentUser?.nickname || 'User');
+      const { callId } = await agoraRTCService.startCall(`${roomCode}_call`, currentUser?.nickname || 'User');
       setShowCallModal(true);
+
+      // Notify others in the room via Socket.IO (Very Reliable)
+      socketManager.emit('call-signal', {
+        nickname: currentUser?.nickname || 'Someone',
+        callId
+      });
+
+      // Notify others in the room via RTM (Secondary)
+      if (isRtmConnected) {
+        agoraRTMService.sendMessage({
+          messageType: 'signal',
+          action: 'call',
+          callId
+        }).catch(err => console.error('Failed to send call signal via RTM', err));
+      }
     } catch (err) {
       setError('Failed to start call. Please check microphone permissions.');
     }

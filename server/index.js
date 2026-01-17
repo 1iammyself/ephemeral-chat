@@ -900,6 +900,13 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Handle call signaling (Relatable Socket.IO signaling fallback)
+  socket.on('call-signal', (data) => {
+    if (!socket.roomCode) return;
+    // Broadcast incoming-call to everyone in the room except the sender
+    socket.to(socket.roomCode).emit('incoming-call', data);
+  });
+
   // Handle message viewed events (for view-once images)
   socket.on('message-viewed', async ({ messageId }) => {
     try {

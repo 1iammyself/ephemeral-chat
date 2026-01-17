@@ -58,7 +58,7 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
     const handleJoinCall = async () => {
         // With Agora, joining a call is the same as starting one (join the channel)
         try {
-            await agoraRTCService.joinCall(roomCode, 'Audio Call');
+            await agoraRTCService.joinCall(`${roomCode}_call`, 'Audio Call');
         } catch (error) {
             console.error('Failed to join call:', error);
         }
