@@ -103,6 +103,11 @@ const getCorsOptions = () => {
       // Allow requests with no origin (like mobile apps or curl)
       if (!origin) return callback(null, true);
 
+      // Check if '*' is in the list
+      if (allowedOrigins.includes('*')) {
+        return callback(null, true);
+      }
+
       // Check against allowed origins list
       if (allowedOrigins.indexOf(origin) !== -1) {
         return callback(null, true);
@@ -135,6 +140,11 @@ const io = socketIo(server, {
 
       // Allow no origin (server-to-server)
       if (!origin) return callback(null, true);
+
+      // Check if '*' is in the list
+      if (allowedOrigins.includes('*')) {
+        return callback(null, true);
+      }
 
       // Check against allowed origins list
       if (allowedOrigins.indexOf(origin) !== -1) {
