@@ -47,19 +47,21 @@ class AgoraRTMService {
 
             // Fetch Token for login
             let token = null;
+            let dynamicAppId = APP_ID;
             try {
                 const response = await fetch(`${SERVER_URL}/api/tokens/agora/rtm?userId=${userId}`);
                 const data = await response.json();
                 if (data.token) {
                     token = data.token;
-                    console.log('🔌 Received RTM token from server');
+                    if (data.appId) dynamicAppId = data.appId;
+                    console.log('🔌 Received RTM token and appId from server');
                 }
             } catch (tokenError) {
                 console.warn('⚠️ Failed to fetch RTM token, attempting login without it:', tokenError);
             }
 
             // Create RTM client instance (SDK 2.x)
-            this.client = new AgoraRTM.RTM(APP_ID, userId, {
+            this.client = new AgoraRTM.RTM(dynamicAppId, userId, {
                 token: token,
                 logLevel: 'warn'
             });

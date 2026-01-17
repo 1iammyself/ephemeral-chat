@@ -161,13 +161,15 @@ class AgoraRTCService {
 
             // Fetch token if not provided
             let rtcToken = token;
+            let dynamicAppId = APP_ID;
             if (!rtcToken) {
                 try {
                     const response = await fetch(`${SERVER_URL}/api/tokens/agora/rtc?channelName=${channelName}`);
                     const data = await response.json();
                     if (data.token) {
                         rtcToken = data.token;
-                        console.log('📞 Received RTC token from server');
+                        if (data.appId) dynamicAppId = data.appId;
+                        console.log('📞 Received RTC token and appId from server');
                     }
                 } catch (tokenError) {
                     console.warn('⚠️ Failed to fetch RTC token, will attempt to join without it:', tokenError);
@@ -175,7 +177,7 @@ class AgoraRTCService {
             }
 
             // Join the Agora channel
-            const uid = await this.client.join(APP_ID, channelName, rtcToken, null);
+            const uid = await this.client.join(dynamicAppId, channelName, rtcToken, null);
             console.log(`📞 Joined channel with UID: ${uid}`);
             this.currentChannel = channelName;
 

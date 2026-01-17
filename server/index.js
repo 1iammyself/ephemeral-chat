@@ -365,7 +365,7 @@ app.get('/api/tokens/agora/rtc', (req, res) => {
 
   try {
     const token = RtcTokenBuilder.buildTokenWithUid(appId, appCertificate, channelName, uid, role, privilegeExpiredTs);
-    res.json({ token });
+    res.json({ token, appId });
   } catch (error) {
     console.error('Error generating RTC token:', error);
     res.status(500).json({ error: 'Failed to generate token' });
@@ -400,12 +400,12 @@ app.get('/api/tokens/agora/rtm', (req, res) => {
 
       token.addService(serviceRtm);
       const tokenStr = token.build();
-      res.json({ token: tokenStr });
+      res.json({ token: tokenStr, appId });
     } else {
       // Fallback to 1.x (older SDKs)
       const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
       const token = RtmTokenBuilder.buildToken(appId, appCertificate, userId, privilegeExpiredTs);
-      res.json({ token });
+      res.json({ token, appId });
     }
   } catch (error) {
     console.error('Error generating RTM token:', error);
