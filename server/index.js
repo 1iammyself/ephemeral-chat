@@ -12,9 +12,9 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const { createClient } = require('redis');
 const RoomManager = require('./rooms');
+const { RtcTokenBuilder, RtmTokenBuilder, RtcRole, AccessToken2, ServiceRtm } = require('agora-token');
 const SecurityManager = require('./security');
 const authUtils = require('./auth-utils');
-const { RtcTokenBuilder, RtmTokenBuilder, RtcRole } = require('agora-token');
 // Cap.js removed - no CAPTCHA verification per user request
 const rateLimit = require('express-rate-limit');
 const {
@@ -390,8 +390,19 @@ app.get('/api/tokens/agora/rtm', (req, res) => {
   const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
 
   try {
-    const token = RtmTokenBuilder.buildToken(appId, appCertificate, userId, privilegeExpiredTs);
-    res.json({ token });
+    // RTM 2.x requires AccessToken2 format
+    if (AccessToken2 && ServiceRtm) {
+      const token = new AccessToken2(appId, appCertificate, currentTimestamp, expirationTimeInSeconds);
+      const serviceRtm = new ServiceRtm(userId);
+      serviceRtm.addPrivilege(ServiceRtm.kPrivilegeLogin, expirationTimeInSeconds);
+      token.addService(serviceRtm);
+      const tokenStr = token.build();
+      res.json({ token: tokenStr });
+    } else {
+      // Fallback to 1.x if library version is older (though we need 2.x for SDK 2.x)
+      const token = RtmTokenBuilder.buildToken(appId, appCertificate, userId, privilegeExpiredTs);
+      res.json({ token });
+    }
   } catch (error) {
     console.error('Error generating RTM token:', error);
     res.status(500).json({ error: 'Failed to generate token' });
