@@ -2,22 +2,18 @@
 # Strictly ignore everything except backend code
 
 # Frontend & Mobile
-client/
-android/
 android-twa/
 docs/
 screenshots/
 scripts/
 
 # Dependencies & Build
-node_modules/
 dist/
 build/
 .next/
 coverage/
 
 # System & Config
-.git/
 .gitignore
 .env
 .env*
@@ -38,3 +34,17 @@ tmp/
 *.mp4
 *.wav
 keystore_path/
+
+# Block the Android SDK and System files causing the crash
+**/AppData/
+**/Android/
+**/Sdk/
+adb.exe
+
+# Block the heavy folders (the 511MB)
+node_modules/
+**/node_modules/
+client/
+android/
+ios/
+.git/

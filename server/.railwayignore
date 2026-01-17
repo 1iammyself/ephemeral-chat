@@ -3,3 +3,16 @@
 ../../**/AppData/
 **/adb.exe
 node_modules/
+# Block the Android SDK and System files causing the crash
+**/AppData/
+
+**/Sdk/
+
+
+# Block the heavy folders (the 511MB)
+
+**/node_modules/
+client/
+android/
+ios/
+.git/
