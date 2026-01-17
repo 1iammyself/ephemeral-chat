@@ -25,7 +25,7 @@ Here’s a sneak peek at the app interface:
 <div align="center">
   <h1>Ephemeral Chat</h1>
 
-  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
   [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/cLLeB/ephemeral-chat/issues)
   [![Live Demo](https://img.shields.io/badge/🌐-Live_Demo-2ea44f)](https://ephemeral-chat-7j66.onrender.com/)
 
@@ -186,7 +186,7 @@ See our [Contributing Guidelines](https://github.com/cLLeB/ephemeral-chat/issues
 
 ## 📄 License
 
-Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
+Distributed under the GNU General Public License v3. See [LICENSE](LICENSE) for more information.
 
 ## 📞 Contact
 
@@ -278,7 +278,15 @@ INVITE_TOKEN_EXPIRY_MINUTES=5
 MAX_MESSAGES_PER_MINUTE=30
 
 # Redis (optional)
+# Redis (optional)
 # REDIS_URL=redis://localhost:6379
+
+### Client Environment Variables
+Create a `.env` file in the `client` directory for frontend configurations:
+```env
+# WebRTC ICE Servers (Optional - for custom TURN/STUN servers)
+VITE_ICE_SERVERS=[{"urls":"stun:stun.l.google.com:19302"}]
+```
 ```
 
 ### Available Scripts

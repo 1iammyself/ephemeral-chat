@@ -24,7 +24,7 @@
     "real-time"
   ],
   "author": "Ephemeral Chat Team",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "dependencies": {
     "@cap.js/server": "^4.0.4",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
