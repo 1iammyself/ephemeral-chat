@@ -55,6 +55,7 @@ async function initializeRedis() {
 }
 
 const app = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 
 // Request logging middleware
@@ -80,7 +81,7 @@ const isRender = process.env.RENDER === 'true';
 // Allowed origins can be provided as a comma-separated list via env
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : ['https://ephemeral-chat-7j66.onrender.com'];
+  : ['*']; // Fallback to allow all if not specified, though production logic will still apply isProduction check
 
 // Configure CORS options
 const getCorsOptions = () => {
@@ -932,11 +933,11 @@ const staticRouteLimiter = rateLimit({
 });
 
 app.get('*', staticRouteLimiter, (req, res) => {
-  if (process.env.NODE_ENV === 'production') {
-    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
-  } else {
-    res.sendFile(path.join(__dirname, '../client/index.html'));
-  }
+  res.json({
+    message: 'Ephemeral Chat API is running',
+    environment: process.env.NODE_ENV || 'development',
+    status: 'online'
+  });
 });
 
 // Start server
