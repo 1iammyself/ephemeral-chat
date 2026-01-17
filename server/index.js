@@ -385,22 +385,25 @@ app.get('/api/tokens/agora/rtm', (req, res) => {
     return res.status(500).json({ error: 'Agora credentials not configured on server' });
   }
 
-  const expirationTimeInSeconds = 3600;
   const currentTimestamp = Math.floor(Date.now() / 1000);
-  const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
+  const expirationTimeInSeconds = 3600;
 
   try {
-    // RTM 2.x requires AccessToken2 format
+    // RTM 2.x requires AccessToken2 format with Duration (not Timestamp)
     if (AccessToken2 && ServiceRtm) {
-      const token = new AccessToken2(appId, appCertificate, currentTimestamp, expirationTimeInSeconds);
+      // Third param is token expiration duration in seconds
+      const token = new AccessToken2(appId, appCertificate, expirationTimeInSeconds);
+
       const serviceRtm = new ServiceRtm(userId);
-      // Privilege expiration must be an absolute timestamp, not a duration
-      serviceRtm.addPrivilege(ServiceRtm.kPrivilegeLogin, privilegeExpiredTs);
+      // addPrivilege also takes duration in seconds for this version
+      serviceRtm.addPrivilege(ServiceRtm.kPrivilegeLogin, expirationTimeInSeconds);
+
       token.addService(serviceRtm);
       const tokenStr = token.build();
       res.json({ token: tokenStr });
     } else {
-      // Fallback to 1.x if library version is older (though we need 2.x for SDK 2.x)
+      // Fallback to 1.x (older SDKs)
+      const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
       const token = RtmTokenBuilder.buildToken(appId, appCertificate, userId, privilegeExpiredTs);
       res.json({ token });
     }
