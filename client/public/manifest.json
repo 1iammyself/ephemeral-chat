@@ -1,14 +1,21 @@
 {
+  "id": "com.ephemeral-chat.app",
   "name": "Ephemeral Chat",
   "short_name": "EphChat",
-  "description": "Secure, anonymous, and ephemeral chat application",
+  "description": "Secure, anonymous, and ephemeral chat rooms. Messages disappear when you leave, ensuring your privacy and security. No registration required.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#1f2937",
-  "theme_color": "#4F46E5",
+  "theme_color": "#4f46e5",
   "orientation": "portrait",
-  "categories": ["social", "communication", "productivity"],
+  "categories": [
+    "social",
+    "communication",
+    "productivity",
+    "utilities",
+    "security"
+  ],
   "icons": [
     {
       "src": "pwa-192x192.png",
@@ -20,58 +27,67 @@
       "src": "pwa-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "maskable-icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    },
+    {
+      "src": "logo.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ],
   "screenshots": [
     {
-      "src": "screenshot-chat.png",
-      "sizes": "1280x800",
+      "src": "screenshot-home.png",
+      "sizes": "1920x1080",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Chat Interface"
+      "label": "Ephemeral Chat Home Screen"
     },
     {
-      "src": "screenshot-room.png",
-      "sizes": "750x1334",
+      "src": "screenshot-chat.png",
+      "sizes": "1920x1080",
       "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Chat Room"
+      "form_factor": "wide",
+      "label": "Real-time Messaging Interface"
+    },
+    {
+      "src": "screenshot-join.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Join Private Rooms"
     }
   ],
   "shortcuts": [
     {
-      "name": "New Chat",
-      "short_name": "New",
-      "description": "Start a new chat room",
-      "url": "/new"
-    },
-    {
       "name": "Join Chat",
       "short_name": "Join",
-      "description": "Join an existing chat room",
-      "url": "/join"
+      "description": "Join an existing chat room with a code",
+      "url": "/join",
+      "icons": [
+        {
+          "src": "pwa-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ],
   "prefer_related_applications": false,
-  "related_applications": [
-    {
-      "platform": "webapp",
-      "url": "https://ephemeral-chat-7j66.onrender.com/manifest.json"
-    }
-  ],
   "dir": "ltr",
   "lang": "en-US",
-  "splash_pages": null,
-  "serviceworker": {
-    "src": "/sw.js",
-    "scope": "/",
-    "use_cache": true
+  "display_override": [
+    "window-controls-overlay",
+    "minimal-ui"
+  ],
+  "handle_links": "auto",
+  "launch_handler": {
+    "client_mode": "navigate-existing"
   }
 }
