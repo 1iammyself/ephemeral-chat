@@ -23,8 +23,8 @@
     "ephemeral",
     "real-time"
   ],
-  "author": "Ephemeral Chat Team",
-  "license": "MIT",
+  "author": "Caleb Kyere-Boateng",
+  "license": "Apache-2.0",
   "dependencies": {
     "@cap.js/server": "^4.0.4",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",

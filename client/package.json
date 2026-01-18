@@ -2,6 +2,7 @@
   "name": "ephemeral-chat-client",
   "private": true,
   "version": "1.0.0",
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -23,17 +24,16 @@
     "socket.io-client": "^4.7.2",
     "vite": "^4.4.5",
     "vite-plugin-pwa": "^0.17.4",
-     "postcss": "^8.5.6",
+    "postcss": "^8.5.6",
     "tailwindcss": "^3.4.19",
     "autoprefixer": "^10.4.23",
-     "@types/react": "^18.2.15",
+    "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
     "@vitejs/plugin-react": "^4.7.0",
     "gh-pages": "^6.0.0",
     "typescript": "^5.8.3"
   },
   "devDependencies": {
-   
     "workbox-core": "^7.0.0",
     "workbox-expiration": "^7.0.0",
     "workbox-precaching": "^7.0.0",
