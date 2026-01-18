@@ -1,335 +1,185 @@
+# 🗨️ Ephemeral Chat
 
-## 🎥 Demo Video
+<p align="center">
+  <img src="screenshots/homepage_picture.png" alt="Ephemeral Chat Home" width="600"/>
+</p>
 
-[![Demo Video](screenshots/chatroompic.png)](https://youtu.be/gnvoWkvkkho)
+<div align="center">
 
-Watch a quick demo of Ephemeral Chat in action!
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/cLLeB/ephemeral-chat/issues)
+[![Live Demo](https://img.shields.io/badge/🌐-Live_Demo-2ea44f)](https://ephemeral-chat-7j66.onrender.com/)
+[![Powered by Agora](https://img.shields.io/badge/Powered%20by-Agora-blueviolet)](https://www.agora.io/)
+[![Support](https://img.shields.io/badge/Support-Email-orange)](mailto:kyereboatengcaleb@gmail.com)
+
+**Secure. Anonymous. Ephemeral.**
+*Professional-grade, real-time communication that leaves no trace.*
+
+[Features](#-key-features) • [Tech Stack](#-tech-stack) • [Security](#-privacy--security) • [Quick Start](#-quick-start) • [TWA Distribution](#-android-twa-distribution)
+
+</div>
 
 ---
 
-## 📸 Screenshots
+## 🎥 Quick Demo
+[![Demo Video](screenshots/chatroompic.png)](https://youtu.be/gnvoWkvkkho)  
+*Watch how Ephemeral Chat enables seamless, secure communication.*
 
-Here’s a sneak peek at the app interface:
+---
 
-<p align="center">
-   <img src="screenshots/homepage_picture.png" alt="Home Screen" width="400"/>
-   <img src="screenshots/join room pic.png" alt="Join Room UI" width="400"/>
-</p>
+## 👋 Introduction
 
-## 🔒 CI/CD & Code Quality
+**Ephemeral Chat** is a privacy-first communication platform designed for users who value anonymity and security. Whether you need a quick temporary workspace or a secure channel for sensitive discussions, Ephemeral Chat provides a robust, account-free environment where messages disappear the moment they are no longer needed.
 
-- **GitHub Actions**: Automated workflows for building, testing, and analyzing code.
-- **CodeQL**: Security analysis for JavaScript/Node.js and Java/Android code.
-- **Gradle Build**: Ensures Android app builds successfully on every push.
+Built with a focus on **End-to-End Encryption (E2EE)** and **Real-Time Performance**, the application is available as a web platform, a Progressive Web App (PWA), and an Android-ready Trusted Web Activity (TWA).
 
-<div align="center">
-  <h1>Ephemeral Chat</h1>
+---
 
-  [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-  [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/cLLeB/ephemeral-chat/issues)
-  [![Live Demo](https://img.shields.io/badge/🌐-Live_Demo-2ea44f)](https://ephemeral-chat-7j66.onrender.com/)
+## ✨ Key Features
 
-  <p>A secure, anonymous, and ephemeral chat application with self-destructing messages. Installable as a Progressive Web App (PWA) for native-like experience.</p>
-   <p>A secure, anonymous, and ephemeral chat application with self-destructing messages. Installable as a Progressive Web App (PWA) for native-like experience. <strong>Can also be distributed as a Trusted Web Activity (TWA) for Android via the Play Store.</strong></p>
+### 📡 Real-Time Communication
+- **Instant Messaging**: Powered by **Socket.io** for sub-millisecond delivery.
+- **📞 HD Voice & Video**: Integrated **Agora RTC** for high-quality, peer-to-peer audio and video calls.
+- **🎤 Universal Voice Notes**: Cross-platform recording and playback.
+  - *Technical Highlight*: Automated server-side conversion to **AAC (.m4a)** ensures seamless compatibility with iOS Safari and all modern browsers.
 
-  [Report Bug](https://github.com/cLLeB/ephemeral-chat/issues) · [Request Feature](https://github.com/cLLeB/ephemeral-chat/issues/new?assignees=&labels=enhancement&template=feature_request.md&title=)
-</div>
+### 🛡️ Privacy & Security
+- **🔐 End-to-End Encryption (E2EE)**: Messages are encrypted client-side using **AES-GCM (256-bit)**. Encryption keys never leave your browser.
+- **🚫 Zero Data Retention**: Messages are stored in-memory (or Redis) and are never persisted to a database.
+- **📸 Self-Destructing Media**: Share images with a **view-once** capability.
+- **🚪 Knock-to-Join Lobby**: Host-controlled entry system to prevent unwanted guests.
 
-## ✨ Features
+### 📱 Modern Web Experience
+- **Progressive Web App (PWA)**: Installable on iOS, Android, and Desktop with offline support.
+- **Trusted Web Activity (TWA)**: Fully compatible with Android distribution via the Google Play Store.
+- **Adaptive UI**: Responsive design tailored for both mobile and desktop users.
 
-### 💬 Rich Messaging
-- **Real-Time Messaging**: Lightning-fast message delivery using Socket.io
-- **📞 Voice Calls**: Crystal clear peer-to-peer audio calls using WebRTC
-- **🎤 Universal Voice Notes**: Record audio on any device (iOS, Android, Desktop) and play it anywhere.
-    - *Technical Feat*: Server-side conversion to AAC (.m4a) ensures seamless playback on Safari and all modern browsers.
-- **📸 Image Sharing**: Share images securely with view-once capability
-- **Self-Destructing Messages**: Messages disappear after being read or after a set time
-
-### 🏠 Room Management
-- **Instant Room Creation**: Generate unique chat rooms instantly with 6-digit codes
-- **🚪 Knock-to-Join System**: Guests enter a lobby and must be approved by the host
-- **👑 Host Controls**: Room creators can approve or deny entry to pending guests
-- **🔄 Host Handover**: Automatic ownership transfer if the host leaves
-- **Anonymous Participation**: No accounts or personal information required
-- **Auto-Cleanup**: Rooms automatically close after inactivity
-
-### 🛡️ Security & Privacy
-- **🔐 Client-Side Encryption (E2EE)**: Messages are encrypted in the browser using AES-GCM. The key is in the URL hash and never reaches the server.
-- **No Message Persistence**: Messages are never stored permanently on the server
-- **🔒 Password Protection**: Optional password protection for rooms
-- **🤖 Bot Protection**: Integrated Proof-of-Work CAPTCHA to prevent spam
-- **🛡️ Brute Force Protection**: Failed attempt tracking and automatic lockout
-- **✅ Input Validation**: XSS prevention and credential sanitization
-
-### 📱 Progressive Web App (PWA)
-- **Installable**: Add to home screen on any device
-- **Native Feel**: App-like experience with splash screen and theme colors
-- **Offline Capable**: Core shell works offline
+---
 
 ## 🛠️ Tech Stack
 
-
 ### Frontend
-- **React**: UI library
-- **Vite**: Build tool and dev server
-- **Tailwind CSS**: Utility-first CSS framework
-- **Socket.io Client**: Real-time communication
-- **WebRTC**: Peer-to-peer audio calls
-- **Lucide React**: Beautiful icons
-
-### Android Distribution
-- **Trusted Web Activity (TWA)**: The project includes an `android/` directory with a Gradle project, allowing the PWA to be packaged and distributed as a native Android app on the Google Play Store.
+- **React.js**: Highly responsive UI components.
+- **Tailwind CSS**: Modern, utility-first styling.
+- **Lucide Icons**: Beautiful, lightweight iconography.
+- **Vite**: Ultra-fast build tool and development server.
+- **Agora SDK**: Professional-grade real-time engagement.
 
 ### Backend
-- **Node.js & Express**: Server runtime and framework
-- **Socket.io**: Real-time event-based communication
-- **FFmpeg**: Audio processing and conversion (with static binaries)
-- **@cap.js**: Proof-of-Work CAPTCHA system
-- **Redis** (Optional): For scaling across multiple instances
+- **Node.js & Express**: High-performance server runtime.
+- **Socket.io**: Scalable real-time event engine.
+- **Redis**: Low-latency message brokerage and distribution.
+- **FFmpeg**: Advanced server-side audio processing.
 
-### Audio Processing
-- **Universal Compatibility**: Automated conversion of WebM/Ogg (Android/Chrome) to AAC (iOS/Safari).
-- **Smart Copy**: Intelligent detection of AAC inputs to avoid unnecessary re-encoding.
-- **Robust Normalization**: Auto-correction of sample rates and timestamps for glitch-free playback.
+### Security
+- **Web Crypto API**: High-standard cryptographic operations.
+- **Rate Limiting**: Protection against brute-force and spam.
+- **XSS Prevention**: Strict input sanitization and content security policies.
 
-### PWA
-- **Vite PWA Plugin**: PWA generation and management
-- **Workbox**: Service worker libraries
+---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js (v16 or higher)
-- npm (v8 or higher) or yarn
-- (Optional) Redis for production deployments
+- **Node.js** (v18.0.0 or higher)
+- **npm** (v9.0.0 or higher)
+- **FFmpeg** (Included via static binaries)
 
 ### Installation
 
-1. **Clone the repository**
+1. **Clone the Repository**
    ```bash
    git clone https://github.com/cLLeB/ephemeral-chat.git
    cd ephemeral-chat
    ```
 
-2. **Install dependencies**
+2. **Install Dependencies**
    ```bash
-   # Install root dependencies
+   # Root & Server
    npm install
 
-   # Install client dependencies
+   # Client
    cd client && npm install && cd ..
    ```
 
-3. **Set up environment variables**
-   Copy the existing `.env` file or create one with these settings:
-   ```env
-   # Server Configuration
-   PORT=3001
-   NODE_ENV=development
+3. **Configure Environment**
+   Create a `.env` in the root and `client/` directories. Refer to the [Configuration](#-configuration) section.
 
-   # Security Settings (already configured)
-   INACTIVITY_TIMEOUT_MINUTES=10
-   MAX_FAILED_ATTEMPTS=5
-   LOCKOUT_DURATION_MINUTES=10
-   ROOM_CODE_SALT=your-secure-salt-here
-   CAP_SECRET=your-captcha-secret-key
-
-   # Room Settings
-   ROOM_EXPIRY_MINUTES=60
-   INVITE_TOKEN_EXPIRY_MINUTES=5
-   MAX_MESSAGES_PER_MINUTE=30
-   ```
-
-4. **Start the development server**
+4. **Launch Development Server**
    ```bash
-   # Start both client and server concurrently
    npm run dev
    ```
 
-5. **Access the application**
-   - Frontend: http://localhost:5173 (Vite dev server)
-   - Backend API: http://localhost:3001
-
-## 📱 Progressive Web App (PWA)
-
-Your chat application is a fully-featured PWA that can be installed on any device!
-
-### Installation
-1. **Open in browser** and visit the live demo
-2. **Look for install prompt** in your browser's address bar
-3. **Click "Install"** or "Add to Home Screen"
-4. **Launch from home screen** like a native app
-
-### PWA Features
-- **Offline functionality** - Chat works without internet
-- **Native app feel** - Custom splash screen and theme colors
-- **Auto-updates** - Always runs the latest version
-- **Fast loading** - Cached assets for instant access
-
-##  Documentation
-
-### User Documentation
-- [User Guide](docs/USER_GUIDE.md) - Complete guide for end users
-
-## 🤝 Contributing
-
-Contributions are welcome! Here's how you can help:
-
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
-3. **Make your changes** and test them thoroughly
-4. **Commit your changes**: `git commit -m 'Add amazing feature'`
-5. **Push to the branch**: `git push origin feature/amazing-feature`
-6. **Open a Pull Request**
-
-See our [Contributing Guidelines](https://github.com/cLLeB/ephemeral-chat/issues) for more details.
-
-## 📄 License
-
-Distributed under the GNU General Public License v3. See [LICENSE](LICENSE) for more information.
-
-## 📞 Contact
-
-- **Project Link**: [https://github.com/cLLeB/ephemeral-chat](https://github.com/cLLeB/ephemeral-chat)
-- **Live Demo**: [https://ephemeral-chat-7j66.onrender.com/](https://ephemeral-chat-7j66.onrender.com/)
-- **Email**: kyereboatengcaleb@gmail.com
-
-## 🙏 Acknowledgments
-
-- [Socket.IO](https://socket.io/) for real-time communication
-- [React](https://reactjs.org/) for the amazing UI framework
-- [Vite](https://vitejs.dev/) for fast development experience
-- [Tailwind CSS](https://tailwindcss.com/) for utility-first CSS
-- [Render](https://render.com/) for hosting
-- [Progressive Web Apps](https://developers.google.com/web/progressive-web-apps) for native-like web experience
-
 ---
-
-## 🏗️ Project Structure
-
-```
-ephemeral-chat/
-├── android/                  # Android TWA project (wraps the PWA for Play Store distribution)
-│   ├── app/                  # Android app module
-│   ├── build.gradle          # Gradle build files
-│   ├── gradlew, gradlew.bat  # Gradle wrapper scripts
-│   └── ...                   # Other Android/Gradle files
-├── client/                   # React frontend (Vite + PWA)
-│   ├── public/               # PWA assets & manifest
-│   │   ├── manifest.json     # Web app manifest
-│   │   ├── sw.js             # Service worker
-│   │   └── *.png             # PWA icons
-│   ├── src/                  # React source code
-│   │   ├── components/       # Reusable UI components
-│   │   ├── hooks/            # Custom React hooks
-│   │   ├── services/         # API integrations
-│   │   └── utils/            # Helper functions
-│   ├── vite.config.js        # Vite configuration with PWA
-│   └── package.json
-│
-├── server/                   # Express + Socket.IO backend
-│   ├── auth-utils.js         # Authentication utilities
-│   ├── index.js              # Server entry point
-│   ├── rooms.js              # Room management
-│   ├── security.js           # Security middleware
-│   └── utils.js              # Utility functions
-│
-├── docs/                     # Documentation
-│   └── USER_GUIDE.md         # User guide
-│
-├── .env                      # Environment variables
-├── package.json              # Root dependencies
-└── README.md
-```
 
 ## 📱 Android TWA Distribution
 
-This project can be distributed as a native Android app using Trusted Web Activity (TWA). The `android/` directory contains a Gradle project that wraps the PWA, allowing you to publish the app on the Google Play Store for a seamless, native-like experience.
+The project includes a ready-to-use Android project in the `android/` directory. This allows you to package your PWA as a native APK for the Google Play Store using **Trusted Web Activity (TWA)**.
 
-### Building the Android App
+**Build Requirements:**
+- Android Studio / Gradle
+- Java 11+
 
 ```bash
 cd android
-./gradlew assembleDebug  # or assembleRelease for production
+./gradlew assembleRelease
 ```
-The output APK will be in `android/app/build/outputs/apk/`.
-
-You can customize the TWA settings and assets in the `android/` directory as needed.
-
-## ⚙️ Configuration
-
-### Environment Variables
-The application uses the following environment variables (see `.env` file):
-
-```env
-# Server
-PORT=3001
-NODE_ENV=development
-
-# Security (REQUIRED)
-INACTIVITY_TIMEOUT_MINUTES=10
-MAX_FAILED_ATTEMPTS=5
-LOCKOUT_DURATION_MINUTES=10
-ROOM_CODE_SALT=your-secure-salt-here
-
-# Room Settings
-ROOM_EXPIRY_MINUTES=60
-INVITE_TOKEN_EXPIRY_MINUTES=5
-MAX_MESSAGES_PER_MINUTE=30
-
-# Redis (optional)
-# Redis (optional)
-# REDIS_URL=redis://localhost:6379
-
-### Client Environment Variables
-Create a `.env` file in the `client` directory for frontend configurations:
-```env
-# WebRTC ICE Servers (Optional - for custom TURN/STUN servers)
-VITE_ICE_SERVERS=[{"urls":"stun:stun.l.google.com:19302"}]
-```
-```
-
-### Available Scripts
-- `npm run dev`: Start development servers (client + server)
-- `npm run server`: Start backend server only
-- `npm run client`: Start frontend client only
-- `npm run build`: Build frontend for production
-- `npm start`: Start production server
-
-## 🔧 Development
-
-### Frontend Development
-The client is built with React and Vite:
-
-```bash
-cd client
-npm run dev  # Starts on http://localhost:5173
-```
-
-### Backend Development
-The server uses Node.js with Express and Socket.IO:
-
-```bash
-npm run server  # Starts on http://localhost:3001
-```
-
-### API Endpoints
-- `GET /` - Health check
-- `POST /api/rooms` - Create room
-- `GET /api/rooms/:code` - Get room info
-- WebSocket events: `joinRoom`, `sendMessage`, `leaveRoom`
-
-## 🚀 Deployment
-
-The application is currently deployed on **Render**:
-
-- **Frontend**: Static site deployment
-- **Backend**: Web service
-- **URL**: https://ephemeral-chat-7j66.onrender.com/
-
-### Deployment Configuration
-The deployment uses the `render.yaml` configuration for automatic builds and deployments.
 
 ---
 
-*Built with ❤️ for privacy-focused communication*
+## ⚙️ Configuration
+
+### Server `.env`
+```env
+PORT=3001
+NODE_ENV=production
+ALLOWED_ORIGINS=https://your-domain.com
+REDIS_URL=redis://localhost:6379
+
+# Agora Credentials
+AGORA_APP_ID=your_app_id
+AGORA_APP_CERTIFICATE=your_certificate
+```
+
+### Client `.env`
+```env
+VITE_SERVER_URL=https://your-api.com
+VITE_AGORA_APP_ID=your_app_id
+```
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions of all sizes! 
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+---
+
+## 📄 License & Attribution
+
+Distributed under the **Apache License 2.0**. See `LICENSE` and `NOTICE` for more information.
+
+**Author:** Caleb Kyere Boateng  
+**Powered by:** [cLLeB](https://github.com/cLLeB/ephemeral-chat)
+
+---
+
+## 🙏 Acknowledgments
+
+- **[Agora.io](https://www.agora.io/)**: For providing the robust Real-Time Engagement (RCE) platform that powers our voice and video calls.
+- **[Socket.io](https://socket.io/)**: For the seamless real-time WebSocket communication.
+- **[React](https://reactjs.org/)**: For the intuitive UI development experience.
+- **[Lucide](https://lucide.dev/)**: For the beautiful and consistent iconography.
+- **[Railway](https://railway.app/)**: For the reliable deployment and hosting environment.
+
+
+---
+
+<div align="center">
+  *Designed with ❤️ for a safer, private internet.*
+</div>
