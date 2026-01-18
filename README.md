@@ -25,7 +25,7 @@ Here’s a sneak peek at the app interface:
 <div align="center">
   <h1>Ephemeral Chat</h1>
 
-  [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+  [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
   [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/cLLeB/ephemeral-chat/issues)
   [![Live Demo](https://img.shields.io/badge/🌐-Live_Demo-2ea44f)](https://ephemeral-chat-7j66.onrender.com/)
 
@@ -186,7 +186,7 @@ See our [Contributing Guidelines](https://github.com/cLLeB/ephemeral-chat/issues
 
 ## 📄 License
 
-Distributed under the GNU General Public License v3. See [LICENSE](LICENSE) for more information.
+Distributed under the Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE) for more information.
 
 ## 📞 Contact
 
