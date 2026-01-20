@@ -1,181 +1,80 @@
-<div align="center">
-  <img src="client/public/favicon.png" alt="Ephemeral Chat Logo" width="100"/>
-  <h1>Ephemeral Chat</h1>
-  
-  <p align="center">
-    <strong>Secure, anonymous, and ephemeral communication with self-destructing magic.</strong>
-  </p>
-
-  <p align="center">
-    <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"></a>
-    <a href="https://github.com/cLLeB/ephemeral-chat/issues"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
-    <a href="https://chat.kyere.me/"><img src="https://img.shields.io/badge/🌐-Live_Demo-2ea44f" alt="Live Demo"></a>
-  </p>
-
-  <p align="center">
-    <a href="#-features">Features</a> •
-    <a href="#-quick-start">Quick Start</a> •
-    <a href="#-tech-stack">Tech Stack</a> •
-    <a href="#-architecture">Architecture</a> •
-    <a href="#-deployment">Deployment</a>
-  </p>
-</div>
+# 📱 Ephemeral Chat: Master Your Privacy
+Welcome to the official guide for **Ephemeral Chat**. This app is designed for total anonymity and peace of mind. Every message you send is like writing in the sand at low tide,it’s only there until the next wave.
 
 ---
 
-## 🎥 Experience the Magic
+## 🚀 The Basics: Getting In
+You don't need an account, an email, or even a real name. Just a portal.
 
-Watch how Ephemeral Chat redefines private communication:
+### 1. Creating a Room (The Host)
+*   Tap **"Create New Room"** on the home screen.
+*   **Pick a Nickname**: This is how others will see you.
+*   **Set a Password (Optional)**: If you want a password you can set one.
+    > [!TIP]
+    > **Stealth Entry**: When typing your password, you won't see dots or characters. This is a security feature to prevent anyone looking over your shoulder from seeing how many characters your password has!
+*   Tap **"Create Room"**.
 
-[![Watch the video](screenshots/chatroompic.png)](https://youtu.be/gnvoWkvkkho)
+### 2. Joining a Room (The Guest)
+*   **Via Link**: Simply click the link someone sent you. Make sure the link starts with `https://...` and ends with a `#` followed by random characters.
 
-### 📸 Sneak Peek
-
-<p align="center">
-   <img src="screenshots/homepage_picture.png" alt="Home Screen" width="400" style="border-radius: 10px; margin-right: 10px;"/>
-   <img src="screenshots/join room pic.png" alt="Join Room UI" width="400" style="border-radius: 10px;"/>
-</p>
-
----
-
-## ✨ Features
-
-### 💬 Seamless Messaging
-- **Real-Time Engine**: Instant message delivery powered by Socket.io.
-- **📞 Hybrid Voice Calls**: Crystal clear P2P audio with WebRTC, falling back to Agora for rock-solid reliability.
-- **🎤 Universal Voice Notes**: Record on any device. Our backend handles conversion to AAC (.m4a) for flawless playback on iOS Safari and everywhere else.
-- **📸 Secure Media**: Share images with "View Once" capability.
-
-### 🛡️ Privacy First
-- **� End-to-End Encryption**: AES-GCM encryption happens in your browser. Keys stay in the URL hash—never sent to our server.
-- **� Zero Persistence**: Messages live in memory and self-destruct after reading or a set timeout.
-- **🚪 Guarded Entry**: Host-controlled "Knock-to-Join" system and optional room passwords.
-- **🤖 Anti-Spam**: Integrated Proof-of-Work CAPTCHA protects every room.
-
-### � Native Experience
-- **PWA Ready**: Installable on any device for a native app feel.
-- **TWA Distribution**: Optimized for Android via Google Play Store (Trusted Web Activity).
-- **Offline Shell**: Quick loading with cached essential assets.
 
 ---
 
-## 🛠️ Tech Stack
+## 🛡️ Your Privacy Tools
+We’ve built-in "magic" features to keep your chat truly private.
 
-| Frontend | Backend | DevOps |
-| :--- | :--- | :--- |
-| **React** & **Vite** | **Node.js** & **Express** | **Docker** Ready |
-| **Tailwind CSS** | **Socket.io** | **GitHub Actions** CI/CD |
-| **Lucide Icons** | **FFmpeg** (Processing) | **CodeQL** Analysis |
-| **WebRTC & Agora** | **Redis** (Scaling) | **Render** Hosting |
+### 🕵️ Privacy Blur (Instant Protection)
 
----
+*   **The Magic**: The moment you switch apps or look away from your screen, the entire chat turns into a blurry cloud.
 
-## 🚀 Quick Start
-
-### 1. Requirements
-Ensure you have **Node.js (v16+)** and **npm (v8+)** installed.
-
-### 2. Installation
-```bash
-# Clone the repo
-git clone https://github.com/cLLeB/ephemeral-chat.git
-cd ephemeral-chat
-
-# Install dependencies for both root and client
-npm install
-cd client && npm install && cd ..
-```
-
-### 3. Configuration
-Copy the template and add your credentials:
-```bash
-cp client/.env.example client/.env
-```
-
-<details>
-<summary>🔑 <b>Click to see Environment Variables Guide</b></summary>
-
-| Variable | Description |
-| :--- | :--- |
-| `VITE_AGORA_APP_ID` | Your Agora project ID |
-| `VITE_AGORA_TOKEN` | Agora primary certificate / token |
-| `INACTIVITY_TIMEOUT` | Minutes before a room is cleared |
-| `CAP_SECRET` | Secret key for Captcha system |
-
-</details>
-
-### 4. Run Locally
-```bash
-npm run dev
-```
-- **Frontend**: [http://localhost:5173](http://localhost:5173)
-- **Backend**: [http://localhost:3001](http://localhost:3001)
+### 👻 The Ghost Watermark
+You might notice your name hashed across the background of the chat. This is our **Ghost Watermark**.
 
 ---
 
-## 🏗️ Architecture & Deep Dives
+## 💬 Mastery of Communication
 
-<details>
-<summary><b>📐 Hybrid Call State Machine</b></summary>
+### 🗣️ Sending Voice Notes
+*   Tap and hold the **Microphone (🎤)** icon.
+*   Speak naturally. You have **30 seconds**.
+*   Release to send, or tap the **Trash (🗑️)** icon to cancel.
+*   *Don't worry about compatibility!* Whether you're on an old Android or the latest iPhone, your voice will play perfectly.
 
-We use a sophisticated failover logic for audio calls:
-1. **P2P Mode**: Uses WebRTC via Google STUN and ExpressTURN.
-2. **Fallback**: Auto-switches to Agora SDK if:
-   - Packet loss exceeds 5%.
-   - More than 3 participants join.
-   - P2P connection fails to establish.
+### 📞 Starting a Call
+Want to talk live? 
+*   Tap the **Phone (📞)** icon.
+*   The app will automatically use the best connection possible.
 
-</details>
+### 🎯 Targeted Messaging (Private Talk)
+In a room with 10 people but only want to whisper to 2?
+1.  Open the **User List** (tap the People icon in the top right).
+2.  **Tap the Names** of the people you want to talk to. They will be highlighted.
+3.  Go back to the chat. You'll see a blue bar saying **"Sending to X specific users"**.
+4.  Send your message. **Only those selected people will see it.** Everyone else gets nothing!
+5.  *Tip: Tap "Clear selection" to go back to talking to everyone.*
 
-<details>
-<summary><b>🔒 Encryption Architecture</b></summary>
-
-Using **AES-GCM (256-bit)**:
-1. Room key is generated locally on creation.
-2. Key is appended to the URL as a fragment identifier (`#key`).
-3. Fragment identifiers are *never* sent to the server.
-4. Messages are encrypted/decrypted entirely client-side.
-
-</details>
-
-<details>
-<summary><b>🌍 ICE Server Configuration</b></summary>
-
-```javascript
-[
-   { urls: "stun:stun.l.google.com:19302" },
-   { urls: "turn:free.expressturn.com:3478?transport=udp", username: "...", credential: "..." },
-   { urls: "turn:relay.metered.ca:80", username: "...", credential: "..." }
-]
-```
-
-</details>
+### 📸 "View Once" Photos
+When you share a photo using the **Image (🖼️)** icon, it is sent as a "View Once" message. Once the recipient sees it or closes the room, it's gone forever.
 
 ---
 
-## 🏗️ Project Structure
+## 📥 Installation: App-Like Experience
+You don't have to use your browser every time!
 
-```text
-ephemeral-chat/
-├── android/          # Android TWA project (Play Store)
-├── client/           # React frontend (Vite + PWA)
-│   ├── src/          # React components, hooks, services
-│   └── public/       # PWA manifest and icons
-├── server/           # Express + Socket.IO backend
-│   ├── auth-utils.js # Security & Validation
-│   └── rooms.js      # Room management logic
-└── docs/             # Detailed user and dev guides
-```
+*   **iPhone/iPad**: Tap the "Share" icon (the square with an arrow) in Safari and select **"Add to Home Screen"**.
+*   **Android**: Look for a prompt that says "Install App" or "Add to Home Screen" in Chrome.
+*   **Desktop**: Click the "Install" icon in the address bar of Chrome or Edge.
+*   **Microsoft Store**  Look for "Ephchat".
 
 ---
 
-## 🤝 Contributing & License
+## ❓ FAQ (Frequently Asked Questions)
 
-We love contributions! Please feel free to open an issue or submit a pull request.
+**Q: Why can't I see my own password when I type it?**
+**A:** This is "Stealth Entry." It prevents anyone nearby from seeing your password length or characters. Just type confidently!
 
-**License**: Distributed under the **Apache License 2.0**. See `LICENSE` and `NOTICE` for details.
+**Q: Do my messages stay on your server?**
+**A:** Never.
 
 ---
-<div align="center">
-  <i>Maintained and Powered by <a href="https://chat.kyere.me/">Caleb Kyere-Boateng</a></i>
-</div>
+**Need help?** Ask your Host or rejoin the room to reset your session.
