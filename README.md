@@ -2,14 +2,7 @@
 **The Gold Standard for Zero-Persistence, Encrypted Communication.**
 
 Ephemeral Chat is a high-security, anonymous messaging platform built for users who demand absolute privacy. No accounts, no logs.
-<<<<<<< HEAD
-# 👻 Ephemeral Chat
-**The Gold Standard for Zero-Persistence, Encrypted Communication.**
 
-Ephemeral Chat is a high-security, anonymous messaging platform built for users who demand absolute privacy. No accounts, no logs, and no traces. Messages live only in memory and self-destruct with mathematical precision.
-
-=======
->>>>>>> 02f2e985820d3b9102a76db6540248f19500471e
   <p align="center">
     <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"></a>
     <a href="https://github.com/cLLeB/ephemeral-chat/issues"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
@@ -17,11 +10,11 @@ Ephemeral Chat is a high-security, anonymous messaging platform built for users 
   </p>
 
   <p align="center">
-    <a href="#-features">Features</a> •
-    <a href="#-quick-start">Quick Start</a> •
-    <a href="#-tech-stack">Tech Stack</a> •
-    <a href="#-architecture">Architecture</a> •
-    <a href="#-deployment">Deployment</a>
+    <a href="#features">Features</a> •
+    <a href="#quick-start">Quick Start</a> •
+    <a href="#tech-stack">Tech Stack</a> •
+    <a href="#architecture">Architecture</a> •
+    <a href="#deployment">Deployment</a>
   </p>
 </div>
 
@@ -225,5 +218,5 @@ We love contributions! Please feel free to open an issue or submit a pull reques
 
 ---
 <div align="center">
-  <i>Maintained and Powered by <a href="https://talk.kyere.me/">Caleb Kyere-Boateng</a></i>
+  <i>Maintained and Powered by <a href="https://portfolio.kyere.me/">Caleb Kyere-Boateng</a></i>
 </div>
