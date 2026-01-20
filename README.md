@@ -183,5 +183,5 @@ We love contributions! Please feel free to open an issue or submit a pull reques
 
 ---
 <div align="center">
-  <i>Maintained and Powered by <a href="https://chat.kyere.me/">Caleb Kyere-Boateng</a></i>
+  <i>Maintained and Powered by <a href="https://portfolio.kyere.me/">Caleb Kyere-Boateng</a></i>
 </div>
