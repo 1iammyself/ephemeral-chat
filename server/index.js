@@ -26,6 +26,7 @@ const {
   logger
 } = require('./utils');
 const { convertAudioToAAC } = require('./utils/audio-converter');
+const { RtcTokenBuilder, RtcRole } = require('agora-token');
 
 // Initialize Cap.js for proof-of-work CAPTCHA
 const cap = new Cap({
@@ -447,16 +448,56 @@ app.post('/api/reveal-image', async (req, res) => {
     const base64Data = message.content.split(',')[1];
     const imgBuffer = Buffer.from(base64Data, 'base64');
     const mimeType = message.content.split(';')[0].split(':')[1];
-
     res.setHeader('Content-Type', mimeType);
-    res.setHeader('Cache-Control', 'no-store');
     res.send(imgBuffer);
-
   } catch (error) {
     logger.error('Error revealing image:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Failed to reveal image' });
   }
 });
+
+/**
+ * Agora RTC Token Generation
+ * GET /api/agora/token?channelName=roomCode
+ */
+app.get('/api/agora/token', (req, res) => {
+  try {
+    const channelName = req.query.channelName;
+    if (!channelName) {
+      return res.status(400).json({ error: 'channelName is required' });
+    }
+
+    const appId = process.env.AGORA_APP_ID;
+    const appCertificate = process.env.AGORA_APP_CERTIFICATE;
+
+    if (!appId || !appCertificate) {
+      logger.error('Agora configuration missing');
+      return res.status(500).json({ error: 'Agora not configured on server' });
+    }
+
+    const role = RtcRole.PUBLISHER;
+    const expirationTimeInSeconds = 3600;
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+    const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
+
+    // Build token using UID 0 (allows any UID to join)
+    const token = RtcTokenBuilder.buildTokenWithUid(
+      appId,
+      appCertificate,
+      channelName,
+      0,
+      role,
+      privilegeExpiredTs,
+      privilegeExpiredTs
+    );
+
+    res.json({ success: true, token, appId });
+  } catch (error) {
+    logger.error('Error generating Agora token:', error);
+    res.status(500).json({ error: 'Failed to generate token' });
+  }
+});
+
 
 io.on('connection', (socket) => {
   // logger.info(`🔌 User connected: ${socket.id}`);

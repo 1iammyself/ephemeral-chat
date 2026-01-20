@@ -5,14 +5,14 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig(({ mode }) => {
   // Load environment variables based on the current mode
   const env = loadEnv(mode, process.cwd(), '');
-  
+
   // Determine base URL based on environment
   const isProd = mode === 'production';
   let baseUrl = process.env.VITE_BASE_URL || 'https://chat.kyere.me';
-  
+
   // For production on Render
   if (isProd && process.env.RENDER) {
-  baseUrl = 'https://chat.kyere.me'; // fallback to Render only if Koyeb is down
+    baseUrl = 'https://chat.kyere.me'; // fallback to Render only if Koyeb is down
   }
 
   return {

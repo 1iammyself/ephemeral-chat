@@ -10,16 +10,16 @@ class SecurityManager {
     // User activity tracking
     this.userActivity = new Map(); // socketId -> { lastActivity, userId, roomCode, timeoutId }
     this.sessionTokens = new Map(); // sessionToken -> { socketId, userId, roomCode, createdAt }
-    
+
     // Configuration
     this.INACTIVITY_TIMEOUT_MS = parseInt(process.env.INACTIVITY_TIMEOUT_MINUTES || 15) * 60 * 1000; // 15 minutes default
     this.SESSION_TOKEN_LENGTH = 32;
     this.MAX_FAILED_ATTEMPTS = 5;
     this.LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes lockout
-    
+
     // Failed authentication attempts tracking
     this.failedAttempts = new Map(); // identifier -> { count, lockedUntil }
-    
+
     // console.log(`🔒 Security Manager initialized with ${this.INACTIVITY_TIMEOUT_MS / 1000}s inactivity timeout`);
   }
 
@@ -262,9 +262,9 @@ class SecurityManager {
     if (attempts.count >= this.MAX_FAILED_ATTEMPTS) {
       attempts.lockedUntil = now + this.LOCKOUT_DURATION_MS;
       this.failedAttempts.set(identifier, attempts);
-      
+
       // console.log(`🔒 Identifier ${identifier} locked until ${new Date(attempts.lockedUntil).toISOString()}`);
-      
+
       return {
         locked: true,
         remainingAttempts: 0,
@@ -273,7 +273,7 @@ class SecurityManager {
     }
 
     this.failedAttempts.set(identifier, attempts);
-    
+
     return {
       locked: false,
       remainingAttempts: this.MAX_FAILED_ATTEMPTS - attempts.count,

@@ -1,10 +1,7 @@
-<div align="center">
-  <img src="client/public/favicon.png" alt="Ephemeral Chat Logo" width="100"/>
-  <h1>Ephemeral Chat</h1>
-  
-  <p align="center">
-    <strong>Secure, anonymous, and ephemeral communication with self-destructing magic.</strong>
-  </p>
+# 👻 Ephemeral Chat
+**The Gold Standard for Zero-Persistence, Encrypted Communication.**
+
+Ephemeral Chat is a high-security, anonymous messaging platform built for users who demand absolute privacy. No accounts, no logs, and no traces. Messages live only in memory and self-destruct with mathematical precision.
 
   <p align="center">
     <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"></a>
@@ -27,35 +24,36 @@
 
 Watch how Ephemeral Chat redefines private communication:
 
-[![Watch the video](screenshots/chatroompic.png)](https://youtu.be/gnvoWkvkkho)
+[![Watch the video](client/public/screenshot-chat.png)](https://youtu.be/gnvoWkvkkho)
 
 ### 📸 Sneak Peek
 
 <p align="center">
-   <img src="screenshots/homepage_picture.png" alt="Home Screen" width="400" style="border-radius: 10px; margin-right: 10px;"/>
-   <img src="screenshots/join room pic.png" alt="Join Room UI" width="400" style="border-radius: 10px;"/>
+   <img src="client/public/screenshot-home.png" alt="Home Screen" width="400" style="border-radius: 10px; margin-right: 10px;"/>
+   <img src="client/public/screenshot-join.png" alt="Join Room UI" width="400" style="border-radius: 10px;"/>
 </p>
 
 ---
 
-## ✨ Features
+## ⚡ Advanced Features
 
-### 💬 Seamless Messaging
-- **Real-Time Engine**: Instant message delivery powered by Socket.io.
-- **📞 Hybrid Voice Calls**: Crystal clear P2P audio with WebRTC, falling back to Agora for rock-solid reliability.
-- **🎤 Universal Voice Notes**: Record on any device. Our backend handles conversion to AAC (.m4a) for flawless playback on iOS Safari and everywhere else.
-- **📸 Secure Media**: Share images with "View Once" capability.
+### 🔐 Ironclad Privacy
+- **E2EE (AES-GCM)**: Military-grade 256-bit encryption performed entirely in-browser. Keys are stored in the URL fragment (`#`) and never traverse the network.
+- **Snapshot Protection**: 
+    - **Privacy Blur**: Instant grayscale blur applied to the UI when focus is lost.
+    - **iOS Guard**: Automatic black-screen overlay to prevent sensitive snapshots in the App Switcher.
+    - **Ghost Watermark**: Dynamic, drifting watermark Layer that rotates and moves to deter AI-based OCR and screenshot reconstruction.
+- **Stealth Password Entry**: Invisible input system for room passwords—no characters, no dots, zero visual footprint.
 
-### 🛡️ Privacy First
-- **� End-to-End Encryption**: AES-GCM encryption happens in your browser. Keys stay in the URL hash—never sent to our server.
-- **� Zero Persistence**: Messages live in memory and self-destruct after reading or a set timeout.
-- **🚪 Guarded Entry**: Host-controlled "Knock-to-Join" system and optional room passwords.
-- **🤖 Anti-Spam**: Integrated Proof-of-Work CAPTCHA protects every room.
+### 🎙️ Elite Communication
+- **Hybrid Voice Engine**: A state-of-the-art failover system. Starts with **WebRTC P2P** for low latency and auto-scales to **Agora RTM/RTC** if network conditions degrade or participant count increases.
+- **Universal Voice Notes**: Backend FFmpeg pipeline converts recordings to AAC (.m4a) on-the-fly, ensuring flawless playback across iOS, Android, and Desktop.
+- **Targeted Messaging**: Granular control over message recipients within a room, orchestrated via a secure server relay.
 
-### � Native Experience
-- **PWA Ready**: Installable on any device for a native app feel.
-- **TWA Distribution**: Optimized for Android via Google Play Store (Trusted Web Activity).
-- **Offline Shell**: Quick loading with cached essential assets.
+### 🛡️ System Integrity
+- **Proof-of-Work CAPTCHA**: Custom `@cap.js/widget` implementation for anti-spam without compromising user anonymity.
+- **Zero-Persistence**: All data resides in volatile memory (RAM). Once the last user departs, the environment is scrubbed.
+- **Micro-interactions**: Animated message delivery and "vanishing" effects powered by optimized CSS transforms.
 
 ---
 
@@ -98,7 +96,6 @@ cp client/.env.example client/.env
 | Variable | Description |
 | :--- | :--- |
 | `VITE_AGORA_APP_ID` | Your Agora project ID |
-| `VITE_AGORA_TOKEN` | Agora primary certificate / token |
 | `INACTIVITY_TIMEOUT` | Minutes before a room is cleared |
 | `CAP_SECRET` | Secret key for Captcha system |
 
@@ -128,13 +125,22 @@ We use a sophisticated failover logic for audio calls:
 </details>
 
 <details>
-<summary><b>🔒 Encryption Architecture</b></summary>
+<summary><b>🔒 Security & Encryption Deep Dive</b></summary>
 
-Using **AES-GCM (256-bit)**:
-1. Room key is generated locally on creation.
-2. Key is appended to the URL as a fragment identifier (`#key`).
-3. Fragment identifiers are *never* sent to the server.
-4. Messages are encrypted/decrypted entirely client-side.
+Using **Web Crypto API (AES-GCM 256-bit)**:
+1. **Key Generation**: A cryptographically strong pseudo-random key is generated on the client.
+2. **Key Storage**: The key is stored in `window.location.hash`. Fragment identifiers are client-side only and are **never** included in HTTP requests.
+3. **Encryption**: Every message is encrypted with a unique Initialization Vector (IV).
+4. **Targeting**: Private messages are encrypted and tagged with specific recipient IDs for the server to relay exclusively to the intended sockets.
+
+</details>
+
+<details>
+<summary><b>📱 Multi-Platform Architecture</b></summary>
+
+- **PWA**: Fully offline-capable service workers using Workbox.
+- **TWA (Android)**: Wrapped via Trusted Web Activity for Google Play Store distribution, utilizing Digital Asset Links for seamless verification.
+- **Microsoft Store**: Packaged PWA optimized for Windows 10/11 system integration.
 
 </details>
 

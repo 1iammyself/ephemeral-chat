@@ -48,9 +48,9 @@ class WebRTCService {
             console.warn('Failed to parse VITE_ICE_SERVERS', e);
         }
 
-    // Use secure credentials for ExpressTURN and Agora
-    // Metered is kept as a redundant backup
-    this.iceServers = configuredIceServers.length > 0 ? configuredIceServers : [
+        // Use secure credentials for ExpressTURN and Agora
+        // Metered is kept as a redundant backup
+        this.iceServers = configuredIceServers.length > 0 ? configuredIceServers : [
             // Google STUN (priority)
             { urls: "stun:stun.l.google.com:19302" },
 
@@ -514,7 +514,7 @@ class WebRTCService {
 // --- Hybrid failover helpers ---
 
 // Monitor network quality for P2P calls
-WebRTCService.prototype._startStatsMonitor = function() {
+WebRTCService.prototype._startStatsMonitor = function () {
     if (this._statsInterval || this._switchedToAgora) return;
 
     this._statsInterval = setInterval(async () => {
@@ -544,7 +544,7 @@ WebRTCService.prototype._startStatsMonitor = function() {
     }, 5000);
 };
 
-WebRTCService.prototype._stopStatsMonitor = function() {
+WebRTCService.prototype._stopStatsMonitor = function () {
     if (this._statsInterval) {
         clearInterval(this._statsInterval);
         this._statsInterval = null;
@@ -552,7 +552,7 @@ WebRTCService.prototype._stopStatsMonitor = function() {
 };
 
 // Switch to Agora: clean up P2P and start Agora SDK
-WebRTCService.prototype.switchToAgora = async function(reason, opts = {}) {
+WebRTCService.prototype.switchToAgora = async function (reason, opts = {}) {
     if (this._switchedToAgora) return;
     this._switchedToAgora = true;
 
@@ -569,7 +569,7 @@ WebRTCService.prototype.switchToAgora = async function(reason, opts = {}) {
     }
 
     this.peers.forEach(peer => {
-        if (peer.connection) try { peer.connection.close(); } catch(e) {}
+        if (peer.connection) try { peer.connection.close(); } catch (e) { }
     });
     this.peers.clear();
 
@@ -581,11 +581,26 @@ WebRTCService.prototype.switchToAgora = async function(reason, opts = {}) {
 
         const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 
-        // Use appId from credentials
-        const appId = AGORA.appId;
+        // Use appId from credentials or server
         const channel = this.currentRoomCode || (opts.roomCode || `room_${Date.now()}`);
-        const token = AGORA.token || null;
-        const uid = AGORA.uid || null;
+        let token = null;
+        let appId = AGORA.appId;
+
+        try {
+            const apiBase = import.meta.env.VITE_API_URL || '';
+            const response = await fetch(`${apiBase}/api/agora/token?channelName=${channel}`);
+            const data = await response.json();
+            if (data.success) {
+                token = data.token;
+                appId = data.appId || appId;
+                console.log('Successfully fetched Agora token from server');
+            }
+        } catch (err) {
+            console.warn('Failed to fetch Agora token, falling back to configured token:', err);
+            token = AGORA.token || null;
+        }
+
+        const uid = AGORA.uid || 0;
 
         await client.join(appId, channel, token, uid);
 

@@ -8,7 +8,6 @@ export const EXPRESS_TURN = {
 
 export const AGORA = {
   appId: import.meta.env.VITE_AGORA_APP_ID,
-  token: import.meta.env.VITE_AGORA_TOKEN,
   uid: import.meta.env.VITE_AGORA_UID
 };
 
