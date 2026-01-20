@@ -134,7 +134,7 @@ const io = socketIo(server, {
   perMessageDeflate: false // Disable to prevent Base64 corruption
 });
 
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 3001
 
 // Apply JSON middleware
 app.use(express.json());

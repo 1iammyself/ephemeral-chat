@@ -1,5 +1,6 @@
 # 📱 Ephemeral Chat: Master Your Privacy
 Welcome to the official guide for **Ephemeral Chat**. This app is designed for total anonymity and peace of mind. 
+<<<<<<< HEAD
 
 ---
 
@@ -41,6 +42,8 @@ You might notice your name hashed across the background of the chat. This is our
 *   *Don't worry about compatibility!* Whether you're on an old Android or the latest iPhone, your voice will play perfectly.
 # 📱 Ephemeral Chat: Master Your Privacy
 Welcome to the official guide for **Ephemeral Chat**. This app is designed for total anonymity and peace of mind. Every message you send is like writing in the sand at low tide—it’s only there until the next wave.
+=======
+>>>>>>> 02f2e985820d3b9102a76db6540248f19500471e
 
 ---
 
