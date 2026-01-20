@@ -1,159 +1,80 @@
-# 📱 Ephemeral Chat - Comprehensive User Guide
-
-Welcome to **Ephemeral Chat**, the secure, anonymous, and ephemeral messaging application. This guide will take you through every feature of the app, ensuring you can communicate privately and effectively.
-
-## 📚 Table of Contents
-1.  [Getting Started](#getting-started)
-2.  [Creating a Room (Host)](#creating-a-room-host)
-3.  [Joining a Room (Guest)](#joining-a-room-guest)
-4.  [Messaging Features](#messaging-features)
-    *   [Text Messages](#text-messages)
-    *   [🎤 Audio Messages (Voice Notes)](#audio-messages-voice-notes)
-    *   [📸 Image Sharing](#image-sharing)
-5.  [📞 Audio & Video Calls](#audio--video-calls)
-6.  [Room Management](#room-management)
-    *   [Knock-to-Join](#knock-to-join)
-    *   [Managing Guests](#managing-guests)
-    *   [Host Handover](#host-handover)
-7.  [Security & Privacy](#security--privacy)
-8.  [Troubleshooting](#troubleshooting)
+# 📱 Ephemeral Chat: Master Your Privacy
+Welcome to the official guide for **Ephemeral Chat**. This app is designed for total anonymity and peace of mind. 
 
 ---
 
-## <a name="getting-started"></a>1. Getting Started
+## 🚀 The Basics: Getting In
+You don't need an account, an email, or even a real name. Just a portal.
 
-**No Account Required**: You do not need to sign up, provide an email, or create a password to use Ephemeral Chat. Just open the app and start chatting.
+### 1. Creating a Room (The Host)
+*   Tap **"Create New Room"** on the home screen.
+*   **Pick a Nickname**: This is how others will see you.
+*   **Set a Password (Optional)**: If you want a password you can set one.
+    > [!TIP]
+    > **Stealth Entry**: When typing your password, you won't see dots or characters. This is a security feature to prevent anyone looking over your shoulder from seeing how many characters your password has!
+*   Tap **"Create Room"**.
 
-**Platform Support**:
-*   **Desktop**: Chrome, Firefox, Safari, Edge.
-*   **Mobile**: iOS (Safari), Android (Chrome, Firefox).
-*   **PWA**: You can install the app to your home screen for a native experience.
+### 2. Joining a Room (The Guest)
+*   **Via Link**: Simply click the link someone sent you. Make sure the link starts with `https://...` and ends with a `#` followed by random characters.
 
----
-
-## <a name="creating-a-room-host"></a>2. Creating a Room (Host)
-
-To start a secure conversation, you need to create a room.
-
-1.  **Open the App**: Navigate to the home page.
-2.  **Click "New Chat"**: This generates a secure, random 6-digit Room Code.
-3.  **Set a Nickname**: Choose a display name for yourself.
-4.  **(Optional) Set a Password**: For extra security, you can set a password that guests must enter to join.
-5.  **Create**: Click the "Create Room" button.
-
-**You are now the Host.** You have special privileges to control who enters the room.
 
 ---
 
-## <a name="joining-a-room-guest"></a>3. Joining a Room (Guest)
+## 🛡️ Your Privacy Tools
+We’ve built-in "magic" features to keep your chat truly private.
 
-There are two ways to join a room:
+### 🕵️ Privacy Blur (Instant Protection)
 
-### Method A: Using a Link (Recommended)
-1.  **Get the Link**: Ask the Host to send you the **Full Invite Link**.
-    *   *Note*: The link must contain the `#` hash part (e.g., `.../room/123456#xyz...`). This is the **Encryption Key**. Without it, you cannot read messages.
-2.  **Open the Link**: Click the link to open the app.
-3.  **Enter Nickname**: Choose a display name.
-4.  **Join**: Click "Join Room".
+*   **The Magic**: The moment you switch apps or look away from your screen, the entire chat turns into a blurry cloud.
 
-### Method B: Using the Room Code
-1.  **Get the Code**: Ask the Host for the 6-digit Room Code (e.g., `123456`).
-2.  **Enter Code**: On the home page, enter the code in the "Enter Room Code" box.
-3.  **Enter Nickname**: Choose a display name.
-4.  **Join**: Click "Join Room".
-    *   *Warning*: If you join via code, you might not have the Encryption Key unless the Host shares it separately or the room is unencrypted (rare).
+### 👻 The Ghost Watermark
+You might notice your name hashed across the background of the chat. This is our **Ghost Watermark**.
 
 ---
 
-## <a name="messaging-features"></a>4. Messaging Features
+## 💬 Mastery of Communication
 
-Once in the room, you can communicate in multiple ways.
+### 🗣️ Sending Voice Notes
+*   Tap and hold the **Microphone (🎤)** icon.
+*   Speak naturally. You have **30 seconds**.
+*   Release to send, or tap the **Trash (🗑️)** icon to cancel.
+*   *Don't worry about compatibility!* Whether you're on an old Android or the latest iPhone, your voice will play perfectly.
 
-### Text Messages
-*   Type in the input bar at the bottom and press **Enter** or the **Send (➤)** button.
-*   **Emojis**: Fully supported.
-*   **Links**: URLs are automatically clickable.
+### 📞 Starting a Call
+Want to talk live? 
+*   Tap the **Phone (📞)** icon.
+*   The app will automatically use the best connection possible.
 
-### <a name="audio-messages-voice-notes"></a>🎤 Audio Messages (Voice Notes)
-Send voice messages that play perfectly on any device.
+### 🎯 Targeted Messaging (Private Talk)
+In a room with 10 people but only want to whisper to 2?
+1.  Open the **User List** (tap the People icon in the top right).
+2.  **Tap the Names** of the people you want to talk to. They will be highlighted.
+3.  Go back to the chat. You'll see a blue bar saying **"Sending to X specific users"**.
+4.  Send your message. **Only those selected people will see it.** Everyone else gets nothing!
+5.  *Tip: Tap "Clear selection" to go back to talking to everyone.*
 
-1.  **Record**: Click the **Microphone (🎤)** icon.
-2.  **Speak**: You have up to **30 seconds**. A timer will show your progress.
-3.  **Stop/Send**:
-    *   Click the **Stop (Square)** button to finish recording and review (if feature available) or send immediately.
-    *   Click the **Send (➤)** button to send immediately.
-4.  **Cancel**: Click the **Trash (🗑️)** icon to discard the recording.
-
-**Universal Compatibility**:
-*   Record on **iPhone** -> Plays on **Android/Windows**.
-*   Record on **Android** -> Plays on **iPhone/Mac**.
-*   Our server automatically converts all audio to high-quality **AAC** format for universal playback.
-
-### <a name="image-sharing"></a>📸 Image Sharing
-Share photos securely.
-
-1.  **Upload**: Click the **Image (🖼️)** icon.
-2.  **Select**: Choose a file from your device.
-3.  **View Once**: Images are typically "View Once" or ephemeral, disappearing after the room closes.
+### 📸 "View Once" Photos
+When you share a photo using the **Image (🖼️)** icon, it is sent as a "View Once" message. Once the recipient sees it or closes the room, it's gone forever.
 
 ---
 
-## <a name="audio--video-calls"></a>5. 📞 Audio & Video Calls
+## 📥 Installation: App-Like Experience
+You don't have to use your browser every time!
 
-Start a real-time call with everyone in the room.
-
-1.  **Start Call**: Click the **Phone (📞)** icon in the input bar.
-    *   *Requirement*: There must be at least 2 people in the room.
-2.  **Permissions**: Allow microphone access when prompted.
-3.  **In Call**: You will see a call interface. You can mute your mic or leave the call at any time.
-
----
-
-## <a name="room-management"></a>6. Room Management
-
-### Knock-to-Join
-For security, new guests cannot enter directly. They are placed in a **Waiting Room**.
-*   **Guest View**: "Waiting for Host to approve..."
-*   **Host View**: A notification appears with the guest's name.
-
-### Managing Guests
-As a Host, you see a list of pending guests in the sidebar (or menu on mobile).
-*   **Approve (✓)**: Allows the guest to enter the room and read messages.
-*   **Deny (X)**: Rejects the guest. They will be shown an error message.
-*   **Kick**: In the User List, you can remove disruptive users (if feature enabled).
-
-### Host Handover
-If the Host leaves the room (disconnects or closes tab):
-*   The system automatically assigns the **Host** role to the next oldest member of the room.
-*   The room does *not* close; the conversation continues.
+*   **iPhone/iPad**: Tap the "Share" icon (the square with an arrow) in Safari and select **"Add to Home Screen"**.
+*   **Android**: Look for a prompt that says "Install App" or "Add to Home Screen" in Chrome.
+*   **Desktop**: Click the "Install" icon in the address bar of Chrome or Edge.
+*   **Microsoft Store**  Look for "Ephchat".
 
 ---
 
-## <a name="security--privacy"></a>7. Security & Privacy
+## ❓ FAQ (Frequently Asked Questions)
 
-### 🔐 End-to-End Encryption (E2EE)
-*   **How it works**: A secret key is generated in your browser when you create a room.
-*   **The Key**: It is stored in the URL hash (after the `#`).
-*   **Privacy**: This key is **NEVER** sent to our servers. We cannot read your messages even if we wanted to.
-*   **Sharing**: You must share the full link (with the `#`) for others to decrypt the chat.
+**Q: Why can't I see my own password when I type it?**
+**A:** This is "Stealth Entry." It prevents anyone nearby from seeing your password length or characters. Just type confidently!
 
-### Ephemeral Nature
-*   **No History**: Messages are stored in temporary memory (RAM) only.
-*   **Auto-Deletion**: Once all users leave, the room and all messages are permanently destroyed.
-*   **TTL (Time-To-Live)**: Rooms have an inactivity timer. If no one sends a message for a set time (e.g., 10 mins), the room closes automatically.
+**Q: Do my messages stay on your server?**
+**A:** Never.
 
 ---
-
-## <a name="troubleshooting"></a>8. Troubleshooting
-
-**Q: I can't hear audio messages on my iPhone.**
-*   **A**: Ensure your silent switch is off. Our new "Universal Audio" system ensures the format is compatible with iPhone (AAC).
-
-**Q: "Waiting for Host" forever?**
-*   **A**: The Host might be away or has ignored your request. Try contacting them via another channel.
-
-**Q: Messages look like gibberish or "Decryption Failed".**
-*   **A**: You likely joined without the Encryption Key. Ask the Host to resend the **Full Link** (with the `#` part).
-
-**Q: Call quality is poor.**
-*   **A**: Calls use Peer-to-Peer (WebRTC). Quality depends on your internet connection and the connection of other participants. Try moving closer to your router.
+**Need help?** Ask your Host or rejoin the room to reset your session.
