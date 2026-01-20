@@ -1,5 +1,5 @@
 # 📱 Ephemeral Chat: Master Your Privacy
-Welcome to the official guide for **Ephemeral Chat**. This app is designed for total anonymity and peace of mind. Every message you send is like writing in the sand at low tide—it’s only there until the next wave.
+Welcome to the official guide for **Ephemeral Chat**. This app is designed for total anonymity and peace of mind. 
 
 ---
 
