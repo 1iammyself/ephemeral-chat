@@ -101,18 +101,17 @@ const Home = ({ children }) => {
               </p>
             </div>
 
-            {/* Join Room Form */}
-            <div className="mt-10 max-w-md mx-auto bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden p-4 sm:p-6 transition-colors duration-200">
-              
-              <div className="mt-4 sm:mt-6">
+            {/* Hero Action Card */}
+            <div className="mt-10 max-w-lg mx-auto">
+              <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-6 sm:p-8 shadow-xl transition-colors duration-200">
                 <button
                   onClick={() => setShowCreateModal(true)}
-                  className="w-full flex justify-center items-center px-4 py-3 text-sm sm:text-base font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 min-h-[44px]"
+                  className="w-full flex justify-center items-center px-4 py-3 sm:py-4 text-base sm:text-lg font-bold rounded-xl text-white bg-[#22c55e] hover:bg-[#16a34a] transition-all transform active:scale-[0.98] shadow-lg shadow-green-500/20"
                 >
-                  <Plus className="-ml-1 mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                  <Plus className="-ml-1 mr-2 h-5 w-5" />
                   Create New Room
                 </button>
-                <p className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                <p className="mt-6 text-center text-sm sm:text-base text-gray-500 dark:text-gray-400">
                   To join a room, please use the invite link shared by the host.
                 </p>
               </div>

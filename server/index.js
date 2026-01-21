@@ -22,7 +22,6 @@ const {
   isValidRoomCode,
   isValidNickname,
   getTTLOptions,
-  generateInviteLink,
   logger
 } = require('./utils');
 const { convertAudioToAAC } = require('./utils/audio-converter');
@@ -315,14 +314,17 @@ app.post('/api/rooms/:roomCode/invite', async (req, res) => {
     }
 
     // Generate the invite link using the generateInviteLink method
+    const origin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : null);
     const invite = await roomManager.generateInviteLink(roomCode, {
       isPermanent: false,
-      expiryMs: 25 * 60 * 1000 // 25 minutes
+      expiryMs: 25 * 60 * 1000, // 25 minutes
+      baseUrl: origin
     });
 
     res.json({
       success: true,
       inviteLink: invite.url,
+      url: invite.url,
       expiresIn: '25 minutes'
     });
 
@@ -375,24 +377,7 @@ app.post('/api/rooms', async (req, res) => {
  * Exchange an invite token for room credentials
  * GET /api/invite/:token
  */
-app.get('/api/invite/:token', async (req, res) => {
-  try {
-    const { token } = req.params;
-    const roomCredentials = await roomManager.validateInviteToken(token);
 
-    res.json({
-      success: true,
-      ...roomCredentials
-    });
-
-  } catch (error) {
-    logger.error('Error validating invite token:', error);
-    res.status(400).json({
-      error: 'Invalid or expired invite token',
-      details: error.message
-    });
-  }
-});
 
 app.get('/api/rooms/:roomCode', async (req, res) => {
   try {

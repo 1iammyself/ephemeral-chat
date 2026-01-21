@@ -638,25 +638,30 @@ class RoomManager {
    * @param {number} [options.expiryMs] - Custom expiration time in milliseconds
    * @returns {Promise<{token: string, url: string, expiresAt: Date | null}>} The token and full URL
    */
-  async generateInviteLink(roomCode, { isPermanent = false, expiryMs } = {}) {
+  async generateInviteLink(roomCode, { isPermanent = false, expiryMs, baseUrl } = {}) {
     const token = await this.generateInviteToken(roomCode, isPermanent, expiryMs);
 
     // Robust URL detection for different environments
-    let baseUrl;
+    let usedBaseUrl = baseUrl;
 
-    if (process.env.NODE_ENV === 'production') {
-      // In production, prefer BASE_URL (chat.kyere.me), fallback to Render only if Koyeb is down
-      baseUrl = process.env.BASE_URL ||
-        (process.env.RENDER_EXTERNAL_HOSTNAME ? `https://${process.env.RENDER_EXTERNAL_HOSTNAME}` : null);
-    } else {
-      // In development, use localhost
-      baseUrl = 'http://localhost:5173';
+    if (!usedBaseUrl) {
+      if (process.env.NODE_ENV === 'production') {
+        // In production, prefer BASE_URL (chat.kyere.me), fallback to Render only if Koyeb is down
+        usedBaseUrl = process.env.BASE_URL ||
+          (process.env.RENDER_EXTERNAL_HOSTNAME ? `https://${process.env.RENDER_EXTERNAL_HOSTNAME}` : null);
+      } else {
+        // In development, use localhost
+        usedBaseUrl = 'http://localhost:5173';
+      }
     }
 
     // Final fallback
-    baseUrl = baseUrl || 'http://localhost:5173';
+    usedBaseUrl = usedBaseUrl || 'http://localhost:5173';
 
-    const url = `${baseUrl}/invite/${token}`;
+    // Remove trailing slash if present
+    usedBaseUrl = usedBaseUrl.replace(/\/$/, '');
+
+    const url = `${usedBaseUrl}/invite/${token}`;
 
     const tokenData = this.inviteTokens.get(token);
     return {

@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
 
   // Determine base URL based on environment
   const isProd = mode === 'production';
-  let baseUrl = process.env.VITE_BASE_URL || 'https://chat.kyere.me';
+  let baseUrl = process.env.VITE_BASE_URL || (isProd ? 'https://chat.kyere.me' : '/');
 
   // For production on Render
   if (isProd && process.env.RENDER) {

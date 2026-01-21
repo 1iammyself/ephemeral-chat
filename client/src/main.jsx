@@ -13,4 +13,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <App />
     </ThemeProvider>
   </React.StrictMode>,
-)
+);
+
+// Signal that the app is ready to hide the splash screen
+window.dispatchEvent(new Event('app-ready'));
