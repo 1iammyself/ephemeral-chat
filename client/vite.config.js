@@ -107,7 +107,8 @@ export default defineConfig(({ mode }) => {
     build: {
       target: 'esnext',
       outDir: 'dist',
-      sourcemap: true,
+      sourcemap: isProd ? false : true, // Disable sourcemaps in prod for security
+      minify: 'esbuild',
       rollupOptions: {
         output: {
           manualChunks: {
@@ -116,6 +117,9 @@ export default defineConfig(({ mode }) => {
           }
         }
       }
+    },
+    esbuild: {
+      drop: isProd ? ['console', 'debugger'] : []
     },
     optimizeDeps: {
       include: ['react', 'react-dom', 'react-router-dom', 'socket.io-client']

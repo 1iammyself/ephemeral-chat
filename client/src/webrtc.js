@@ -39,22 +39,35 @@ class WebRTCService {
         };
 
         // ICE servers for NAT traversal
-        let configuredIceServers = [];
-        try {
-            if (import.meta.env.VITE_ICE_SERVERS) {
-                configuredIceServers = JSON.parse(import.meta.env.VITE_ICE_SERVERS);
-            }
-        } catch (e) {
-            console.warn('Failed to parse VITE_ICE_SERVERS', e);
-        }
-
-        // Use secure credentials for ExpressTURN and Agora
-        // Metered is kept as a redundant backup
-        this.iceServers = configuredIceServers.length > 0 ? configuredIceServers : [
-            // Google STUN (priority)
+        // Hierarchy: 1. Google STUN (Fast), 2. Metered (Global/Reliable), 3. ExpressTURN (Failover)
+        this.iceServers = [
+            // Google STUN (Priority 1)
             { urls: "stun:stun.l.google.com:19302" },
 
-            // ExpressTURN (UDP then TCP)
+            // Metered Global Relay (Priority 2)
+            { urls: "stun:stun.relay.metered.ca:80" },
+            {
+                urls: "turn:global.relay.metered.ca:80",
+                username: METERED.username,
+                credential: METERED.credential
+            },
+            {
+                urls: "turn:global.relay.metered.ca:80?transport=tcp",
+                username: METERED.username,
+                credential: METERED.credential
+            },
+            {
+                urls: "turn:global.relay.metered.ca:443",
+                username: METERED.username,
+                credential: METERED.credential
+            },
+            {
+                urls: "turns:global.relay.metered.ca:443?transport=tcp",
+                username: METERED.username,
+                credential: METERED.credential
+            },
+
+            // ExpressTURN (Priority 3)
             {
                 urls: "turn:free.expressturn.com:3478?transport=udp",
                 username: EXPRESS_TURN.username,
@@ -64,13 +77,6 @@ class WebRTCService {
                 urls: "turn:free.expressturn.com:3478?transport=tcp",
                 username: EXPRESS_TURN.username,
                 credential: EXPRESS_TURN.credential
-            },
-
-            // Metered (legacy, doomsday backup)
-            {
-                urls: "turn:relay.metered.ca:80",
-                username: METERED.username,
-                credential: METERED.credential
             }
         ];
 
@@ -159,9 +165,10 @@ class WebRTCService {
                 video: false
             });
 
-            // If group call (>3 total participants), bypass P2P and use Agora
-            if (recipients.length > 2) {
-                console.log('Group call detected, switching to Agora');
+            // If group call (5 or more total participants), bypass P2P and use Agora
+            // STUN/TURN handles 3 and 4 users well enough
+            if (recipients.length > 3) {
+                console.log('Group call detected (5+ users), switching to Agora');
                 await this.switchToAgora('group-call', { roomCode, recipients });
                 return;
             }

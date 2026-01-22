@@ -222,7 +222,7 @@ app.get('/api/invite/:token', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Error validating invite token:', error);
+    logger.error('Error validating invite token:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -232,20 +232,18 @@ app.get('/api/invite/:token', async (req, res) => {
 
 // Cap.js API endpoints for proof-of-work CAPTCHA
 app.post('/api/cap/challenge', async (req, res) => {
-  // console.log('Received Cap challenge request');
   try {
     const challenge = await cap.createChallenge();
-    // console.log('Generated challenge:', challenge);
     res.json(challenge);
   } catch (error) {
-    console.error('Error generating Cap challenge:', error);
+    logger.error('Error generating Cap challenge:', error);
     res.status(500).json({ error: 'Failed to generate challenge' });
   }
 });
 
 app.post('/api/cap/redeem', async (req, res) => {
-  // console.log('Received Cap redeem request');
-  // console.log('Request body:', req.body);
+  logger.info('Received Cap redeem request');
+  logger.info('Request body:', req.body);
   try {
     const { token, solution } = req.body;
     // The widget might send 'token' or 'solution' or both.
@@ -273,7 +271,7 @@ app.post('/api/cap/redeem', async (req, res) => {
       result = await cap.validateToken(token);
     }
 
-    // console.log('Verification result:', result);
+    logger.info('Verification result:', result);
 
     // If result is an object, send it directly. If boolean, wrap it.
     if (typeof result === 'object') {
@@ -282,7 +280,7 @@ app.post('/api/cap/redeem', async (req, res) => {
       res.json({ success: result });
     }
   } catch (error) {
-    console.error('Error redeeming Cap token:', error);
+    logger.error('Error redeeming Cap token:', error);
     res.status(500).json({ success: false, error: 'Failed to verify token' });
   }
 });
@@ -329,7 +327,7 @@ app.post('/api/rooms/:roomCode/invite', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error generating invite:', error);
+    logger.error('Error generating invite:', error);
     res.status(500).json({
       error: 'Failed to generate invite',
       details: error.message
@@ -341,13 +339,13 @@ app.post('/api/rooms', async (req, res) => {
   try {
     const { messageTTL, password, maxUsers, capToken } = req.body;
 
-    // console.log('HTTP room creation request:', { messageTTL, password, maxUsers, hasCapToken: !!capToken });
+    logger.info('HTTP room creation request:', { messageTTL, password, maxUsers, hasCapToken: !!capToken });
 
     // Validate Cap token (proof-of-work verification)
     if (capToken) {
       const isValid = await cap.validateToken(capToken);
       if (!isValid) {
-        console.error('Invalid Cap token');
+        logger.error('Invalid Cap token');
         return res.status(400).json({ error: 'Verification failed. Please try again.' });
       }
     }
@@ -366,7 +364,7 @@ app.post('/api/rooms', async (req, res) => {
     const roomCode = await roomManager.createRoom(settings);
     res.json({ success: true, roomCode });
   } catch (error) {
-    console.error('Error creating room via HTTP:', error);
+    logger.error('Error creating room via HTTP:', error);
     res.status(500).json({ error: 'Failed to create room' });
   }
 });
@@ -418,7 +416,7 @@ app.post('/api/reveal-image', async (req, res) => {
     if (!tokenData) return res.status(401).json({ error: 'Invalid or expired view token' });
 
     const { messageId } = tokenData;
-    const msgResult = roomManager.getMessageById(messageId);
+    const msgResult = await roomManager.getMessageById(messageId);
 
     if (!msgResult || !msgResult.message) {
       return res.status(404).json({ error: 'Image not found' });
@@ -909,11 +907,8 @@ io.on('connection', (socket) => {
     try {
       if (!socket.roomCode) return;
 
-      // logger.info(`👁️ Message ${messageId} viewed by ${socket.nickname}`);
-
-      // Mark message as viewed in room manager
-      // Use socket.id as the unique identifier for the session
-      await roomManager.markMessageViewed(messageId, socket.id);
+      // Mark message as viewed in room manager with room context for better performance/Redis support
+      await roomManager.markMessageViewed(messageId, socket.id, socket.roomCode);
 
     } catch (error) {
       logger.error('Error marking message as viewed:', error);
@@ -933,10 +928,42 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Explicit delete for view-once audio after first play completion
+  // Explicit delete for view-once audio/images after completion
   socket.on('delete-message', async ({ messageId }) => {
     try {
       if (!socket.roomCode || !messageId) return;
+
+      const message = await roomManager.getMessage(socket.roomCode, messageId);
+      if (!message) return;
+
+      // Smart deletion for multi-recipient messages
+      if (message.isViewOnce) {
+        const recipients = message.recipients || [];
+        const viewedBy = message.viewedBy || [];
+
+        if (recipients.length > 0) {
+          // Targeted delivery: Only delete if all recipients have viewed it
+          const allViewed = recipients.every(rId => viewedBy.includes(rId));
+          if (!allViewed) {
+            // Not everyone finished viewing, so we don't delete from server yet.
+            // The client who just finished will still hide it locally.
+            return;
+          }
+        } else {
+          // Broadcast message: Delete only if all currently active users have viewed it
+          // This ensures if someone joins later they can't see "already viewed" content
+          // but ensures everyone in the room has a chance to see it.
+          const room = await roomManager.getRoom(socket.roomCode);
+          if (room && room.users) {
+            const currentOtherUsers = room.users
+              .map(u => u.socketId)
+              .filter(id => id !== message.sender.socketId);
+
+            const allOthersViewed = currentOtherUsers.every(id => viewedBy.includes(id));
+            if (!allOthersViewed) return;
+          }
+        }
+      }
 
       const removed = await roomManager.removeMessage(socket.roomCode, messageId);
       if (removed) {
@@ -946,6 +973,7 @@ io.on('connection', (socket) => {
       logger.error('Error deleting message:', error);
     }
   });
+
 
   // WebRTC Call Signaling Events
 

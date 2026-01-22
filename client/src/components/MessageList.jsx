@@ -173,8 +173,10 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
 
   const handleAudioEnded = useCallback((message) => {
     // Mark viewed and request deletion for view-once audio once playback finishes
-    socketManager.emit('message-viewed', { messageId: message.id });
-    socketManager.emit('delete-message', { messageId: message.id });
+    if (message.isViewOnce) {
+      socketManager.emit('message-viewed', { messageId: message.id });
+      socketManager.emit('delete-message', { messageId: message.id });
+    }
     setViewedMessages(prev => new Set([...prev, message.id]));
     setPlayingAudioId(null);
 
@@ -211,6 +213,8 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
           return newMap;
         });
       }, 500);
+      // Explicitly request deletion from server for view-once image
+      socketManager.emit('delete-message', { messageId: msgId });
     }
     setViewingImage(null);
     setCurrentImageUrl(null);
@@ -371,8 +375,8 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
                           autoPlay={playingAudioId === message.id}
                           onEnded={() => handleAudioEnded(message)}
                         />
-// ...existing code...
-// --- Utility: Fix audio content for Safari/desktop playback ---
+                        // ...existing code...
+                        // --- Utility: Fix audio content for Safari/desktop playback ---
                       )}
                     </div>
                   ) : (

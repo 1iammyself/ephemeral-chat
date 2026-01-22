@@ -6,6 +6,8 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
+const { logger } = require('./utils');
+
 /**
  * Hash a password using bcrypt (for password protection)
  * @param {string} password - Plain text password
@@ -26,7 +28,7 @@ async function verifyPassword(password, hash) {
   try {
     return await bcrypt.compare(password, hash);
   } catch (error) {
-    // console.error('Error verifying password:', error);
+    logger.error('Error verifying password:', error);
     return false;
   }
 }
@@ -82,7 +84,7 @@ function createRoomVerificationToken(roomCode, secret) {
   const signature = crypto.createHmac('sha256', secret)
     .update(data)
     .digest('hex');
-  
+
   return Buffer.from(JSON.stringify({
     signature,
     timestamp
@@ -101,18 +103,18 @@ function verifyRoomVerificationToken(token, roomCode, secret, maxAge = 5 * 60 * 
   try {
     const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
     const { signature, timestamp } = decoded;
-    
+
     // Check age
     if (Date.now() - timestamp > maxAge) {
       return false;
     }
-    
+
     // Verify signature
     const data = `${roomCode}:${timestamp}`;
     const expectedSignature = crypto.createHmac('sha256', secret)
       .update(data)
       .digest('hex');
-    
+
     return crypto.timingSafeEqual(
       Buffer.from(signature, 'hex'),
       Buffer.from(expectedSignature, 'hex')
@@ -131,19 +133,19 @@ function verifyRoomVerificationToken(token, roomCode, secret, maxAge = 5 * 60 * 
  */
 function createSecureInviteToken(roomCode, secret, options = {}) {
   const { expiresIn = 24 * 60 * 60 * 1000, metadata = {} } = options;
-  
+
   const payload = {
     roomCode,
     expiresAt: Date.now() + expiresIn,
     metadata,
     nonce: crypto.randomBytes(16).toString('hex')
   };
-  
+
   const payloadStr = JSON.stringify(payload);
   const signature = crypto.createHmac('sha256', secret)
     .update(payloadStr)
     .digest('hex');
-  
+
   return Buffer.from(JSON.stringify({
     payload: payloadStr,
     signature
@@ -160,29 +162,29 @@ function verifySecureInviteToken(token, secret) {
   try {
     const decoded = JSON.parse(Buffer.from(token, 'base64url').toString());
     const { payload: payloadStr, signature } = decoded;
-    
+
     // Verify signature
     const expectedSignature = crypto.createHmac('sha256', secret)
       .update(payloadStr)
       .digest('hex');
-    
+
     if (!crypto.timingSafeEqual(
       Buffer.from(signature, 'hex'),
       Buffer.from(expectedSignature, 'hex')
     )) {
       return null;
     }
-    
+
     const payload = JSON.parse(payloadStr);
-    
+
     // Check expiration
     if (Date.now() > payload.expiresAt) {
       return null;
     }
-    
+
     return payload;
   } catch (error) {
-    console.error('Error verifying invite token:', error);
+    logger.error('Error verifying invite token:', error);
     return null;
   }
 }
@@ -195,7 +197,7 @@ function verifySecureInviteToken(token, secret) {
 function validateCredentials(credentials) {
   const errors = [];
   const sanitized = {};
-  
+
   // Validate room code
   if (credentials.roomCode) {
     const roomCode = credentials.roomCode.toString().trim().toUpperCase();
@@ -205,7 +207,7 @@ function validateCredentials(credentials) {
       sanitized.roomCode = roomCode;
     }
   }
-  
+
   // Validate password
   if (credentials.password !== undefined) {
     const password = credentials.password.toString();
@@ -217,7 +219,7 @@ function validateCredentials(credentials) {
       sanitized.password = password;
     }
   }
-  
+
   // Validate nickname
   if (credentials.nickname) {
     const nickname = credentials.nickname.toString().trim();
@@ -229,7 +231,7 @@ function validateCredentials(credentials) {
       sanitized.nickname = nickname;
     }
   }
-  
+
   return {
     valid: errors.length === 0,
     sanitized,
@@ -258,13 +260,13 @@ function generateTOTP(secret, window = 30) {
   const hmac = crypto.createHmac('sha1', secret);
   hmac.update(Buffer.from(counter.toString(16).padStart(16, '0'), 'hex'));
   const hash = hmac.digest();
-  
+
   const offset = hash[hash.length - 1] & 0xf;
   const binary = ((hash[offset] & 0x7f) << 24) |
-                 ((hash[offset + 1] & 0xff) << 16) |
-                 ((hash[offset + 2] & 0xff) << 8) |
-                 (hash[offset + 3] & 0xff);
-  
+    ((hash[offset + 1] & 0xff) << 16) |
+    ((hash[offset + 2] & 0xff) << 8) |
+    (hash[offset + 3] & 0xff);
+
   const otp = binary % 1000000;
   return otp.toString().padStart(6, '0');
 }
@@ -283,20 +285,20 @@ function verifyTOTP(code, secret, window = 30, tolerance = 1) {
     const hmac = crypto.createHmac('sha1', secret);
     hmac.update(Buffer.from(counter.toString(16).padStart(16, '0'), 'hex'));
     const hash = hmac.digest();
-    
+
     const offset = hash[hash.length - 1] & 0xf;
     const binary = ((hash[offset] & 0x7f) << 24) |
-                   ((hash[offset + 1] & 0xff) << 16) |
-                   ((hash[offset + 2] & 0xff) << 8) |
-                   (hash[offset + 3] & 0xff);
-    
+      ((hash[offset + 1] & 0xff) << 16) |
+      ((hash[offset + 2] & 0xff) << 8) |
+      (hash[offset + 3] & 0xff);
+
     const otp = (binary % 1000000).toString().padStart(6, '0');
-    
+
     if (otp === code) {
       return true;
     }
   }
-  
+
   return false;
 }
 

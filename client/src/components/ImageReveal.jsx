@@ -1,20 +1,20 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { ShieldAlert } from 'lucide-react';
 
 /**
  * ImageReveal Component
  * Securely renders an image on a canvas only while the user is pressing.
- * Watermark is handled by the global GhostWatermark component for consistency.
  */
 const ImageReveal = ({ viewToken }) => {
     const canvasRef = useRef(null);
+    const containerRef = useRef(null);
     const [revealActive, setRevealActive] = useState(false);
     const [imageBitmap, setImageBitmap] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [isHolding, setIsHolding] = useState(false);
     const [permissionWarning, setPermissionWarning] = useState(false);
-    const navigate = useNavigate();
 
+    // Wipe canvas helper
     const wipeCanvas = useCallback(() => {
         const canvas = canvasRef.current;
         if (canvas) {
@@ -23,17 +23,15 @@ const ImageReveal = ({ viewToken }) => {
         }
     }, []);
 
+    // Draw image helper
     const drawImage = useCallback((bitmap) => {
         const canvas = canvasRef.current;
         if (!canvas || !bitmap) return;
 
         const ctx = canvas.getContext('2d');
         const { width, height } = canvas;
-
-        // Clear first
         ctx.clearRect(0, 0, width, height);
 
-        // Draw image scaled to fit
         const imgAspect = bitmap.width / bitmap.height;
         const canvasAspect = width / height;
         let drawWidth, drawHeight, x, y;
@@ -51,66 +49,106 @@ const ImageReveal = ({ viewToken }) => {
         }
 
         ctx.drawImage(bitmap, x, y, drawWidth, drawHeight);
-        // Note: Watermark is now handled by the global GhostWatermark component
-        // which displays consistently across the entire app including image view
     }, []);
 
-    const startReveal = useCallback(async (e) => {
-        if (e) e.stopPropagation();
-        if (revealActive || isLoading) return;
+    // PRE-FETCH IMAGE DATA
+    useEffect(() => {
+        if (!viewToken) return;
 
-        setIsLoading(true);
-        setRevealActive(true);
+        let active = true;
+        const fetchImage = async () => {
+            setIsLoading(true);
+            try {
+                const res = await fetch('/api/reveal-image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ viewToken })
+                });
 
-        try {
-            const res = await fetch('/api/reveal-image', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ viewToken })
-            });
+                if (!res.ok) throw new Error('Failed to fetch image');
 
-            if (!res.ok) throw new Error('Failed to fetch image');
+                const blob = await res.blob();
+                const bitmap = await createImageBitmap(blob);
 
-            const blob = await res.blob();
-            const bitmap = await createImageBitmap(blob);
-            setImageBitmap(bitmap);
+                if (active) {
+                    setImageBitmap(bitmap);
+                } else {
+                    bitmap.close();
+                }
+            } catch (err) {
+                if (process.env.NODE_ENV !== 'production') {
+                    console.error('Reveal fetch error:', err);
+                }
+            } finally {
+                if (active) setIsLoading(false);
+            }
+        };
 
-            // Use requestAnimationFrame for timing guarantee
-            requestAnimationFrame(() => {
-                drawImage(bitmap);
-            });
-        } catch (err) {
-            console.error('Reveal error:', err);
+        fetchImage();
+        return () => {
+            active = false;
+        };
+    }, [viewToken]);
+
+    // Update reveal state based on holding and readiness
+    useEffect(() => {
+        if (isHolding && imageBitmap && !isLoading) {
+            setRevealActive(true);
+        } else {
             setRevealActive(false);
-        } finally {
-            setIsLoading(false);
         }
-    }, [viewToken, revealActive, isLoading, drawImage]);
+    }, [isHolding, imageBitmap, isLoading]);
+
+    // Handle Reveal Logic
+    const startReveal = useCallback((e) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+                if (e.target.setPointerCapture) {
+                    e.target.setPointerCapture(e.pointerId);
+                }
+            } catch (err) { }
+        }
+        setIsHolding(true);
+    }, []);
 
     const stopReveal = useCallback((e) => {
-        if (e) e.stopPropagation();
-
-        // Immediate state update
-        setRevealActive(false);
-
-        // Immediate canvas wipe (synchronous)
-        const canvas = canvasRef.current;
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (e) {
+            e.stopPropagation();
+            try {
+                if (e.target.releasePointerCapture) {
+                    e.target.releasePointerCapture(e.pointerId);
+                }
+            } catch (err) { }
         }
+        setIsHolding(false);
+    }, []);
 
-        if (imageBitmap) {
-            imageBitmap.close(); // Release memory immediately
-            setImageBitmap(null);
+    // Update canvas based on reveal state
+    useEffect(() => {
+        if (revealActive && imageBitmap) {
+            drawImage(imageBitmap);
+        } else {
+            wipeCanvas();
         }
+    }, [revealActive, imageBitmap, drawImage, wipeCanvas]);
+
+    // Cleanup resources
+    useEffect(() => {
+        return () => {
+            if (imageBitmap) {
+                imageBitmap.close();
+            }
+        };
     }, [imageBitmap]);
 
+    // Handle visibility/blur interrupts
     useEffect(() => {
         const handleVisibilityChange = () => {
-            if (document.hidden) stopReveal();
+            if (document.hidden) setIsHolding(false);
         };
-        const handleBlur = () => stopReveal();
+        const handleBlur = () => setIsHolding(false);
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('blur', handleBlur);
@@ -118,51 +156,52 @@ const ImageReveal = ({ viewToken }) => {
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             window.removeEventListener('blur', handleBlur);
-            // Internal cleanup only, don't trigger external callbacks
-            setRevealActive(false);
-            const canvas = canvasRef.current;
-            if (canvas) {
-                const ctx = canvas.getContext('2d');
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-            }
         };
-    }, [stopReveal]);
+    }, []);
 
     return (
-        <div className="relative w-full h-full flex items-center justify-center sensitive-container">
+        <div
+            ref={containerRef}
+            className="relative w-full h-full flex items-center justify-center sensitive-container cursor-pointer bg-gray-900/40"
+            onPointerDown={startReveal}
+            onPointerUp={stopReveal}
+            onPointerCancel={stopReveal}
+            onPointerLeave={stopReveal}
+            onContextMenu={(e) => e.preventDefault()}
+            style={{
+                touchAction: 'none',
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                WebkitTouchCallout: 'none'
+            }}
+        >
             <canvas
                 ref={canvasRef}
                 width={800}
                 height={600}
-                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl bg-gray-900/50 backdrop-blur-xl"
-                onPointerDown={startReveal}
-                onPointerUp={stopReveal}
-                onPointerCancel={stopReveal}
-                onPointerLeave={stopReveal}
-                onContextMenu={(e) => e.preventDefault()}
-                style={{
-                    touchAction: 'none',
-                    userSelect: 'none',
-                    WebkitUserSelect: 'none',
-                    WebkitTouchCallout: 'none'
-                }}
+                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl bg-black/20 backdrop-blur-xl pointer-events-none transition-opacity duration-300"
+                style={{ opacity: revealActive ? 1 : 0 }}
             />
+
             {!revealActive && !isLoading && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <div className="bg-black/40 backdrop-blur-md p-6 rounded-2xl border border-white/10 text-center">
-                        <p className="text-white font-medium mb-1">Press and Hold</p>
-                        <p className="text-white/60 text-xs">to reveal image</p>
+                <div className="absolute inset-0 flex flex-col items-center justify-end pb-12 pointer-events-none">
+                    <div className="bg-black/60 backdrop-blur-md px-6 py-3 rounded-full border border-white/10 text-center animate-pulse">
+                        <p className="text-white font-medium text-sm">
+                            {isHolding ? 'Preparing image...' : 'Press and Hold to reveal image'}
+                        </p>
                     </div>
                 </div>
             )}
+
             {isLoading && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
             )}
+
             {permissionWarning && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none p-4">
-                    <div className="bg-red-500/90 backdrop-blur-md p-6 rounded-2xl border border-white/10 text-center max-w-xs">
+                    <div className="bg-red-500/90 backdrop-blur-md p-6 rounded-2xl border border-white/10 text-center max-w-xs transition-all duration-300">
                         <ShieldAlert className="w-10 h-10 text-white mx-auto mb-3" />
                         <p className="text-white font-bold mb-1">Security Lockdown</p>
                         <p className="text-white/80 text-xs leading-relaxed">

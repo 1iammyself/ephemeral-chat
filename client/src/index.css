@@ -25,6 +25,21 @@
     @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
   }
 
+  /* Hide browser search/reveal icons for passwords */
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none;
+  }
+
+  input::-webkit-contacts-auto-fill-button,
+  input::-webkit-credentials-auto-fill-button {
+    visibility: hidden;
+    display: none !important;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
+  }
+
   .card {
     @apply bg-white rounded-xl shadow-sm border border-gray-200;
   }

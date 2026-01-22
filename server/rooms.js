@@ -5,7 +5,7 @@
 
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const { generateRoomCode, sanitizeInput } = require('./utils');
+const { generateRoomCode, sanitizeInput, logger } = require('./utils');
 
 class RoomManager {
   constructor(redisClient = null) {
@@ -441,38 +441,91 @@ class RoomManager {
   }
 
   /**
+   * Get a specific message from a room
+   */
+  async getMessage(roomCode, messageId) {
+    if (this.redis) {
+      const room = await this.getRoom(roomCode);
+      if (!room) return null;
+
+      // Check if message is in Redis (with TTL)
+      if (room.settings.messageTTL > 0) {
+        const messageKey = `message:${roomCode}:${messageId}`;
+        const messageData = await this.redis.get(messageKey);
+        return messageData ? JSON.parse(messageData) : null;
+      }
+
+      // Check if message is in room object (no TTL)
+      return (room.messages || []).find(m => m.id === messageId) || null;
+    }
+
+    const room = this.rooms.get(roomCode);
+    if (!room) return null;
+    return (room.messages || []).find(m => m.id === messageId) || null;
+  }
+
+  /**
    * Get a message by id across all rooms
    */
-  getMessageById(messageId) {
+  async getMessageById(messageId) {
+    // Check in-memory maps first
     for (const [roomCode, room] of this.rooms.entries()) {
       const msg = (room.messages || []).find(m => m.id === messageId);
       if (msg) return { roomCode, message: msg };
     }
+
+    // If using Redis, we'd need to pattern match keys which is expensive
+    // In current architecture, we usually have the roomCode when we need a message
     return null;
   }
 
   /**
    * Mark a message as viewed by a specific user
    */
-  async markMessageViewed(messageId, userId) {
-    for (const [roomCode, room] of this.rooms.entries()) {
-      const idx = (room.messages || []).findIndex(m => m.id === messageId);
-      if (idx >= 0) {
-        const msg = room.messages[idx];
-
+  async markMessageViewed(messageId, userId, roomCode = null) {
+    // If roomCode is provided, we can be much more efficient
+    if (roomCode) {
+      const msg = await this.getMessage(roomCode, messageId);
+      if (msg) {
         if (!msg.viewedBy) msg.viewedBy = [];
-
-        // Add user to viewed list if not already present
         if (!msg.viewedBy.includes(userId)) {
           msg.viewedBy.push(userId);
-          await this.saveRoom(roomCode, room);
+
+          // Save back to storage
+          const room = await this.getRoom(roomCode);
+          if (this.redis && room.settings.messageTTL > 0) {
+            const messageKey = `message:${roomCode}:${messageId}`;
+            await this.redis.setex(messageKey, room.settings.messageTTL, JSON.stringify(msg));
+          } else {
+            const idx = room.messages.findIndex(m => m.id === messageId);
+            if (idx >= 0) {
+              room.messages[idx] = msg;
+              await this.saveRoom(roomCode, room);
+            }
+          }
 
           // Broadcast via socket.io if available
           if (this._io) {
-            this._io.to(roomCode).emit('message-viewed', {
-              messageId,
-              userId
-            });
+            this._io.to(roomCode).emit('message-viewed', { messageId, userId });
+          }
+          return true;
+        }
+        return false;
+      }
+    }
+
+    // Fallback search across all rooms (only for in-memory)
+    for (const [rCode, room] of this.rooms.entries()) {
+      const idx = (room.messages || []).findIndex(m => m.id === messageId);
+      if (idx >= 0) {
+        const msg = room.messages[idx];
+        if (!msg.viewedBy) msg.viewedBy = [];
+        if (!msg.viewedBy.includes(userId)) {
+          msg.viewedBy.push(userId);
+          await this.saveRoom(rCode, room);
+
+          if (this._io) {
+            this._io.to(rCode).emit('message-viewed', { messageId, userId });
           }
           return true;
         }
@@ -747,7 +800,7 @@ class RoomManager {
     // Verify the room still exists
     const room = await this.getRoom(tokenData.roomCode);
     if (!room) {
-      // console.log(`Room ${tokenData.roomCode} not found for token ${token}`);
+      logger.info(`Room ${tokenData.roomCode} not found for token ${token}`);
       // Clean up invalid token
       this.inviteTokens.delete(token);
       const tokens = this.roomToTokens.get(tokenData.roomCode);
@@ -762,7 +815,7 @@ class RoomManager {
 
     // If this is a one-time token and we're consuming it, invalidate it after use
     if (!tokenData.isPermanent && consumeToken) {
-      // console.log('Consuming one-time token after successful join');
+      logger.info('Consuming one-time token after successful join');
       this.inviteTokens.delete(token);
       const tokens = this.roomToTokens.get(tokenData.roomCode);
       if (tokens) {
@@ -773,7 +826,7 @@ class RoomManager {
       }
     }
 
-    // console.log(`Token validation successful for room ${tokenData.roomCode}`);
+    logger.info(`Token validation successful for room ${tokenData.roomCode}`);
     return {
       valid: true,
       roomCode: tokenData.roomCode,

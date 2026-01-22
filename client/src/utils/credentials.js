@@ -11,7 +11,7 @@ export const AGORA = {
   uid: import.meta.env.VITE_AGORA_UID
 };
 
-// Metered credentials (legacy, not used)
+// Metered credentials (Global Relay)
 export const METERED = {
   username: import.meta.env.VITE_METERED_USER,
   credential: import.meta.env.VITE_METERED_PASS

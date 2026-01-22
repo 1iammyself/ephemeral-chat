@@ -4,6 +4,7 @@
  */
 
 const crypto = require('crypto');
+const { logger } = require('./utils');
 
 class SecurityManager {
   constructor() {
@@ -20,7 +21,7 @@ class SecurityManager {
     // Failed authentication attempts tracking
     this.failedAttempts = new Map(); // identifier -> { count, lockedUntil }
 
-    // console.log(`🔒 Security Manager initialized with ${this.INACTIVITY_TIMEOUT_MS / 1000}s inactivity timeout`);
+    logger.info(`🔒 Security Manager initialized with ${this.INACTIVITY_TIMEOUT_MS / 1000}s inactivity timeout`);
   }
 
   /**
@@ -100,7 +101,7 @@ class SecurityManager {
     this.clearUserActivity(socketId);
 
     const timeoutId = setTimeout(() => {
-      // console.log(`⏰ User ${userId} (${socketId}) timed out due to inactivity`);
+      logger.info(`⏰ User ${userId} (${socketId}) timed out due to inactivity`);
       this.clearUserActivity(socketId);
       if (onTimeout) {
         onTimeout(socketId, userId, roomCode);
@@ -114,7 +115,7 @@ class SecurityManager {
       timeoutId
     });
 
-    // console.log(`✅ Activity registered for user ${userId} (${socketId})`);
+    logger.info(`✅ Activity registered for user ${userId} (${socketId})`);
   }
 
   /**
@@ -135,7 +136,7 @@ class SecurityManager {
 
     // Set new timeout
     const timeoutId = setTimeout(() => {
-      // console.log(`⏰ User ${activity.userId} (${socketId}) timed out due to inactivity`);
+      logger.info(`⏰ User ${activity.userId} (${socketId}) timed out due to inactivity`);
       this.clearUserActivity(socketId);
       if (onTimeout) {
         onTimeout(socketId, activity.userId, activity.roomCode);
@@ -263,7 +264,7 @@ class SecurityManager {
       attempts.lockedUntil = now + this.LOCKOUT_DURATION_MS;
       this.failedAttempts.set(identifier, attempts);
 
-      // console.log(`🔒 Identifier ${identifier} locked until ${new Date(attempts.lockedUntil).toISOString()}`);
+      logger.info(`🔒 Identifier ${identifier} locked until ${new Date(attempts.lockedUntil).toISOString()}`);
 
       return {
         locked: true,
@@ -332,7 +333,7 @@ class SecurityManager {
       }
     }
 
-    // console.log(`🧹 Security cleanup completed. Active sessions: ${this.sessionTokens.size}, Active users: ${this.userActivity.size}`);
+    logger.info(`🧹 Security cleanup completed. Active sessions: ${this.sessionTokens.size}, Active users: ${this.userActivity.size}`);
   }
 
   /**
