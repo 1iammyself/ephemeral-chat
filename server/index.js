@@ -797,7 +797,7 @@ io.on('connection', (socket) => {
       }
 
       // Support for text, image and audio messages
-      const { content, messageType = 'text', isViewOnce = false, imageData, recipients = [] } = data;
+      const { content, messageType = 'text', isViewOnce = false, imageData, pollData, recipients = [] } = data;
 
       // For text messages, validate content
       if (messageType === 'text') {
@@ -849,6 +849,33 @@ io.on('connection', (socket) => {
           socket.emit('error', { message: 'Failed to process audio message' });
           return;
         }
+      } else if (messageType === 'poll') {
+        if (!pollData || !pollData.question || !Array.isArray(pollData.options)) {
+          socket.emit('error', { message: 'Invalid poll data' });
+          return;
+        }
+        // Sanitize poll data
+        const sanitizedQuestion = sanitizeInput(pollData.question.trim());
+        const sanitizedOptions = pollData.options
+          .filter(opt => opt && typeof opt === 'string' && opt.trim().length > 0)
+          .slice(0, 5) // Max 5 options
+          .map((opt, idx) => ({
+            id: `opt_${Date.now()}_${idx}`,
+            text: sanitizeInput(opt.trim()),
+            votes: []
+          }));
+
+        if (!sanitizedQuestion || sanitizedOptions.length < 2) {
+          socket.emit('error', { message: 'Poll must have a question and at least 2 options' });
+          return;
+        }
+
+        messageContent = sanitizedQuestion;
+        data.pollData = {
+          question: sanitizedQuestion,
+          options: sanitizedOptions,
+          allowMultiple: !!pollData.allowMultiple
+        };
       } else {
         messageContent = sanitizeInput(content.trim());
       }
@@ -858,6 +885,7 @@ io.on('connection', (socket) => {
         content: messageContent,
         messageType,
         isViewOnce,
+        pollData: messageType === 'poll' ? data.pollData : undefined,
         recipients, // Store recipients
         hasBeenViewed: false,
         sender: {
@@ -912,6 +940,20 @@ io.on('connection', (socket) => {
 
     } catch (error) {
       logger.error('Error marking message as viewed:', error);
+    }
+  });
+
+  // Handle poll voting
+  socket.on('vote-poll', async ({ messageId, optionId }) => {
+    try {
+      if (!socket.roomCode || !messageId || !optionId) return;
+
+      const updatedMessage = await roomManager.votePoll(socket.roomCode, messageId, optionId, socket.id, socket.nickname);
+      if (updatedMessage) {
+        io.to(socket.roomCode).emit('message-updated', updatedMessage);
+      }
+    } catch (error) {
+      logger.error('Error voting on poll:', error);
     }
   });
 

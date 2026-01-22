@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Clock, User, Eye, Lock, Image as ImageIcon, Mic } from 'lucide-react';
 import ImageViewer from './ImageViewer';
 import AudioPlayer from './AudioPlayer';
+import PollMessage from './PollMessage';
 import socketManager from '../socket-simple';
 
-const MessageList = ({ messages, currentUser, messageTTL }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote }) => {
   const [messageTimers, setMessageTimers] = useState(new Map());
   const [viewingImage, setViewingImage] = useState(null);
   const [currentImageUrl, setCurrentImageUrl] = useState(null); // Save image URL separately
@@ -299,15 +300,20 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
             }
           }
 
+          const isPoll = message.messageType === 'poll';
+
           return (
             <div
               key={message.id}
               className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} ${isMessageVanishing(message) ? 'message-vanishing' : ''} ${newMessages.has(message.id) ? 'message-new' : ''}`}
             >
               <div
-                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg transition-all duration-300 ${isOwnMessage
-                  ? 'bg-primary-600 dark:bg-primary-700 text-white'
-                  : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:text-gray-100'
+                className={`max-w-xs lg:max-w-md rounded-lg transition-all duration-300 ${isPoll
+                  ? ''
+                  : `px-4 py-2 ${isOwnMessage
+                    ? 'bg-primary-600 dark:bg-primary-700 text-white'
+                    : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:text-gray-100'
+                  }`
                   } ${isOwnMessage && newMessages.has(message.id) ? 'message-delivered-glow' : ''}`}
               >
                 {/* Sender name (only for others' messages) */}
@@ -379,6 +385,12 @@ const MessageList = ({ messages, currentUser, messageTTL }) => {
                         // --- Utility: Fix audio content for Safari/desktop playback ---
                       )}
                     </div>
+                  ) : message.messageType === 'poll' ? (
+                    <PollMessage
+                      message={message}
+                      currentUser={currentUser}
+                      onVote={onVote}
+                    />
                   ) : (
                     // Text message
                     message.content

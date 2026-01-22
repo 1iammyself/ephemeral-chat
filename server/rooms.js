@@ -879,6 +879,66 @@ class RoomManager {
     return data;
   }
 
+  /**
+   * Vote on a poll message
+   * @param {string} roomCode - Room code
+   * @param {string} messageId - Message ID of the poll
+   * @param {string} optionId - ID of the option being voted for
+   * @param {string} userId - ID of the user voting
+   * @param {string} nickname - Nickname of the user voting
+   * @returns {Promise<Object|null>} Updated message or null
+   */
+  async votePoll(roomCode, messageId, optionId, userId, nickname) {
+    const room = await this.getRoom(roomCode);
+    if (!room) return null;
+
+    const message = (room.messages || []).find(m => m.id === messageId);
+    if (!message || message.messageType !== 'poll' || !message.pollData) return null;
+
+    const { pollData } = message;
+    const { options, allowMultiple } = pollData;
+
+    const option = options.find(o => o.id === optionId);
+    if (!option) return null;
+
+    if (!option.votes) option.votes = [];
+
+    const voterIndex = option.votes.findIndex(v => v.userId === userId);
+    const hasVotedForThis = voterIndex !== -1;
+
+    if (hasVotedForThis) {
+      // Remove vote
+      option.votes.splice(voterIndex, 1);
+    } else {
+      // Add vote
+      const voteObj = {
+        userId,
+        nickname,
+        timestamp: new Date().toISOString()
+      };
+
+      if (!allowMultiple) {
+        // Remove from all other options first
+        options.forEach(opt => {
+          if (opt.votes) {
+            opt.votes = opt.votes.filter(v => v.userId !== userId);
+          }
+        });
+      }
+      option.votes.push(voteObj);
+    }
+
+    // Save back to storage
+    if (this.redis && room.settings.messageTTL > 0) {
+      const messageKey = `message:${roomCode}:${messageId}`;
+      await this.redis.setex(messageKey, room.settings.messageTTL, JSON.stringify(message));
+    } else {
+      await this.saveRoom(roomCode, room);
+    }
+
+    return message;
+  }
+
 }
 
 module.exports = RoomManager;
