@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, Users, Clock, Shield, Plus, ArrowRight, Zap, Wifi, User, Edit, Lock } from 'lucide-react';
 import CreateRoomModal from './CreateRoomModal';
+import TraceHashModal from './TraceHashModal';
 import ThemeToggle from './ThemeToggle';
 
 const Home = ({ children }) => {
   const [roomCode, setRoomCode] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showTraceModal, setShowTraceModal] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const navigate = useNavigate();
 
@@ -102,7 +104,7 @@ const Home = ({ children }) => {
             </div>
 
             {/* Hero Action Card */}
-            <div className="mt-10 max-w-lg mx-auto">
+            <div className="mt-10 max-w-lg mx-auto space-y-4">
               <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-6 sm:p-8 shadow-xl transition-colors duration-200">
                 <button
                   onClick={() => setShowCreateModal(true)}
@@ -115,6 +117,14 @@ const Home = ({ children }) => {
                   To join a room, please use the invite link shared by the host.
                 </p>
               </div>
+
+              <button
+                onClick={() => setShowTraceModal(true)}
+                className="w-full flex justify-center items-center px-4 py-3 text-sm font-semibold rounded-xl text-gray-600 dark:text-gray-400 bg-white/50 dark:bg-gray-800/50 hover:bg-white dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 transition-all transform active:scale-[0.98]"
+              >
+                <Shield className="mr-2 h-4 w-4" />
+                Trace Forensic Hash
+              </button>
             </div>
 
             {/* Features - Info Section */}
@@ -139,6 +149,13 @@ const Home = ({ children }) => {
           <CreateRoomModal
             onClose={() => setShowCreateModal(false)}
             onRoomCreated={handleRoomCreated}
+          />
+        )}
+
+        {/* Trace Hash Modal */}
+        {showTraceModal && (
+          <TraceHashModal
+            onClose={() => setShowTraceModal(false)}
           />
         )}
       </main>
