@@ -1137,9 +1137,10 @@ io.on('connection', (socket) => {
         // logger.info(`📷 Image message created - ID: ${message.id}, content length: ${message.content?.length}`);
       }
 
-      // Initialize viewedBy array for view-once messages
+      // Initialize viewedBy array for read receipts
+      message.viewedBy = [];
       if (isViewOnce) {
-        message.viewedBy = [];
+        // Keep explicit flag if needed logic depends on it, but viewedBy is now universal
       }
 
       await roomManager.addMessage(socket.roomCode, message);

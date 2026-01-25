@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, FileText, Download } from 'lucide-react';
+import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, FileText, Download, Check, CheckCheck } from 'lucide-react';
 import ImageViewer from './ImageViewer';
 import AudioPlayer from './AudioPlayer';
 import PollMessage from './PollMessage';
@@ -104,6 +104,32 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
       }
     });
   }, [messages]);
+
+  // Read Receipt Observer
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const msgId = entry.target.dataset.id;
+          // If we haven't tracked this view locally AND it's not our own message
+          if (msgId && !viewedMessages.has(msgId)) {
+            const msg = messages.find(m => m.id === msgId);
+            const isOwn = msg && currentUser && (msg.sender.id === currentUser.id || msg.sender.socketId === currentUser.socketId);
+
+            if (!isOwn) {
+              socketManager.emit('message-viewed', { messageId: msgId });
+              setViewedMessages(prev => new Set([...prev, msgId]));
+            }
+          }
+        }
+      });
+    }, { threshold: 0.5 });
+
+    const elements = document.querySelectorAll('.message-item');
+    elements.forEach(el => observer.observe(el));
+
+    return () => observer.disconnect();
+  }, [messages, viewedMessages, currentUser]);
 
   const formatTime = (timestamp) => {
     const date = new Date(timestamp);
@@ -309,7 +335,8 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
             <div
               id={message.id}
               key={message.id}
-              className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} ${isMessageVanishing(message) ? 'message-vanishing' : ''} ${newMessages.has(message.id) ? 'message-new' : ''} group relative`}
+              data-id={message.id}
+              className={`message-item flex ${isOwnMessage ? 'justify-end' : 'justify-start'} ${isMessageVanishing(message) ? 'message-vanishing' : ''} ${newMessages.has(message.id) ? 'message-new' : ''} group relative`}
             >
               <div
                 className={`max-w-xs lg:max-w-md rounded-lg transition-all duration-300 ${isPoll
@@ -525,6 +552,15 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                     <div className="flex items-center space-x-1">
                       <Clock className="w-3 h-3" />
                       <span>{timeLeft}</span>
+                    </div>
+                  )}
+                  {isOwnMessage && !isViewOnce && (
+                    <div className="flex items-center" title={message.viewedBy && message.viewedBy.length > 0 ? "Read" : "Sent"}>
+                      {message.viewedBy && message.viewedBy.length > 0 ? (
+                        <CheckCheck className="w-3 h-3 text-blue-500" />
+                      ) : (
+                        <Check className="w-3 h-3 text-gray-400" />
+                      )}
                     </div>
                   )}
                 </div>
