@@ -880,6 +880,55 @@ class RoomManager {
   }
 
   /**
+   * Add or remove a reaction from a message
+   * @param {string} roomCode - Room code
+   * @param {string} messageId - Message ID
+   * @param {string} emoji - Emoji character
+   * @param {string} userId - User ID
+   * @returns {Promise<Object|null>} Updated message or null
+   */
+  async addReaction(roomCode, messageId, emoji, userId) {
+    const room = await this.getRoom(roomCode);
+    if (!room) return null;
+
+    let message;
+    if (this.redis && room.settings.messageTTL > 0) {
+      const messageKey = `message:${roomCode}:${messageId}`;
+      const messageData = await this.redis.get(messageKey);
+      message = messageData ? JSON.parse(messageData) : null;
+    } else {
+      message = (room.messages || []).find(m => m.id === messageId);
+    }
+
+    if (!message) return null;
+
+    if (!message.reactions) message.reactions = {};
+    if (!message.reactions[emoji]) message.reactions[emoji] = [];
+
+    const userIndex = message.reactions[emoji].indexOf(userId);
+    if (userIndex !== -1) {
+      // Remove reaction
+      message.reactions[emoji].splice(userIndex, 1);
+      if (message.reactions[emoji].length === 0) {
+        delete message.reactions[emoji];
+      }
+    } else {
+      // Add reaction
+      message.reactions[emoji].push(userId);
+    }
+
+    // Save back to storage
+    if (this.redis && room.settings.messageTTL > 0) {
+      const messageKey = `message:${roomCode}:${messageId}`;
+      await this.redis.setex(messageKey, room.settings.messageTTL, JSON.stringify(message));
+    } else if (!this.redis) {
+      await this.saveRoom(roomCode, room);
+    }
+
+    return message;
+  }
+
+  /**
    * Vote on a poll message
    * @param {string} roomCode - Room code
    * @param {string} messageId - Message ID of the poll

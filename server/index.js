@@ -1013,7 +1013,7 @@ io.on('connection', (socket) => {
       }
 
       // Support for text, image and audio messages
-      const { content, messageType = 'text', isViewOnce = false, imageData, pollData, recipients = [] } = data;
+      const { content, messageType = 'text', isViewOnce = false, imageData, pollData, recipients = [], replyTo, isEncrypted, iv } = data;
 
       // For text messages, validate content
       if (messageType === 'text') {
@@ -1103,10 +1103,15 @@ io.on('connection', (socket) => {
         isViewOnce,
         pollData: messageType === 'poll' ? data.pollData : undefined,
         recipients, // Store recipients
+        isEncrypted: !!isEncrypted, // Store encryption flag
+        iv: iv || null, // Store IV if encrypted
+        replyTo: replyTo || null, // Store reply text/preview
+        reactions: {}, // Initialize reactions
         hasBeenViewed: false,
         sender: {
           socketId: socket.id,
-          nickname: socket.nickname
+          nickname: socket.nickname,
+          id: socket.id
         },
         timestamp: new Date().toISOString()
       };
@@ -1143,6 +1148,29 @@ io.on('connection', (socket) => {
     } catch (error) {
       logger.error('Error sending message:', error);
       socket.emit('error', { message: 'Failed to send message' });
+    }
+  });
+
+  // Reaction
+  socket.on('add-reaction', async ({ messageId, emoji }) => {
+    if (!socket.roomCode || !messageId || !emoji) return;
+
+    // Call roomManager
+    const updatedMessage = await roomManager.addReaction(socket.roomCode, messageId, emoji, socket.id);
+
+    if (updatedMessage) {
+      // Broadcast update
+      io.to(socket.roomCode).emit('message-updated', updatedMessage);
+    }
+  });
+
+  // Pulse
+  socket.on('send-pulse', ({ roomCode }) => {
+    // Rate limit pulse
+    if (!checkRateLimit(socket.id)) return;
+
+    if (roomCode && socket.roomCode === roomCode) {
+      socket.to(roomCode).emit('pulse-received', { from: socket.nickname });
     }
   });
 

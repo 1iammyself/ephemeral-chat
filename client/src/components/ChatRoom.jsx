@@ -20,7 +20,9 @@ import {
   Smile,
   BarChart2,
   Plus,
-  Edit2
+  Edit2,
+  Zap,
+  Reply
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -80,7 +82,10 @@ const ChatRoom = () => {
   const [showTimerModal, setShowTimerModal] = useState(false);
   const [activeTimer, setActiveTimer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
+  const [replyingTo, setReplyingTo] = useState(null);
   const { theme } = useTheme();
+
+  const messageInputRef = useRef(null);
 
   useEffect(() => {
     if (!activeTimer) {
@@ -340,6 +345,16 @@ const ChatRoom = () => {
       setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: `${stoppedBy} stopped the timer`, timestamp: new Date().toISOString() }]);
     };
 
+    const handlePulseReceived = ({ from }) => {
+      if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+      const container = document.querySelector('.chat-container');
+      if (container) {
+        container.classList.add('animate-shake');
+        setTimeout(() => container.classList.remove('animate-shake'), 500);
+      }
+      setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: `${from} sent a ⚡ pulse!`, timestamp: new Date().toISOString() }]);
+    };
+
     socketManager.on('connect', handleConnect);
     socketManager.on('disconnect', handleDisconnect);
     socketManager.on('room-joined', handleRoomJoined);
@@ -363,6 +378,8 @@ const ChatRoom = () => {
     socketManager.on('room-topic-updated', handleRoomTopicUpdated);
     socketManager.on('timer-started', handleTimerStarted);
     socketManager.on('timer-stopped', handleTimerStopped);
+    socketManager.on('pulse-received', handlePulseReceived);
+    socketManager.on('message-updated', handleMessageUpdated);
 
     return () => {
       socketManager.off('connect', handleConnect);
@@ -388,6 +405,8 @@ const ChatRoom = () => {
       socketManager.off('room-topic-updated', handleRoomTopicUpdated);
       socketManager.off('timer-started', handleTimerStarted);
       socketManager.off('timer-stopped', handleTimerStopped);
+      socketManager.off('pulse-received', handlePulseReceived);
+      socketManager.off('message-updated', handleMessageUpdated);
       if (process.env.NODE_ENV !== 'development') socketManager.disconnect();
     };
   }, [roomCode, performJoin, roomKey]);
@@ -474,9 +493,23 @@ const ChatRoom = () => {
         iv = result.iv;
         isEncrypted = true;
       }
-      socketManager.emit('send-message', { content, isEncrypted, iv, recipients: selectedRecipients });
+
+      const replyData = replyingTo ? {
+        id: replyingTo.id,
+        content: replyingTo.messageType === 'image' ? 'Image' : replyingTo.messageType === 'audio' ? 'Voice Note' : replyingTo.content,
+        sender: replyingTo.sender.nickname
+      } : null;
+
+      socketManager.emit('send-message', {
+        content,
+        isEncrypted,
+        iv,
+        recipients: selectedRecipients,
+        replyTo: replyData
+      });
       socketManager.emit('user-activity');
       setNewMessage('');
+      setReplyingTo(null);
     } catch (error) {
       setError('Failed to send message');
     } finally {
@@ -509,6 +542,24 @@ const ChatRoom = () => {
 
   const handleStopTimer = () => {
     socketManager.emit('stop-timer', { roomCode });
+  };
+
+  const handleReply = (message) => {
+    setReplyingTo(message);
+    messageInputRef.current?.focus();
+  };
+
+  const handleCancelReply = () => {
+    setReplyingTo(null);
+  };
+
+  const handleReaction = (messageId, emoji) => {
+    socketManager.emit('add-reaction', { messageId, emoji });
+  };
+
+  const handleSendPulse = () => {
+    socketManager.emit('send-pulse', { roomCode });
+    setShowFeatureMenu(false);
   };
 
   const handleImageUpload = useCallback(async (event) => {
@@ -673,7 +724,7 @@ const ChatRoom = () => {
   if (showJoinModal) return <JoinRoomModal roomCode={roomCode} onJoin={handleJoinRoom} onCancel={() => navigate('/')} error={error} isProcessingInvite={isProcessingInvite} isWaitingForHost={isWaitingForHost} />;
 
   return (
-    <div className={`h-screen flex flex-col transition-colors duration-500 ${getVibeById(roomVibe).bgClass}`}>
+    <div className={`h-screen flex flex-col transition-colors duration-500 chat-container ${getVibeById(roomVibe).bgClass}`}>
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -697,267 +748,300 @@ const ChatRoom = () => {
           </div>
         </div>
       </div>
-    </div>
 
-      {/* Topic Banner */ }
-  {
-    roomTopic && (
-      <div className="bg-primary-50 dark:bg-primary-900/10 border-b border-primary-100 dark:border-primary-800 px-4 py-2 flex items-center justify-between animate-in slide-in-from-top-2">
-        <p className="text-sm font-medium text-primary-800 dark:text-primary-200 flex-1 truncate text-center">
-          📢 {roomTopic}
-        </p>
-        {canManageRoom(currentUserRole) && (
-          <button onClick={() => setShowTopicEditor(true)} className="p-1 hover:bg-primary-100 dark:hover:bg-primary-800 rounded text-primary-600 dark:text-primary-300">
-            <Edit2 className="w-3 h-3" />
-          </button>
-        )}
-      </div>
-    )
-  }
-
-  {/* Timer Banner */ }
-  {
-    activeTimer && (
-      <div className="bg-indigo-600 px-4 py-2 flex items-center justify-center text-white shadow-md animate-in slide-in-from-top-1 relative z-10 transition-all duration-300">
-        <div className="flex items-center space-x-3">
-          <Clock className={`w-4 h-4 ${timeLeft === '00:00' ? 'animate-bounce text-red-300' : 'animate-pulse'}`} />
-          <span className={`font-mono text-lg font-bold tracking-wider ${timeLeft === '00:00' ? 'text-red-100' : ''}`}>{timeLeft || '00:00'}</span>
-          {canManageRoom(currentUserRole) && (
-            <button
-              onClick={handleStopTimer}
-              className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors"
-              title="Stop Timer"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  { error && <div className="bg-red-100 dark:bg-red-900 border-l-4 border-red-500 text-red-700 dark:text-red-200 p-3"><p className="text-sm">{error}</p></div> }
-
-  <div className="flex-1 flex overflow-hidden">
-    <div className="flex-1 flex flex-col">
-      <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
-        <MessageList messages={messages} currentUser={currentUser} messageTTL={room?.settings?.messageTTL} onVote={handleVote} />
-        <div ref={messagesEndRef} />
-      </div>
-      <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-        {selectedRecipients.length > 0 && (
-          <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800 flex items-center justify-between">
-            <span className="text-xs text-blue-600 dark:text-blue-300 font-medium flex items-center"><Users className="w-3 h-3 mr-1.5" />Sending to {selectedRecipients.length} specific user{selectedRecipients.length !== 1 ? 's' : ''}</span>
-            <button onClick={() => setSelectedRecipients([])} className="text-xs text-blue-500 hover:text-blue-700 dark:hover:text-blue-200 underline">Clear selection</button>
+      {/* Topic Banner */}
+      {
+        roomTopic && (
+          <div className="bg-primary-50 dark:bg-primary-900/10 border-b border-primary-100 dark:border-primary-800 px-4 py-2 flex items-center justify-between animate-in slide-in-from-top-2">
+            <p className="text-sm font-medium text-primary-800 dark:text-primary-200 flex-1 truncate text-center">
+              📢 {roomTopic}
+            </p>
+            {canManageRoom(currentUserRole) && (
+              <button onClick={() => setShowTopicEditor(true)} className="p-1 hover:bg-primary-100 dark:hover:bg-primary-800 rounded text-primary-600 dark:text-primary-300">
+                <Edit2 className="w-3 h-3" />
+              </button>
+            )}
           </div>
-        )}
-        <div className="p-4">
-          <form onSubmit={handleSendMessage} className="flex items-center space-x-2 sm:space-x-3">
-            {isRecording ? (
-              <div className="flex-1 flex items-center justify-between bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-2">
-                <div className="flex items-center space-x-3"><div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" /><span className="text-red-600 dark:text-red-400 font-medium font-mono">{formatDuration(recordingDuration)} / 0:30</span></div>
-                <div className="flex items-center space-x-2">
-                  <button type="button" onClick={handleCancelRecording} className="p-2 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-full text-red-500"><Trash2 className="w-5 h-5" /></button>
-                  <button type="button" onClick={handleStopRecording} className="p-2 bg-red-500 hover:bg-red-600 rounded-full text-white shadow-sm"><Send className="w-5 h-5" /></button>
+        )
+      }
+
+      {/* Timer Banner */}
+      {
+        activeTimer && (
+          <div className="bg-indigo-600 px-4 py-2 flex items-center justify-center text-white shadow-md animate-in slide-in-from-top-1 relative z-10 transition-all duration-300">
+            <div className="flex items-center space-x-3">
+              <Clock className={`w-4 h-4 ${timeLeft === '00:00' ? 'animate-bounce text-red-300' : 'animate-pulse'}`} />
+              <span className={`font-mono text-lg font-bold tracking-wider ${timeLeft === '00:00' ? 'text-red-100' : ''}`}>{timeLeft || '00:00'}</span>
+              {canManageRoom(currentUserRole) && (
+                <button
+                  onClick={handleStopTimer}
+                  className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors"
+                  title="Stop Timer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </div>
+        )
+      }
+
+      {error && <div className="bg-red-100 dark:bg-red-900 border-l-4 border-red-500 text-red-700 dark:text-red-200 p-3"><p className="text-sm">{error}</p></div>}
+
+      <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex flex-col">
+          <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
+            <MessageList
+              messages={messages}
+              currentUser={currentUser}
+              messageTTL={room?.settings?.messageTTL}
+              onVote={handleVote}
+              onReply={handleReply}
+              onReact={handleReaction}
+            />
+            <div ref={messagesEndRef} />
+          </div>
+          <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+            {replyingTo && (
+              <div className="px-4 py-2 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-600 flex items-center justify-between animate-in slide-in-from-bottom-2">
+                <div className="flex items-center space-x-2 overflow-hidden">
+                  <Reply className="w-4 h-4 text-blue-500" />
+                  <div className="flex flex-col text-xs border-l-2 border-blue-500 pl-2">
+                    <span className="font-semibold text-blue-500">Replying to {replyingTo.sender.nickname}</span>
+                    <span className="text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
+                      {replyingTo.messageType === 'image' ? 'Image' : replyingTo.messageType === 'audio' ? 'Voice Note' : replyingTo.content}
+                    </span>
+                  </div>
                 </div>
+                <button onClick={handleCancelReply} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full">
+                  <X className="w-4 h-4 text-gray-500" />
+                </button>
               </div>
-            ) : (
-              <>
-                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" id="image-upload" />
-                <div className="relative" ref={featureMenuRef}>
-                  <button
-                    type="button"
-                    onClick={() => setShowFeatureMenu(!showFeatureMenu)}
-                    disabled={!isConnected}
-                    className={`p-3 rounded-lg transition-all duration-200 ${showFeatureMenu ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-600 rotate-45' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
-                  >
-                    <Plus className="w-5 h-5" />
-                  </button>
+            )}
+            {selectedRecipients.length > 0 && (
+              <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800 flex items-center justify-between">
+                <span className="text-xs text-blue-600 dark:text-blue-300 font-medium flex items-center"><Users className="w-3 h-3 mr-1.5" />Sending to {selectedRecipients.length} specific user{selectedRecipients.length !== 1 ? 's' : ''}</span>
+                <button onClick={() => setSelectedRecipients([])} className="text-xs text-blue-500 hover:text-blue-700 dark:hover:text-blue-200 underline">Clear selection</button>
+              </div>
+            )}
+            <div className="p-4">
+              <form onSubmit={handleSendMessage} className="flex items-center space-x-2 sm:space-x-3">
+                {isRecording ? (
+                  <div className="flex-1 flex items-center justify-between bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-2">
+                    <div className="flex items-center space-x-3"><div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" /><span className="text-red-600 dark:text-red-400 font-medium font-mono">{formatDuration(recordingDuration)} / 0:30</span></div>
+                    <div className="flex items-center space-x-2">
+                      <button type="button" onClick={handleCancelRecording} className="p-2 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-full text-red-500"><Trash2 className="w-5 h-5" /></button>
+                      <button type="button" onClick={handleStopRecording} className="p-2 bg-red-500 hover:bg-red-600 rounded-full text-white shadow-sm"><Send className="w-5 h-5" /></button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" id="image-upload" />
+                    <div className="relative" ref={featureMenuRef}>
+                      <button
+                        type="button"
+                        onClick={() => setShowFeatureMenu(!showFeatureMenu)}
+                        disabled={!isConnected}
+                        className={`p-3 rounded-lg transition-all duration-200 ${showFeatureMenu ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-600 rotate-45' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
+                      >
+                        <Plus className="w-5 h-5" />
+                      </button>
 
-                  {showFeatureMenu && (
-                    <div className="absolute bottom-full mb-2 left-0 z-50 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-2 flex flex-col space-y-1 w-72 animate-in slide-in-from-bottom-2 duration-200">
-                      {/* Admin Controls */}
-                      {canManageRoom(currentUserRole) && (
-                        <div className="p-2 border-b border-gray-100 dark:border-gray-700 mb-1">
-                          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Room Controls</p>
+                      {showFeatureMenu && (
+                        <div className="absolute bottom-full mb-2 left-0 z-50 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-2 flex flex-col space-y-1 w-72 animate-in slide-in-from-bottom-2 duration-200">
+                          {/* Admin Controls */}
+                          {canManageRoom(currentUserRole) && (
+                            <div className="p-2 border-b border-gray-100 dark:border-gray-700 mb-1">
+                              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Room Controls</p>
 
+                              <button
+                                type="button"
+                                onClick={() => { setShowTopicEditor(true); setShowFeatureMenu(false); }}
+                                className="flex items-center space-x-3 w-full p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mb-2"
+                              >
+                                <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                                  <Edit2 className="w-3 h-3 text-orange-500" />
+                                </div>
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Set Topic</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (activeTimer) {
+                                    handleStopTimer();
+                                  } else {
+                                    setShowTimerModal(true);
+                                  }
+                                  setShowFeatureMenu(false);
+                                }}
+                                className={`flex items-center space-x-3 w-full p-2 rounded-lg transition-colors mb-2 ${activeTimer ? 'bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                              >
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center ${activeTimer ? 'bg-red-100 dark:bg-red-900/30' : 'bg-indigo-100 dark:bg-indigo-900/30'}`}>
+                                  {activeTimer ? <X className="w-3 h-3 text-red-500" /> : <Clock className="w-3 h-3 text-indigo-500" />}
+                                </div>
+                                <span className={`text-sm font-medium ${activeTimer ? 'text-red-700 dark:text-red-300' : 'text-gray-700 dark:text-gray-300'}`}>
+                                  {activeTimer ? 'Stop Timer' : 'Start Timer'}
+                                </span>
+                              </button>
+
+                              <div className="grid grid-cols-4 gap-2">
+                                {getAllVibes().map(vibe => (
+                                  <button
+                                    key={vibe.id}
+                                    onClick={() => handleUpdateVibe(vibe.id)}
+                                    className={`aspect-square rounded-lg flex items-center justify-center text-lg transition-all ${roomVibe === vibe.id ? 'bg-primary-100 dark:bg-primary-900 ring-2 ring-primary-500' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                    title={vibe.name}
+                                  >
+                                    {vibe.emoji}
+                                  </button>
+                                ))}
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={handleSendPulse}
+                                className="flex items-center space-x-3 w-full p-2 rounded-lg hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-colors mt-1"
+                              >
+                                <div className="w-6 h-6 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
+                                  <Zap className="w-3 h-3 text-yellow-500" />
+                                </div>
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Pulse</span>
+                              </button>
+                            </div>
+                          )}
                           <button
                             type="button"
-                            onClick={() => { setShowTopicEditor(true); setShowFeatureMenu(false); }}
-                            className="flex items-center space-x-3 w-full p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mb-2"
+                            onClick={() => {
+                              fileInputRef.current?.click();
+                              setShowFeatureMenu(false);
+                            }}
+                            disabled={!isConnected || isUploading}
+                            className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
                           >
-                            <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                              <Edit2 className="w-3 h-3 text-orange-500" />
+                            <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                              {isUploading ? <Loader2 className="w-4 h-4 text-blue-500 animate-spin" /> : <ImageIcon className="w-4 h-4 text-blue-500" />}
                             </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Set Topic</span>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Photo</span>
                           </button>
 
                           <button
                             type="button"
                             onClick={() => {
-                              if (activeTimer) {
-                                handleStopTimer();
-                              } else {
-                                setShowTimerModal(true);
-                              }
+                              handleStartCall();
                               setShowFeatureMenu(false);
                             }}
-                            className={`flex items-center space-x-3 w-full p-2 rounded-lg transition-colors mb-2 ${activeTimer ? 'bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                            disabled={!isConnected || users.length < 2}
+                            className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors disabled:opacity-50"
                           >
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center ${activeTimer ? 'bg-red-100 dark:bg-red-900/30' : 'bg-indigo-100 dark:bg-indigo-900/30'}`}>
-                              {activeTimer ? <X className="w-3 h-3 text-red-500" /> : <Clock className="w-3 h-3 text-indigo-500" />}
+                            <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                              <Phone className="w-4 h-4 text-green-500" />
                             </div>
-                            <span className={`text-sm font-medium ${activeTimer ? 'text-red-700 dark:text-red-300' : 'text-gray-700 dark:text-gray-300'}`}>
-                              {activeTimer ? 'Stop Timer' : 'Start Timer'}
-                            </span>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Voice Call</span>
                           </button>
 
-                          <div className="grid grid-cols-4 gap-2">
-                            {getAllVibes().map(vibe => (
-                              <button
-                                key={vibe.id}
-                                onClick={() => handleUpdateVibe(vibe.id)}
-                                className={`aspect-square rounded-lg flex items-center justify-center text-lg transition-all ${roomVibe === vibe.id ? 'bg-primary-100 dark:bg-primary-900 ring-2 ring-primary-500' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-                                title={vibe.name}
-                              >
-                                {vibe.emoji}
-                              </button>
-                            ))}
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowPollModal(true);
+                              setShowFeatureMenu(false);
+                            }}
+                            disabled={!isConnected}
+                            className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors disabled:opacity-50"
+                          >
+                            <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                              <BarChart2 className="w-4 h-4 text-purple-500" />
+                            </div>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Poll</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              startRecording();
+                              setShowFeatureMenu(false);
+                            }}
+                            disabled={!isConnected}
+                            className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                          >
+                            <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                              <Mic className="w-4 h-4 text-red-500" />
+                            </div>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Voice Note</span>
+                          </button>
                         </div>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          fileInputRef.current?.click();
-                          setShowFeatureMenu(false);
-                        }}
-                        disabled={!isConnected || isUploading}
-                        className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                          {isUploading ? <Loader2 className="w-4 h-4 text-blue-500 animate-spin" /> : <ImageIcon className="w-4 h-4 text-blue-500" />}
-                        </div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Photo</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleStartCall();
-                          setShowFeatureMenu(false);
-                        }}
-                        disabled={!isConnected || users.length < 2}
-                        className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors disabled:opacity-50"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                          <Phone className="w-4 h-4 text-green-500" />
-                        </div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Voice Call</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowPollModal(true);
-                          setShowFeatureMenu(false);
-                        }}
-                        disabled={!isConnected}
-                        className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors disabled:opacity-50"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                          <BarChart2 className="w-4 h-4 text-purple-500" />
-                        </div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Poll</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          startRecording();
-                          setShowFeatureMenu(false);
-                        }}
-                        disabled={!isConnected}
-                        className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                          <Mic className="w-4 h-4 text-red-500" />
-                        </div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Voice Note</span>
-                      </button>
                     </div>
-                  )}
-                </div>
 
-                <div className="relative" ref={emojiPickerRef}>
-                  <button
-                    type="button"
-                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                    disabled={!isConnected}
-                    className={`p-3 rounded-lg transition-colors ${showEmojiPicker ? 'bg-gray-100 dark:bg-gray-700 text-blue-500' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
-                  >
-                    <Smile className="w-5 h-5" />
-                  </button>
-                  {showEmojiPicker && (
-                    <div className="absolute bottom-full mb-2 left-0 z-50">
-                      <EmojiPicker
-                        onEmojiClick={onEmojiClick}
-                        theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
-                        lazyLoadEmojis={true}
-                        skinTonesDisabled
-                        searchPlaceHolder="Search emojis..."
-                        width={320}
-                        height={400}
-                      />
+                    <div className="relative" ref={emojiPickerRef}>
+                      <button
+                        type="button"
+                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                        disabled={!isConnected}
+                        className={`p-3 rounded-lg transition-colors ${showEmojiPicker ? 'bg-gray-100 dark:bg-gray-700 text-blue-500' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
+                      >
+                        <Smile className="w-5 h-5" />
+                      </button>
+                      {showEmojiPicker && (
+                        <div className="absolute bottom-full mb-2 left-0 z-50">
+                          <EmojiPicker
+                            onEmojiClick={onEmojiClick}
+                            theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
+                            lazyLoadEmojis={true}
+                            skinTonesDisabled
+                            searchPlaceHolder="Search emojis..."
+                            width={320}
+                            height={400}
+                          />
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-                <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onCopy={(e) => e.preventDefault()} onCut={(e) => e.preventDefault()} onPaste={(e) => e.preventDefault()} placeholder="Type your message..." className="flex-1 input-field py-3 px-4 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600" disabled={!isConnected || isSending} maxLength={500} />
-                <button type="submit" disabled={!newMessage.trim() || !isConnected || isSending} className="btn-primary px-4 py-3"><Send className="w-5 h-5" /></button>
-              </>
-            )}
-          </form>
+                    <input ref={messageInputRef} type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onCopy={(e) => e.preventDefault()} onCut={(e) => e.preventDefault()} onPaste={(e) => e.preventDefault()} placeholder="Type your message..." className="flex-1 input-field py-3 px-4 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600" disabled={!isConnected || isSending} maxLength={500} />
+                    <button type="submit" disabled={!newMessage.trim() || !isConnected || isSending} className="btn-primary px-4 py-3"><Send className="w-5 h-5" /></button>
+                  </>
+                )}
+              </form>
+            </div>
+          </div>
+        </div>
+        <div className="hidden lg:block w-64 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <UserList users={users} currentUser={currentUser} pendingGuests={pendingGuests} isHost={isHost} onApprove={handleApproveGuest} onDeny={handleDenyGuest} selectedRecipients={selectedRecipients} onToggleRecipient={toggleRecipient} onSetUserRole={handleSetUserRole} onKickUser={handleKickUser} currentUserRole={currentUserRole} />
         </div>
       </div>
-    </div>
-    <div className="hidden lg:block w-64 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-      <UserList users={users} currentUser={currentUser} pendingGuests={pendingGuests} isHost={isHost} onApprove={handleApproveGuest} onDeny={handleDenyGuest} selectedRecipients={selectedRecipients} onToggleRecipient={toggleRecipient} onSetUserRole={handleSetUserRole} onKickUser={handleKickUser} currentUserRole={currentUserRole} />
-    </div>
-  </div>
 
-  {
-    showMobileMenu && (
-      <div className="fixed inset-0 z-50 lg:hidden">
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileMenu(false)} />
-        <div className="absolute right-0 top-0 bottom-0 w-80 max-w-[85vw] bg-white dark:bg-gray-800 shadow-xl flex flex-col">
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700"><h2 className="text-lg font-semibold text-gray-900 dark:text-white">Room Details</h2><button onClick={() => setShowMobileMenu(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400"><X className="w-5 h-5" /></button></div>
-          <div className="flex-1 overflow-y-auto"><UserList users={users} currentUser={currentUser} pendingGuests={pendingGuests} isHost={isHost} onApprove={handleApproveGuest} onDeny={handleDenyGuest} selectedRecipients={selectedRecipients} onToggleRecipient={toggleRecipient} onSetUserRole={handleSetUserRole} onKickUser={handleKickUser} currentUserRole={currentUserRole} /></div>
-        </div>
-      </div>
-    )
-  }
+      {
+        showMobileMenu && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileMenu(false)} />
+            <div className="absolute right-0 top-0 bottom-0 w-80 max-w-[85vw] bg-white dark:bg-gray-800 shadow-xl flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700"><h2 className="text-lg font-semibold text-gray-900 dark:text-white">Room Details</h2><button onClick={() => setShowMobileMenu(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400"><X className="w-5 h-5" /></button></div>
+              <div className="flex-1 overflow-y-auto"><UserList users={users} currentUser={currentUser} pendingGuests={pendingGuests} isHost={isHost} onApprove={handleApproveGuest} onDeny={handleDenyGuest} selectedRecipients={selectedRecipients} onToggleRecipient={toggleRecipient} onSetUserRole={handleSetUserRole} onKickUser={handleKickUser} currentUserRole={currentUserRole} /></div>
+            </div>
+          </div>
+        )
+      }
 
-  { showCallModal && <AudioCallModal isOpen={showCallModal} onClose={() => setShowCallModal(false)} roomCode={roomCode} /> }
-      <TopicEditor 
-        isOpen={showTopicEditor} 
-        onClose={() => setShowTopicEditor(false)} 
-        currentTopic={roomTopic} 
-        onSave={handleSaveTopic} 
+      {showCallModal && <AudioCallModal isOpen={showCallModal} onClose={() => setShowCallModal(false)} roomCode={roomCode} />}
+      <TopicEditor
+        isOpen={showTopicEditor}
+        onClose={() => setShowTopicEditor(false)}
+        currentTopic={roomTopic}
+        onSave={handleSaveTopic}
       />
-      <TimerModal 
-        isOpen={showTimerModal} 
-        onClose={() => setShowTimerModal(false)} 
-        onStart={handleStartTimer} 
+      <TimerModal
+        isOpen={showTimerModal}
+        onClose={() => setShowTimerModal(false)}
+        onStart={handleStartTimer}
       />
       <PollModal isOpen={showPollModal} onClose={() => setShowPollModal(false)} onSend={handleSendPoll} />
       <PrivacyOverlay />
-  {
-    isJoined && currentUser && (
-      <GhostWatermark
-        nickname={currentUser.nickname}
-      />
-    )
-  }
+      {
+        isJoined && currentUser && (
+          <GhostWatermark
+            nickname={currentUser.nickname}
+          />
+        )
+      }
     </div >
   );
 };

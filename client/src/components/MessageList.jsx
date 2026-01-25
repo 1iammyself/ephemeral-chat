@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Clock, User, Eye, Lock, Image as ImageIcon, Mic } from 'lucide-react';
+import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus } from 'lucide-react';
 import ImageViewer from './ImageViewer';
 import AudioPlayer from './AudioPlayer';
 import PollMessage from './PollMessage';
 import socketManager from '../socket-simple';
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote }) => {
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '😡'];
+
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact }) => {
+  const [activeReactionId, setActiveReactionId] = useState(null);
   const [messageTimers, setMessageTimers] = useState(new Map());
   const [viewingImage, setViewingImage] = useState(null);
   const [currentImageUrl, setCurrentImageUrl] = useState(null); // Save image URL separately
@@ -304,8 +307,9 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote }) => {
 
           return (
             <div
+              id={message.id}
               key={message.id}
-              className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} ${isMessageVanishing(message) ? 'message-vanishing' : ''} ${newMessages.has(message.id) ? 'message-new' : ''}`}
+              className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} ${isMessageVanishing(message) ? 'message-vanishing' : ''} ${newMessages.has(message.id) ? 'message-new' : ''} group relative`}
             >
               <div
                 className={`max-w-xs lg:max-w-md rounded-lg transition-all duration-300 ${isPoll
@@ -318,8 +322,29 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote }) => {
               >
                 {/* Sender name (only for others' messages) */}
                 {!isOwnMessage && (
-                  <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                    {message.sender.nickname}
+                  <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 flex items-center justify-between group">
+                    <span>{message.sender.nickname}</span>
+                    <button
+                      onClick={() => onReply(message)}
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-opacity"
+                      title="Reply"
+                    >
+                      <Reply className="w-3 h-3 text-gray-500" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Reply Context */}
+                {message.replyTo && (
+                  <div
+                    className={`mb-1 p-2 rounded text-xs border-l-2 cursor-pointer ${isOwnMessage ? 'bg-black/10 border-white/50' : 'bg-gray-100 dark:bg-gray-700 border-gray-400'}`}
+                    onClick={() => {
+                      const el = document.getElementById(message.replyTo.id);
+                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }}
+                  >
+                    <div className="font-semibold opacity-75">{message.replyTo.sender}</div>
+                    <div className="truncate opacity-75">{message.replyTo.content}</div>
                   </div>
                 )}
 
@@ -397,34 +422,104 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote }) => {
                   )}
                 </div>
 
-                {/* Timestamp, TTL, and view-once indicator */}
-                <div className={`flex items-center justify-between mt-2 text-xs ${isOwnMessage ? 'text-primary-100' : 'text-gray-500 dark:text-gray-400'
-                  }`}>
+              </div>
+
+              {/* Reactions */}
+              {message.reactions && Object.keys(message.reactions).length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {Object.entries(message.reactions).map(([emoji, userIds]) => (
+                    <button
+                      key={emoji}
+                      onClick={() => onReact(message.id, emoji)}
+                      className={`text-xs px-1.5 py-0.5 rounded-full border flex items-center space-x-1 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${userIds.includes(currentUser?.id || currentUser?.socketId)
+                        ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800'
+                        : 'bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700'
+                        }`}
+                    >
+                      <span>{emoji}</span>
+                      <span className="opacity-75">{userIds.length}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Timestamp, TTL, and Actions */}
+              <div className={`flex items-center justify-between mt-2 text-xs ${isOwnMessage ? 'text-primary-100' : 'text-gray-500 dark:text-gray-400'
+                }`}>
+                <div className="flex items-center space-x-2">
                   <span>{formatTime(message.timestamp)}</span>
-                  <div className="flex items-center space-x-2">
-                    {isViewOnce && (
-                      <div className="flex items-center space-x-1">
-                        <Clock className="w-3 h-3 text-amber-500" />
-                        <span className="text-amber-500">View once</span>
-                      </div>
-                    )}
-                    {timeLeft && (
-                      <div className="flex items-center space-x-1">
-                        <Clock className="w-3 h-3" />
-                        <span>{timeLeft}</span>
-                      </div>
-                    )}
+                  {/* Action Buttons */}
+                  <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => onReply(message)}
+                      className="p-1 hover:bg-black/10 rounded transition-colors"
+                      title="Reply"
+                    >
+                      <Reply className="w-3 h-3" />
+                    </button>
+                    <div className="relative">
+                      <button
+                        onClick={() => setActiveReactionId(activeReactionId === message.id ? null : message.id)}
+                        className="p-1 hover:bg-black/10 rounded transition-colors"
+                        title="React"
+                      >
+                        <Smile className="w-3 h-3" />
+                      </button>
+                      {/* Quick Reaction Popover */}
+                      {activeReactionId === message.id && (
+                        <div className="absolute bottom-full left-0 mb-1 bg-white dark:bg-gray-800 shadow-xl rounded-full p-1 flex items-center space-x-1 border border-gray-200 dark:border-gray-700 z-10">
+                          {QUICK_REACTIONS.map(emoji => (
+                            <button
+                              key={emoji}
+                              onClick={() => {
+                                onReact(message.id, emoji);
+                                setActiveReactionId(null);
+                              }}
+                              className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-lg hover:scale-110 transition-transform"
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                          <button
+                            onClick={() => {
+                              // For full picker, we'd need more complex UI logic
+                              setActiveReactionId(null);
+                            }}
+                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+                          >
+                            <Plus className="w-4 h-4 text-gray-500" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  {isViewOnce && (
+                    <div className="flex items-center space-x-1">
+                      <Clock className="w-3 h-3 text-amber-500" />
+                      <span className="text-amber-500">View once</span>
+                    </div>
+                  )}
+                  {timeLeft && (
+                    <div className="flex items-center space-x-1">
+                      <Clock className="w-3 h-3" />
+                      <span>{timeLeft}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
+
           );
         })}
-      </div>
+      </div >
 
       {/* Image Viewer Modal */}
-      <ImageViewer
-        isOpen={!!viewingImage}
+      < ImageViewer
+        isOpen={!!viewingImage
+        }
         onClose={handleViewerClose}
         imageUrl={currentImageUrl}
         duration={20}
