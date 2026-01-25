@@ -1,3 +1,4 @@
+import React, { useState, useEffect, useCallback } from 'react';
 import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, FileText, Download, Check, CheckCheck, Pencil } from 'lucide-react';
 import ImageViewer from './ImageViewer';
 import AudioPlayer from './AudioPlayer';
