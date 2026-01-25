@@ -22,7 +22,8 @@ import {
   Plus,
   Edit2,
   Zap,
-  Reply
+  Reply,
+  Activity
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -88,6 +89,7 @@ const ChatRoom = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [typingUsers, setTypingUsers] = useState(new Map());
   const [editingMessage, setEditingMessage] = useState(null);
+  const [latency, setLatency] = useState(null);
   const dragCounter = useRef(0);
   const typingTimeoutRef = useRef(null);
   const { theme } = useTheme();
@@ -378,15 +380,20 @@ const ChatRoom = () => {
       });
     };
 
+    const handlePong = (startTime) => {
+      setLatency(Date.now() - startTime);
+    };
+
     socketManager.on('connect', handleConnect);
     socketManager.on('disconnect', handleDisconnect);
     socketManager.on('room-joined', handleRoomJoined);
     socketManager.on('new-message', handleNewMessage);
     socketManager.on('message-deleted', handleMessageDeleted);
     socketManager.on('message-updated', handleMessageUpdated);
-    socketManager.on('user-joined', handleUserJoined);
-    socketManager.on('user-left', handleUserLeft);
-    socketManager.on('error', handleError);
+    socketManager.on('room-joined', handleRoomJoined);
+    socketManager.on('room-left', handleUserLeft);
+    socketManager.on('room-error', handleError);
+    socketManager.on('latency-pong', handlePong);
     socketManager.on('knock-approved', handleKnockApproved);
     socketManager.on('knock-denied', handleKnockDenied);
     socketManager.on('user-knocking', handleUserKnocking);
@@ -413,9 +420,10 @@ const ChatRoom = () => {
       socketManager.off('new-message', handleNewMessage);
       socketManager.off('message-deleted', handleMessageDeleted);
       socketManager.off('message-updated', handleMessageUpdated);
-      socketManager.off('user-joined', handleUserJoined);
-      socketManager.off('user-left', handleUserLeft);
-      socketManager.off('error', handleError);
+      socketManager.off('room-joined', handleRoomJoined);
+      socketManager.off('room-left', handleUserLeft);
+      socketManager.off('room-error', handleError);
+      socketManager.off('latency-pong', handlePong);
       socketManager.off('knock-approved', handleKnockApproved);
       socketManager.off('knock-denied', handleKnockDenied);
       socketManager.off('user-knocking', handleUserKnocking);
@@ -437,6 +445,14 @@ const ChatRoom = () => {
       if (process.env.NODE_ENV !== 'development') socketManager.disconnect();
     };
   }, [roomCode, performJoin, roomKey]);
+
+  useEffect(() => {
+    if (!isConnected) return;
+    const interval = setInterval(() => {
+      socketManager.emit('latency-ping', Date.now());
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [isConnected]);
 
 
   useEffect(() => {
@@ -846,6 +862,7 @@ const ChatRoom = () => {
               <h1 className="text-lg font-semibold truncate text-gray-900 dark:text-white">Secure Chat</h1>
               <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
                 <div className="flex items-center space-x-1">{isConnected ? <Wifi className="w-4 h-4 text-green-500" /> : <WifiOff className="w-4 h-4 text-red-500" />}<span>{isConnected ? 'Connected' : 'Disconnected'}</span></div>
+                {latency && <div className="flex items-center space-x-1" title={`Latency: ${latency}ms`}><Activity className={`w-4 h-4 ${latency < 100 ? 'text-green-500' : latency < 300 ? 'text-yellow-500' : 'text-red-500'}`} /><span>{latency}ms</span></div>}
                 <div className="flex items-center space-x-1"><Users className="w-4 h-4" /><span>{users.length}</span></div>
                 {room?.settings?.passwordHash && <div className="flex items-center space-x-1"><Lock className="w-4 h-4" /><span>Protected</span></div>}
                 {getTTLDisplay() && <div className="flex items-center space-x-1"><Clock className="w-4 h-4" /><span>TTL: {getTTLDisplay()}</span></div>}

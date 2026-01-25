@@ -1204,6 +1204,11 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Health Check
+  socket.on('latency-ping', (startTime) => {
+    socket.emit('latency-pong', startTime);
+  });
+
   // Typing indicators
   socket.on('typing', ({ roomCode }) => {
     if (socket.roomCode === roomCode) {
