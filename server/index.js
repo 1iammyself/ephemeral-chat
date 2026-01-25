@@ -737,6 +737,51 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Room Vibe - host, tier1, tier2 can change
+  socket.on('update-vibe', ({ vibeId, roomCode }) => {
+    const room = roomData[roomCode];
+    if (!room) return;
+
+    const userRole = room.userRoles?.[socket.id] || (room.hostId === socket.id ? 'host' : 'user');
+    const canChange = userRole === 'host' || userRole === 'tier1' || userRole === 'tier2';
+    if (!canChange) return;
+
+    // Valid vibes
+    const validVibes = ['default', 'party', 'chill', 'focus'];
+    if (!validVibes.includes(vibeId)) return;
+
+    // Store vibe on room
+    room.vibe = vibeId;
+
+    // Notify all users
+    io.to(roomCode).emit('vibe-updated', {
+      vibeId,
+      updatedBy: socket.nickname
+    });
+  });
+
+  // Room Topic - host, tier1, tier2 can change
+  socket.on('set-room-topic', ({ topic, roomCode }) => {
+    const room = roomData[roomCode];
+    if (!room) return;
+
+    const userRole = room.userRoles?.[socket.id] || (room.hostId === socket.id ? 'host' : 'user');
+    const canChange = userRole === 'host' || userRole === 'tier1' || userRole === 'tier2';
+    if (!canChange) return;
+
+    // Sanitize and limit topic length
+    const sanitizedTopic = sanitizeInput((topic || '').trim()).substring(0, 100);
+
+    // Store topic on room
+    room.topic = sanitizedTopic;
+
+    // Notify all users
+    io.to(roomCode).emit('room-topic-updated', {
+      topic: sanitizedTopic,
+      updatedBy: socket.nickname
+    });
+  });
+
   socket.on('join-room', async (data, callback) => {
     try {
       const { roomCode, nickname, password, inviteToken, capToken } = data;

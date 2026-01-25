@@ -19,7 +19,8 @@ import {
   UserX,
   Smile,
   BarChart2,
-  Plus
+  Plus,
+  Edit2
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -35,6 +36,9 @@ import { Mp3Recorder } from '../utils/mp3Recorder';
 import ThemeToggle from './ThemeToggle';
 import PrivacyOverlay from './PrivacyOverlay';
 import GhostWatermark from './GhostWatermark';
+import TopicEditor from './TopicEditor';
+import { getVibeById, getAllVibes } from '../utils/vibes';
+import { canManageRoom } from '../utils/roles';
 
 const ChatRoom = () => {
   const { roomCode } = useParams();
@@ -69,6 +73,9 @@ const ChatRoom = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
   const [showFeatureMenu, setShowFeatureMenu] = useState(false);
+  const [roomVibe, setRoomVibe] = useState('default');
+  const [roomTopic, setRoomTopic] = useState('');
+  const [showTopicEditor, setShowTopicEditor] = useState(false);
   const { theme } = useTheme();
 
   const emojiPickerRef = useRef(null);
@@ -130,7 +137,13 @@ const ChatRoom = () => {
         }
         setMessages(msgs);
         setUsers(response.room?.users || []);
-        setCurrentUser({ id: socketManager.socket?.id, socketId: socketManager.socket?.id, nickname: response.nickname, isAdmin: false });
+
+        const myRole = response.room.userRoles?.[socketManager.socket?.id] || (response.room.hostId === socketManager.socket?.id ? 'host' : 'user');
+        setCurrentUserRole(myRole);
+        setRoomVibe(response.room.vibe || 'default');
+        setRoomTopic(response.room.topic || '');
+
+        setCurrentUser({ id: socketManager.socket?.id, socketId: socketManager.socket?.id, nickname: response.nickname, isAdmin: myRole === 'host' || myRole === 'tier1' });
         setIsJoined(true);
         setShowJoinModal(false);
         setIsProcessingInvite(false);
@@ -170,7 +183,14 @@ const ChatRoom = () => {
         }));
       }
       setMessages(msgs);
-      setCurrentUser({ id: socketManager.socket?.id, socketId: socketManager.socket?.id, nickname: data.nickname, isAdmin: data.isAdmin });
+      setUsers(data.users || []);
+
+      const myRole = data.room.userRoles?.[socketManager.socket?.id] || (data.room.hostId === socketManager.socket?.id ? 'host' : 'user');
+      setCurrentUserRole(myRole);
+      setRoomVibe(data.room.vibe || 'default');
+      setRoomTopic(data.room.topic || '');
+
+      setCurrentUser({ id: socketManager.socket?.id, socketId: socketManager.socket?.id, nickname: data.nickname, isAdmin: (myRole === 'host' || myRole === 'tier1') });
       setIsJoined(true);
       setShowJoinModal(false);
       setError(null);
@@ -266,6 +286,19 @@ const ChatRoom = () => {
       setPendingGuests(prev => prev.filter(g => g.socketId !== guestId));
     };
 
+    // Room customization handlers
+    const handleVibeUpdated = ({ vibeId, updatedBy }) => {
+      setRoomVibe(vibeId);
+      setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: `${updatedBy} changed the room vibe to ${getVibeById(vibeId).name}`, timestamp: new Date().toISOString() }]);
+    };
+
+    const handleRoomTopicUpdated = ({ topic, updatedBy }) => {
+      setRoomTopic(topic);
+      if (topic) {
+        setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: `${updatedBy} set the topic: "${topic}"`, timestamp: new Date().toISOString() }]);
+      }
+    };
+
     socketManager.on('connect', handleConnect);
     socketManager.on('disconnect', handleDisconnect);
     socketManager.on('room-joined', handleRoomJoined);
@@ -285,6 +318,8 @@ const ChatRoom = () => {
     socketManager.on('user-kicked', handleUserKicked);
     socketManager.on('guest-approved', handleGuestApproved);
     socketManager.on('guest-denied', handleGuestDenied);
+    socketManager.on('vibe-updated', handleVibeUpdated);
+    socketManager.on('room-topic-updated', handleRoomTopicUpdated);
 
     return () => {
       socketManager.off('connect', handleConnect);
@@ -306,6 +341,8 @@ const ChatRoom = () => {
       socketManager.off('user-kicked', handleUserKicked);
       socketManager.off('guest-approved', handleGuestApproved);
       socketManager.off('guest-denied', handleGuestDenied);
+      socketManager.off('vibe-updated', handleVibeUpdated);
+      socketManager.off('room-topic-updated', handleRoomTopicUpdated);
       if (process.env.NODE_ENV !== 'development') socketManager.disconnect();
     };
   }, [roomCode, performJoin, roomKey]);
@@ -410,6 +447,15 @@ const ChatRoom = () => {
   const handleVote = (messageId, optionId) => {
     if (!isConnected) return;
     socketManager.emit('vote-poll', { messageId, optionId });
+  };
+
+  const handleUpdateVibe = (vibeId) => {
+    socketManager.emit('update-vibe', { vibeId, roomCode });
+    setShowFeatureMenu(false);
+  };
+
+  const handleSaveTopic = (topic) => {
+    socketManager.emit('set-room-topic', { topic, roomCode });
   };
 
   const handleImageUpload = useCallback(async (event) => {
@@ -574,7 +620,7 @@ const ChatRoom = () => {
   if (showJoinModal) return <JoinRoomModal roomCode={roomCode} onJoin={handleJoinRoom} onCancel={() => navigate('/')} error={error} isProcessingInvite={isProcessingInvite} isWaitingForHost={isWaitingForHost} />;
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+    <div className={`h-screen flex flex-col transition-colors duration-500 ${getVibeById(roomVibe).bgClass}`}>
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -598,168 +644,221 @@ const ChatRoom = () => {
           </div>
         </div>
       </div>
+    </div>
 
-      {error && <div className="bg-red-100 dark:bg-red-900 border-l-4 border-red-500 text-red-700 dark:text-red-200 p-3"><p className="text-sm">{error}</p></div>}
+      {/* Topic Banner */ }
+  {
+    roomTopic && (
+      <div className="bg-primary-50 dark:bg-primary-900/10 border-b border-primary-100 dark:border-primary-800 px-4 py-2 flex items-center justify-between animate-in slide-in-from-top-2">
+        <p className="text-sm font-medium text-primary-800 dark:text-primary-200 flex-1 truncate text-center">
+          📢 {roomTopic}
+        </p>
+        {canManageRoom(currentUserRole) && (
+          <button onClick={() => setShowTopicEditor(true)} className="p-1 hover:bg-primary-100 dark:hover:bg-primary-800 rounded text-primary-600 dark:text-primary-300">
+            <Edit2 className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+    )
+  }
 
-      <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 flex flex-col">
-          <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
-            <MessageList messages={messages} currentUser={currentUser} messageTTL={room?.settings?.messageTTL} onVote={handleVote} />
-            <div ref={messagesEndRef} />
+  { error && <div className="bg-red-100 dark:bg-red-900 border-l-4 border-red-500 text-red-700 dark:text-red-200 p-3"><p className="text-sm">{error}</p></div> }
+
+  <div className="flex-1 flex overflow-hidden">
+    <div className="flex-1 flex flex-col">
+      <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
+        <MessageList messages={messages} currentUser={currentUser} messageTTL={room?.settings?.messageTTL} onVote={handleVote} />
+        <div ref={messagesEndRef} />
+      </div>
+      <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        {selectedRecipients.length > 0 && (
+          <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800 flex items-center justify-between">
+            <span className="text-xs text-blue-600 dark:text-blue-300 font-medium flex items-center"><Users className="w-3 h-3 mr-1.5" />Sending to {selectedRecipients.length} specific user{selectedRecipients.length !== 1 ? 's' : ''}</span>
+            <button onClick={() => setSelectedRecipients([])} className="text-xs text-blue-500 hover:text-blue-700 dark:hover:text-blue-200 underline">Clear selection</button>
           </div>
-          <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-            {selectedRecipients.length > 0 && (
-              <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800 flex items-center justify-between">
-                <span className="text-xs text-blue-600 dark:text-blue-300 font-medium flex items-center"><Users className="w-3 h-3 mr-1.5" />Sending to {selectedRecipients.length} specific user{selectedRecipients.length !== 1 ? 's' : ''}</span>
-                <button onClick={() => setSelectedRecipients([])} className="text-xs text-blue-500 hover:text-blue-700 dark:hover:text-blue-200 underline">Clear selection</button>
+        )}
+        <div className="p-4">
+          <form onSubmit={handleSendMessage} className="flex items-center space-x-2 sm:space-x-3">
+            {isRecording ? (
+              <div className="flex-1 flex items-center justify-between bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-2">
+                <div className="flex items-center space-x-3"><div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" /><span className="text-red-600 dark:text-red-400 font-medium font-mono">{formatDuration(recordingDuration)} / 0:30</span></div>
+                <div className="flex items-center space-x-2">
+                  <button type="button" onClick={handleCancelRecording} className="p-2 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-full text-red-500"><Trash2 className="w-5 h-5" /></button>
+                  <button type="button" onClick={handleStopRecording} className="p-2 bg-red-500 hover:bg-red-600 rounded-full text-white shadow-sm"><Send className="w-5 h-5" /></button>
+                </div>
               </div>
+            ) : (
+              <>
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" id="image-upload" />
+                <div className="relative" ref={featureMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowFeatureMenu(!showFeatureMenu)}
+                    disabled={!isConnected}
+                    className={`p-3 rounded-lg transition-all duration-200 ${showFeatureMenu ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-600 rotate-45' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
+
+                  {showFeatureMenu && (
+                    <div className="absolute bottom-full mb-2 left-0 z-50 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-2 flex flex-col space-y-1 w-72 animate-in slide-in-from-bottom-2 duration-200">
+                      {/* Admin Controls */}
+                      {canManageRoom(currentUserRole) && (
+                        <div className="p-2 border-b border-gray-100 dark:border-gray-700 mb-1">
+                          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Room Controls</p>
+
+                          <button
+                            type="button"
+                            onClick={() => { setShowTopicEditor(true); setShowFeatureMenu(false); }}
+                            className="flex items-center space-x-3 w-full p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mb-2"
+                          >
+                            <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                              <Edit2 className="w-3 h-3 text-orange-500" />
+                            </div>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Set Topic</span>
+                          </button>
+
+                          <div className="grid grid-cols-4 gap-2">
+                            {getAllVibes().map(vibe => (
+                              <button
+                                key={vibe.id}
+                                onClick={() => handleUpdateVibe(vibe.id)}
+                                className={`aspect-square rounded-lg flex items-center justify-center text-lg transition-all ${roomVibe === vibe.id ? 'bg-primary-100 dark:bg-primary-900 ring-2 ring-primary-500' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                title={vibe.name}
+                              >
+                                {vibe.emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          fileInputRef.current?.click();
+                          setShowFeatureMenu(false);
+                        }}
+                        disabled={!isConnected || isUploading}
+                        className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                          {isUploading ? <Loader2 className="w-4 h-4 text-blue-500 animate-spin" /> : <ImageIcon className="w-4 h-4 text-blue-500" />}
+                        </div>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Photo</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleStartCall();
+                          setShowFeatureMenu(false);
+                        }}
+                        disabled={!isConnected || users.length < 2}
+                        className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors disabled:opacity-50"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                          <Phone className="w-4 h-4 text-green-500" />
+                        </div>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Voice Call</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPollModal(true);
+                          setShowFeatureMenu(false);
+                        }}
+                        disabled={!isConnected}
+                        className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors disabled:opacity-50"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                          <BarChart2 className="w-4 h-4 text-purple-500" />
+                        </div>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Poll</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          startRecording();
+                          setShowFeatureMenu(false);
+                        }}
+                        disabled={!isConnected}
+                        className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                          <Mic className="w-4 h-4 text-red-500" />
+                        </div>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Voice Note</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative" ref={emojiPickerRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                    disabled={!isConnected}
+                    className={`p-3 rounded-lg transition-colors ${showEmojiPicker ? 'bg-gray-100 dark:bg-gray-700 text-blue-500' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
+                  >
+                    <Smile className="w-5 h-5" />
+                  </button>
+                  {showEmojiPicker && (
+                    <div className="absolute bottom-full mb-2 left-0 z-50">
+                      <EmojiPicker
+                        onEmojiClick={onEmojiClick}
+                        theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
+                        lazyLoadEmojis={true}
+                        skinTonesDisabled
+                        searchPlaceHolder="Search emojis..."
+                        width={320}
+                        height={400}
+                      />
+                    </div>
+                  )}
+                </div>
+                <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onCopy={(e) => e.preventDefault()} onCut={(e) => e.preventDefault()} onPaste={(e) => e.preventDefault()} placeholder="Type your message..." className="flex-1 input-field py-3 px-4 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600" disabled={!isConnected || isSending} maxLength={500} />
+                <button type="submit" disabled={!newMessage.trim() || !isConnected || isSending} className="btn-primary px-4 py-3"><Send className="w-5 h-5" /></button>
+              </>
             )}
-            <div className="p-4">
-              <form onSubmit={handleSendMessage} className="flex items-center space-x-2 sm:space-x-3">
-                {isRecording ? (
-                  <div className="flex-1 flex items-center justify-between bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-2">
-                    <div className="flex items-center space-x-3"><div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" /><span className="text-red-600 dark:text-red-400 font-medium font-mono">{formatDuration(recordingDuration)} / 0:30</span></div>
-                    <div className="flex items-center space-x-2">
-                      <button type="button" onClick={handleCancelRecording} className="p-2 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-full text-red-500"><Trash2 className="w-5 h-5" /></button>
-                      <button type="button" onClick={handleStopRecording} className="p-2 bg-red-500 hover:bg-red-600 rounded-full text-white shadow-sm"><Send className="w-5 h-5" /></button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" id="image-upload" />
-                    <div className="relative" ref={featureMenuRef}>
-                      <button
-                        type="button"
-                        onClick={() => setShowFeatureMenu(!showFeatureMenu)}
-                        disabled={!isConnected}
-                        className={`p-3 rounded-lg transition-all duration-200 ${showFeatureMenu ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-600 rotate-45' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
-                      >
-                        <Plus className="w-5 h-5" />
-                      </button>
-
-                      {showFeatureMenu && (
-                        <div className="absolute bottom-full mb-2 left-0 z-50 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-2 flex flex-col space-y-1 min-w-[160px] animate-in slide-in-from-bottom-2 duration-200">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              fileInputRef.current?.click();
-                              setShowFeatureMenu(false);
-                            }}
-                            disabled={!isConnected || isUploading}
-                            className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-                          >
-                            <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                              {isUploading ? <Loader2 className="w-4 h-4 text-blue-500 animate-spin" /> : <ImageIcon className="w-4 h-4 text-blue-500" />}
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Photo</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleStartCall();
-                              setShowFeatureMenu(false);
-                            }}
-                            disabled={!isConnected || users.length < 2}
-                            className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors disabled:opacity-50"
-                          >
-                            <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                              <Phone className="w-4 h-4 text-green-500" />
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Voice Call</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowPollModal(true);
-                              setShowFeatureMenu(false);
-                            }}
-                            disabled={!isConnected}
-                            className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors disabled:opacity-50"
-                          >
-                            <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                              <BarChart2 className="w-4 h-4 text-purple-500" />
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Poll</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              startRecording();
-                              setShowFeatureMenu(false);
-                            }}
-                            disabled={!isConnected}
-                            className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
-                          >
-                            <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                              <Mic className="w-4 h-4 text-red-500" />
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Voice Note</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="relative" ref={emojiPickerRef}>
-                      <button
-                        type="button"
-                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                        disabled={!isConnected}
-                        className={`p-3 rounded-lg transition-colors ${showEmojiPicker ? 'bg-gray-100 dark:bg-gray-700 text-blue-500' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
-                      >
-                        <Smile className="w-5 h-5" />
-                      </button>
-                      {showEmojiPicker && (
-                        <div className="absolute bottom-full mb-2 left-0 z-50">
-                          <EmojiPicker
-                            onEmojiClick={onEmojiClick}
-                            theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
-                            lazyLoadEmojis={true}
-                            skinTonesDisabled
-                            searchPlaceHolder="Search emojis..."
-                            width={320}
-                            height={400}
-                          />
-                        </div>
-                      )}
-                    </div>
-                    <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onCopy={(e) => e.preventDefault()} onCut={(e) => e.preventDefault()} onPaste={(e) => e.preventDefault()} placeholder="Type your message..." className="flex-1 input-field py-3 px-4 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600" disabled={!isConnected || isSending} maxLength={500} />
-                    <button type="submit" disabled={!newMessage.trim() || !isConnected || isSending} className="btn-primary px-4 py-3"><Send className="w-5 h-5" /></button>
-                  </>
-                )}
-              </form>
-            </div>
-          </div>
-        </div>
-        <div className="hidden lg:block w-64 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-          <UserList users={users} currentUser={currentUser} pendingGuests={pendingGuests} isHost={isHost} onApprove={handleApproveGuest} onDeny={handleDenyGuest} selectedRecipients={selectedRecipients} onToggleRecipient={toggleRecipient} onSetUserRole={handleSetUserRole} onKickUser={handleKickUser} currentUserRole={currentUserRole} />
+          </form>
         </div>
       </div>
+    </div>
+    <div className="hidden lg:block w-64 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+      <UserList users={users} currentUser={currentUser} pendingGuests={pendingGuests} isHost={isHost} onApprove={handleApproveGuest} onDeny={handleDenyGuest} selectedRecipients={selectedRecipients} onToggleRecipient={toggleRecipient} onSetUserRole={handleSetUserRole} onKickUser={handleKickUser} currentUserRole={currentUserRole} />
+    </div>
+  </div>
 
-      {
-        showMobileMenu && (
-          <div className="fixed inset-0 z-50 lg:hidden">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileMenu(false)} />
-            <div className="absolute right-0 top-0 bottom-0 w-80 max-w-[85vw] bg-white dark:bg-gray-800 shadow-xl flex flex-col">
-              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700"><h2 className="text-lg font-semibold text-gray-900 dark:text-white">Room Details</h2><button onClick={() => setShowMobileMenu(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400"><X className="w-5 h-5" /></button></div>
-              <div className="flex-1 overflow-y-auto"><UserList users={users} currentUser={currentUser} pendingGuests={pendingGuests} isHost={isHost} onApprove={handleApproveGuest} onDeny={handleDenyGuest} selectedRecipients={selectedRecipients} onToggleRecipient={toggleRecipient} onSetUserRole={handleSetUserRole} onKickUser={handleKickUser} currentUserRole={currentUserRole} /></div>
-            </div>
-          </div>
-        )
-      }
+  {
+    showMobileMenu && (
+      <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileMenu(false)} />
+        <div className="absolute right-0 top-0 bottom-0 w-80 max-w-[85vw] bg-white dark:bg-gray-800 shadow-xl flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700"><h2 className="text-lg font-semibold text-gray-900 dark:text-white">Room Details</h2><button onClick={() => setShowMobileMenu(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400"><X className="w-5 h-5" /></button></div>
+          <div className="flex-1 overflow-y-auto"><UserList users={users} currentUser={currentUser} pendingGuests={pendingGuests} isHost={isHost} onApprove={handleApproveGuest} onDeny={handleDenyGuest} selectedRecipients={selectedRecipients} onToggleRecipient={toggleRecipient} onSetUserRole={handleSetUserRole} onKickUser={handleKickUser} currentUserRole={currentUserRole} /></div>
+        </div>
+      </div>
+    )
+  }
 
-      {showCallModal && <AudioCallModal isOpen={showCallModal} onClose={() => setShowCallModal(false)} roomCode={roomCode} />}
+  { showCallModal && <AudioCallModal isOpen={showCallModal} onClose={() => setShowCallModal(false)} roomCode={roomCode} /> }
+      <TopicEditor 
+        isOpen={showTopicEditor} 
+        onClose={() => setShowTopicEditor(false)} 
+        currentTopic={roomTopic} 
+        onSave={handleSaveTopic} 
+      />
       <PollModal isOpen={showPollModal} onClose={() => setShowPollModal(false)} onSend={handleSendPoll} />
       <PrivacyOverlay />
-      {
-        isJoined && currentUser && (
-          <GhostWatermark
-            nickname={currentUser.nickname}
-          />
-        )
-      }
+  {
+    isJoined && currentUser && (
+      <GhostWatermark
+        nickname={currentUser.nickname}
+      />
+    )
+  }
     </div >
   );
 };
