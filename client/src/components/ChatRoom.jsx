@@ -37,6 +37,7 @@ import ThemeToggle from './ThemeToggle';
 import PrivacyOverlay from './PrivacyOverlay';
 import GhostWatermark from './GhostWatermark';
 import TopicEditor from './TopicEditor';
+import TimerModal from './TimerModal';
 import { getVibeById, getAllVibes } from '../utils/vibes';
 import { canManageRoom } from '../utils/roles';
 
@@ -76,7 +77,34 @@ const ChatRoom = () => {
   const [roomVibe, setRoomVibe] = useState('default');
   const [roomTopic, setRoomTopic] = useState('');
   const [showTopicEditor, setShowTopicEditor] = useState(false);
+  const [showTimerModal, setShowTimerModal] = useState(false);
+  const [activeTimer, setActiveTimer] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(null);
   const { theme } = useTheme();
+
+  useEffect(() => {
+    if (!activeTimer) {
+      if (timeLeft) setTimeLeft(null);
+      return;
+    }
+
+    // Immediate update
+    const update = () => {
+      const remaining = Math.ceil((activeTimer.endTime - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setTimeLeft('00:00');
+        // Keep activeTimer until explicitly stopped or cleared by server
+      } else {
+        const mins = Math.floor(remaining / 60);
+        const secs = remaining % 60;
+        setTimeLeft(`${mins}:${secs.toString().padStart(2, '0')}`);
+      }
+    };
+
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [activeTimer]);
 
   const emojiPickerRef = useRef(null);
   const featureMenuRef = useRef(null);
@@ -142,6 +170,7 @@ const ChatRoom = () => {
         setCurrentUserRole(myRole);
         setRoomVibe(response.room.vibe || 'default');
         setRoomTopic(response.room.topic || '');
+        setActiveTimer(response.room.timer);
 
         setCurrentUser({ id: socketManager.socket?.id, socketId: socketManager.socket?.id, nickname: response.nickname, isAdmin: myRole === 'host' || myRole === 'tier1' });
         setIsJoined(true);
@@ -189,6 +218,7 @@ const ChatRoom = () => {
       setCurrentUserRole(myRole);
       setRoomVibe(data.room.vibe || 'default');
       setRoomTopic(data.room.topic || '');
+      setActiveTimer(data.room.timer);
 
       setCurrentUser({ id: socketManager.socket?.id, socketId: socketManager.socket?.id, nickname: data.nickname, isAdmin: (myRole === 'host' || myRole === 'tier1') });
       setIsJoined(true);
@@ -299,6 +329,17 @@ const ChatRoom = () => {
       }
     };
 
+    const handleTimerStarted = (timer) => {
+      setActiveTimer(timer);
+      setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: `${timer.startedBy} started a timer`, timestamp: new Date().toISOString() }]);
+    };
+
+    const handleTimerStopped = ({ stoppedBy }) => {
+      setActiveTimer(null);
+      setTimeLeft(null);
+      setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: `${stoppedBy} stopped the timer`, timestamp: new Date().toISOString() }]);
+    };
+
     socketManager.on('connect', handleConnect);
     socketManager.on('disconnect', handleDisconnect);
     socketManager.on('room-joined', handleRoomJoined);
@@ -320,6 +361,8 @@ const ChatRoom = () => {
     socketManager.on('guest-denied', handleGuestDenied);
     socketManager.on('vibe-updated', handleVibeUpdated);
     socketManager.on('room-topic-updated', handleRoomTopicUpdated);
+    socketManager.on('timer-started', handleTimerStarted);
+    socketManager.on('timer-stopped', handleTimerStopped);
 
     return () => {
       socketManager.off('connect', handleConnect);
@@ -343,6 +386,8 @@ const ChatRoom = () => {
       socketManager.off('guest-denied', handleGuestDenied);
       socketManager.off('vibe-updated', handleVibeUpdated);
       socketManager.off('room-topic-updated', handleRoomTopicUpdated);
+      socketManager.off('timer-started', handleTimerStarted);
+      socketManager.off('timer-stopped', handleTimerStopped);
       if (process.env.NODE_ENV !== 'development') socketManager.disconnect();
     };
   }, [roomCode, performJoin, roomKey]);
@@ -456,6 +501,14 @@ const ChatRoom = () => {
 
   const handleSaveTopic = (topic) => {
     socketManager.emit('set-room-topic', { topic, roomCode });
+  };
+
+  const handleStartTimer = (duration) => {
+    socketManager.emit('start-timer', { duration, roomCode });
+  };
+
+  const handleStopTimer = () => {
+    socketManager.emit('stop-timer', { roomCode });
   };
 
   const handleImageUpload = useCallback(async (event) => {
@@ -662,6 +715,27 @@ const ChatRoom = () => {
     )
   }
 
+  {/* Timer Banner */ }
+  {
+    activeTimer && (
+      <div className="bg-indigo-600 px-4 py-2 flex items-center justify-center text-white shadow-md animate-in slide-in-from-top-1 relative z-10 transition-all duration-300">
+        <div className="flex items-center space-x-3">
+          <Clock className={`w-4 h-4 ${timeLeft === '00:00' ? 'animate-bounce text-red-300' : 'animate-pulse'}`} />
+          <span className={`font-mono text-lg font-bold tracking-wider ${timeLeft === '00:00' ? 'text-red-100' : ''}`}>{timeLeft || '00:00'}</span>
+          {canManageRoom(currentUserRole) && (
+            <button
+              onClick={handleStopTimer}
+              className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors"
+              title="Stop Timer"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   { error && <div className="bg-red-100 dark:bg-red-900 border-l-4 border-red-500 text-red-700 dark:text-red-200 p-3"><p className="text-sm">{error}</p></div> }
 
   <div className="flex-1 flex overflow-hidden">
@@ -716,6 +790,26 @@ const ChatRoom = () => {
                               <Edit2 className="w-3 h-3 text-orange-500" />
                             </div>
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Set Topic</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (activeTimer) {
+                                handleStopTimer();
+                              } else {
+                                setShowTimerModal(true);
+                              }
+                              setShowFeatureMenu(false);
+                            }}
+                            className={`flex items-center space-x-3 w-full p-2 rounded-lg transition-colors mb-2 ${activeTimer ? 'bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                          >
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center ${activeTimer ? 'bg-red-100 dark:bg-red-900/30' : 'bg-indigo-100 dark:bg-indigo-900/30'}`}>
+                              {activeTimer ? <X className="w-3 h-3 text-red-500" /> : <Clock className="w-3 h-3 text-indigo-500" />}
+                            </div>
+                            <span className={`text-sm font-medium ${activeTimer ? 'text-red-700 dark:text-red-300' : 'text-gray-700 dark:text-gray-300'}`}>
+                              {activeTimer ? 'Stop Timer' : 'Start Timer'}
+                            </span>
                           </button>
 
                           <div className="grid grid-cols-4 gap-2">
@@ -849,6 +943,11 @@ const ChatRoom = () => {
         onClose={() => setShowTopicEditor(false)} 
         currentTopic={roomTopic} 
         onSave={handleSaveTopic} 
+      />
+      <TimerModal 
+        isOpen={showTimerModal} 
+        onClose={() => setShowTimerModal(false)} 
+        onStart={handleStartTimer} 
       />
       <PollModal isOpen={showPollModal} onClose={() => setShowPollModal(false)} onSend={handleSendPoll} />
       <PrivacyOverlay />

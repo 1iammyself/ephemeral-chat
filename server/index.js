@@ -782,6 +782,44 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Timer - host, tier1, tier2
+  socket.on('start-timer', ({ duration, roomCode }) => {
+    const room = roomData[roomCode];
+    if (!room) return;
+
+    const userRole = room.userRoles?.[socket.id] || (room.hostId === socket.id ? 'host' : 'user');
+    const canChange = userRole === 'host' || userRole === 'tier1' || userRole === 'tier2';
+    if (!canChange) return;
+
+    const durationSec = parseInt(duration);
+    if (!durationSec || durationSec <= 0) return;
+
+    const endTime = Date.now() + (durationSec * 1000);
+    room.timer = {
+      endTime,
+      duration: durationSec,
+      isRunning: true
+    };
+
+    io.to(roomCode).emit('timer-started', {
+      endTime,
+      duration: durationSec,
+      startedBy: socket.nickname
+    });
+  });
+
+  socket.on('stop-timer', ({ roomCode }) => {
+    const room = roomData[roomCode];
+    if (!room) return;
+
+    const userRole = room.userRoles?.[socket.id] || (room.hostId === socket.id ? 'host' : 'user');
+    const canChange = userRole === 'host' || userRole === 'tier1' || userRole === 'tier2';
+    if (!canChange) return;
+
+    room.timer = null;
+    io.to(roomCode).emit('timer-stopped', { stoppedBy: socket.nickname });
+  });
+
   socket.on('join-room', async (data, callback) => {
     try {
       const { roomCode, nickname, password, inviteToken, capToken } = data;
@@ -875,9 +913,33 @@ io.on('connection', (socket) => {
         // Send room data to user
         // Pass socket.id to filter private messages correctly
         const messages = await roomManager.getMessages(roomCode, socket.id);
+
+        // Ensure roomData exists and merge metadata
+        if (!roomData[roomCode]) {
+          // Should exist if roomManager has room, but just in case
+          roomData[roomCode] = {
+            hostId: result.room.users[0]?.socketId || socket.id,
+            lobbyLimit: 100,
+            lobbyCount: 0,
+            userRoles: {},
+            vibe: 'default',
+            topic: '',
+            timer: null
+          };
+        }
+
+        const extendedRoom = {
+          ...result.room,
+          hostId: roomData[roomCode].hostId,
+          userRoles: roomData[roomCode].userRoles || {},
+          vibe: roomData[roomCode].vibe || 'default',
+          topic: roomData[roomCode].topic || '',
+          timer: roomData[roomCode].timer || null
+        };
+
         callback({
           success: true,
-          room: result.room,
+          room: extendedRoom,
           messages,
           nickname: userNickname,
           isInviteOnly: result.room.settings?.isInviteOnly || false,
