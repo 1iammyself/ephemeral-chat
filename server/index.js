@@ -1012,8 +1012,8 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // Support for text, image and audio messages
-      const { content, messageType = 'text', isViewOnce = false, imageData, pollData, recipients = [], replyTo, isEncrypted, iv } = data;
+      // Support for text, image, audio, and file messages
+      const { content, messageType = 'text', isViewOnce = false, imageData, pollData, recipients = [], replyTo, isEncrypted, iv, fileName, mimeType, fileSize } = data;
 
       // For text messages, validate content
       if (messageType === 'text') {
@@ -1047,6 +1047,19 @@ io.on('connection', (socket) => {
         const base64Size = content.length * 0.75; // Approximate size in bytes
         if (base64Size > 5 * 1024 * 1024) {
           socket.emit('error', { message: 'Audio too large. Maximum size is 5MB.' });
+          return;
+        }
+      }
+
+      // For file messages
+      if (messageType === 'file') {
+        const base64Size = content ? content.length * 0.75 : 0;
+        if (base64Size > 10 * 1024 * 1024) {
+          socket.emit('error', { message: 'File too large. Maximum size is 10MB.' });
+          return;
+        }
+        if (!fileName) {
+          socket.emit('error', { message: 'Invalid file data' });
           return;
         }
       }
@@ -1102,6 +1115,9 @@ io.on('connection', (socket) => {
         messageType,
         isViewOnce,
         pollData: messageType === 'poll' ? data.pollData : undefined,
+        fileName: messageType === 'file' ? fileName : undefined,
+        mimeType: messageType === 'file' ? mimeType : undefined,
+        fileSize: messageType === 'file' ? fileSize : undefined,
         recipients, // Store recipients
         isEncrypted: !!isEncrypted, // Store encryption flag
         iv: iv || null, // Store IV if encrypted

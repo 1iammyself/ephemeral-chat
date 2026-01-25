@@ -40,6 +40,7 @@ import PrivacyOverlay from './PrivacyOverlay';
 import GhostWatermark from './GhostWatermark';
 import TopicEditor from './TopicEditor';
 import TimerModal from './TimerModal';
+import DragDropOverlay from './DragDropOverlay';
 import { getVibeById, getAllVibes } from '../utils/vibes';
 import { canManageRoom } from '../utils/roles';
 
@@ -83,6 +84,8 @@ const ChatRoom = () => {
   const [activeTimer, setActiveTimer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounter = useRef(0);
   const { theme } = useTheme();
 
   const messageInputRef = useRef(null);
@@ -562,6 +565,64 @@ const ChatRoom = () => {
     setShowFeatureMenu(false);
   };
 
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current += 1;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current -= 1;
+    if (dragCounter.current === 0) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    dragCounter.current = 0;
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      uploadFile(files[0]);
+    }
+  };
+
+  const uploadFile = (file) => {
+    if (file.size > 10 * 1024 * 1024) {
+      setError('File too large (max 10MB)');
+      return;
+    }
+
+    setIsUploading(true);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64Content = e.target.result.split(',')[1];
+      socketManager.emit('send-message', {
+        messageType: 'file',
+        content: base64Content,
+        fileName: file.name,
+        mimeType: file.type,
+        fileSize: file.size,
+        recipients: selectedRecipients
+      });
+      setIsUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleImageUpload = useCallback(async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -724,7 +785,13 @@ const ChatRoom = () => {
   if (showJoinModal) return <JoinRoomModal roomCode={roomCode} onJoin={handleJoinRoom} onCancel={() => navigate('/')} error={error} isProcessingInvite={isProcessingInvite} isWaitingForHost={isWaitingForHost} />;
 
   return (
-    <div className={`h-screen flex flex-col transition-colors duration-500 chat-container ${getVibeById(roomVibe).bgClass}`}>
+    <div
+      className={`h-screen flex flex-col transition-colors duration-500 chat-container ${getVibeById(roomVibe).bgClass}`}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -1034,6 +1101,7 @@ const ChatRoom = () => {
         onStart={handleStartTimer}
       />
       <PollModal isOpen={showPollModal} onClose={() => setShowPollModal(false)} onSend={handleSendPoll} />
+      <DragDropOverlay isDragging={isDragging} />
       <PrivacyOverlay />
       {
         isJoined && currentUser && (

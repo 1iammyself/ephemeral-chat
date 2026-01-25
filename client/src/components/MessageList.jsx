@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus } from 'lucide-react';
+import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, FileText, Download } from 'lucide-react';
 import ImageViewer from './ImageViewer';
 import AudioPlayer from './AudioPlayer';
 import PollMessage from './PollMessage';
@@ -416,6 +416,25 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                       currentUser={currentUser}
                       onVote={onVote}
                     />
+                  ) : message.messageType === 'file' ? (
+                    // File message
+                    <div className="flex items-center space-x-3 p-2 bg-gray-100 dark:bg-gray-700/50 rounded-lg max-w-full min-w-[200px]">
+                      <div className="p-2 bg-white dark:bg-gray-600 rounded-lg">
+                        <FileText className="w-6 h-6 text-blue-500" />
+                      </div>
+                      <div className="flex-1 min-w-0 mr-2">
+                        <p className="text-sm font-medium truncate text-gray-900 dark:text-gray-100">{message.fileName}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{formatFileSize(message.fileSize)} • {message.mimeType?.split('/')[1]?.toUpperCase() || 'FILE'}</p>
+                      </div>
+                      <a
+                        href={`data:${message.mimeType};base64,${message.content}`}
+                        download={message.fileName}
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors"
+                        title="Download"
+                      >
+                        <Download className="w-4 h-4 text-gray-500 dark:text-gray-300" />
+                      </a>
+                    </div>
                   ) : (
                     // Text message
                     message.content
@@ -554,4 +573,12 @@ function fixAudioContentForPlayback(content) {
     mimeType = 'audio/ogg';
   }
   return `data:${mimeType};base64,${content}`;
+}
+
+function formatFileSize(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
