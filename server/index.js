@@ -1181,6 +1181,19 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Edit Message
+  socket.on('edit-message', async ({ messageId, newContent }) => {
+    if (!socket.roomCode || !messageId || !newContent) return;
+
+    // Call roomManager
+    const updatedMessage = await roomManager.editMessage(socket.roomCode, messageId, newContent, socket.id);
+
+    if (updatedMessage) {
+      // Broadcast update
+      io.to(socket.roomCode).emit('message-updated', updatedMessage);
+    }
+  });
+
   // Pulse
   socket.on('send-pulse', ({ roomCode }) => {
     // Rate limit pulse

@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, FileText, Download, Check, CheckCheck } from 'lucide-react';
+import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, FileText, Download, Check, CheckCheck, Pencil } from 'lucide-react';
 import ImageViewer from './ImageViewer';
 import AudioPlayer from './AudioPlayer';
 import PollMessage from './PollMessage';
@@ -7,7 +6,7 @@ import socketManager from '../socket-simple';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '😡'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit }) => {
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [messageTimers, setMessageTimers] = useState(new Map());
   const [viewingImage, setViewingImage] = useState(null);
@@ -464,7 +463,10 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                     </div>
                   ) : (
                     // Text message
-                    message.content
+                    <span>
+                      {message.content}
+                      {message.isEdited && <span className="text-xs text-gray-400 italic ml-1">(edited)</span>}
+                    </span>
                   )}
                 </div>
 
@@ -503,6 +505,15 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                     >
                       <Reply className="w-3 h-3" />
                     </button>
+                    {isOwnMessage && message.messageType === 'text' && (
+                      <button
+                        onClick={() => onEdit(message)}
+                        className="p-1 hover:bg-black/10 rounded transition-colors"
+                        title="Edit"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                    )}
                     <div className="relative">
                       <button
                         onClick={() => setActiveReactionId(activeReactionId === message.id ? null : message.id)}

@@ -40,6 +40,7 @@ import PrivacyOverlay from './PrivacyOverlay';
 import GhostWatermark from './GhostWatermark';
 import TopicEditor from './TopicEditor';
 import TimerModal from './TimerModal';
+import EditMessageModal from './EditMessageModal';
 import DragDropOverlay from './DragDropOverlay';
 import { getVibeById, getAllVibes } from '../utils/vibes';
 import { canManageRoom } from '../utils/roles';
@@ -86,6 +87,7 @@ const ChatRoom = () => {
   const [replyingTo, setReplyingTo] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [typingUsers, setTypingUsers] = useState(new Map());
+  const [editingMessage, setEditingMessage] = useState(null);
   const dragCounter = useRef(0);
   const typingTimeoutRef = useRef(null);
   const { theme } = useTheme();
@@ -653,6 +655,20 @@ const ChatRoom = () => {
     reader.readAsDataURL(file);
   };
 
+  const handleEditMessage = (message) => {
+    setEditingMessage(message);
+  };
+
+  const handleSaveEdit = (newContent) => {
+    if (editingMessage) {
+      socketManager.emit('edit-message', {
+        messageId: editingMessage.id,
+        newContent
+      });
+      setEditingMessage(null);
+    }
+  };
+
   const handleImageUpload = useCallback(async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -895,6 +911,7 @@ const ChatRoom = () => {
               onVote={handleVote}
               onReply={handleReply}
               onReact={handleReaction}
+              onEdit={handleEditMessage}
             />
             <div ref={messagesEndRef} />
           </div>
@@ -1134,6 +1151,12 @@ const ChatRoom = () => {
         isOpen={showTimerModal}
         onClose={() => setShowTimerModal(false)}
         onStart={handleStartTimer}
+      />
+      <EditMessageModal
+        isOpen={!!editingMessage}
+        onClose={() => setEditingMessage(null)}
+        onSave={handleSaveEdit}
+        initialContent={editingMessage?.content}
       />
       <PollModal isOpen={showPollModal} onClose={() => setShowPollModal(false)} onSend={handleSendPoll} />
       <DragDropOverlay isDragging={isDragging} />
