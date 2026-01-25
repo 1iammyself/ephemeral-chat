@@ -268,10 +268,10 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
         {messages.map((message) => {
           if (message.type === 'system') {
             return (
-              <div key={message.id} className="text-center">
-                <div className="inline-block bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-sm px-3 py-1 rounded-full">
+              <div key={message.id} className="flex justify-center my-1.5 animate-in fade-in duration-300">
+                <span className="text-xs text-gray-400 dark:text-gray-500 italic bg-gray-50/50 dark:bg-gray-900/30 px-2 py-0.5 rounded border border-transparent dark:border-gray-800/50">
                   {message.content}
-                </div>
+                </span>
               </div>
             );
           }
@@ -339,11 +339,11 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
               className={`message-item flex ${isOwnMessage ? 'justify-end' : 'justify-start'} ${isMessageVanishing(message) ? 'message-vanishing' : ''} ${newMessages.has(message.id) ? 'message-new' : ''} group relative`}
             >
               <div
-                className={`max-w-xs lg:max-w-md rounded-lg transition-all duration-300 ${isPoll
+                className={`max-w-[85%] sm:max-w-md lg:max-w-xl xl:max-w-2xl rounded-2xl transition-all duration-300 shadow-sm ${isPoll
                   ? ''
                   : `px-4 py-2 ${isOwnMessage
-                    ? 'bg-primary-600 dark:bg-primary-700 text-white'
-                    : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:text-gray-100'
+                    ? 'bg-primary-600 dark:bg-primary-700 text-white rounded-br-none'
+                    : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 dark:text-gray-100 rounded-bl-none'
                   }`
                   } ${isOwnMessage && newMessages.has(message.id) ? 'message-delivered-glow' : ''}`}
               >

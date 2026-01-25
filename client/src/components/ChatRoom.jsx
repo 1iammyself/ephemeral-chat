@@ -45,6 +45,7 @@ import EditMessageModal from './EditMessageModal';
 import DragDropOverlay from './DragDropOverlay';
 import { getVibeById, getAllVibes } from '../utils/vibes';
 import { canManageRoom } from '../utils/roles';
+import { getRandomIcebreaker } from '../utils/icebreakers';
 
 const ChatRoom = () => {
   const { roomCode } = useParams();
@@ -389,8 +390,10 @@ const ChatRoom = () => {
     socketManager.on('room-joined', handleRoomJoined);
     socketManager.on('new-message', handleNewMessage);
     socketManager.on('message-deleted', handleMessageDeleted);
+    socketManager.on('message-deleted', handleMessageDeleted);
     socketManager.on('message-updated', handleMessageUpdated);
     socketManager.on('room-joined', handleRoomJoined);
+    socketManager.on('user-joined', handleUserJoined);
     socketManager.on('room-left', handleUserLeft);
     socketManager.on('room-error', handleError);
     socketManager.on('latency-pong', handlePong);
@@ -420,7 +423,10 @@ const ChatRoom = () => {
       socketManager.off('new-message', handleNewMessage);
       socketManager.off('message-deleted', handleMessageDeleted);
       socketManager.off('message-updated', handleMessageUpdated);
+      socketManager.off('message-deleted', handleMessageDeleted);
+      socketManager.off('message-updated', handleMessageUpdated);
       socketManager.off('room-joined', handleRoomJoined);
+      socketManager.off('user-joined', handleUserJoined);
       socketManager.off('room-left', handleUserLeft);
       socketManager.off('room-error', handleError);
       socketManager.off('latency-pong', handlePong);
@@ -634,6 +640,17 @@ const ChatRoom = () => {
     typingTimeoutRef.current = setTimeout(() => {
       socketManager.emit('stop-typing', { roomCode });
     }, 1000);
+  };
+
+  const handleSendIcebreaker = () => {
+    const question = getRandomIcebreaker();
+    socketManager.emit('send-message', {
+      content: `🧊 ${question}`,
+      isEncrypted: false,
+      recipients: selectedRecipients
+    });
+    socketManager.emit('user-activity');
+    setShowFeatureMenu(false);
   };
 
   const handleDrop = (e) => {
@@ -879,44 +896,39 @@ const ChatRoom = () => {
         </div>
       </div>
 
-      {/* Topic Banner */}
-      {
-        roomTopic && (
-          <div className="bg-primary-50 dark:bg-primary-900/10 border-b border-primary-100 dark:border-primary-800 px-4 py-2 flex items-center justify-between animate-in slide-in-from-top-2">
-            <p className="text-sm font-medium text-primary-800 dark:text-primary-200 flex-1 truncate text-center">
-              📢 {roomTopic}
-            </p>
+      <div className="absolute top-16 left-0 right-0 z-10 flex flex-col items-center space-y-2 pointer-events-none transition-all duration-300">
+        {/* Topic Pill */}
+        {roomTopic && (
+          <div className="pointer-events-auto bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 px-4 py-1.5 rounded-full shadow-sm flex items-center space-x-2 animate-in slide-in-from-top-2 max-w-[80%]">
+            <span className="text-xs font-semibold text-primary-600 dark:text-primary-400 uppercase tracking-wider">Topic</span>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{roomTopic}</span>
             {canManageRoom(currentUserRole) && (
-              <button onClick={() => setShowTopicEditor(true)} className="p-1 hover:bg-primary-100 dark:hover:bg-primary-800 rounded text-primary-600 dark:text-primary-300">
+              <button onClick={() => setShowTopicEditor(true)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 hover:text-primary-500 transition-colors">
                 <Edit2 className="w-3 h-3" />
               </button>
             )}
           </div>
-        )
-      }
+        )}
 
-      {/* Timer Banner */}
-      {
-        activeTimer && (
-          <div className="bg-indigo-600 px-4 py-2 flex items-center justify-center text-white shadow-md animate-in slide-in-from-top-1 relative z-10 transition-all duration-300">
-            <div className="flex items-center space-x-3">
-              <Clock className={`w-4 h-4 ${timeLeft === '00:00' ? 'animate-bounce text-red-300' : 'animate-pulse'}`} />
-              <span className={`font-mono text-lg font-bold tracking-wider ${timeLeft === '00:00' ? 'text-red-100' : ''}`}>{timeLeft || '00:00'}</span>
-              {canManageRoom(currentUserRole) && (
-                <button
-                  onClick={handleStopTimer}
-                  className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors"
-                  title="Stop Timer"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
+        {/* Timer Pill */}
+        {activeTimer && (
+          <div className="pointer-events-auto bg-indigo-600/90 backdrop-blur-md px-4 py-1.5 rounded-full shadow-lg flex items-center space-x-3 animate-in slide-in-from-top-2 text-white border border-indigo-500/50">
+            <Clock className={`w-3.5 h-3.5 ${timeLeft === '00:00' ? 'animate-bounce text-red-300' : 'animate-pulse'}`} />
+            <span className={`font-mono text-sm font-bold tracking-wider ${timeLeft === '00:00' ? 'text-red-100' : ''}`}>{timeLeft || '00:00'}</span>
+            {canManageRoom(currentUserRole) && (
+              <button
+                onClick={handleStopTimer}
+                className="ml-1 p-0.5 hover:bg-white/20 rounded-full transition-colors"
+                title="Stop Timer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
           </div>
-        )
-      }
+        )}
+      </div>
 
-      {error && <div className="bg-red-100 dark:bg-red-900 border-l-4 border-red-500 text-red-700 dark:text-red-200 p-3"><p className="text-sm">{error}</p></div>}
+      {error && <div className="mx-4 mt-2 bg-red-100 dark:bg-red-900/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-2 rounded-lg text-sm text-center md:w-fit md:mx-auto">{error}</div>}
 
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 flex flex-col">
@@ -1089,6 +1101,18 @@ const ChatRoom = () => {
                               <BarChart2 className="w-4 h-4 text-purple-500" />
                             </div>
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Poll</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleSendIcebreaker}
+                            disabled={!isConnected}
+                            className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-cyan-50 dark:hover:bg-cyan-900/20 transition-colors disabled:opacity-50"
+                          >
+                            <div className="w-8 h-8 rounded-full bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center">
+                              <Smile className="w-4 h-4 text-cyan-500" />
+                            </div>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Icebreaker</span>
                           </button>
 
                           <button
