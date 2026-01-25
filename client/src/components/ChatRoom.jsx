@@ -63,6 +63,7 @@ const ChatRoom = () => {
   const [pendingGuests, setPendingGuests] = useState([]);
   const [isHost, setIsHost] = useState(false);
   const [roomKey, setRoomKey] = useState(null);
+  const [currentUserRole, setCurrentUserRole] = useState('user');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [selectedRecipients, setSelectedRecipients] = useState([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -224,11 +225,45 @@ const ChatRoom = () => {
 
     const handlePromotedToHost = () => {
       setIsHost(true);
+      setCurrentUserRole('host');
       setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: 'You are now the host of this room', timestamp: new Date().toISOString() }]);
     };
 
     const handleMessageUpdated = (updatedMessage) => {
       setMessages(prev => prev.map(m => m.id === updatedMessage.id ? updatedMessage : m));
+    };
+
+    // Role and moderation event handlers
+    const handleRoleUpdated = ({ userId, role, updatedBy }) => {
+      if (userId === socketManager.socket?.id) {
+        setCurrentUserRole(role);
+        setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: `Your role has been changed to ${role} by ${updatedBy}`, timestamp: new Date().toISOString() }]);
+      }
+      setUsers(prev => prev.map(u => u.socketId === userId ? { ...u, role } : u));
+    };
+
+    const handleUsersUpdated = ({ users: updatedUsers }) => {
+      setUsers(updatedUsers);
+    };
+
+    const handleKicked = ({ reason, kickedBy }) => {
+      setError(`You were kicked by ${kickedBy}: ${reason}`);
+      setIsJoined(false);
+      setRoom(null);
+      navigate('/');
+    };
+
+    const handleUserKicked = ({ userId, nickname, kickedBy }) => {
+      setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: `${nickname} was kicked by ${kickedBy}`, timestamp: new Date().toISOString() }]);
+      setUsers(prev => prev.filter(u => u.socketId !== userId));
+    };
+
+    const handleGuestApproved = ({ guestId }) => {
+      setPendingGuests(prev => prev.filter(g => g.socketId !== guestId));
+    };
+
+    const handleGuestDenied = ({ guestId }) => {
+      setPendingGuests(prev => prev.filter(g => g.socketId !== guestId));
     };
 
     socketManager.on('connect', handleConnect);
@@ -244,6 +279,12 @@ const ChatRoom = () => {
     socketManager.on('knock-denied', handleKnockDenied);
     socketManager.on('user-knocking', handleUserKnocking);
     socketManager.on('promoted-to-host', handlePromotedToHost);
+    socketManager.on('role-updated', handleRoleUpdated);
+    socketManager.on('users-updated', handleUsersUpdated);
+    socketManager.on('kicked', handleKicked);
+    socketManager.on('user-kicked', handleUserKicked);
+    socketManager.on('guest-approved', handleGuestApproved);
+    socketManager.on('guest-denied', handleGuestDenied);
 
     return () => {
       socketManager.off('connect', handleConnect);
@@ -259,6 +300,12 @@ const ChatRoom = () => {
       socketManager.off('knock-denied', handleKnockDenied);
       socketManager.off('user-knocking', handleUserKnocking);
       socketManager.off('promoted-to-host', handlePromotedToHost);
+      socketManager.off('role-updated', handleRoleUpdated);
+      socketManager.off('users-updated', handleUsersUpdated);
+      socketManager.off('kicked', handleKicked);
+      socketManager.off('user-kicked', handleUserKicked);
+      socketManager.off('guest-approved', handleGuestApproved);
+      socketManager.off('guest-denied', handleGuestDenied);
       if (process.env.NODE_ENV !== 'development') socketManager.disconnect();
     };
   }, [roomCode, performJoin, roomKey]);
@@ -321,6 +368,14 @@ const ChatRoom = () => {
   const handleDenyGuest = (guestId) => {
     socketManager.emit('deny-guest', { guestId, roomCode });
     setPendingGuests(prev => prev.filter(g => g.socketId !== guestId));
+  };
+
+  const handleSetUserRole = (targetUserId, role) => {
+    socketManager.emit('set-user-role', { targetUserId, role, roomCode });
+  };
+
+  const handleKickUser = (targetUserId) => {
+    socketManager.emit('kick-user', { targetUserId, roomCode });
   };
 
   const handleSendMessage = async (e) => {
@@ -679,7 +734,7 @@ const ChatRoom = () => {
           </div>
         </div>
         <div className="hidden lg:block w-64 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-          <UserList users={users} currentUser={currentUser} pendingGuests={pendingGuests} isHost={isHost} onApprove={handleApproveGuest} onDeny={handleDenyGuest} selectedRecipients={selectedRecipients} onToggleRecipient={toggleRecipient} />
+          <UserList users={users} currentUser={currentUser} pendingGuests={pendingGuests} isHost={isHost} onApprove={handleApproveGuest} onDeny={handleDenyGuest} selectedRecipients={selectedRecipients} onToggleRecipient={toggleRecipient} onSetUserRole={handleSetUserRole} onKickUser={handleKickUser} currentUserRole={currentUserRole} />
         </div>
       </div>
 
@@ -689,7 +744,7 @@ const ChatRoom = () => {
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileMenu(false)} />
             <div className="absolute right-0 top-0 bottom-0 w-80 max-w-[85vw] bg-white dark:bg-gray-800 shadow-xl flex flex-col">
               <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700"><h2 className="text-lg font-semibold text-gray-900 dark:text-white">Room Details</h2><button onClick={() => setShowMobileMenu(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400"><X className="w-5 h-5" /></button></div>
-              <div className="flex-1 overflow-y-auto"><UserList users={users} currentUser={currentUser} pendingGuests={pendingGuests} isHost={isHost} onApprove={handleApproveGuest} onDeny={handleDenyGuest} selectedRecipients={selectedRecipients} onToggleRecipient={toggleRecipient} /></div>
+              <div className="flex-1 overflow-y-auto"><UserList users={users} currentUser={currentUser} pendingGuests={pendingGuests} isHost={isHost} onApprove={handleApproveGuest} onDeny={handleDenyGuest} selectedRecipients={selectedRecipients} onToggleRecipient={toggleRecipient} onSetUserRole={handleSetUserRole} onKickUser={handleKickUser} currentUserRole={currentUserRole} /></div>
             </div>
           </div>
         )

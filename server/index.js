@@ -150,7 +150,8 @@ if (process.env.NODE_ENV === 'production') {
 const rateLimits = new Map();
 
 // Room metadata for Lobby/Host logic
-const roomData = {}; // { [roomId]: { hostId: string, lobbyLimit: number, lobbyCount: number } }
+// Roles: 'host', 'tier1', 'tier2', 'user'
+const roomData = {}; // { [roomId]: { hostId: string, lobbyLimit: number, lobbyCount: number, userRoles: { [socketId]: role } } }
 
 // Initialize Redis client (optional)
 let redisClient = null;
@@ -618,13 +619,121 @@ io.on('connection', (socket) => {
   });
 
   socket.on('deny-guest', ({ guestId, roomCode }) => {
-    // Verify requester is host
-    if (roomData[roomCode]?.hostId !== socket.id) return;
+    // Verify requester is host or tier1
+    const room = roomData[roomCode];
+    if (!room) return;
+    const requesterRole = room.userRoles?.[socket.id] || (room.hostId === socket.id ? 'host' : 'user');
+    if (requesterRole !== 'host' && requesterRole !== 'tier1') return;
 
     const guestSocket = io.sockets.sockets.get(guestId);
     if (guestSocket) {
       if (roomData[roomCode].lobbyCount > 0) roomData[roomCode].lobbyCount--;
-      guestSocket.emit('knock-denied', { reason: 'Host denied entry' });
+      guestSocket.emit('knock-denied', { reason: 'Entry denied by admin' });
+    }
+
+    // Notify all admins to update their pending lists
+    io.to(roomCode).emit('guest-denied', { guestId });
+  });
+
+  // Enhanced approve-guest to allow tier1 admins
+  socket.on('approve-guest', ({ guestId, roomCode }) => {
+    const room = roomData[roomCode];
+    if (!room) return;
+    const requesterRole = room.userRoles?.[socket.id] || (room.hostId === socket.id ? 'host' : 'user');
+    if (requesterRole !== 'host' && requesterRole !== 'tier1') return;
+
+    const guestSocket = io.sockets.sockets.get(guestId);
+    if (guestSocket) {
+      if (room.lobbyCount > 0) room.lobbyCount--;
+      guestSocket.emit('knock-approved', { isHost: false });
+    }
+
+    // Notify all admins to update their pending lists
+    io.to(roomCode).emit('guest-approved', { guestId });
+  });
+
+  // Role management - only host can change roles
+  socket.on('set-user-role', ({ targetUserId, role, roomCode }) => {
+    const room = roomData[roomCode];
+    if (!room) return;
+
+    // Only host can change roles
+    if (room.hostId !== socket.id) return;
+
+    // Valid roles
+    const validRoles = ['tier1', 'tier2', 'user'];
+    if (!validRoles.includes(role)) return;
+
+    // Can't change own role
+    if (targetUserId === socket.id) return;
+
+    // Initialize userRoles if needed
+    if (!room.userRoles) room.userRoles = {};
+    room.userRoles[targetUserId] = role;
+
+    // Notify all users in room about role update
+    io.to(roomCode).emit('role-updated', {
+      userId: targetUserId,
+      role,
+      updatedBy: socket.nickname
+    });
+
+    // Also send updated users list
+    const roomSocket = io.sockets.adapter.rooms.get(roomCode);
+    if (roomSocket) {
+      const updatedUsers = Array.from(roomSocket).map(socketId => {
+        const s = io.sockets.sockets.get(socketId);
+        return {
+          socketId,
+          nickname: s?.nickname || 'Unknown',
+          role: room.userRoles?.[socketId] || (room.hostId === socketId ? 'host' : 'user')
+        };
+      });
+      io.to(roomCode).emit('users-updated', { users: updatedUsers });
+    }
+  });
+
+  // Kick user - host can kick anyone, tier1 can kick tier2 and users
+  socket.on('kick-user', ({ targetUserId, roomCode }) => {
+    const room = roomData[roomCode];
+    if (!room) return;
+
+    const kickerRole = room.userRoles?.[socket.id] || (room.hostId === socket.id ? 'host' : 'user');
+    const targetRole = room.userRoles?.[targetUserId] || (room.hostId === targetUserId ? 'host' : 'user');
+
+    // Permission check
+    let canKick = false;
+    if (kickerRole === 'host' && targetUserId !== socket.id) {
+      canKick = true; // Host can kick anyone except self
+    } else if (kickerRole === 'tier1' && (targetRole === 'tier2' || targetRole === 'user')) {
+      canKick = true; // Tier1 can kick tier2 and regular users
+    }
+
+    if (!canKick) return;
+
+    const targetSocket = io.sockets.sockets.get(targetUserId);
+    if (targetSocket) {
+      // Notify the kicked user
+      targetSocket.emit('kicked', {
+        reason: 'You have been removed from this room',
+        kickedBy: socket.nickname
+      });
+
+      // Force disconnect from room
+      targetSocket.leave(roomCode);
+      targetSocket.roomCode = null;
+
+      // Remove from userRoles if exists
+      if (room.userRoles?.[targetUserId]) {
+        delete room.userRoles[targetUserId];
+      }
+
+      // Notify room
+      io.to(roomCode).emit('user-kicked', {
+        userId: targetUserId,
+        nickname: targetSocket.nickname,
+        kickedBy: socket.nickname
+      });
     }
   });
 

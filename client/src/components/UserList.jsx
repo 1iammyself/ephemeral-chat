@@ -1,7 +1,22 @@
-import React from 'react';
-import { Users, Crown, User, Check, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Users, Crown, User, Check, X, ChevronDown, Shield, UserX } from 'lucide-react';
+import { ROLES, ROLE_INFO, canKick, canChangeRole, canManageGuests, getAssignableRoles } from '../utils/roles';
 
-const UserList = ({ users, currentUser, pendingGuests = [], isHost = false, onApprove, onDeny, selectedRecipients = [], onToggleRecipient }) => {
+const UserList = ({
+  users,
+  currentUser,
+  pendingGuests = [],
+  isHost = false,
+  onApprove,
+  onDeny,
+  selectedRecipients = [],
+  onToggleRecipient,
+  onSetUserRole,
+  onKickUser,
+  currentUserRole = ROLES.USER
+}) => {
+  const [expandedUser, setExpandedUser] = useState(null);
+
   const getInitials = (nickname) => {
     return nickname
       .split(' ')
@@ -12,7 +27,6 @@ const UserList = ({ users, currentUser, pendingGuests = [], isHost = false, onAp
   };
 
   const getAvatarColor = (nickname) => {
-    // Generate a consistent color based on nickname
     const colors = [
       'bg-red-500',
       'bg-blue-500',
@@ -32,10 +46,30 @@ const UserList = ({ users, currentUser, pendingGuests = [], isHost = false, onAp
     return colors[Math.abs(hash) % colors.length];
   };
 
+  const getUserRole = (user) => {
+    return user.role || ROLES.USER;
+  };
+
+  const handleRoleChange = (userId, newRole) => {
+    if (onSetUserRole) {
+      onSetUserRole(userId, newRole);
+    }
+    setExpandedUser(null);
+  };
+
+  const handleKick = (userId, nickname) => {
+    if (onKickUser && window.confirm(`Are you sure you want to kick ${nickname}?`)) {
+      onKickUser(userId);
+    }
+    setExpandedUser(null);
+  };
+
+  const canManageGuestsCheck = canManageGuests(currentUserRole);
+
   return (
     <div className="h-full flex flex-col">
-      {/* Pending Guests Section (Host Only) */}
-      {isHost && pendingGuests.length > 0 && (
+      {/* Pending Guests Section (Host and Tier1 Only) */}
+      {canManageGuestsCheck && pendingGuests.length > 0 && (
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-yellow-50 dark:bg-yellow-900/20 transition-colors duration-200">
           <h3 className="font-medium text-yellow-800 dark:text-yellow-400 mb-3 text-xs uppercase tracking-wider flex items-center">
             <Users className="w-3 h-3 mr-1" />
@@ -51,15 +85,15 @@ const UserList = ({ users, currentUser, pendingGuests = [], isHost = false, onAp
                   <span className="font-medium text-sm truncate text-gray-900 dark:text-gray-200">{guest.nickname}</span>
                 </div>
                 <div className="flex space-x-1 flex-shrink-0">
-                  <button 
-                    onClick={() => onApprove(guest.socketId)} 
+                  <button
+                    onClick={() => onApprove(guest.socketId)}
                     className="p-1.5 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
                     title="Approve"
                   >
                     <Check className="w-3 h-3" />
                   </button>
-                  <button 
-                    onClick={() => onDeny(guest.socketId)} 
+                  <button
+                    onClick={() => onDeny(guest.socketId)}
                     className="p-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
                     title="Deny"
                   >
@@ -90,48 +124,109 @@ const UserList = ({ users, currentUser, pendingGuests = [], isHost = false, onAp
             <p className="text-sm">No users online</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {users.map((user, index) => {
               const isCurrentUser = currentUser && (user.socketId === currentUser.socketId || user.socketId === currentUser.id || user.id === currentUser.id);
-              const isFirstUser = index === 0; // First user is considered room creator
+              const userRole = getUserRole(user);
+              const roleInfo = ROLE_INFO[userRole];
+              const canKickUser = !isCurrentUser && canKick(currentUserRole, userRole);
+              const canChangeUserRole = !isCurrentUser && canChangeRole(currentUserRole);
+              const assignableRoles = getAssignableRoles(currentUserRole);
+              const showAdminMenu = expandedUser === user.socketId && (canKickUser || canChangeUserRole);
 
               return (
-                <div
-                  key={user.socketId || user.id || index}
-                  className={`flex items-center space-x-3 p-2 rounded-lg transition-colors duration-200 cursor-pointer ${
-                    isCurrentUser 
-                      ? 'bg-indigo-50 dark:bg-indigo-900/20' 
-                      : selectedRecipients.includes(user.socketId)
-                        ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
-                        : 'hover:bg-gray-50 dark:hover:bg-gray-800 border border-transparent'
-                  }`}
-                  onClick={() => !isCurrentUser && onToggleRecipient && onToggleRecipient(user.socketId)}
-                >
-                  <div className="relative">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm text-white font-medium shadow-sm ${getAvatarColor(user.nickname)}`}>
-                      {getInitials(user.nickname)}
-                    </div>
-                    {!isCurrentUser && onToggleRecipient && (
-                      <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center ${
-                        selectedRecipients.includes(user.socketId) ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-600'
-                      }`}>
-                        {selectedRecipients.includes(user.socketId) && <Check className="w-2.5 h-2.5 text-white" />}
+                <div key={user.socketId || user.id || index} className="relative">
+                  <div
+                    className={`flex items-center space-x-3 p-2 rounded-lg transition-colors duration-200 cursor-pointer ${isCurrentUser
+                        ? 'bg-indigo-50 dark:bg-indigo-900/20'
+                        : selectedRecipients.includes(user.socketId)
+                          ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
+                          : 'hover:bg-gray-50 dark:hover:bg-gray-800 border border-transparent'
+                      }`}
+                    onClick={() => {
+                      if (!isCurrentUser && onToggleRecipient) {
+                        onToggleRecipient(user.socketId);
+                      }
+                    }}
+                  >
+                    <div className="relative">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm text-white font-medium shadow-sm ${getAvatarColor(user.nickname)}`}>
+                        {getInitials(user.nickname)}
                       </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center">
-                      <p className={`text-sm font-medium truncate ${
-                        isCurrentUser ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-gray-200'
-                      }`}>
-                        {user.nickname}
-                        {isCurrentUser && ' (You)'}
-                      </p>
-                      {isFirstUser && (
-                        <Crown className="w-3 h-3 text-yellow-500 ml-1.5 flex-shrink-0" />
+                      {!isCurrentUser && onToggleRecipient && (
+                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center ${selectedRecipients.includes(user.socketId) ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-600'
+                          }`}>
+                          {selectedRecipients.includes(user.socketId) && <Check className="w-2.5 h-2.5 text-white" />}
+                        </div>
                       )}
                     </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className={`text-sm font-medium truncate ${isCurrentUser ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-gray-200'
+                          }`}>
+                          {user.nickname}
+                          {isCurrentUser && ' (You)'}
+                        </p>
+                        {/* Role Badge */}
+                        {roleInfo.badge && (
+                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${roleInfo.bgColor} ${roleInfo.color} font-medium`}>
+                            {roleInfo.badge} {roleInfo.label}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {/* Admin Controls Toggle */}
+                    {(canKickUser || canChangeUserRole) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedUser(expandedUser === user.socketId ? null : user.socketId);
+                        }}
+                        className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
+                      >
+                        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showAdminMenu ? 'rotate-180' : ''}`} />
+                      </button>
+                    )}
                   </div>
+
+                  {/* Admin Actions Menu */}
+                  {showAdminMenu && (
+                    <div className="mt-1 ml-11 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 space-y-2">
+                      {/* Role Selection */}
+                      {canChangeUserRole && assignableRoles.length > 0 && (
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 flex items-center">
+                            <Shield className="w-3 h-3 mr-1" />
+                            Change Role
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {assignableRoles.map(role => (
+                              <button
+                                key={role}
+                                onClick={() => handleRoleChange(user.socketId, role)}
+                                className={`text-xs px-2 py-1 rounded-full transition-colors ${userRole === role
+                                    ? `${ROLE_INFO[role].bgColor} ${ROLE_INFO[role].color} ring-2 ring-offset-1 ring-gray-300 dark:ring-gray-600`
+                                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                                  }`}
+                              >
+                                {ROLE_INFO[role].badge} {ROLE_INFO[role].label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {/* Kick Button */}
+                      {canKickUser && (
+                        <button
+                          onClick={() => handleKick(user.socketId, user.nickname)}
+                          className="w-full flex items-center justify-center space-x-1 px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors text-sm font-medium"
+                        >
+                          <UserX className="w-3.5 h-3.5" />
+                          <span>Kick User</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
