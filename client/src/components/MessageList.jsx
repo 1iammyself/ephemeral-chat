@@ -464,7 +464,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                   ) : (
                     // Text message
                     <span>
-                      {message.content}
+                      {renderMessageContent(message.content, currentUser)}
                       {message.isEdited && <span className="text-xs text-gray-400 italic ml-1">(edited)</span>}
                     </span>
                   )}
@@ -628,4 +628,35 @@ function formatFileSize(bytes) {
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function renderMessageContent(content, currentUser) {
+  if (!content) return null;
+  // Split by URLs and Mentions
+  const parts = content.split(/((?:https?:\/\/[^\s]+)|(?:@[\w\-\.]+))/g);
+  return parts.map((part, i) => {
+    if (part.match(/^https?:\/\//)) {
+      return (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-500 dark:text-blue-400 underline break-all hover:text-blue-600 dark:hover:text-blue-300"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </a>
+      );
+    }
+    if (part.startsWith('@') && part.length > 1) {
+      const isMe = currentUser && (part.slice(1).toLowerCase() === currentUser.nickname?.toLowerCase());
+      return (
+        <span key={i} className={`font-medium ${isMe ? 'bg-yellow-200 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 px-1 rounded' : 'text-blue-500 dark:text-blue-400'}`}>
+          {part}
+        </span>
+      );
+    }
+    return part;
+  });
 }
