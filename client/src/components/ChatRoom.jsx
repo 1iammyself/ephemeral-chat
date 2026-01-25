@@ -85,7 +85,9 @@ const ChatRoom = () => {
   const [timeLeft, setTimeLeft] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [typingUsers, setTypingUsers] = useState(new Map());
   const dragCounter = useRef(0);
+  const typingTimeoutRef = useRef(null);
   const { theme } = useTheme();
 
   const messageInputRef = useRef(null);
@@ -358,6 +360,22 @@ const ChatRoom = () => {
       setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: `${from} sent a ⚡ pulse!`, timestamp: new Date().toISOString() }]);
     };
 
+    const handleUserTyping = ({ userId, nickname }) => {
+      setTypingUsers(prev => {
+        const next = new Map(prev);
+        next.set(userId, nickname);
+        return next;
+      });
+    };
+
+    const handleUserStopTyping = ({ userId }) => {
+      setTypingUsers(prev => {
+        const next = new Map(prev);
+        next.delete(userId);
+        return next;
+      });
+    };
+
     socketManager.on('connect', handleConnect);
     socketManager.on('disconnect', handleDisconnect);
     socketManager.on('room-joined', handleRoomJoined);
@@ -383,6 +401,8 @@ const ChatRoom = () => {
     socketManager.on('timer-stopped', handleTimerStopped);
     socketManager.on('pulse-received', handlePulseReceived);
     socketManager.on('message-updated', handleMessageUpdated);
+    socketManager.on('user-typing', handleUserTyping);
+    socketManager.on('user-stop-typing', handleUserStopTyping);
 
     return () => {
       socketManager.off('connect', handleConnect);
@@ -410,6 +430,8 @@ const ChatRoom = () => {
       socketManager.off('timer-stopped', handleTimerStopped);
       socketManager.off('pulse-received', handlePulseReceived);
       socketManager.off('message-updated', handleMessageUpdated);
+      socketManager.off('user-typing', handleUserTyping);
+      socketManager.off('user-stop-typing', handleUserStopTyping);
       if (process.env.NODE_ENV !== 'development') socketManager.disconnect();
     };
   }, [roomCode, performJoin, roomKey]);
@@ -586,6 +608,14 @@ const ChatRoom = () => {
   const handleDragOver = (e) => {
     e.preventDefault();
     e.stopPropagation();
+  };
+
+  const handleTyping = () => {
+    socketManager.emit('typing', { roomCode });
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      socketManager.emit('stop-typing', { roomCode });
+    }, 1000);
   };
 
   const handleDrop = (e) => {
@@ -869,6 +899,11 @@ const ChatRoom = () => {
             <div ref={messagesEndRef} />
           </div>
           <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+            {typingUsers.size > 0 && (
+              <div className="px-4 py-1 text-xs text-gray-500 dark:text-gray-400 italic animate-pulse bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
+                {Array.from(typingUsers.values()).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
+              </div>
+            )}
             {replyingTo && (
               <div className="px-4 py-2 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-600 flex items-center justify-between animate-in slide-in-from-bottom-2">
                 <div className="flex items-center space-x-2 overflow-hidden">
@@ -1063,7 +1098,7 @@ const ChatRoom = () => {
                         </div>
                       )}
                     </div>
-                    <input ref={messageInputRef} type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onCopy={(e) => e.preventDefault()} onCut={(e) => e.preventDefault()} onPaste={(e) => e.preventDefault()} placeholder="Type your message..." className="flex-1 input-field py-3 px-4 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600" disabled={!isConnected || isSending} maxLength={500} />
+                    <input ref={messageInputRef} type="text" value={newMessage} onChange={(e) => { setNewMessage(e.target.value); handleTyping(); }} onCopy={(e) => e.preventDefault()} onCut={(e) => e.preventDefault()} onPaste={(e) => e.preventDefault()} placeholder="Type your message..." className="flex-1 input-field py-3 px-4 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600" disabled={!isConnected || isSending} maxLength={500} />
                     <button type="submit" disabled={!newMessage.trim() || !isConnected || isSending} className="btn-primary px-4 py-3"><Send className="w-5 h-5" /></button>
                   </>
                 )}

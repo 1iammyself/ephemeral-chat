@@ -1190,6 +1190,19 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Typing indicators
+  socket.on('typing', ({ roomCode }) => {
+    if (socket.roomCode === roomCode) {
+      socket.to(roomCode).emit('user-typing', { userId: socket.id, nickname: socket.nickname });
+    }
+  });
+
+  socket.on('stop-typing', ({ roomCode }) => {
+    if (socket.roomCode === roomCode) {
+      socket.to(roomCode).emit('user-stop-typing', { userId: socket.id });
+    }
+  });
+
   // Handle message viewed events (for view-once images)
   socket.on('message-viewed', async ({ messageId }) => {
     try {
