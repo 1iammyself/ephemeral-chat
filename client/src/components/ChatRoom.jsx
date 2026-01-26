@@ -231,6 +231,7 @@ const ChatRoom = () => {
 
       const myRole = data.room.userRoles?.[socketManager.socket?.id] || (data.room.hostId === socketManager.socket?.id ? 'host' : 'user');
       setCurrentUserRole(myRole);
+      setIsHost(myRole === 'host');
       setRoomVibe(data.room.vibe || 'default');
       setRoomTopic(data.room.topic || '');
       setActiveTimer(data.room.timer);
@@ -291,6 +292,7 @@ const ChatRoom = () => {
     const handlePromotedToHost = () => {
       setIsHost(true);
       setCurrentUserRole('host');
+      setCurrentUser(prev => prev ? { ...prev, isAdmin: true } : prev);
       setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: 'You are now the host of this room', timestamp: new Date().toISOString() }]);
     };
 

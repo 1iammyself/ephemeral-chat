@@ -197,6 +197,24 @@ function checkRateLimit(socketId, maxMessages = 30, windowMs = 60000) {
   return userLimits.count <= maxMessages;
 }
 
+// Helper to get users with roles attached
+function getEnrichedUsers(roomCode) {
+  const room = roomData[roomCode];
+  if (!room) return [];
+
+  const roomSocket = io.sockets.adapter.rooms.get(roomCode);
+  if (!roomSocket) return [];
+
+  return Array.from(roomSocket).map(socketId => {
+    const s = io.sockets.sockets.get(socketId);
+    return {
+      socketId,
+      nickname: s?.nickname || 'Unknown',
+      role: room.userRoles?.[socketId] || (room.hostId === socketId ? 'host' : 'user')
+    };
+  });
+}
+
 // REST API Routes
 app.get('/api/invite/:token', async (req, res) => {
   try {
@@ -598,9 +616,20 @@ io.on('connection', (socket) => {
       }
     } else {
       room.lobbyCount++;
-      hostSocket.emit('user-knocking', {
-        socketId: socket.id,
-        nickname: nickname
+      room.lobbyCount++;
+
+      // Notify all managers (host and tier1)
+      const managers = Array.from(io.sockets.sockets.values()).filter(s => {
+        if (s.roomCode !== roomCode) return false;
+        const role = room.userRoles?.[s.id] || (room.hostId === s.id ? 'host' : 'user');
+        return role === 'host' || role === 'tier1';
+      });
+
+      managers.forEach(mgr => {
+        mgr.emit('user-knocking', {
+          socketId: socket.id,
+          nickname: nickname
+        });
       });
     }
 
@@ -937,9 +966,12 @@ io.on('connection', (socket) => {
           timer: roomData[roomCode].timer || null
         };
 
+        const enrichedUsers = getEnrichedUsers(roomCode);
+
         callback({
           success: true,
           room: extendedRoom,
+          users: enrichedUsers,
           messages,
           nickname: userNickname,
           isInviteOnly: result.room.settings?.isInviteOnly || false,
@@ -951,9 +983,10 @@ io.on('connection', (socket) => {
           user: {
             socketId: socket.id,
             id: socket.id,
-            nickname: userNickname
+            nickname: userNickname,
+            role: roomData[roomCode].userRoles?.[socket.id] || (roomData[roomCode].hostId === socket.id ? 'host' : 'user')
           },
-          roomUsers: result.room.users
+          roomUsers: enrichedUsers
         });
 
         // logger.info(`👤 ${userNickname} joined room ${roomCode}`);
