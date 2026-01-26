@@ -210,9 +210,37 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                 >
                   {/* Content Container */}
                   <div className="break-words max-w-full">
+                    {/* Reply Context */}
+                    {message.replyTo && (
+                      <div
+                        className={`mb-2 p-2 rounded-lg text-[11px] border-l-4 cursor-pointer transition-colors ${isOwnMessage
+                            ? 'bg-black/10 border-white/30 hover:bg-black/20'
+                            : 'bg-gray-100 dark:bg-gray-700/50 border-gray-300 dark:border-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'
+                          }`}
+                        onClick={() => {
+                          const el = document.getElementById(message.replyTo.id);
+                          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }}
+                      >
+                        <div className="font-bold opacity-80 mb-0.5">{message.replyTo.sender}</div>
+                        <div className="truncate opacity-70 italic">{message.replyTo.content}</div>
+                      </div>
+                    )}
                     {isImage ? (
-                      <div className="cursor-pointer" onClick={() => (isViewOnce && !hasBeenViewed) ? handleImageClick(message) : !isViewOnce && setViewingImage(message)}>
-                        {isViewOnce && !hasBeenViewed ? (
+                      <div
+                        className={isOwnMessage ? "" : "cursor-pointer"}
+                        onClick={() => {
+                          if (isOwnMessage) return;
+                          (isViewOnce && !hasBeenViewed) ? handleImageClick(message) : !isViewOnce && setViewingImage(message);
+                        }}
+                      >
+                        {isOwnMessage ? (
+                          <div className="flex flex-col items-center justify-center p-4 bg-black/5 dark:bg-white/5 rounded-xl border border-dashed border-black/10 dark:border-white/10 opacity-70">
+                            <ImageIcon className="w-8 h-8 mb-2 text-primary-300" />
+                            <span className="text-[10px] font-bold uppercase tracking-wider">You sent a photo</span>
+                            {isViewOnce && <span className="text-[9px] opacity-60 mt-1">(View Once)</span>}
+                          </div>
+                        ) : (isViewOnce && !hasBeenViewed) ? (
                           <div className="w-48 h-32 bg-black/5 dark:bg-white/5 rounded-xl flex flex-col items-center justify-center space-y-2 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
                             <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-500"><Eye className="w-5 h-5" /></div>
                             <span className="text-xs font-bold uppercase tracking-wide">Tap to View</span>
@@ -223,7 +251,15 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                       </div>
                     ) : isAudio ? (
                       <div className="min-w-[200px]">
-                        {isViewOnce && !hasBeenViewed && playingAudioId !== message.id ? (
+                        {isOwnMessage ? (
+                          <div className="flex items-center space-x-3 p-2 bg-black/5 dark:bg-white/5 rounded-xl border border-dashed border-black/10 dark:border-white/10 opacity-70">
+                            <div className="w-10 h-10 bg-primary-500/10 rounded-full flex items-center justify-center text-primary-300"><Mic className="w-5 h-5" /></div>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold">Voice Note Sent</span>
+                              {isViewOnce && <span className="text-[10px] opacity-60">View Once</span>}
+                            </div>
+                          </div>
+                        ) : isViewOnce && !hasBeenViewed && playingAudioId !== message.id ? (
                           <div onClick={() => handleAudioPlay(message)} className="flex items-center space-x-3 cursor-pointer p-1">
                             <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-500"><Mic className="w-5 h-5" /></div>
                             <div className="flex flex-col"><span className="text-sm font-bold">Voice Note</span><span className="text-[10px] opacity-70">View Once</span></div>
