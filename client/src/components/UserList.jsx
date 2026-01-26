@@ -84,20 +84,20 @@ const UserList = ({
                   </div>
                   <span className="font-medium text-sm truncate text-gray-900 dark:text-gray-200">{guest.nickname}</span>
                 </div>
-                <div className="flex space-x-1 flex-shrink-0">
+                <div className="flex space-x-2 flex-shrink-0">
                   <button
                     onClick={() => onApprove(guest.socketId)}
-                    className="p-1.5 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
+                    className="p-2 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors shadow-sm"
                     title="Approve"
                   >
-                    <Check className="w-3 h-3" />
+                    <Check className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => onDeny(guest.socketId)}
-                    className="p-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                    className="p-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors shadow-sm"
                     title="Deny"
                   >
-                    <X className="w-3 h-3" />
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
               </div>
@@ -138,10 +138,10 @@ const UserList = ({
                 <div key={user.socketId || user.id || index} className="relative">
                   <div
                     className={`flex items-center space-x-3 p-2 rounded-lg transition-colors duration-200 cursor-pointer ${isCurrentUser
-                        ? 'bg-indigo-50 dark:bg-indigo-900/20'
-                        : selectedRecipients.includes(user.socketId)
-                          ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
-                          : 'hover:bg-gray-50 dark:hover:bg-gray-800 border border-transparent'
+                      ? 'bg-indigo-50 dark:bg-indigo-900/20'
+                      : selectedRecipients.includes(user.socketId)
+                        ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
+                        : 'hover:bg-gray-50 dark:hover:bg-gray-800 border border-transparent'
                       }`}
                     onClick={() => {
                       if (!isCurrentUser && onToggleRecipient) {
@@ -205,8 +205,8 @@ const UserList = ({
                                 key={role}
                                 onClick={() => handleRoleChange(user.socketId, role)}
                                 className={`text-xs px-2 py-1 rounded-full transition-colors ${userRole === role
-                                    ? `${ROLE_INFO[role].bgColor} ${ROLE_INFO[role].color} ring-2 ring-offset-1 ring-gray-300 dark:ring-gray-600`
-                                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                                  ? `${ROLE_INFO[role].bgColor} ${ROLE_INFO[role].color} ring-2 ring-offset-1 ring-gray-300 dark:ring-gray-600`
+                                  : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                                   }`}
                               >
                                 {ROLE_INFO[role].badge} {ROLE_INFO[role].label}

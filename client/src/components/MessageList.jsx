@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, FileText, Download, Check, CheckCheck, Pencil } from 'lucide-react';
+import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, FileText, Download, Check, CheckCheck, Pencil, X } from 'lucide-react';
 import ImageViewer from './ImageViewer';
 import AudioPlayer from './AudioPlayer';
 import PollMessage from './PollMessage';
@@ -11,7 +11,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [messageTimers, setMessageTimers] = useState(new Map());
   const [viewingImage, setViewingImage] = useState(null);
-  const [currentImageUrl, setCurrentImageUrl] = useState(null); // Save image URL separately
+  const [currentImageUrl, setCurrentImageUrl] = useState(null);
   const [viewedMessages, setViewedMessages] = useState(new Set());
   const [playingAudioId, setPlayingAudioId] = useState(null);
   const [newMessages, setNewMessages] = useState(new Set());
@@ -19,23 +19,16 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   // Listen for message-viewed events from server
   useEffect(() => {
     const handleMessageViewed = ({ messageId, userId }) => {
-      // console.log(`Event: message-viewed`, { messageId, userId, currentUserId: currentUser?.id, currentUserSocket: currentUser?.socketId });
-
-      // Only mark as viewed locally if WE viewed it
       if (currentUser && (userId === currentUser.id || userId === currentUser.socketId)) {
         setViewedMessages(prev => new Set([...prev, messageId]));
       }
     };
-
     socketManager.on('message-viewed', handleMessageViewed);
-
-    return () => {
-      socketManager.off('message-viewed', handleMessageViewed);
-    };
+    return () => socketManager.off('message-viewed', handleMessageViewed);
   }, [currentUser]);
 
+  // Set up timers for messages with TTL
   useEffect(() => {
-    // Set up timers for messages with TTL
     if (messageTTL && messageTTL > 0) {
       messages.forEach(message => {
         if (message.type !== 'system' && !messageTimers.has(message.id)) {
@@ -45,65 +38,22 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
 
           if (timeLeft > 0) {
             const timer = setTimeout(() => {
-              // Start vanishing animation
-              setMessageTimers(prev => {
-                const newMap = new Map(prev);
-                newMap.set(message.id, 'vanishing');
-                return newMap;
-              });
-
-              // Truly expire after animation
+              setMessageTimers(prev => new Map(prev).set(message.id, 'vanishing'));
               setTimeout(() => {
-                setMessageTimers(prev => {
-                  const newMap = new Map(prev);
-                  newMap.set(message.id, 'expired');
-                  return newMap;
-                });
-              }, 500); // Match CSS animation duration
+                setMessageTimers(prev => new Map(prev).set(message.id, 'expired'));
+              }, 500);
             }, timeLeft);
-
-            setMessageTimers(prev => {
-              const newMap = new Map(prev);
-              newMap.set(message.id, timer);
-              return newMap;
-            });
+            setMessageTimers(prev => new Map(prev).set(message.id, timer));
           } else {
-            setMessageTimers(prev => {
-              const newMap = new Map(prev);
-              newMap.set(message.id, 'expired');
-              return newMap;
-            });
+            setMessageTimers(prev => new Map(prev).set(message.id, 'expired'));
           }
         }
       });
     }
-
     return () => {
-      // Cleanup timers
-      messageTimers.forEach(timer => {
-        if (typeof timer === 'object') {
-          clearTimeout(timer);
-        }
-      });
+      messageTimers.forEach(timer => { if (typeof timer === 'object') clearTimeout(timer); });
     };
-  }, [messages, messageTTL, messageTimers]);
-
-  // Track new messages for delivery glow
-  useEffect(() => {
-    messages.forEach(msg => {
-      if (!newMessages.has(msg.id)) {
-        setNewMessages(prev => new Set([...prev, msg.id]));
-        // Remove from newMessages after animation
-        setTimeout(() => {
-          setNewMessages(prev => {
-            const next = new Set(prev);
-            next.delete(msg.id);
-            return next;
-          });
-        }, 2000);
-      }
-    });
-  }, [messages]);
+  }, [messages, messageTTL]);
 
   // Read Receipt Observer
   useEffect(() => {
@@ -111,12 +61,14 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           const msgId = entry.target.dataset.id;
-          // If we haven't tracked this view locally AND it's not our own message
           if (msgId && !viewedMessages.has(msgId)) {
             const msg = messages.find(m => m.id === msgId);
             const isOwn = msg && currentUser && (msg.sender.id === currentUser.id || msg.sender.socketId === currentUser.socketId);
 
-            if (!isOwn) {
+            // BUG FIX: Don't auto-read view-once images/audio
+            const isAutoViewable = msg && !(msg.isViewOnce && (msg.messageType === 'image' || msg.messageType === 'audio'));
+
+            if (!isOwn && isAutoViewable) {
               socketManager.emit('message-viewed', { messageId: msgId });
               setViewedMessages(prev => new Set([...prev, msgId]));
             }
@@ -127,7 +79,6 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
 
     const elements = document.querySelectorAll('.message-item');
     elements.forEach(el => observer.observe(el));
-
     return () => observer.disconnect();
   }, [messages, viewedMessages, currentUser]);
 
@@ -138,62 +89,25 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
 
   const getTimeLeft = (message) => {
     if (!messageTTL || messageTTL === 0 || message.type === 'system') return null;
-
     const messageTime = new Date(message.timestamp).getTime();
     const expiryTime = messageTime + (messageTTL * 1000);
     const timeLeft = Math.max(0, expiryTime - Date.now());
-
     if (timeLeft === 0) return null;
-
-    if (timeLeft < 60000) {
-      return `${Math.ceil(timeLeft / 1000)}s`;
-    } else {
-      return `${Math.ceil(timeLeft / 60000)}m`;
-    }
-  };
-
-  const isMessageExpired = (message) => {
-    return messageTimers.get(message.id) === 'expired';
-  };
-
-  const isMessageVanishing = (message) => {
-    return messageTimers.get(message.id) === 'vanishing';
+    return timeLeft < 60000 ? `${Math.ceil(timeLeft / 1000)}s` : `${Math.ceil(timeLeft / 60000)}m`;
   };
 
   const isMessageViewed = useCallback((message) => {
-    // Check if we have viewed it locally OR if the server says we viewed it
     const myId = currentUser?.id || currentUser?.socketId;
     const serverSaysViewed = message.viewedBy && Array.isArray(message.viewedBy) && message.viewedBy.includes(myId);
-
-    // Debug logging
-    // if (message.isViewOnce) {
-    //   console.log(`Msg ${message.id} check: MyID=${myId}, ViewedBy=${JSON.stringify(message.viewedBy)}, ServerSays=${serverSaysViewed}, Local=${viewedMessages.has(message.id)}`);
-    // }
-
     return viewedMessages.has(message.id) || serverSaysViewed;
   }, [viewedMessages, currentUser]);
 
   const handleImageClick = useCallback((message) => {
-    // Don't allow viewing if already viewed
-    if (isMessageViewed(message)) {
-      return;
-    }
-
-    // IMPORTANT: Save the image URL FIRST before any state changes
-    const imageUrl = message.content;
-
-    // Save both the message reference and the actual image URL
+    if (isMessageViewed(message)) return;
     setViewingImage(message);
-    setCurrentImageUrl(message.isViewOnce ? message.id : imageUrl);
-
-    // Emit message-viewed event to server
+    setCurrentImageUrl(message.isViewOnce ? message.id : message.content);
     socketManager.emit('message-viewed', { messageId: message.id });
-
-    // Mark as viewed locally
     setViewedMessages(prev => new Set([...prev, message.id]));
-
-    // If it's view-once, we'll trigger the vanish animation when the viewer closes
-    // or immediately if it's not an image
   }, [isMessageViewed]);
 
   const handleAudioPlay = useCallback((message) => {
@@ -202,48 +116,21 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   }, [isMessageViewed]);
 
   const handleAudioEnded = useCallback((message) => {
-    // Mark viewed and request deletion for view-once audio once playback finishes
     if (message.isViewOnce) {
       socketManager.emit('message-viewed', { messageId: message.id });
       socketManager.emit('delete-message', { messageId: message.id });
+      setMessageTimers(prev => new Map(prev).set(message.id, 'vanishing'));
+      setTimeout(() => setMessageTimers(prev => new Map(prev).set(message.id, 'expired')), 500);
     }
     setViewedMessages(prev => new Set([...prev, message.id]));
     setPlayingAudioId(null);
-
-    // Trigger vanish animation for audio
-    if (message.isViewOnce) {
-      setMessageTimers(prev => {
-        const newMap = new Map(prev);
-        newMap.set(message.id, 'vanishing');
-        return newMap;
-      });
-      setTimeout(() => {
-        setMessageTimers(prev => {
-          const newMap = new Map(prev);
-          newMap.set(message.id, 'expired');
-          return newMap;
-        });
-      }, 500);
-    }
   }, []);
 
   const handleViewerClose = useCallback(() => {
     if (viewingImage && viewingImage.isViewOnce) {
       const msgId = viewingImage.id;
-      // Trigger vanish animation for the image message in the list
-      setMessageTimers(prev => {
-        const newMap = new Map(prev);
-        newMap.set(msgId, 'vanishing');
-        return newMap;
-      });
-      setTimeout(() => {
-        setMessageTimers(prev => {
-          const newMap = new Map(prev);
-          newMap.set(msgId, 'expired');
-          return newMap;
-        });
-      }, 500);
-      // Explicitly request deletion from server for view-once image
+      setMessageTimers(prev => new Map(prev).set(msgId, 'vanishing'));
+      setTimeout(() => setMessageTimers(prev => new Map(prev).set(msgId, 'expired')), 500);
       socketManager.emit('delete-message', { messageId: msgId });
     }
     setViewingImage(null);
@@ -252,370 +139,185 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
 
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center h-full">
         <div className="text-center text-gray-500 dark:text-gray-400">
-          <User className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p className="text-lg font-medium mb-2">No messages yet</p>
-          <p className="text-sm">Start the conversation by sending a message!</p>
+          <User className="w-12 h-12 mx-auto mb-4 opacity-30" />
+          <p className="text-lg font-medium mb-1">No messages yet</p>
+          <p className="text-sm opacity-60">Start the conversation!</p>
         </div>
       </div>
     );
   }
 
   return (
-    <>
-      <div className="space-y-4">
-        {messages.map((message) => {
-          if (message.type === 'system') {
-            return (
-              <div key={message.id} className="flex justify-center my-1.5 animate-in fade-in duration-300">
-                <span className="text-xs text-gray-400 dark:text-gray-500 italic bg-gray-50/50 dark:bg-gray-900/30 px-2 py-0.5 rounded border border-transparent dark:border-gray-800/50">
-                  {message.content}
-                </span>
-              </div>
-            );
-          }
-
-          const isOwnMessage = currentUser && (
-            message.sender.socketId === currentUser.socketId ||
-            message.sender.socketId === currentUser.id
-          );
-          const isExpired = isMessageExpired(message);
-          const timeLeft = getTimeLeft(message);
-          const isImage = message.messageType === 'image';
-          const isAudio = message.messageType === 'audio';
-          const isViewOnce = message.isViewOnce;
-          const hasBeenViewed = isMessageViewed(message);
-
-          if (isExpired) {
-            return null;
-          }
-
-          // View-once content that has been viewed
-          // For audio, we keep showing the player if it's currently playing (or just unlocked for this session)
-          if ((isImage || isAudio) && isViewOnce) {
-            // If I sent it, I can't view it
-            if (isOwnMessage) {
-              return (
-                <div
-                  key={message.id}
-                  className={`flex justify-end`}
-                >
-                  <div className="max-w-xs lg:max-w-md px-4 py-3 rounded-lg bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-200">
-                    <div className="flex items-center space-x-2 text-sm italic">
-                      {isImage ? <Eye className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                      <span>View Once {isImage ? 'Photo' : 'Audio'} Sent</span>
-                    </div>
-                    <div className={`flex items-center justify-between mt-2 text-xs text-gray-500 dark:text-gray-400`}>
-                      <span>{formatTime(message.timestamp)}</span>
-                      <div className="flex items-center space-x-1">
-                        <Lock className="w-3 h-3 text-green-500" />
-                        <span>View once</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            // If I viewed it, show placeholder for images; for audio we rely on deletion on end
-            if (hasBeenViewed) {
-              // If it's audio and we are currently playing it, don't show the "viewed" placeholder yet
-              if (isAudio && playingAudioId === message.id) {
-                // Pass through to render the player
-              } else if (!isAudio) {
-                return null;
-              }
-            }
-          }
-
-          const isPoll = message.messageType === 'poll';
-
+    <div className="flex flex-col space-y-6 pb-4">
+      {messages.map((message) => {
+        if (message.type === 'system') {
           return (
-            <div
-              id={message.id}
-              key={message.id}
-              data-id={message.id}
-              className={`message-item flex ${isOwnMessage ? 'justify-end' : 'justify-start'} ${isMessageVanishing(message) ? 'message-vanishing' : ''} ${newMessages.has(message.id) ? 'message-new' : ''} group relative`}
-            >
-              <div
-                className={`max-w-[85%] sm:max-w-md lg:max-w-xl xl:max-w-2xl rounded-2xl transition-all duration-300 shadow-sm ${isPoll
-                  ? ''
-                  : `px-4 py-2 ${isOwnMessage
-                    ? 'bg-primary-600 dark:bg-primary-700 text-white rounded-br-none'
-                    : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 dark:text-gray-100 rounded-bl-none'
-                  }`
-                  } ${isOwnMessage && newMessages.has(message.id) ? 'message-delivered-glow' : ''}`}
-              >
-                {/* Sender name (only for others' messages) */}
-                {!isOwnMessage && (
-                  <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 flex items-center justify-between group">
-                    <span>{message.sender.nickname}</span>
-                    <button
-                      onClick={() => onReply(message)}
-                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-opacity"
-                      title="Reply"
-                    >
-                      <Reply className="w-3 h-3 text-gray-500" />
-                    </button>
-                  </div>
-                )}
+            <div key={message.id} className="flex justify-center my-2">
+              <span className="text-[10px] uppercase tracking-widest font-bold text-gray-400 dark:text-gray-600 bg-gray-100/50 dark:bg-gray-800/30 px-3 py-1 rounded-full">
+                {message.content}
+              </span>
+            </div>
+          );
+        }
 
-                {/* Reply Context */}
-                {message.replyTo && (
-                  <div
-                    className={`mb-1 p-2 rounded text-xs border-l-2 cursor-pointer ${isOwnMessage ? 'bg-black/10 border-white/50' : 'bg-gray-100 dark:bg-gray-700 border-gray-400'}`}
-                    onClick={() => {
-                      const el = document.getElementById(message.replyTo.id);
-                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }}
-                  >
-                    <div className="font-semibold opacity-75">{message.replyTo.sender}</div>
-                    <div className="truncate opacity-75">{message.replyTo.content}</div>
-                  </div>
-                )}
+        const isOwnMessage = currentUser && (message.sender.socketId === currentUser.socketId || message.sender.id === currentUser.id);
+        const isExpired = messageTimers.get(message.id) === 'expired';
+        if (isExpired) return null;
 
-                {/* Message content */}
-                <div className="break-words no-copy" onCopy={(e) => e.preventDefault()} onCut={(e) => e.preventDefault()} onPaste={(e) => e.preventDefault()}>
-                  {isImage ? (
-                    // Image message
-                    <div
-                      className={`relative cursor-pointer ${isViewOnce && !hasBeenViewed ? 'group' : ''}`}
-                      onClick={() => isViewOnce && !hasBeenViewed && handleImageClick(message)}
-                    >
-                      {isViewOnce && !hasBeenViewed ? (
-                        // View-once image placeholder
-                        <div className="w-48 h-32 bg-gray-200 dark:bg-gray-700 rounded-lg flex flex-col items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
-                          <div className="w-12 h-12 bg-amber-500/20 rounded-full flex items-center justify-center mb-2 group-hover:animate-pulse">
-                            <Eye className="w-6 h-6 text-amber-500" />
-                          </div>
-                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Tap to view</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Disappears after viewing</p>
-                        </div>
-                      ) : (
-                        // Regular image preview
-                        <img
-                          src={message.content}
-                          alt="Shared image"
-                          className="max-w-48 max-h-32 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => setViewingImage(message)}
-                        />
-                      )}
-                    </div>
-                  ) : isAudio ? (
-                    // Audio message
-                    <div className="min-w-[200px]">
-                      {isViewOnce && !hasBeenViewed && playingAudioId !== message.id ? (
-                        <div
-                          className={`flex items-center space-x-3 p-2 rounded-lg cursor-pointer transition-colors ${isOwnMessage
-                            ? 'bg-white/10 hover:bg-white/20'
-                            : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
-                            }`}
-                          onClick={() => handleAudioPlay(message)}
-                        >
-                          <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center">
-                            <Mic className="w-5 h-5 text-amber-500" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">Voice Message</p>
-                            <p className="text-xs opacity-70">Tap to listen (View Once)</p>
-                          </div>
-                        </div>
-                      ) : isOwnMessage && isViewOnce ? (
-                        // Sender cannot play their own view-once audio
-                        <div className="px-3 py-2 rounded-lg bg-gray-200/60 dark:bg-gray-700/60 text-xs text-gray-700 dark:text-gray-200">
-                          You sent a view-once voice note
-                        </div>
-                      ) : (
-                        <AudioPlayer
-                          src={fixAudioContentForPlayback(message.content)}
-                          isOwnMessage={isOwnMessage}
-                          autoPlay={playingAudioId === message.id}
-                          onEnded={() => handleAudioEnded(message)}
-                        />
-                        // ...existing code...
-                        // --- Utility: Fix audio content for Safari/desktop playback ---
-                      )}
-                    </div>
-                  ) : message.messageType === 'poll' ? (
-                    <PollMessage
-                      message={message}
-                      currentUser={currentUser}
-                      onVote={onVote}
-                    />
-                  ) : message.messageType === 'file' ? (
-                    // File message
-                    <div className="flex items-center space-x-3 p-2 bg-gray-100 dark:bg-gray-700/50 rounded-lg max-w-full min-w-[200px]">
-                      <div className="p-2 bg-white dark:bg-gray-600 rounded-lg">
-                        <FileText className="w-6 h-6 text-blue-500" />
-                      </div>
-                      <div className="flex-1 min-w-0 mr-2">
-                        <p className="text-sm font-medium truncate text-gray-900 dark:text-gray-100">{message.fileName}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{formatFileSize(message.fileSize)} • {message.mimeType?.split('/')[1]?.toUpperCase() || 'FILE'}</p>
-                      </div>
-                      <a
-                        href={`data:${message.mimeType};base64,${message.content}`}
-                        download={message.fileName}
-                        className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors"
-                        title="Download"
-                      >
-                        <Download className="w-4 h-4 text-gray-500 dark:text-gray-300" />
-                      </a>
-                    </div>
-                  ) : (
-                    // Text message
-                    <span>
-                      {renderMessageContent(message.content, currentUser)}
-                      {message.isEdited && <span className="text-xs text-gray-400 italic ml-1">(edited)</span>}
-                    </span>
-                  )}
-                </div>
+        const isVanishing = messageTimers.get(message.id) === 'vanishing';
+        const timeLeft = getTimeLeft(message);
+        const isImage = message.messageType === 'image';
+        const isAudio = message.messageType === 'audio';
+        const isViewOnce = message.isViewOnce;
+        const hasBeenViewed = isMessageViewed(message);
 
+        // Viewed View-Once Content Layout
+        if (isViewOnce && hasBeenViewed && !(isAudio && playingAudioId === message.id)) {
+          return (
+            <div key={message.id} className={`flex ${isOwnMessage ? 'justify-end pr-1' : 'justify-start pl-1'} mb-4`}>
+              <div className="max-w-[70%] px-4 py-2 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-dashed border-gray-200 dark:border-gray-800 text-gray-400 dark:text-gray-500 italic text-xs flex items-center space-x-2">
+                <Lock className="w-3 h-3" />
+                <span>Opened view-once {isImage ? 'photo' : 'audio'}</span>
               </div>
+            </div>
+          );
+        }
 
-              {/* Reactions */}
-              {message.reactions && Object.keys(message.reactions).length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {Object.entries(message.reactions).map(([emoji, userIds]) => (
-                    <button
-                      key={emoji}
-                      onClick={() => onReact(message.id, emoji)}
-                      className={`text-xs px-1.5 py-0.5 rounded-full border flex items-center space-x-1 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${userIds.includes(currentUser?.id || currentUser?.socketId)
-                        ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800'
-                        : 'bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700'
-                        }`}
-                    >
-                      <span>{emoji}</span>
-                      <span className="opacity-75">{userIds.length}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+        return (
+          <div
+            id={message.id}
+            key={message.id}
+            data-id={message.id}
+            className={`message-item group flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'} ${isVanishing ? 'message-vanishing' : ''} relative`}
+          >
+            {/* Meta: Name and Time */}
+            <div className={`flex items-center space-x-2 mb-1 px-1 text-[10px] font-bold uppercase tracking-tighter text-gray-400 dark:text-gray-500`}>
+              {!isOwnMessage && <span className="text-primary-500 dark:text-primary-400">{message.sender.nickname}</span>}
+              {!isOwnMessage && <span>•</span>}
+              <span>{formatTime(message.timestamp)}</span>
+            </div>
 
-              {/* Timestamp, TTL, and Actions */}
-              <div className={`flex items-center justify-between mt-2 text-xs ${isOwnMessage ? 'text-primary-100' : 'text-gray-500 dark:text-gray-400'
-                }`}>
-                <div className="flex items-center space-x-2">
-                  <span>{formatTime(message.timestamp)}</span>
-                  {/* Action Buttons */}
-                  <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => onReply(message)}
-                      className="p-1 hover:bg-black/10 rounded transition-colors"
-                      title="Reply"
-                    >
-                      <Reply className="w-3 h-3" />
-                    </button>
-                    {isOwnMessage && message.messageType === 'text' && (
-                      <button
-                        onClick={() => onEdit(message)}
-                        className="p-1 hover:bg-black/10 rounded transition-colors"
-                        title="Edit"
-                      >
-                        <Pencil className="w-3 h-3" />
-                      </button>
+            <div className={`flex items-center w-full ${isOwnMessage ? 'justify-end pl-12' : 'justify-start pr-12'}`}>
+              <div className="relative group/bubble">
+                <div
+                  className={`relative z-10 rounded-2xl shadow-sm transition-all duration-300 ${message.messageType === 'poll' ? '' : 'px-4 py-3'
+                    } ${isOwnMessage
+                      ? 'bg-primary-600 dark:bg-primary-700 text-white rounded-tr-none'
+                      : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 dark:text-gray-100 rounded-tl-none'
+                    }`}
+                >
+                  {/* Content Container */}
+                  <div className="break-words max-w-full">
+                    {isImage ? (
+                      <div className="cursor-pointer" onClick={() => (isViewOnce && !hasBeenViewed) ? handleImageClick(message) : !isViewOnce && setViewingImage(message)}>
+                        {isViewOnce && !hasBeenViewed ? (
+                          <div className="w-48 h-32 bg-black/5 dark:bg-white/5 rounded-xl flex flex-col items-center justify-center space-y-2 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
+                            <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-500"><Eye className="w-5 h-5" /></div>
+                            <span className="text-xs font-bold uppercase tracking-wide">Tap to View</span>
+                          </div>
+                        ) : (
+                          <img src={message.content} alt="shared" className="max-w-xs max-h-64 object-cover rounded-lg shadow-inner" />
+                        )}
+                      </div>
+                    ) : isAudio ? (
+                      <div className="min-w-[200px]">
+                        {isViewOnce && !hasBeenViewed && playingAudioId !== message.id ? (
+                          <div onClick={() => handleAudioPlay(message)} className="flex items-center space-x-3 cursor-pointer p-1">
+                            <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-500"><Mic className="w-5 h-5" /></div>
+                            <div className="flex flex-col"><span className="text-sm font-bold">Voice Note</span><span className="text-[10px] opacity-70">View Once</span></div>
+                          </div>
+                        ) : (
+                          <AudioPlayer src={fixAudioContentForPlayback(message.content)} isOwnMessage={isOwnMessage} autoPlay={playingAudioId === message.id} onEnded={() => handleAudioEnded(message)} />
+                        )}
+                      </div>
+                    ) : message.messageType === 'poll' ? (
+                      <PollMessage message={message} currentUser={currentUser} onVote={onVote} />
+                    ) : message.messageType === 'file' ? (
+                      <div className="flex items-center space-x-3 min-w-[200px]">
+                        <div className="p-2 bg-black/10 dark:bg-white/10 rounded-lg"><FileText className="w-6 h-6" /></div>
+                        <div className="flex-1 truncate"><p className="text-sm font-bold truncate">{message.fileName}</p><p className="text-[10px] opacity-60">{formatFileSize(message.fileSize)}</p></div>
+                        <a href={`data:${message.mimeType};base64,${message.content}`} download={message.fileName} className="p-2 hover:bg-black/10 dark:hover:bg-white/10 rounded-full transition-colors"><Download className="w-4 h-4" /></a>
+                      </div>
+                    ) : (
+                      <div className="text-[15px] leading-relaxed select-text">
+                        {renderMessageContent(message.content, currentUser)}
+                        {message.isEdited && <span className="text-[10px] opacity-50 italic ml-1">(edited)</span>}
+                      </div>
                     )}
-                    <div className="relative">
-                      <button
-                        onClick={() => setActiveReactionId(activeReactionId === message.id ? null : message.id)}
-                        className="p-1 hover:bg-black/10 rounded transition-colors"
-                        title="React"
-                      >
-                        <Smile className="w-3 h-3" />
-                      </button>
-                      {/* Quick Reaction Popover */}
-                      {activeReactionId === message.id && (
-                        <div className="absolute bottom-full left-0 mb-1 bg-white dark:bg-gray-800 shadow-xl rounded-full p-1 flex items-center space-x-1 border border-gray-200 dark:border-gray-700 z-10">
-                          {QUICK_REACTIONS.map(emoji => (
-                            <button
-                              key={emoji}
-                              onClick={() => {
-                                onReact(message.id, emoji);
-                                setActiveReactionId(null);
-                              }}
-                              className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-lg hover:scale-110 transition-transform"
-                            >
-                              {emoji}
-                            </button>
-                          ))}
-                          <button
-                            onClick={() => {
-                              // For full picker, we'd need more complex UI logic
-                              setActiveReactionId(null);
-                            }}
-                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
-                          >
-                            <Plus className="w-4 h-4 text-gray-500" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-center space-x-2">
-                  {isViewOnce && (
-                    <div className="flex items-center space-x-1">
-                      <Clock className="w-3 h-3 text-amber-500" />
-                      <span className="text-amber-500">View once</span>
+                  {/* Reactions Display */}
+                  {message.reactions && Object.keys(message.reactions).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {Object.entries(message.reactions).map(([emoji, userIds]) => (
+                        <button key={emoji} onClick={() => onReact(message.id, emoji)} className={`text-[10px] px-1.5 py-0.5 rounded-full border flex items-center space-x-1 ${userIds.includes(currentUser?.id || currentUser?.socketId) ? 'bg-primary-500/20 border-primary-500/50' : 'bg-black/5 dark:bg-white/5 border-transparent'} hover:scale-105 transition-transform`}>
+                          <span>{emoji}</span><span>{userIds.length}</span>
+                        </button>
+                      ))}
                     </div>
                   )}
-                  {timeLeft && (
-                    <div className="flex items-center space-x-1">
-                      <Clock className="w-3 h-3" />
-                      <span>{timeLeft}</span>
-                    </div>
+                </div>
+
+                {/* Hover Actions: Reply, React, Edit */}
+                <div className={`absolute top-1/2 -translate-y-1/2 flex items-center space-x-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity duration-200 ${isOwnMessage ? 'right-full mr-3' : 'left-full ml-3'} z-0`}>
+                  <button onClick={() => onReply(message)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400 hover:text-primary-500 transition-colors" title="Reply"><Reply className="w-4 h-4" /></button>
+                  <div className="relative">
+                    <button onClick={() => setActiveReactionId(activeReactionId === message.id ? null : message.id)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400 hover:text-primary-500 transition-colors" title="React"><Smile className="w-4 h-4" /></button>
+                    {activeReactionId === message.id && (
+                      <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 shadow-2xl rounded-full p-1 flex items-center space-x-1 border border-gray-100 dark:border-gray-700 z-50">
+                        {QUICK_REACTIONS.map(emoji => (
+                          <button key={emoji} onClick={() => { onReact(message.id, emoji); setActiveReactionId(null); }} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-lg hover:scale-125 transition-transform">{emoji}</button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {isOwnMessage && message.messageType === 'text' && (
+                    <button onClick={() => onEdit(message)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400 hover:text-primary-500 transition-colors" title="Edit"><Pencil className="w-4 h-4" /></button>
                   )}
                 </div>
               </div>
             </div>
 
-          );
-        })}
-      </div >
+            {/* Bottom Meta: TTL indicator */}
+            {timeLeft && (
+              <div className="mt-1 px-1 flex items-center space-x-1 text-[9px] font-bold uppercase text-amber-500 animate-pulse">
+                <Clock className="w-2.5 h-2.5" />
+                <span>{timeLeft}</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
 
-      {/* Image Viewer Modal */}
-      < ImageViewer
-        isOpen={!!viewingImage
-        }
+      <ImageViewer
+        isOpen={!!viewingImage}
         onClose={handleViewerClose}
         imageUrl={currentImageUrl}
         duration={20}
       />
-    </>
+    </div>
   );
 };
 
 export default MessageList;
 
-// --- Utility: Fix audio content for Safari/desktop playback ---
+// --- Helpers ---
+
 function fixAudioContentForPlayback(content) {
-  // If already a data URL or blob, return as is
-  if (typeof content !== 'string' || content.startsWith('http') || content.startsWith('blob:') || content.startsWith('data:')) {
-    return content;
-  }
-  // Try to detect and wrap as data URL with best guess at MIME type
-  // Default to WAV for Safari, WebM for others
+  if (typeof content !== 'string' || content.startsWith('http') || content.startsWith('blob:') || content.startsWith('data:')) return content;
   let mimeType = 'audio/webm;codecs=opus';
-  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-  if (isSafari) {
-    mimeType = 'audio/wav';
-  }
-  // Heuristic: if base64 starts with 'UklGR' it's likely WAV
-  if (content.startsWith('UklGR')) {
-    mimeType = 'audio/wav';
-  } else if (content.startsWith('SUQz')) {
-    mimeType = 'audio/mp3';
-  } else if (content.startsWith('AAAA')) {
-    mimeType = 'audio/mp4';
-  } else if (content.startsWith('T2dn')) {
-    mimeType = 'audio/ogg';
-  }
+  if (/^((?!chrome|android).)*safari/i.test(navigator.userAgent)) mimeType = 'audio/wav';
+  if (content.startsWith('UklGR')) mimeType = 'audio/wav';
+  else if (content.startsWith('SUQz')) mimeType = 'audio/mp3';
+  else if (content.startsWith('AAAA')) mimeType = 'audio/mp4';
+  else if (content.startsWith('T2dn')) mimeType = 'audio/ogg';
   return `data:${mimeType};base64,${content}`;
 }
 
 function formatFileSize(bytes) {
-  if (!bytes || bytes === 0) return '0 B';
+  if (!bytes) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -624,30 +326,14 @@ function formatFileSize(bytes) {
 
 function renderMessageContent(content, currentUser) {
   if (!content) return null;
-  // Split by URLs and Mentions
   const parts = content.split(/((?:https?:\/\/[^\s]+)|(?:@[\w\-\.]+))/g);
   return parts.map((part, i) => {
     if (part.match(/^https?:\/\//)) {
-      return (
-        <a
-          key={i}
-          href={part}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-500 dark:text-blue-400 underline break-all hover:text-blue-600 dark:hover:text-blue-300"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {part}
-        </a>
-      );
+      return <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline break-all hover:text-blue-600" onClick={(e) => e.stopPropagation()}>{part}</a>;
     }
     if (part.startsWith('@') && part.length > 1) {
       const isMe = currentUser && (part.slice(1).toLowerCase() === currentUser.nickname?.toLowerCase());
-      return (
-        <span key={i} className={`font-medium ${isMe ? 'bg-yellow-200 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 px-1 rounded' : 'text-blue-500 dark:text-blue-400'}`}>
-          {part}
-        </span>
-      );
+      return <span key={i} className={`font-bold ${isMe ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 px-1 rounded' : 'text-primary-500'}`}>{part}</span>;
     }
     return part;
   });
