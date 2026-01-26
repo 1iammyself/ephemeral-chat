@@ -608,6 +608,7 @@ const ChatRoom = () => {
 
   const handleSendPulse = () => {
     socketManager.emit('send-pulse', { roomCode });
+    handlePulseReceived({ from: 'You' });
     setShowFeatureMenu(false);
   };
 
@@ -932,7 +933,7 @@ const ChatRoom = () => {
 
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 flex flex-col">
-          <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
+          <div className="flex-1 overflow-y-auto pl-4 py-4 pr-1 sm:pr-2 scrollbar-thin">
             <MessageList
               messages={messages}
               currentUser={currentUser}

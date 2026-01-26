@@ -566,15 +566,6 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                       <span>{timeLeft}</span>
                     </div>
                   )}
-                  {isOwnMessage && !isViewOnce && (
-                    <div className="flex items-center" title={message.viewedBy && message.viewedBy.length > 0 ? "Read" : "Sent"}>
-                      {message.viewedBy && message.viewedBy.length > 0 ? (
-                        <CheckCheck className="w-3 h-3 text-blue-500" />
-                      ) : (
-                        <Check className="w-3 h-3 text-gray-400" />
-                      )}
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
