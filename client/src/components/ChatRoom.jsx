@@ -932,24 +932,46 @@ const ChatRoom = () => {
 
   return (
     <div
-      className={`h-screen flex flex-col transition-colors duration-500 chat-container ${getVibeById(roomVibe).bgClass}`}
+      className={`h-[100dvh] flex flex-col transition-colors duration-500 chat-container ${getVibeById(roomVibe).bgClass}`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 sm:py-3 sticky top-0 z-50">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <button onClick={() => navigate('/')} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300"><ArrowLeft className="w-5 h-5" /></button>
-            <div>
-              <h1 className="text-lg font-semibold truncate text-gray-900 dark:text-white">Secure Chat</h1>
-              <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
-                <div className="flex items-center space-x-1">{isConnected ? <Wifi className="w-4 h-4 text-green-500" /> : <WifiOff className="w-4 h-4 text-red-500" />}<span>{isConnected ? 'Connected' : 'Disconnected'}</span></div>
-                {latency && <div className="flex items-center space-x-1" title={`Latency: ${latency}ms`}><Activity className={`w-4 h-4 ${latency < 100 ? 'text-green-500' : latency < 300 ? 'text-yellow-500' : 'text-red-500'}`} /><span>{latency}ms</span></div>}
-                <div className="flex items-center space-x-1"><Users className="w-4 h-4" /><span>{users.length}</span></div>
-                {room?.settings?.passwordHash && <div className="flex items-center space-x-1"><Lock className="w-4 h-4" /><span>Protected</span></div>}
-                {getTTLDisplay() && <div className="flex items-center space-x-1"><Clock className="w-4 h-4" /><span>TTL: {getTTLDisplay()}</span></div>}
+          <div className="flex items-center space-x-2 sm:space-x-4">
+            <button onClick={() => navigate('/')} className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-lg font-bold truncate text-gray-900 dark:text-white leading-tight">Secure Chat</h1>
+              <div className="flex items-center space-x-3 sm:space-x-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
+                <div className="flex items-center space-x-1">
+                  {isConnected ? <Wifi className="w-4 h-4 text-green-500" /> : <WifiOff className="w-4 h-4 text-red-500" />}
+                  <span className="hidden sm:inline">{isConnected ? 'Connected' : 'Disconnected'}</span>
+                </div>
+                {latency && (
+                  <div className="flex items-center space-x-1" title={`Latency: ${latency}ms`}>
+                    <Activity className={`w-4 h-4 ${latency < 100 ? 'text-green-500' : latency < 300 ? 'text-yellow-500' : 'text-red-500'}`} />
+                    <span className="hidden sm:inline">{latency}ms</span>
+                    <span className="sm:hidden text-xs">{latency}</span>
+                  </div>
+                )}
+                <div className="flex items-center space-x-1">
+                  <Users className="w-4 h-4" />
+                  <span>{users.length}</span>
+                </div>
+                {room?.settings?.passwordHash && (
+                  <div className="flex items-center space-x-1" title="Protected Room">
+                    <Lock className="w-4 h-4" />
+                    <span className="hidden sm:inline">Protected</span>
+                  </div>
+                )}
+                {getTTLDisplay() && (
+                  <div className="flex items-center space-x-1">
+                    <Clock className="w-4 h-4" />
+                    <span><span className="hidden sm:inline">TTL: </span>{getTTLDisplay()}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -999,7 +1021,7 @@ const ChatRoom = () => {
 
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 flex flex-col">
-          <div className="flex-1 overflow-y-auto pl-10 pr-2 scrollbar-thin">
+          <div className="flex-1 overflow-y-auto pl-4 lg:pl-10 pr-2 scrollbar-thin">
             <MessageList
               messages={messages}
               currentUser={currentUser}
@@ -1039,8 +1061,8 @@ const ChatRoom = () => {
                 <button onClick={() => setSelectedRecipients([])} className="text-xs text-blue-500 hover:text-blue-700 dark:hover:text-blue-200 underline">Clear selection</button>
               </div>
             )}
-            <div className="p-4">
-              <form onSubmit={handleSendMessage} className="flex items-center space-x-2 sm:space-x-3">
+            <div className="p-2 sm:p-4">
+              <form onSubmit={handleSendMessage} className="flex items-center space-x-1.5 sm:space-x-3">
                 {isRecording ? (
                   <div className="flex-1 flex flex-col space-y-2">
                     {/* Safari Audio Notice */}
@@ -1077,161 +1099,156 @@ const ChatRoom = () => {
                         type="button"
                         onClick={() => setShowFeatureMenu(!showFeatureMenu)}
                         disabled={!isConnected}
-                        className={`p-3 rounded-lg transition-all duration-200 ${showFeatureMenu ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-600 rotate-45' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
+                        className={`p-2.5 sm:p-3 rounded-xl transition-all duration-200 ${showFeatureMenu ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-600 scale-110' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
                       >
-                        <Plus className="w-5 h-5" />
+                        <Plus className={`w-5 h-5 transition-transform duration-300 ${showFeatureMenu ? 'rotate-45' : ''}`} />
                       </button>
 
                       {showFeatureMenu && (
-                        <div className="absolute bottom-full mb-2 left-0 z-50 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 p-2 flex flex-col space-y-2 w-72 animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-xl">
-                          {/* Floating Reaction Pill - Matches User Image */}
-                          <div className="flex items-center justify-between bg-gray-50/50 dark:bg-gray-900/50 rounded-full p-1.5 border border-gray-100/50 dark:border-gray-800/50 shadow-inner">
+                        <div className="absolute bottom-full mb-3 left-0 z-50 bg-white/95 dark:bg-gray-800/95 rounded-3xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 p-3 sm:p-4 flex flex-col space-y-3 w-[280px] sm:w-80 animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/5">
+                          {/* Floating Reaction Pill */}
+                          <div className="flex items-center justify-between bg-gray-50/80 dark:bg-gray-900/80 rounded-2xl p-2 border border-gray-100/50 dark:border-gray-800/50 shadow-inner">
                             {['❤️', '🔥', '👏', '😂', '😮', '💯'].map(emoji => (
                               <button
                                 key={emoji}
                                 type="button"
                                 onClick={() => sendRoomReaction(emoji)}
-                                className="p-2 hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all hover:scale-150 hover:rotate-12 active:scale-95"
+                                className="p-1 sm:p-2 hover:bg-white dark:hover:bg-gray-700 rounded-lg transition-all hover:scale-125 active:scale-95"
                               >
-                                <span className="text-2xl leading-none filter drop-shadow-sm">{emoji}</span>
+                                <span className="text-xl sm:text-2xl leading-none">{emoji}</span>
                               </button>
                             ))}
                           </div>
 
-                          <div className="h-px bg-gray-100 dark:bg-gray-700/50 mx-2" />
+                          <div className="h-px bg-gray-100 dark:bg-gray-700/50 mx-1" />
 
-                          {/* Admin Controls */}
-                          {canManageRoom(currentUserRole) && (
-                            <div className="flex flex-col space-y-1">
-                              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Room Controls</p>
-
-                              <button
-                                type="button"
-                                onClick={() => { setShowTopicEditor(true); setShowFeatureMenu(false); }}
-                                className="flex items-center space-x-3 w-full p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mb-2"
-                              >
-                                <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                                  <Edit2 className="w-3 h-3 text-orange-500" />
-                                </div>
-                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Set Topic</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (activeTimer) {
-                                    handleStopTimer();
-                                  } else {
-                                    setShowTimerModal(true);
-                                  }
-                                  setShowFeatureMenu(false);
-                                }}
-                                className={`flex items-center space-x-3 w-full p-2 rounded-lg transition-colors mb-2 ${activeTimer ? 'bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-                              >
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center ${activeTimer ? 'bg-red-100 dark:bg-red-900/30' : 'bg-indigo-100 dark:bg-indigo-900/30'}`}>
-                                  {activeTimer ? <X className="w-3 h-3 text-red-500" /> : <Clock className="w-3 h-3 text-indigo-500" />}
-                                </div>
-                                <span className={`text-sm font-medium ${activeTimer ? 'text-red-700 dark:text-red-300' : 'text-gray-700 dark:text-gray-300'}`}>
-                                  {activeTimer ? 'Stop Timer' : 'Start Timer'}
-                                </span>
-                              </button>
-
-                              <div className="grid grid-cols-4 gap-2">
-                                {getAllVibes().map(vibe => (
-                                  <button
-                                    key={vibe.id}
-                                    onClick={() => handleUpdateVibe(vibe.id)}
-                                    className={`aspect-square rounded-lg flex items-center justify-center text-lg transition-all ${roomVibe === vibe.id ? 'bg-primary-100 dark:bg-primary-900 ring-2 ring-primary-500' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-                                    title={vibe.name}
-                                  >
-                                    {vibe.emoji}
-                                  </button>
-                                ))}
+                          <div className="grid grid-cols-2 gap-2">
+                            {/* Main Actions Grid */}
+                            <button
+                              type="button"
+                              onClick={() => { fileInputRef.current?.click(); setShowFeatureMenu(false); }}
+                              disabled={!isConnected || isUploading}
+                              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-blue-50/50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all border border-blue-100/20 dark:border-blue-800/20 group"
+                            >
+                              <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                {isUploading ? <Loader2 className="w-5 h-5 text-blue-500 animate-spin" /> : <ImageIcon className="w-5 h-5 text-blue-500" />}
                               </div>
+                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Photo</span>
+                            </button>
 
-                              <button
-                                type="button"
-                                onClick={handleSendPulse}
-                                className="flex items-center space-x-3 w-full p-2 rounded-lg hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-colors mt-1"
-                              >
-                                <div className="w-6 h-6 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
-                                  <Zap className="w-3 h-3 text-yellow-500" />
+                            <button
+                              type="button"
+                              onClick={() => { handleStartCall(); setShowFeatureMenu(false); }}
+                              disabled={!isConnected || users.length < 2}
+                              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-green-50/50 dark:bg-green-900/10 hover:bg-green-100 dark:hover:bg-green-900/20 transition-all border border-green-100/20 dark:border-green-800/20 group"
+                            >
+                              <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                <Phone className="w-5 h-5 text-green-500" />
+                              </div>
+                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Voice Call</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => { setShowPollModal(true); setShowFeatureMenu(false); }}
+                              disabled={!isConnected}
+                              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-purple-50/50 dark:bg-purple-900/10 hover:bg-purple-100 dark:hover:bg-purple-900/20 transition-all border border-purple-100/20 dark:border-purple-800/20 group"
+                            >
+                              <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                <BarChart2 className="w-5 h-5 text-purple-500" />
+                              </div>
+                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Poll</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => { startRecording(); setShowFeatureMenu(false); }}
+                              disabled={!isConnected}
+                              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-red-50/50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20 transition-all border border-red-100/20 dark:border-red-800/20 group"
+                            >
+                              <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                <Mic className="w-5 h-5 text-red-500" />
+                              </div>
+                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Voice Note</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={handleSendIcebreaker}
+                              disabled={!isConnected}
+                              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-cyan-50/50 dark:bg-cyan-900/10 hover:bg-cyan-100 dark:hover:bg-cyan-900/20 transition-all border border-cyan-100/20 dark:border-cyan-800/20 group"
+                            >
+                              <div className="w-10 h-10 rounded-xl bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                <Smile className="w-5 h-5 text-cyan-500" />
+                              </div>
+                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Icebreaker</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={handleSendPulse}
+                              disabled={!isConnected}
+                              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-yellow-50/50 dark:bg-yellow-900/10 hover:bg-yellow-100 dark:hover:bg-yellow-900/20 transition-all border border-yellow-100/20 dark:border-yellow-800/20 group"
+                            >
+                              <div className="w-10 h-10 rounded-xl bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                <Zap className="w-5 h-5 text-yellow-500" />
+                              </div>
+                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Pulse</span>
+                            </button>
+                          </div>
+
+                          {/* Admin Section */}
+                          {canManageRoom(currentUserRole) && (
+                            <>
+                              <div className="h-px bg-gray-100 dark:bg-gray-700/50 mx-1" />
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between px-1">
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Admin</p>
+                                  <div className="flex gap-1">
+                                    {getAllVibes().map(vibe => (
+                                      <button
+                                        key={vibe.id}
+                                        onClick={() => handleUpdateVibe(vibe.id)}
+                                        className={`w-6 h-6 rounded-md flex items-center justify-center text-xs transition-all ${roomVibe === vibe.id ? 'bg-primary-500 text-white shadow-lg' : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+                                        title={vibe.name}
+                                      >
+                                        {vibe.emoji}
+                                      </button>
+                                    ))}
+                                  </div>
                                 </div>
-                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Pulse</span>
-                              </button>
-                            </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => { setShowTopicEditor(true); setShowFeatureMenu(false); }}
+                                    className="flex items-center space-x-2 p-2 rounded-xl bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors border border-gray-100 dark:border-gray-800"
+                                  >
+                                    <div className="w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0">
+                                      <Edit2 className="w-3.5 h-3.5 text-orange-500" />
+                                    </div>
+                                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Topic</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (activeTimer) handleStopTimer();
+                                      else setShowTimerModal(true);
+                                      setShowFeatureMenu(false);
+                                    }}
+                                    className={`flex items-center space-x-2 p-2 rounded-xl border transition-all ${activeTimer ? 'bg-red-50 border-red-100 dark:bg-red-900/10 dark:border-red-900/20' : 'bg-gray-50 border-gray-100 dark:bg-gray-900/50 dark:border-gray-800'}`}
+                                  >
+                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${activeTimer ? 'bg-red-100 dark:bg-red-900/30' : 'bg-indigo-100 dark:bg-indigo-900/30'}`}>
+                                      {activeTimer ? <X className="w-3.5 h-3.5 text-red-500" /> : <Clock className="w-3.5 h-3.5 text-indigo-500" />}
+                                    </div>
+                                    <span className={`text-xs font-medium ${activeTimer ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                                      {activeTimer ? 'Stop' : 'Timer'}
+                                    </span>
+                                  </button>
+                                </div>
+                              </div>
+                            </>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              fileInputRef.current?.click();
-                              setShowFeatureMenu(false);
-                            }}
-                            disabled={!isConnected || isUploading}
-                            className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-                          >
-                            <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                              {isUploading ? <Loader2 className="w-4 h-4 text-blue-500 animate-spin" /> : <ImageIcon className="w-4 h-4 text-blue-500" />}
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Photo</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleStartCall();
-                              setShowFeatureMenu(false);
-                            }}
-                            disabled={!isConnected || users.length < 2}
-                            className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors disabled:opacity-50"
-                          >
-                            <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                              <Phone className="w-4 h-4 text-green-500" />
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Voice Call</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowPollModal(true);
-                              setShowFeatureMenu(false);
-                            }}
-                            disabled={!isConnected}
-                            className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors disabled:opacity-50"
-                          >
-                            <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                              <BarChart2 className="w-4 h-4 text-purple-500" />
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Poll</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={handleSendIcebreaker}
-                            disabled={!isConnected}
-                            className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-cyan-50 dark:hover:bg-cyan-900/20 transition-colors disabled:opacity-50"
-                          >
-                            <div className="w-8 h-8 rounded-full bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center">
-                              <Smile className="w-4 h-4 text-cyan-500" />
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Icebreaker</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              startRecording();
-                              setShowFeatureMenu(false);
-                            }}
-                            disabled={!isConnected}
-                            className="flex items-center space-x-3 w-full p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
-                          >
-                            <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                              <Mic className="w-4 h-4 text-red-500" />
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Voice Note</span>
-                          </button>
                         </div>
                       )}
                     </div>
@@ -1241,7 +1258,7 @@ const ChatRoom = () => {
                         type="button"
                         onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                         disabled={!isConnected}
-                        className={`p-3 rounded-lg transition-colors ${showEmojiPicker ? 'bg-gray-100 dark:bg-gray-700 text-blue-500' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
+                        className={`p-2.5 sm:p-3 rounded-xl transition-colors ${showEmojiPicker ? 'bg-gray-100 dark:bg-gray-700 text-blue-500' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
                       >
                         <Smile className="w-5 h-5" />
                       </button>
@@ -1259,8 +1276,8 @@ const ChatRoom = () => {
                         </div>
                       )}
                     </div>
-                    <input ref={messageInputRef} type="text" value={newMessage} onChange={(e) => { setNewMessage(e.target.value); handleTyping(); }} onCopy={(e) => e.preventDefault()} onCut={(e) => e.preventDefault()} onPaste={(e) => e.preventDefault()} placeholder="Type your message..." className="flex-1 input-field py-3 px-4 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600" disabled={!isConnected || isSending} maxLength={500} />
-                    <button type="submit" disabled={!newMessage.trim() || !isConnected || isSending} className="btn-primary px-4 py-3"><Send className="w-5 h-5" /></button>
+                    <input ref={messageInputRef} type="text" value={newMessage} onChange={(e) => { setNewMessage(e.target.value); handleTyping(); }} onCopy={(e) => e.preventDefault()} onCut={(e) => e.preventDefault()} onPaste={(e) => e.preventDefault()} placeholder="Type message..." className="flex-1 input-field py-2.5 sm:py-3 px-3 sm:px-4 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 text-sm sm:text-base" disabled={!isConnected || isSending} maxLength={500} />
+                    <button type="submit" disabled={!newMessage.trim() || !isConnected || isSending} className="btn-primary px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl"><Send className="w-5 h-5" /></button>
                   </>
                 )}
               </form>
