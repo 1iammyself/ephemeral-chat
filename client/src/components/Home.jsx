@@ -160,6 +160,7 @@ const Home = ({ children }) => {
                         value={verbalCode}
                         onChange={(e) => setVerbalCode(e.target.value)}
                         placeholder="clarity-compass-journey-peace"
+                        data-allow-copy="true"
                         className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
                         disabled={isJoiningVerbal}
                       />
