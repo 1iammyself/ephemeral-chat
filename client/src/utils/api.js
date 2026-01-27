@@ -1,6 +1,15 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+// Detect environment and set base URL
+// Vite uses import.meta.env, Create React App uses process.env
+const isDev = (typeof process !== 'undefined' && process.env.NODE_ENV === 'development') ||
+  (typeof import.meta !== 'undefined' && import.meta.env.DEV);
+
+const ENV_API_URL = (typeof process !== 'undefined' ? process.env.REACT_APP_API_URL : null) ||
+  (typeof import.meta !== 'undefined' ? import.meta.env.VITE_API_URL : null);
+
+// In production, default to relative path (empty string) if no URL provided
+const API_BASE_URL = ENV_API_URL || (isDev ? 'http://localhost:3001' : '');
 
 const api = axios.create({
   baseURL: API_BASE_URL,
