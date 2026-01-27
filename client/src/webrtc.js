@@ -583,7 +583,43 @@ WebRTCService.prototype.switchToAgora = async function (reason, opts = {}) {
     // Dynamically import Agora (browser-ready SDK expected)
     try {
         if (!AgoraRTC) {
-            AgoraRTC = await import('agora-rtc-sdk-ng');
+            // Load Agora SDK from CDN via script tag to avoid bundling into application
+            const loadScript = (src) => new Promise((resolve, reject) => {
+                // Do not add duplicate script tags
+                if (document.querySelector(`script[data-src="${src}"]`)) {
+                    // wait for it to be ready
+                    const existing = document.querySelector(`script[data-src="${src}"]`);
+                    if (existing.getAttribute('data-ready') === 'true') return resolve();
+                    existing.addEventListener('load', () => resolve());
+                    existing.addEventListener('error', (e) => reject(e));
+                    return;
+                }
+
+                const s = document.createElement('script');
+                s.src = src;
+                s.async = true;
+                s.setAttribute('data-src', src);
+                s.addEventListener('load', () => {
+                    s.setAttribute('data-ready', 'true');
+                    resolve();
+                });
+                s.addEventListener('error', (e) => reject(e));
+                document.head.appendChild(s);
+            });
+
+            try {
+                await loadScript('https://unpkg.com/agora-rtc-sdk-ng/dist/AgoraRTC_N-production.js');
+                // The UMD build exposes a global - try known names
+                AgoraRTC = window.AgoraRTC || window.A || window.Agora || null;
+                if (!AgoraRTC) {
+                    throw new Error('Agora global not found after loading CDN script');
+                }
+                console.log('Loaded Agora SDK from CDN (script tag)');
+            } catch (err) {
+                console.error('Failed to load Agora SDK from CDN:', err);
+                // Explicitly throw so caller can handle and show an error to the user
+                throw err;
+            }
         }
 
         const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });

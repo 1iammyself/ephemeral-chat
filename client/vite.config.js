@@ -111,12 +111,29 @@ export default defineConfig(({ mode }) => {
       minify: 'esbuild',
       rollupOptions: {
         output: {
-          manualChunks: {
-            react: ['react', 'react-dom', 'react-router-dom'],
-            vendor: ['socket.io-client']
+          // Use a function to place very large deps in their own chunks.
+          // This helps keep the main chunk smaller and allows browsers to cache
+          // large vendor files separately.
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('agora-rtc-sdk-ng') || /AgoraRTC/.test(id) || id.includes('agora')) {
+                return 'agora';
+              }
+              if (id.includes('react') || id.includes('react-router-dom')) {
+                return 'react-vendor';
+              }
+              if (id.includes('socket.io-client')) {
+                return 'socketio';
+              }
+              // fallback vendor chunk for other node_modules
+              return 'vendor';
+            }
           }
         }
-      }
+      },
+      // Raise the warning limit slightly so large but split bundles don't spam warnings.
+      // Still keep it reasonably low to encourage further splitting if necessary.
+      chunkSizeWarningLimit: 700
     },
     esbuild: {
       drop: isProd ? ['console', 'debugger'] : []

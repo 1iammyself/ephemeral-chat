@@ -62,6 +62,18 @@ async function initializeRedis() {
 const app = express();
 const server = http.createServer(app);
 
+// If running behind a reverse proxy (Render, Heroku, nginx, Cloudflare, etc.)
+// Express must be told to trust the proxy so that req.ip and
+// express-rate-limit can read the correct originating IP from X-Forwarded-For.
+// Set TRUST_PROXY=true in your environment or the platform-specific env var
+// (we already check `process.env.RENDER` elsewhere) to enable this.
+if (process.env.TRUST_PROXY === 'true' || process.env.RENDER) {
+  // Use a value of 1 to trust the first proxy in front of the app.
+  // If you have multiple proxies you can set a higher number or a subnet.
+  app.set('trust proxy', 1);
+  logger.info('Express trust proxy enabled (trust proxy = 1)');
+}
+
 // Request logging middleware
 app.use((req, res, next) => {
   logger.info(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
