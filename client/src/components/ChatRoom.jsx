@@ -1015,10 +1015,6 @@ const ChatRoom = () => {
             <div className="min-w-0">
               <h1 className="text-base sm:text-lg font-bold truncate text-gray-900 dark:text-white leading-tight">Secure Chat</h1>
               <div className="flex items-center space-x-3 sm:space-x-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
-                <div className="flex items-center space-x-1">
-                  {isConnected ? <Wifi className="w-4 h-4 text-green-500" /> : <WifiOff className="w-4 h-4 text-red-500" />}
-                  <span className="hidden sm:inline">{isConnected ? 'Connected' : 'Disconnected'}</span>
-                </div>
                 {latency && (
                   <div className="flex items-center space-x-1" title={`Latency: ${latency}ms`}>
                     <Activity className={`w-4 h-4 ${latency < 100 ? 'text-green-500' : latency < 300 ? 'text-yellow-500' : 'text-red-500'}`} />
@@ -1030,12 +1026,6 @@ const ChatRoom = () => {
                   <Users className="w-4 h-4" />
                   <span>{users.length}</span>
                 </div>
-                {room?.settings?.passwordHash && (
-                  <div className="flex items-center space-x-1" title="Protected Room">
-                    <Lock className="w-4 h-4" />
-                    <span className="hidden sm:inline">Protected</span>
-                  </div>
-                )}
                 {getTTLDisplay() && (
                   <div className="flex items-center space-x-1">
                     <Clock className="w-4 h-4" />
@@ -1388,7 +1378,7 @@ const ChatRoom = () => {
         showMobileMenu && (
           <div className="fixed inset-0 z-50 lg:hidden">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileMenu(false)} />
-            <div className="absolute right-0 top-0 bottom-0 w-80 max-w-[85vw] bg-white dark:bg-gray-800 shadow-xl flex flex-col">
+            <div className="absolute right-0 top-0 bottom-0 w-64 max-w-[70vw] bg-white dark:bg-gray-800 shadow-xl flex flex-col">
               <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700"><h2 className="text-lg font-semibold text-gray-900 dark:text-white">Room Details</h2><button onClick={() => setShowMobileMenu(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400"><X className="w-5 h-5" /></button></div>
               <div className="flex-1 overflow-y-auto"><UserList users={users} currentUser={currentUser} pendingGuests={pendingGuests} isHost={isHost} onApprove={handleApproveGuest} onDeny={handleDenyGuest} selectedRecipients={selectedRecipients} onToggleRecipient={toggleRecipient} onSetUserRole={handleSetUserRole} onKickUser={handleKickUser} currentUserRole={currentUserRole} /></div>
             </div>
