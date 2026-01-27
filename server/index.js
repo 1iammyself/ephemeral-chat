@@ -354,6 +354,7 @@ app.post('/api/rooms/:roomCode/invite', async (req, res) => {
       success: true,
       inviteLink: invite.url,
       url: invite.url,
+      verbalCode: invite.verbalCode,
       expiresIn: '25 minutes'
     });
 
@@ -363,6 +364,51 @@ app.post('/api/rooms/:roomCode/invite', async (req, res) => {
       error: 'Failed to generate invite',
       details: error.message
     });
+  }
+});
+
+/**
+ * Join room using verbal code
+ * POST /api/verbal-join
+ * Body: { verbalCode: "clarity-compass-journey-peace" }
+ */
+app.post('/api/verbal-join', async (req, res) => {
+  try {
+    const { verbalCode } = req.body;
+
+    if (!verbalCode || typeof verbalCode !== 'string') {
+      return res.status(400).json({ success: false, error: 'Verbal code is required' });
+    }
+
+    // Validate format: 4 words separated by hyphens
+    const words = verbalCode.toLowerCase().trim().split('-');
+    if (words.length !== 4) {
+      return res.status(400).json({ success: false, error: 'Invalid code format. Expected 4 words separated by hyphens.' });
+    }
+
+    // Look up the token by verbal code
+    const result = roomManager.findTokenByVerbalCode(verbalCode);
+
+    if (!result) {
+      return res.status(404).json({ success: false, error: 'Code not found or expired' });
+    }
+
+    // Verify room still exists
+    const room = await roomManager.getRoom(result.roomCode);
+    if (!room) {
+      return res.status(404).json({ success: false, error: 'Room no longer exists' });
+    }
+
+    res.json({
+      success: true,
+      roomCode: result.roomCode,
+      token: result.token,
+      requiresPassword: !!room.settings?.passwordHash
+    });
+
+  } catch (error) {
+    logger.error('Error processing verbal join:', error);
+    res.status(500).json({ success: false, error: 'Failed to process verbal code' });
   }
 });
 

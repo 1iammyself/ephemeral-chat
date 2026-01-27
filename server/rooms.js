@@ -6,6 +6,7 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { generateRoomCode, sanitizeInput, logger } = require('./utils');
+const { WORDLIST } = require('./wordlist');
 
 class RoomManager {
   constructor(redisClient = null) {
@@ -717,12 +718,56 @@ class RoomManager {
     const url = `${usedBaseUrl}/invite/${token}`;
 
     const tokenData = this.inviteTokens.get(token);
+    const verbalCode = this.tokenToVerbalCode(token);
     return {
       token,
       url,
+      verbalCode,
       expiresAt: tokenData.expiresAt ? new Date(tokenData.expiresAt) : null,
       isPermanent
     };
+  }
+
+  /**
+   * Convert an invite token to a 4-word verbal code
+   * @param {string} token - The invite token
+   * @returns {string} A 4-word verbal code (e.g., "clarity-compass-journey-peace")
+   */
+  tokenToVerbalCode(token) {
+    const hash = crypto.createHash('sha256').update(token).digest();
+    const words = [];
+    for (let i = 0; i < 4; i++) {
+      const idx = hash[i] % WORDLIST.length;
+      words.push(WORDLIST[idx]);
+    }
+    return words.join('-');
+  }
+
+  /**
+   * Find an invite token by its verbal code
+   * @param {string} verbalCode - The 4-word verbal code
+   * @returns {{token: string, roomCode: string} | null} The matching token data or null
+   */
+  findTokenByVerbalCode(verbalCode) {
+    const normalizedCode = verbalCode.toLowerCase().trim();
+
+    for (const [token, tokenData] of this.inviteTokens.entries()) {
+      // Skip expired tokens
+      if (tokenData.expiresAt && new Date() > new Date(tokenData.expiresAt)) {
+        continue;
+      }
+
+      const tokenVerbalCode = this.tokenToVerbalCode(token);
+      if (tokenVerbalCode === normalizedCode) {
+        return {
+          token,
+          roomCode: tokenData.roomCode,
+          isPermanent: tokenData.isPermanent
+        };
+      }
+    }
+
+    return null;
   }
 
   /**

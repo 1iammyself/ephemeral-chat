@@ -17,10 +17,12 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const [isCreating, setIsCreating] = useState(false);
   const [createdRoom, setCreatedRoom] = useState(null);
   const [inviteLink, setInviteLink] = useState('');
+  const [verbalCode, setVerbalCode] = useState('');
   const [isCopied, setIsCopied] = useState({
     roomCode: false,
     password: false,
-    inviteLink: false
+    inviteLink: false,
+    verbalCode: false
   });
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
   const [roomKey, setRoomKey] = useState(null);
@@ -70,6 +72,9 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
 
       if (response.ok && data.inviteLink) {
         setInviteLink(data.inviteLink);
+        if (data.verbalCode) {
+          setVerbalCode(data.verbalCode);
+        }
         return data.inviteLink;
       } else {
         throw new Error(data.error || 'Failed to generate invite link');
@@ -178,10 +183,12 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const handleNewRoom = () => {
     setCreatedRoom(null);
     setInviteLink('');
+    setVerbalCode('');
     setIsCopied({
       roomCode: false,
       password: false,
-      inviteLink: false
+      inviteLink: false,
+      verbalCode: false
     });
     setSettings({
       messageTTL: 'none',
@@ -258,6 +265,29 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 </div>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Share this link with others to join easily</p>
               </div>
+
+              {/* Verbal Join Code */}
+              {verbalCode && (
+                <div className="pt-3">
+                  <div className="p-3 bg-purple-50 dark:bg-purple-900/30 rounded-lg border border-purple-100 dark:border-purple-800">
+                    <label className="block text-sm font-medium text-purple-800 dark:text-purple-300 mb-2">Verbal Join Code</label>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-lg font-semibold text-purple-700 dark:text-purple-200 tracking-wide">
+                        {verbalCode}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(verbalCode, 'verbalCode')}
+                        className={`ml-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${isCopied.verbalCode ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-200 hover:bg-purple-200 dark:hover:bg-purple-700'}`}
+                      >
+                        {isCopied.verbalCode ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                    <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
+                      Share this code verbally — others can type it to join.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-between pt-2">

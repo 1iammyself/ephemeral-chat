@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, Users, Clock, Shield, Plus, ArrowRight, Zap, Wifi, User, Edit, Lock } from 'lucide-react';
+import { MessageCircle, Users, Clock, Shield, Plus, ArrowRight, Zap, Wifi, User, Edit, Lock, KeyRound, Loader2 } from 'lucide-react';
 import CreateRoomModal from './CreateRoomModal';
 import TraceHashModal from './TraceHashModal';
 import ThemeToggle from './ThemeToggle';
+import { joinWithVerbalCode } from '../utils/api';
+import { toast } from 'react-toastify';
 
 const Home = ({ children }) => {
   const [roomCode, setRoomCode] = useState('');
+  const [verbalCode, setVerbalCode] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showTraceModal, setShowTraceModal] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+  const [isJoiningVerbal, setIsJoiningVerbal] = useState(false);
   const navigate = useNavigate();
 
   const handleJoinRoom = async (e) => {
@@ -35,6 +39,35 @@ const Home = ({ children }) => {
       alert('Failed to check room. Please try again.');
     } finally {
       setIsJoining(false);
+    }
+  };
+
+  const handleVerbalJoin = async (e) => {
+    e.preventDefault();
+    const trimmedCode = verbalCode.trim().toLowerCase();
+
+    if (!trimmedCode) {
+      toast.error('Please enter a verbal code');
+      return;
+    }
+
+    // Validate format: 4 words separated by hyphens
+    const words = trimmedCode.split('-');
+    if (words.length !== 4) {
+      toast.error('Please enter 4 words separated by hyphens');
+      return;
+    }
+
+    setIsJoiningVerbal(true);
+    try {
+      const result = await joinWithVerbalCode(trimmedCode);
+      if (result.success) {
+        navigate(`/invite/${result.token}`);
+      }
+    } catch (error) {
+      toast.error(typeof error === 'string' ? error : 'Invalid or expired code');
+    } finally {
+      setIsJoiningVerbal(false);
     }
   };
 
@@ -113,8 +146,40 @@ const Home = ({ children }) => {
                   <Plus className="-ml-1 mr-2 h-5 w-5" />
                   Create New Room
                 </button>
-                <p className="mt-6 text-center text-sm sm:text-base text-gray-500 dark:text-gray-400">
-                  To join a room, please use the invite link shared by the host.
+
+                {/* Verbal Join Section */}
+                <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-700">
+                  <p className="text-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                    Have a join code?
+                  </p>
+                  <form onSubmit={handleVerbalJoin} className="flex gap-2">
+                    <div className="relative flex-1">
+                      <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={verbalCode}
+                        onChange={(e) => setVerbalCode(e.target.value)}
+                        placeholder="clarity-compass-journey-peace"
+                        className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                        disabled={isJoiningVerbal}
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={isJoiningVerbal || !verbalCode.trim()}
+                      className="px-4 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                    >
+                      {isJoiningVerbal ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        'Join'
+                      )}
+                    </button>
+                  </form>
+                </div>
+
+                <p className="mt-4 text-center text-xs text-gray-400 dark:text-gray-500">
+                  Or use an invite link shared by the host
                 </p>
               </div>
 

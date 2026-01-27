@@ -48,7 +48,23 @@ export const validateInviteToken = async (token, roomCode) => {
   }
 };
 
+/**
+ * Join a room using a verbal code
+ * @param {string} verbalCode - 4-word verbal code (e.g., "clarity-compass-journey-peace")
+ * @returns {Promise<{success: boolean, roomCode: string, token: string, requiresPassword: boolean}>}
+ */
+export const joinWithVerbalCode = async (verbalCode) => {
+  try {
+    const response = await api.post('/api/verbal-join', { verbalCode });
+    return response.data;
+  } catch (error) {
+    console.error('Error joining with verbal code:', error);
+    throw error.response?.data?.error || 'Invalid or expired code';
+  }
+};
+
 export default {
   generateInviteLink,
-  validateInviteToken
+  validateInviteToken,
+  joinWithVerbalCode
 };

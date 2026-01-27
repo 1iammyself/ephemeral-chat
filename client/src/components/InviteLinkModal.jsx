@@ -7,9 +7,11 @@ import { X, Loader2, Check, AlertCircle } from 'lucide-react';
 const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
+  const [verbalCode, setVerbalCode] = useState('');
   const [expiry, setExpiry] = useState('24'); // Default 24 hours
   const [isPermanent, setIsPermanent] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [isVerbalCopied, setIsVerbalCopied] = useState(false);
   const [error, setError] = useState(null);
   const linkInputRef = useRef(null);
 
@@ -17,37 +19,40 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
     // Reset state when modal is opened/closed
     if (!isOpen) {
       setInviteLink('');
+      setVerbalCode('');
       setExpiry('24');
       setIsPermanent(false);
       setIsCopied(false);
+      setIsVerbalCopied(false);
     }
   }, [isOpen]);
 
   const handleGenerateLink = async () => {
     if (!roomCode) return;
-    
+
     setIsGenerating(true);
     setError(null);
-    
+
     try {
       const expiryHours = isPermanent ? undefined : parseInt(expiry, 10);
-      
+
       if (!isPermanent && (isNaN(expiryHours) || expiryHours < 1)) {
         throw new Error('Please enter a valid expiry time');
       }
-      
+
       const result = await generateInviteLink(roomCode, {
         isPermanent,
         expiryHours
       });
-      
+
       if (result.success) {
         let url = result.url;
         const hash = window.location.hash;
         if (hash) {
-            url += hash;
+          url += hash;
         }
         setInviteLink(url);
+        setVerbalCode(result.verbalCode || '');
         toast.success('Invite link generated!');
       } else {
         throw new Error(result.error || 'Failed to generate invite link');
@@ -67,6 +72,12 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
+  const handleVerbalCopy = () => {
+    setIsVerbalCopied(true);
+    toast.success('Verbal code copied!');
+    setTimeout(() => setIsVerbalCopied(false), 2000);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -80,7 +91,7 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
           <X className="w-5 h-5" />
         </button>
         <h2 className="text-xl font-bold mb-4 dark:text-white">Generate Invite Link</h2>
-        
+
         {!inviteLink ? (
           <div className="space-y-4">
             <div className="space-y-2">
@@ -93,7 +104,7 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
                 />
                 <span className="font-medium dark:text-white">Temporary Link</span>
               </label>
-              
+
               {!isPermanent && (
                 <div className="ml-6 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -116,7 +127,7 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
                 </div>
               )}
             </div>
-            
+
             <div className="space-y-2">
               <label className="flex items-start space-x-2 p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
                 <input
@@ -133,14 +144,14 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
                 </div>
               </label>
             </div>
-            
+
             {error && (
               <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm rounded-lg flex items-start">
                 <AlertCircle className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" />
                 <span>{error}</span>
               </div>
             )}
-            
+
             <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
               <button
                 type="button"
@@ -153,9 +164,8 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
               <button
                 type="button"
                 onClick={handleGenerateLink}
-                className={`px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors flex items-center justify-center min-w-[120px] ${
-                  isGenerating ? 'opacity-75' : ''
-                }`}
+                className={`px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors flex items-center justify-center min-w-[120px] ${isGenerating ? 'opacity-75' : ''
+                  }`}
                 disabled={isGenerating}
               >
                 {isGenerating ? (
@@ -187,10 +197,9 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
                     onClick={(e) => e.target.select()}
                   />
                   <CopyToClipboard text={inviteLink} onCopy={handleCopy}>
-                    <button 
-                      className={`inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 dark:border-gray-600 rounded-r-md bg-white dark:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
-                        isCopied ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300' : ''
-                      }`}
+                    <button
+                      className={`inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 dark:border-gray-600 rounded-r-md bg-white dark:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${isCopied ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300' : ''
+                        }`}
                     >
                       {isCopied ? (
                         <>
@@ -204,17 +213,39 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
                   </CopyToClipboard>
                 </div>
               </div>
-              
+
               <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-100 dark:border-blue-800">
                 <h4 className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-1">Share this link</h4>
                 <p className="text-xs text-blue-700 dark:text-blue-200">
-                  {isPermanent 
-                    ? 'This is a permanent invite link. It will never expire.' 
+                  {isPermanent
+                    ? 'This is a permanent invite link. It will never expire.'
                     : `This link will expire in ${expiry} hour${expiry === '1' ? '' : 's'}.`}
                   {' '}Anyone with this link can join the room.
                 </p>
               </div>
-              
+
+              {/* Verbal Code Section */}
+              {verbalCode && (
+                <div className="p-3 bg-purple-50 dark:bg-purple-900/30 rounded-lg border border-purple-100 dark:border-purple-800">
+                  <h4 className="text-sm font-medium text-purple-800 dark:text-purple-300 mb-2">Verbal Join Code</h4>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-lg font-semibold text-purple-700 dark:text-purple-200 tracking-wide">
+                      {verbalCode}
+                    </span>
+                    <CopyToClipboard text={verbalCode} onCopy={handleVerbalCopy}>
+                      <button
+                        className={`ml-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${isVerbalCopied ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-200 hover:bg-purple-200 dark:hover:bg-purple-700'}`}
+                      >
+                        {isVerbalCopied ? 'Copied!' : 'Copy'}
+                      </button>
+                    </CopyToClipboard>
+                  </div>
+                  <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
+                    Share this code verbally — others can type it to join.
+                  </p>
+                </div>
+              )}
+
               <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-2">
                 <div className="flex items-center mr-4">
                   <div className="w-2 h-2 rounded-full bg-green-500 mr-1.5"></div>
@@ -228,7 +259,7 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
                 )}
               </div>
             </div>
-            
+
             <div className="flex justify-end mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
               <button
                 type="button"
