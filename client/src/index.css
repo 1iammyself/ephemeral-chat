@@ -276,3 +276,42 @@
 .animate-shake {
   animation: shake 0.5s cubic-bezier(.36, .07, .19, .97) both;
 }
+
+/* Zoom-style Floating Reactions */
+#reaction-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+@keyframes floatUp {
+  0% {
+    transform: translate(var(--x), 0) rotate(var(--r)) scale(0.9);
+    opacity: 1;
+  }
+
+  70% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(var(--x), -70vh) rotate(var(--r)) scale(1.4);
+    opacity: 0;
+  }
+}
+
+.floating-reaction {
+  position: absolute;
+  bottom: env(safe-area-inset-bottom, 16px);
+  left: 50%;
+  /* Center start point, logic will adjust via --x */
+  font-size: 38px;
+  animation: floatUp 3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform, opacity;
+  pointer-events: none;
+  user-select: none;
+  z-index: 9999;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
+}

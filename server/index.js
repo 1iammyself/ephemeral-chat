@@ -1249,6 +1249,20 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Zoom-style Room Reaction
+  socket.on('send-room-reaction', ({ emoji }) => {
+    if (!socket.roomCode) return;
+
+    // Rate limit reactions to prevent spam (slightly higher limit than messages)
+    if (!checkRateLimit(socket.id, 50, 60000)) return;
+
+    // Broadcast to everyone else in the room
+    socket.to(socket.roomCode).emit('room-reaction', {
+      emoji,
+      userId: socket.id
+    });
+  });
+
   // Health Check
   socket.on('latency-ping', (startTime) => {
     socket.emit('latency-pong', startTime);

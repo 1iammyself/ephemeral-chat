@@ -69,6 +69,10 @@ const ChatRoom = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
 
+  // Floating Reactions State
+  const reactionLayerRef = useRef(null);
+  const lastReactionTime = useRef(0);
+
   // Knock-to-Join & Host State
   const [isWaitingForHost, setIsWaitingForHost] = useState(false);
   const [pendingGuests, setPendingGuests] = useState([]);
@@ -199,6 +203,40 @@ const ChatRoom = () => {
       setIsWaitingForHost(false);
     });
   }, [roomCode, navigate, roomKey]);
+
+  const spawnReaction = useCallback((emoji) => {
+    if (!reactionLayerRef.current) return;
+    if (reactionLayerRef.current.children.length > 30) return; // Cap nodes for performance
+
+    const el = document.createElement("div");
+    el.className = "floating-reaction";
+    el.textContent = emoji;
+
+    // Randomize position and rotation
+    const x = Math.random() * 200 - 100; // -100px to 100px from center
+    const r = Math.random() * 40 - 20;   // -20deg to 20deg
+
+    el.style.setProperty("--x", `${x}px`);
+    el.style.setProperty("--r", `${r}deg`);
+
+    el.addEventListener("animationend", () => {
+      el.remove();
+    });
+
+    reactionLayerRef.current.appendChild(el);
+  }, []);
+
+  const sendRoomReaction = useCallback((emoji) => {
+    const now = Date.now();
+    if (now - lastReactionTime.current < 200) return; // Rate limit 5 per second locally
+    lastReactionTime.current = now;
+
+    socketManager.emit('send-room-reaction', { emoji });
+    spawnReaction(emoji); // Show locally immediately
+
+    // Haptics
+    if (navigator.vibrate) navigator.vibrate(10);
+  }, [spawnReaction]);
 
   useEffect(() => {
     const socket = socketManager.connect();
@@ -383,6 +421,10 @@ const ChatRoom = () => {
       });
     };
 
+    const handleRoomReaction = ({ emoji }) => {
+      spawnReaction(emoji);
+    };
+
     const handlePong = (startTime) => {
       setLatency(Date.now() - startTime);
     };
@@ -417,6 +459,7 @@ const ChatRoom = () => {
     socketManager.on('message-updated', handleMessageUpdated);
     socketManager.on('user-typing', handleUserTyping);
     socketManager.on('user-stop-typing', handleUserStopTyping);
+    socketManager.on('room-reaction', handleRoomReaction);
 
     return () => {
       socketManager.off('connect', handleConnect);
@@ -450,6 +493,7 @@ const ChatRoom = () => {
       socketManager.off('message-updated', handleMessageUpdated);
       socketManager.off('user-typing', handleUserTyping);
       socketManager.off('user-stop-typing', handleUserStopTyping);
+      socketManager.off('room-reaction', handleRoomReaction);
       if (process.env.NODE_ENV !== 'development') socketManager.disconnect();
     };
   }, [roomCode, performJoin, roomKey]);
@@ -995,6 +1039,7 @@ const ChatRoom = () => {
                 ) : (
                   <>
                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" id="image-upload" />
+
                     <div className="relative" ref={featureMenuRef}>
                       <button
                         type="button"
@@ -1006,10 +1051,26 @@ const ChatRoom = () => {
                       </button>
 
                       {showFeatureMenu && (
-                        <div className="absolute bottom-full mb-2 left-0 z-50 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-2 flex flex-col space-y-1 w-72 animate-in slide-in-from-bottom-2 duration-200">
+                        <div className="absolute bottom-full mb-2 left-0 z-50 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 p-2 flex flex-col space-y-2 w-72 animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-xl">
+                          {/* Floating Reaction Pill - Matches User Image */}
+                          <div className="flex items-center justify-between bg-gray-50/50 dark:bg-gray-900/50 rounded-full p-1.5 border border-gray-100/50 dark:border-gray-800/50 shadow-inner">
+                            {['❤️', '🔥', '👏', '😂', '😮', '💯'].map(emoji => (
+                              <button
+                                key={emoji}
+                                type="button"
+                                onClick={() => sendRoomReaction(emoji)}
+                                className="p-2 hover:bg-white dark:hover:bg-gray-700 rounded-full transition-all hover:scale-150 hover:rotate-12 active:scale-95"
+                              >
+                                <span className="text-2xl leading-none filter drop-shadow-sm">{emoji}</span>
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className="h-px bg-gray-100 dark:bg-gray-700/50 mx-2" />
+
                           {/* Admin Controls */}
                           {canManageRoom(currentUserRole) && (
-                            <div className="p-2 border-b border-gray-100 dark:border-gray-700 mb-1">
+                            <div className="flex flex-col space-y-1">
                               <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Room Controls</p>
 
                               <button
@@ -1212,6 +1273,10 @@ const ChatRoom = () => {
       <PollModal isOpen={showPollModal} onClose={() => setShowPollModal(false)} onSend={handleSendPoll} />
       <DragDropOverlay isDragging={isDragging} />
       <PrivacyOverlay />
+
+      {/* Zoom-style Reaction Layer */}
+      <div id="reaction-layer" ref={reactionLayerRef} />
+
       {
         isJoined && currentUser && (
           <GhostWatermark
