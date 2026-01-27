@@ -152,16 +152,6 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   return (
     <div className="flex flex-col space-y-6 pb-4">
       {messages.map((message) => {
-        if (message.type === 'system') {
-          return (
-            <div key={message.id} className="flex justify-center my-2">
-              <span className="text-[10px] uppercase tracking-widest font-bold text-gray-400 dark:text-gray-600 bg-gray-100/50 dark:bg-gray-800/30 px-3 py-1 rounded-full">
-                {message.content}
-              </span>
-            </div>
-          );
-        }
-
         const isOwnMessage = currentUser && (message.sender.socketId === currentUser.socketId || message.sender.id === currentUser.id);
         const isExpired = messageTimers.get(message.id) === 'expired';
         if (isExpired) return null;
@@ -214,8 +204,8 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                     {message.replyTo && (
                       <div
                         className={`mb-2 p-2 rounded-lg text-[11px] border-l-4 cursor-pointer transition-colors ${isOwnMessage
-                            ? 'bg-black/10 border-white/30 hover:bg-black/20'
-                            : 'bg-gray-100 dark:bg-gray-700/50 border-gray-300 dark:border-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'
+                          ? 'bg-black/10 border-white/30 hover:bg-black/20'
+                          : 'bg-gray-100 dark:bg-gray-700/50 border-gray-300 dark:border-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'
                           }`}
                         onClick={() => {
                           const el = document.getElementById(message.replyTo.id);

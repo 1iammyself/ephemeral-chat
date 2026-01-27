@@ -44,6 +44,7 @@ import TopicEditor from './TopicEditor';
 import TimerModal from './TimerModal';
 import EditMessageModal from './EditMessageModal';
 import DragDropOverlay from './DragDropOverlay';
+import ActivityLog from './ActivityLog';
 import { getVibeById, getAllVibes } from '../utils/vibes';
 import { canManageRoom } from '../utils/roles';
 import { getRandomIcebreaker } from '../utils/icebreakers';
@@ -105,6 +106,9 @@ const ChatRoom = () => {
   const [typingUsers, setTypingUsers] = useState(new Map());
   const [editingMessage, setEditingMessage] = useState(null);
   const [latency, setLatency] = useState(null);
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [showActivityLogs, setShowActivityLogs] = useState(false);
+  const [hasNewLogs, setHasNewLogs] = useState(false);
   const [safariNoticeShown, setSafariNoticeShown] = useState(() => {
     return localStorage.getItem('safariAudioNoticeShown') === 'true';
   });
@@ -308,16 +312,23 @@ const ChatRoom = () => {
     const handleMessageDeleted = ({ messageId }) => setMessages(prev => prev.filter(m => m.id !== messageId));
 
     const handleUserJoined = ({ user, roomUsers }) => {
-      const displayName = user?.nickname || 'Someone';
-      setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: `${displayName} joined the room`, timestamp: new Date().toISOString() }]);
       if (Array.isArray(roomUsers)) setUsers(roomUsers);
       else if (user?.socketId) setUsers(prev => prev.some(u => u.socketId === user.socketId) ? prev : [...prev, user]);
+
+      const displayName = user?.nickname || 'Someone';
+      const log = { id: `log_${Date.now()}`, type: 'join', content: `${displayName} joined the room`, timestamp: new Date().toISOString() };
+      setActivityLogs(prev => [log, ...prev].slice(0, 50));
+      if (!showActivityLogs) setHasNewLogs(true);
     };
 
     const handleUserLeft = ({ nickname, socketId, userCount }) => {
-      setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: `${nickname || 'A user'} left the room`, timestamp: new Date().toISOString() }]);
       if (socketId) setUsers(prev => prev.filter(u => u.socketId !== socketId));
       else if (typeof userCount === 'number') setUsers(prev => prev.slice(0, userCount));
+
+      const displayName = nickname || 'A user';
+      const log = { id: `log_${Date.now()}`, type: 'leave', content: `${displayName} left the room`, timestamp: new Date().toISOString() };
+      setActivityLogs(prev => [log, ...prev].slice(0, 50));
+      if (!showActivityLogs) setHasNewLogs(true);
     };
 
     const handleError = ({ message }) => {
@@ -344,7 +355,9 @@ const ChatRoom = () => {
       setIsHost(true);
       setCurrentUserRole('host');
       setCurrentUser(prev => prev ? { ...prev, isAdmin: true } : prev);
-      setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: 'You are now the host of this room', timestamp: new Date().toISOString() }]);
+      const log = { id: `log_${Date.now()}`, type: 'system', content: 'You are now the host of this room', timestamp: new Date().toISOString() };
+      setActivityLogs(prev => [log, ...prev].slice(0, 50));
+      if (!showActivityLogs) setHasNewLogs(true);
     };
 
     const handleMessageUpdated = (updatedMessage) => {
@@ -355,7 +368,9 @@ const ChatRoom = () => {
     const handleRoleUpdated = ({ userId, role, updatedBy }) => {
       if (userId === socketManager.socket?.id) {
         setCurrentUserRole(role);
-        setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: `Your role has been changed to ${role} by ${updatedBy}`, timestamp: new Date().toISOString() }]);
+        const log = { id: `log_${Date.now()}`, type: 'system', content: `Your role has been changed to ${role} by ${updatedBy}`, timestamp: new Date().toISOString() };
+        setActivityLogs(prev => [log, ...prev].slice(0, 50));
+        if (!showActivityLogs) setHasNewLogs(true);
       }
       setUsers(prev => prev.map(u => u.socketId === userId ? { ...u, role } : u));
     };
@@ -372,7 +387,9 @@ const ChatRoom = () => {
     };
 
     const handleUserKicked = ({ userId, nickname, kickedBy }) => {
-      setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: `${nickname} was kicked by ${kickedBy}`, timestamp: new Date().toISOString() }]);
+      const log = { id: `log_${Date.now()}`, type: 'system', content: `${nickname} was kicked by ${kickedBy}`, timestamp: new Date().toISOString() };
+      setActivityLogs(prev => [log, ...prev].slice(0, 50));
+      if (!showActivityLogs) setHasNewLogs(true);
       setUsers(prev => prev.filter(u => u.socketId !== userId));
     };
 
@@ -387,25 +404,33 @@ const ChatRoom = () => {
     // Room customization handlers
     const handleVibeUpdated = ({ vibeId, updatedBy }) => {
       setRoomVibe(vibeId);
-      setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: `${updatedBy} changed the room vibe to ${getVibeById(vibeId).name}`, timestamp: new Date().toISOString() }]);
+      const log = { id: `log_${Date.now()}`, type: 'vibe', content: `${updatedBy} changed vibe to ${getVibeById(vibeId).name}`, timestamp: new Date().toISOString() };
+      setActivityLogs(prev => [log, ...prev].slice(0, 50));
+      if (!showActivityLogs) setHasNewLogs(true);
     };
 
     const handleRoomTopicUpdated = ({ topic, updatedBy }) => {
       setRoomTopic(topic);
       if (topic) {
-        setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: `${updatedBy} set the topic: "${topic}"`, timestamp: new Date().toISOString() }]);
+        const log = { id: `log_${Date.now()}`, type: 'topic', content: `${updatedBy} set topic: "${topic}"`, timestamp: new Date().toISOString() };
+        setActivityLogs(prev => [log, ...prev].slice(0, 50));
+        if (!showActivityLogs) setHasNewLogs(true);
       }
     };
 
     const handleTimerStarted = (timer) => {
       setActiveTimer(timer);
-      setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: `${timer.startedBy} started a timer`, timestamp: new Date().toISOString() }]);
+      const log = { id: `log_${Date.now()}`, type: 'timer', content: `${timer.startedBy} started a timer`, timestamp: new Date().toISOString() };
+      setActivityLogs(prev => [log, ...prev].slice(0, 50));
+      if (!showActivityLogs) setHasNewLogs(true);
     };
 
     const handleTimerStopped = ({ stoppedBy }) => {
       setActiveTimer(null);
       setTimeLeft(null);
-      setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: `${stoppedBy} stopped the timer`, timestamp: new Date().toISOString() }]);
+      const log = { id: `log_${Date.now()}`, type: 'timer', content: `${stoppedBy} stopped the timer`, timestamp: new Date().toISOString() };
+      setActivityLogs(prev => [log, ...prev].slice(0, 50));
+      if (!showActivityLogs) setHasNewLogs(true);
     };
 
     const handlePulseReceived = ({ from }) => {
@@ -415,7 +440,9 @@ const ChatRoom = () => {
         container.classList.add('animate-shake');
         setTimeout(() => container.classList.remove('animate-shake'), 500);
       }
-      setMessages(prev => [...prev, { id: `system_${Date.now()}`, type: 'system', content: `${from} sent a ⚡ pulse!`, timestamp: new Date().toISOString() }]);
+      const log = { id: `log_${Date.now()}`, type: 'pulse', content: `${from} sent a pulse`, timestamp: new Date().toISOString() };
+      setActivityLogs(prev => [log, ...prev].slice(0, 50));
+      if (!showActivityLogs) setHasNewLogs(true);
     };
 
     const handleUserTyping = ({ userId, nickname }) => {
@@ -975,7 +1002,15 @@ const ChatRoom = () => {
               </div>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <button
+              onClick={() => { setShowActivityLogs(true); setHasNewLogs(false); }}
+              className={`p-1.5 sm:p-2 rounded-lg transition-all relative ${hasNewLogs ? 'text-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              title="Activity Log"
+            >
+              <Info className="w-5 h-5" />
+              {hasNewLogs && <span className="absolute top-1 right-1 w-2 h-2 bg-primary-500 rounded-full border-2 border-white dark:border-gray-800"></span>}
+            </button>
             <ThemeToggle />
             <button onClick={() => setShowMobileMenu(true)} className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 relative">
               <Users className="w-5 h-5" />
@@ -985,7 +1020,7 @@ const ChatRoom = () => {
         </div>
       </div>
 
-      <div className="absolute top-16 left-0 right-0 z-10 flex flex-col items-center space-y-2 pointer-events-none transition-all duration-300">
+      <div className="absolute top-[84px] sm:top-[100px] left-0 right-0 z-40 flex flex-col items-center space-y-2 pointer-events-none transition-all duration-300">
         {/* Topic Pill */}
         {roomTopic && (
           <div className="pointer-events-auto bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 px-4 py-1.5 rounded-full shadow-sm flex items-center space-x-2 animate-in slide-in-from-top-2 max-w-[80%]">
@@ -1333,6 +1368,11 @@ const ChatRoom = () => {
           />
         )
       }
+      <ActivityLog
+        isOpen={showActivityLogs}
+        onClose={() => setShowActivityLogs(false)}
+        logs={activityLogs}
+      />
     </div >
   );
 };
