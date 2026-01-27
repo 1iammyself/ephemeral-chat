@@ -213,10 +213,10 @@ const ChatRoom = () => {
     el.textContent = emoji;
 
     // Randomize position and rotation
-    const x = Math.random() * 200 - 100; // -100px to 100px from center
-    const r = Math.random() * 40 - 20;   // -20deg to 20deg
+    const x = Math.random() * 80 - 40; // -40vw to 40vw
+    const r = Math.random() * 40 - 20; // -20deg to 20deg
 
-    el.style.setProperty("--x", `${x}px`);
+    el.style.setProperty("--x", `${x}vw`);
     el.style.setProperty("--r", `${r}deg`);
 
     el.addEventListener("animationend", () => {
