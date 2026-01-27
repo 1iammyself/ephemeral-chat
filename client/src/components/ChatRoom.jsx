@@ -109,6 +109,8 @@ const ChatRoom = () => {
   const [activityLogs, setActivityLogs] = useState([]);
   const [showActivityLogs, setShowActivityLogs] = useState(false);
   const [hasNewLogs, setHasNewLogs] = useState(false);
+  const [offsets, setOffsets] = useState({ topic: 0, timer: 0 });
+  const [dragState, setDragState] = useState(null); // { type: 'topic' | 'timer', startX: number, startOffset: number }
   const [safariNoticeShown, setSafariNoticeShown] = useState(() => {
     return localStorage.getItem('safariAudioNoticeShown') === 'true';
   });
@@ -411,11 +413,14 @@ const ChatRoom = () => {
 
     const handleRoomTopicUpdated = ({ topic, updatedBy }) => {
       setRoomTopic(topic);
-      if (topic) {
-        const log = { id: `log_${Date.now()}`, type: 'topic', content: `${updatedBy} set topic: "${topic}"`, timestamp: new Date().toISOString() };
-        setActivityLogs(prev => [log, ...prev].slice(0, 50));
-        if (!showActivityLogs) setHasNewLogs(true);
-      }
+      const log = {
+        id: `log_${Date.now()}`,
+        type: 'topic',
+        content: topic ? `${updatedBy} set topic: "${topic}"` : `${updatedBy} cleared the topic`,
+        timestamp: new Date().toISOString()
+      };
+      setActivityLogs(prev => [log, ...prev].slice(0, 50));
+      if (!showActivityLogs) setHasNewLogs(true);
     };
 
     const handleTimerStarted = (timer) => {
@@ -747,6 +752,44 @@ const ChatRoom = () => {
     setShowFeatureMenu(false);
   };
 
+  const handleStartPillDrag = (e, type) => {
+    const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+    setDragState({
+      type,
+      startX: clientX,
+      startOffset: offsets[type]
+    });
+  };
+
+  useEffect(() => {
+    if (!dragState) return;
+
+    const handleMove = (e) => {
+      const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+      const deltaX = clientX - dragState.startX;
+      setOffsets(prev => ({
+        ...prev,
+        [dragState.type]: dragState.startOffset + deltaX
+      }));
+    };
+
+    const handleEnd = () => {
+      setDragState(null);
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleEnd);
+    window.addEventListener('touchmove', handleMove);
+    window.addEventListener('touchend', handleEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleEnd);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleEnd);
+    };
+  }, [dragState]);
+
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1023,11 +1066,21 @@ const ChatRoom = () => {
       <div className="absolute top-[84px] sm:top-[100px] left-0 right-0 z-40 flex flex-col items-center space-y-2 pointer-events-none transition-all duration-300">
         {/* Topic Pill */}
         {roomTopic && (
-          <div className="pointer-events-auto bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 px-4 py-1.5 rounded-full shadow-sm flex items-center space-x-2 animate-in slide-in-from-top-2 max-w-[80%]">
-            <span className="text-xs font-semibold text-primary-600 dark:text-primary-400 uppercase tracking-wider">Topic</span>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{roomTopic}</span>
+          <div
+            className="pointer-events-auto bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 px-4 py-1.5 rounded-full shadow-sm flex items-center space-x-2 animate-in slide-in-from-top-2 max-w-[80%] cursor-move touch-none"
+            style={{ transform: `translateX(${offsets.topic}px)` }}
+            onMouseDown={(e) => handleStartPillDrag(e, 'topic')}
+            onTouchStart={(e) => handleStartPillDrag(e, 'topic')}
+          >
+            <span className="text-xs font-semibold text-primary-600 dark:text-primary-400 uppercase tracking-wider select-none">Topic</span>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate select-none">{roomTopic}</span>
             {canManageRoom(currentUserRole) && (
-              <button onClick={() => setShowTopicEditor(true)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 hover:text-primary-500 transition-colors">
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowTopicEditor(true); }}
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 hover:text-primary-500 transition-colors"
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+              >
                 <Edit2 className="w-3 h-3" />
               </button>
             )}
@@ -1036,14 +1089,21 @@ const ChatRoom = () => {
 
         {/* Timer Pill */}
         {activeTimer && (
-          <div className="pointer-events-auto bg-indigo-600/90 backdrop-blur-md px-4 py-1.5 rounded-full shadow-lg flex items-center space-x-3 animate-in slide-in-from-top-2 text-white border border-indigo-500/50">
-            <Clock className={`w-3.5 h-3.5 ${timeLeft === '00:00' ? 'animate-bounce text-red-300' : 'animate-pulse'}`} />
-            <span className={`font-mono text-sm font-bold tracking-wider ${timeLeft === '00:00' ? 'text-red-100' : ''}`}>{timeLeft || '00:00'}</span>
+          <div
+            className="pointer-events-auto bg-indigo-600/90 backdrop-blur-md px-4 py-1.5 rounded-full shadow-lg flex items-center space-x-3 animate-in slide-in-from-top-2 text-white border border-indigo-500/50 cursor-move touch-none"
+            style={{ transform: `translateX(${offsets.timer}px)` }}
+            onMouseDown={(e) => handleStartPillDrag(e, 'timer')}
+            onTouchStart={(e) => handleStartPillDrag(e, 'timer')}
+          >
+            <Clock className={`w-3.5 h-3.5 select-none ${timeLeft === '00:00' ? 'animate-bounce text-red-300' : 'animate-pulse'}`} />
+            <span className={`font-mono text-sm font-bold tracking-wider select-none ${timeLeft === '00:00' ? 'text-red-100' : ''}`}>{timeLeft || '00:00'}</span>
             {canManageRoom(currentUserRole) && (
               <button
-                onClick={handleStopTimer}
+                onClick={(e) => { e.stopPropagation(); handleStopTimer(); }}
                 className="ml-1 p-0.5 hover:bg-white/20 rounded-full transition-colors"
                 title="Stop Timer"
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
               >
                 <X className="w-3 h-3" />
               </button>

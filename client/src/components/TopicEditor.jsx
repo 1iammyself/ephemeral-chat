@@ -56,21 +56,35 @@ const TopicEditor = ({ isOpen, onClose, currentTopic, onSave }) => {
                         </p>
                     </div>
 
-                    <div className="flex gap-3">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            className="flex-1 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2"
-                        >
-                            <Check className="w-4 h-4" />
-                            Save Topic
-                        </button>
+                    <div className="flex flex-col gap-3">
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="flex-1 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2"
+                            >
+                                <Check className="w-4 h-4" />
+                                Save Topic
+                            </button>
+                        </div>
+                        {currentTopic && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onSave('');
+                                    onClose();
+                                }}
+                                className="w-full px-4 py-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors font-medium border border-transparent hover:border-red-200 dark:hover:border-red-800/50"
+                            >
+                                Remove Topic
+                            </button>
+                        )}
                     </div>
                 </form>
             </div>
