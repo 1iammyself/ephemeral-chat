@@ -23,7 +23,8 @@ import {
   Edit2,
   Zap,
   Reply,
-  Activity
+  Activity,
+  Info
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -46,6 +47,15 @@ import DragDropOverlay from './DragDropOverlay';
 import { getVibeById, getAllVibes } from '../utils/vibes';
 import { canManageRoom } from '../utils/roles';
 import { getRandomIcebreaker } from '../utils/icebreakers';
+
+// Safari detection (robust hybrid check)
+function isSafariBrowser() {
+  const ua = navigator.userAgent;
+  const isWebKit = ua.includes('AppleWebKit');
+  const isNotChrome = !ua.includes('Chrome') && !ua.includes('CriOS');
+  const isNotFirefox = !ua.includes('FxiOS');
+  return isWebKit && isNotChrome && isNotFirefox;
+}
 
 const ChatRoom = () => {
   const { roomCode } = useParams();
@@ -95,6 +105,9 @@ const ChatRoom = () => {
   const [typingUsers, setTypingUsers] = useState(new Map());
   const [editingMessage, setEditingMessage] = useState(null);
   const [latency, setLatency] = useState(null);
+  const [safariNoticeShown, setSafariNoticeShown] = useState(() => {
+    return localStorage.getItem('safariAudioNoticeShown') === 'true';
+  });
   const dragCounter = useRef(0);
   const typingTimeoutRef = useRef(null);
   const { theme } = useTheme();
@@ -1029,11 +1042,30 @@ const ChatRoom = () => {
             <div className="p-4">
               <form onSubmit={handleSendMessage} className="flex items-center space-x-2 sm:space-x-3">
                 {isRecording ? (
-                  <div className="flex-1 flex items-center justify-between bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-2">
-                    <div className="flex items-center space-x-3"><div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" /><span className="text-red-600 dark:text-red-400 font-medium font-mono">{formatDuration(recordingDuration)} / 0:30</span></div>
-                    <div className="flex items-center space-x-2">
-                      <button type="button" onClick={handleCancelRecording} className="p-2 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-full text-red-500"><Trash2 className="w-5 h-5" /></button>
-                      <button type="button" onClick={handleStopRecording} className="p-2 bg-red-500 hover:bg-red-600 rounded-full text-white shadow-sm"><Send className="w-5 h-5" /></button>
+                  <div className="flex-1 flex flex-col space-y-2">
+                    {/* Safari Audio Notice */}
+                    {isSafariBrowser() && !safariNoticeShown && (
+                      <div className="flex items-center space-x-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200/50 dark:border-amber-800/50 animate-in slide-in-from-top-2">
+                        <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                        <span className="text-xs text-amber-700 dark:text-amber-300">Recordings made and played on Safari may be truncated. Playback on other browsers is unaffected.</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSafariNoticeShown(true);
+                            localStorage.setItem('safariAudioNoticeShown', 'true');
+                          }}
+                          className="ml-auto text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 p-0.5"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-2">
+                      <div className="flex items-center space-x-3"><div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" /><span className="text-red-600 dark:text-red-400 font-medium font-mono">{formatDuration(recordingDuration)} / 0:30</span></div>
+                      <div className="flex items-center space-x-2">
+                        <button type="button" onClick={handleCancelRecording} className="p-2 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-full text-red-500"><Trash2 className="w-5 h-5" /></button>
+                        <button type="button" onClick={handleStopRecording} className="p-2 bg-red-500 hover:bg-red-600 rounded-full text-white shadow-sm"><Send className="w-5 h-5" /></button>
+                      </div>
                     </div>
                   </div>
                 ) : (
