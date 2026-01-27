@@ -321,7 +321,12 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
         isOpen={!!viewingImage}
         onClose={handleViewerClose}
         imageUrl={currentImageUrl}
-        duration={20}
+        duration={(() => {
+          if (!messageTTL || messageTTL === 0) return 1800; // Never = 30m
+          if (messageTTL < 30) return 30; // Min 30s
+          if (messageTTL > 1800) return 1800; // Max 30m
+          return messageTTL;
+        })()}
       />
     </div>
   );

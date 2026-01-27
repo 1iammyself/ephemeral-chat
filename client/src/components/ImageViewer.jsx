@@ -9,7 +9,7 @@ import { X, Clock, Eye, AlertTriangle } from 'lucide-react';
 import ImageReveal from './ImageReveal';
 import socketManager from '../socket-simple';
 
-const ImageViewer = ({ isOpen, onClose, imageUrl, duration = 20 }) => {
+const ImageViewer = ({ isOpen, onClose, imageUrl, duration = 30 }) => {
   const [timeLeft, setTimeLeft] = useState(duration);
   const [isVisible, setIsVisible] = useState(false);
   const [revealData, setRevealData] = useState({ viewToken: null, watermarkSeed: null });
