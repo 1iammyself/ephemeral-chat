@@ -368,6 +368,8 @@
   "security": {
     "network": {
       "allowInsecure": null
-    }
+    },
+    "blockScreenshots": true,
+    "detectScreenshots": true
   }
 }

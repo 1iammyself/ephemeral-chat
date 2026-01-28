@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Crown, User, Check, X, ChevronDown, Shield, UserX } from 'lucide-react';
+import { Users, Crown, User, Check, X, ChevronDown, Shield, UserX, Info } from 'lucide-react';
 import { ROLES, ROLE_INFO, canKick, canChangeRole, canManageGuests, getAssignableRoles } from '../utils/roles';
 
 const UserList = ({
@@ -13,7 +13,9 @@ const UserList = ({
   onToggleRecipient,
   onSetUserRole,
   onKickUser,
-  currentUserRole = ROLES.USER
+  currentUserRole = ROLES.USER,
+  onShowActivityLogs,
+  hasNewLogs = false
 }) => {
   const [expandedUser, setExpandedUser] = useState(null);
 
@@ -107,13 +109,23 @@ const UserList = ({
       )}
 
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700 transition-colors duration-200">
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700 transition-colors duration-200 flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Users className="w-5 h-5 text-gray-600 dark:text-gray-400" />
           <h3 className="font-medium text-gray-900 dark:text-white">
             Participants ({users.length})
           </h3>
         </div>
+        {onShowActivityLogs && (
+          <button
+            onClick={onShowActivityLogs}
+            className={`p-1.5 rounded-lg transition-all relative ${hasNewLogs ? 'text-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+            title="Activity Log"
+          >
+            <Info className="w-5 h-5" />
+            {hasNewLogs && <span className="absolute top-1 right-1 w-2 h-2 bg-primary-500 rounded-full border-2 border-white dark:border-gray-800"></span>}
+          </button>
+        )}
       </div>
 
       {/* User List */}

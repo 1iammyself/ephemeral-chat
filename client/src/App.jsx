@@ -4,6 +4,9 @@ import Home from './components/Home';
 import ChatRoom from './components/ChatRoom';
 import JoinRoomModal from './components/JoinRoomModal';
 import InviteHandler from './components/InviteHandler.jsx';
+import PWAHandler from './components/PWAHandler';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // Simple placeholder for InstallPrompt component
 const InstallPrompt = () => null;
@@ -29,30 +32,10 @@ function App() {
     };
   }, []);
 
-  // Check for service worker updates
-  useEffect(() => {
-    if ('serviceWorker' in navigator && import.meta.env.PROD) {
-      // Check for service worker updates every time the app loads
-      navigator.serviceWorker.getRegistration().then(registration => {
-        if (registration) {
-          registration.update().catch(error => {
-            console.log('Service worker update check failed:', error);
-          });
-        }
-      });
-
-      // Listen for controller change (new service worker activated)
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (confirm('A new version is available. Reload to update?')) {
-          window.location.reload();
-        }
-      });
-    }
-  }, []);
-
   return (
     <Router>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 transition-colors duration-200">
+        <PWAHandler />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/room/:roomCode" element={<ChatRoom />} />
@@ -65,6 +48,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <InstallPrompt />
+        <ToastContainer />
       </div>
     </Router>
   );

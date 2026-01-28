@@ -65,9 +65,9 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.File;
-import java.net.CookieHandler;
-import java.net.URISyntaxException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -78,6 +78,7 @@ import java.util.Observable;
 import java.util.Observer;
 import java.util.Stack;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.regex.Pattern;
 
 import co.median.android.widget.GoNativeSwipeRefreshLayout;
@@ -191,6 +192,11 @@ public class MainActivity extends AppCompatActivity implements Observer,
     private float baseZoomScale = 3f;
     private float currentWebViewZoomScale = -1f;
 
+    // Screenshot protection
+    private boolean blockScreenshots = false;
+    private boolean detectScreenshots = false;
+    private Activity.ScreenCaptureCallback screenCaptureCallback;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         final AppConfig appConfig = AppConfig.getInstance(this);
@@ -234,6 +240,13 @@ public class MainActivity extends AppCompatActivity implements Observer,
 
         if (appConfig.keepScreenOn) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
+
+        loadSecurityConfig();
+        if (this.blockScreenshots) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        } else {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
         }
 
         this.hideWebviewAlpha  = appConfig.hideWebviewAlpha;
@@ -629,6 +642,17 @@ public class MainActivity extends AppCompatActivity implements Observer,
         if (AppConfig.getInstance(this).permissions.isWebRTCBluetoothAudioEnabled()) {
             AudioUtils.initAudioFocusListener(this);
         }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && this.detectScreenshots) {
+            if (this.screenCaptureCallback == null) {
+                this.screenCaptureCallback = () -> {
+                    Toast.makeText(MainActivity.this, "Screenshot detected", Toast.LENGTH_SHORT).show();
+                    // Optional: send event to WebView
+                    runJavascript("median.onScreenshotDetected()");
+                };
+            }
+            registerScreenCaptureCallback(getMainExecutor(), this.screenCaptureCallback);
+        }
     }
 
     @Override
@@ -670,6 +694,11 @@ public class MainActivity extends AppCompatActivity implements Observer,
     protected void onStop() {
         super.onStop();
         getGNApplication().mBridge.onActivityStop(this);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && this.screenCaptureCallback != null) {
+            unregisterScreenCaptureCallback(this.screenCaptureCallback);
+        }
+
         if (isRoot) {
             if (AppConfig.getInstance(this).clearCache) {
                 this.mWebview.clearCache(true);
@@ -797,6 +826,36 @@ public class MainActivity extends AppCompatActivity implements Observer,
     public boolean canGoBack() {
         if (this.mWebview == null) return false;
         return this.mWebview.canGoBack();
+    }
+
+    private void loadSecurityConfig() {
+        try {
+            InputStream is = getAssets().open("appConfig.json");
+            int size = is.available();
+            byte[] buffer = new byte[size];
+            is.read(buffer);
+            is.close();
+            String jsonStr = new String(buffer, StandardCharsets.UTF_8);
+            JSONObject json = new JSONObject(jsonStr);
+            JSONObject security = json.optJSONObject("security");
+            if (security != null) {
+                this.blockScreenshots = security.optBoolean("blockScreenshots", false);
+                this.detectScreenshots = security.optBoolean("detectScreenshots", false);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading security config", e);
+        }
+    }
+
+    public void setScreenCaptureEnabled(boolean enabled) {
+        this.blockScreenshots = enabled;
+        runOnUiThread(() -> {
+            if (enabled) {
+                getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+            } else {
+                getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
+            }
+        });
     }
 
     public void goBack() {

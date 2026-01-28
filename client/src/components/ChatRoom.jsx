@@ -48,6 +48,7 @@ import ActivityLog from './ActivityLog';
 import { getVibeById, getAllVibes } from '../utils/vibes';
 import { canManageRoom } from '../utils/roles';
 import { getRandomIcebreaker } from '../utils/icebreakers';
+import { RefreshButton } from './PWAHandler';
 
 // Safari detection (robust hybrid check)
 function isSafariBrowser() {
@@ -1036,14 +1037,7 @@ const ChatRoom = () => {
             </div>
           </div>
           <div className="flex items-center space-x-2 sm:space-x-3">
-            <button
-              onClick={() => { setShowActivityLogs(true); setHasNewLogs(false); }}
-              className={`p-1.5 sm:p-2 rounded-lg transition-all relative ${hasNewLogs ? 'text-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-              title="Activity Log"
-            >
-              <Info className="w-5 h-5" />
-              {hasNewLogs && <span className="absolute top-1 right-1 w-2 h-2 bg-primary-500 rounded-full border-2 border-white dark:border-gray-800"></span>}
-            </button>
+            <RefreshButton />
             <ThemeToggle />
             <button onClick={() => setShowMobileMenu(true)} className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 relative">
               <Users className="w-5 h-5" />
@@ -1370,7 +1364,21 @@ const ChatRoom = () => {
           </div>
         </div>
         <div className="hidden lg:block w-64 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-          <UserList users={users} currentUser={currentUser} pendingGuests={pendingGuests} isHost={isHost} onApprove={handleApproveGuest} onDeny={handleDenyGuest} selectedRecipients={selectedRecipients} onToggleRecipient={toggleRecipient} onSetUserRole={handleSetUserRole} onKickUser={handleKickUser} currentUserRole={currentUserRole} />
+          <UserList
+            users={users}
+            currentUser={currentUser}
+            pendingGuests={pendingGuests}
+            isHost={isHost}
+            onApprove={handleApproveGuest}
+            onDeny={handleDenyGuest}
+            selectedRecipients={selectedRecipients}
+            onToggleRecipient={toggleRecipient}
+            onSetUserRole={handleSetUserRole}
+            onKickUser={handleKickUser}
+            currentUserRole={currentUserRole}
+            onShowActivityLogs={() => { setShowActivityLogs(true); setHasNewLogs(false); }}
+            hasNewLogs={hasNewLogs}
+          />
         </div>
       </div>
 
@@ -1380,7 +1388,23 @@ const ChatRoom = () => {
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileMenu(false)} />
             <div className="absolute right-0 top-0 bottom-0 w-64 max-w-[70vw] bg-white dark:bg-gray-800 shadow-xl flex flex-col">
               <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700"><h2 className="text-lg font-semibold text-gray-900 dark:text-white">Room Details</h2><button onClick={() => setShowMobileMenu(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400"><X className="w-5 h-5" /></button></div>
-              <div className="flex-1 overflow-y-auto"><UserList users={users} currentUser={currentUser} pendingGuests={pendingGuests} isHost={isHost} onApprove={handleApproveGuest} onDeny={handleDenyGuest} selectedRecipients={selectedRecipients} onToggleRecipient={toggleRecipient} onSetUserRole={handleSetUserRole} onKickUser={handleKickUser} currentUserRole={currentUserRole} /></div>
+              <div className="flex-1 overflow-y-auto">
+                <UserList
+                  users={users}
+                  currentUser={currentUser}
+                  pendingGuests={pendingGuests}
+                  isHost={isHost}
+                  onApprove={handleApproveGuest}
+                  onDeny={handleDenyGuest}
+                  selectedRecipients={selectedRecipients}
+                  onToggleRecipient={toggleRecipient}
+                  onSetUserRole={handleSetUserRole}
+                  onKickUser={handleKickUser}
+                  currentUserRole={currentUserRole}
+                  onShowActivityLogs={() => { setShowActivityLogs(true); setHasNewLogs(false); }}
+                  hasNewLogs={hasNewLogs}
+                />
+              </div>
             </div>
           </div>
         )

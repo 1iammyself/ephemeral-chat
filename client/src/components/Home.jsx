@@ -7,6 +7,8 @@ import ThemeToggle from './ThemeToggle';
 import { joinWithVerbalCode } from '../utils/api';
 import { toast } from 'react-toastify';
 
+import { RefreshButton } from './PWAHandler';
+
 const Home = ({ children }) => {
   const [roomCode, setRoomCode] = useState('');
   const [verbalCode, setVerbalCode] = useState('');
@@ -118,7 +120,10 @@ const Home = ({ children }) => {
             <MessageCircle className="h-8 w-8 mr-2" />
             Ephemeral Chat
           </h1>
-          <ThemeToggle />
+          <div className="flex items-center space-x-2">
+            <RefreshButton />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 

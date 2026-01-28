@@ -265,6 +265,14 @@ public class UrlNavigation {
         }
 
         if ("median".equals(uri.getScheme()) || "gonative".equals(uri.getScheme())) {
+            // Internal bridge for security commands
+            if ("security".equals(uri.getHost()) && "/setScreenCapture".equals(uri.getPath())) {
+                String enabledStr = uri.getQueryParameter("enabled");
+                boolean enabled = "true".equalsIgnoreCase(enabledStr);
+                mainActivity.setScreenCaptureEnabled(enabled);
+                return true;
+            }
+
             mainActivity.getGNApplication().mBridge.handleJSBridgeFunctions(mainActivity, uri);
             return true;
         }
