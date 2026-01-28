@@ -3,7 +3,7 @@ import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, Fi
 import ImageViewer from './ImageViewer';
 import AudioPlayer from './AudioPlayer';
 import PollMessage from './PollMessage';
-import socketManager from '../socket-simple';
+import socketManager from '../socket';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '😡'];
 

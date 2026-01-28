@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Clock, Eye, AlertTriangle } from 'lucide-react';
 import ImageReveal from './ImageReveal';
-import socketManager from '../socket-simple';
+import socketManager from '../socket';
 
 const ImageViewer = ({ isOpen, onClose, imageUrl, duration = 30 }) => {
   const [timeLeft, setTimeLeft] = useState(duration);

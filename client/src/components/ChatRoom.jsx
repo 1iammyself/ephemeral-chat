@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
-import socketManager from '../socket-simple';
+import socketManager from '../socket';
 import JoinRoomModal from './JoinRoomModal';
 import MessageList from './MessageList';
 import UserList from './UserList';

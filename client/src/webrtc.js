@@ -4,7 +4,7 @@
  * Re-implemented based on reference implementation
  */
 
-import socketManager from './socket-simple';
+import socketManager from './socket';
 import { EXPRESS_TURN, AGORA, METERED } from './utils/credentials';
 // Agora SDK will be loaded dynamically when needed
 let AgoraRTC = null;
