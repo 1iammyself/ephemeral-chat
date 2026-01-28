@@ -150,13 +150,15 @@ const PORT = process.env.PORT || 3001
 // Apply JSON middleware
 app.use(express.json());
 
-// Serve static files from the client build directory
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../client/dist')));
-} else {
-  // In development, serve from client directory
-  app.use(express.static(path.join(__dirname, '../client')));
-}
+// Root endpoint for API status / health checks
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    message: 'Ephemeral Chat API Server',
+    version: '1.0.0',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Rate limiting storage
 const rateLimits = new Map();
