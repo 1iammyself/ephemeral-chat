@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { validateInviteToken } from '../utils/api';
 import { Loader2 } from 'lucide-react';
 
 /**
@@ -23,25 +23,25 @@ function InviteHandler() {
     const processInvite = async () => {
       try {
         setStatus('Validating invite token...');
-        
+
         // Exchange the token for room credentials
-        const response = await axios.get(`/api/invite/${token}`);
-        
-        if (response.data?.success && response.data.roomCode) {
+        const data = await validateInviteToken(token);
+
+        if (data.roomCode) {
           // Automatically redirect to the room page
           // The JoinRoomModal there will handle nickname and captcha
-          navigate(`/room/${response.data.roomCode}`, {
+          navigate(`/room/${data.roomCode}`, {
             state: {
               inviteToken: token,
-              requiresPassword: response.data.requiresPassword
+              requiresPassword: data.requiresPassword
             }
           });
         } else {
-          throw new Error(response.data?.error || 'Invalid response from server');
+          throw new Error('Invalid response from server');
         }
       } catch (err) {
         console.error('Error processing invite:', err);
-        const errorMessage = err.response?.data?.error || 'Invalid or expired invite link';
+        const errorMessage = typeof err === 'string' ? err : 'Invalid or expired invite link';
         setError(errorMessage);
         setStatus('');
       }
@@ -54,7 +54,7 @@ function InviteHandler() {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full text-center">
         <h2 className="text-xl font-bold mb-4 dark:text-white">Joining Room</h2>
-        
+
         {error ? (
           <div className="text-red-600 dark:text-red-400 mb-4">
             <p>{error}</p>

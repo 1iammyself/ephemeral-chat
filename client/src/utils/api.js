@@ -8,8 +8,13 @@ const isDev = (typeof process !== 'undefined' && process.env.NODE_ENV === 'devel
 const ENV_API_URL = (typeof process !== 'undefined' ? process.env.REACT_APP_API_URL : null) ||
   (typeof import.meta !== 'undefined' ? import.meta.env.VITE_API_URL : null);
 
-// In production, default to relative path (empty string) if no URL provided
+// In production, we need a full URL if hosting on a different domain (like Cloudflare Pages)
+// If no URL is provided, it will fallback to relative path (empty string)
 const API_BASE_URL = ENV_API_URL || (isDev ? 'http://localhost:3001' : '');
+
+if (ENV_API_URL) {
+  console.log('📡 Using API URL:', ENV_API_URL);
+}
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -72,8 +77,24 @@ export const joinWithVerbalCode = async (verbalCode) => {
   }
 };
 
+/**
+ * Check if a room exists
+ * @param {string} roomCode 
+ * @returns {Promise<{exists: boolean}>}
+ */
+export const checkRoom = async (roomCode) => {
+  try {
+    const response = await api.get(`/api/rooms/${roomCode}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error checking room:', error);
+    throw error.response?.data?.error || 'Failed to check room';
+  }
+};
+
 export default {
   generateInviteLink,
   validateInviteToken,
-  joinWithVerbalCode
+  joinWithVerbalCode,
+  checkRoom
 };

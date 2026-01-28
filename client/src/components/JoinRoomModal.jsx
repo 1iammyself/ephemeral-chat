@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import '@cap.js/widget';
 
 const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite = false, isWaitingForHost = false }) => {
-  const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '';
+  const API_BASE = import.meta.env.VITE_API_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '');
   const location = useLocation();
   const navigate = useNavigate();
   const [nickname, setNickname] = useState('');
@@ -73,7 +73,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
     const checkRoomAndInvite = async () => {
       try {
         // First, check room info
-        const roomResponse = await fetch(`/api/rooms/${roomCode}`);
+        const roomResponse = await fetch(`${API_BASE}/api/rooms/${roomCode}`);
         const roomData = await roomResponse.json();
 
         if (!isMounted) return;

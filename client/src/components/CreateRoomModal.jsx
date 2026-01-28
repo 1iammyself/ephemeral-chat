@@ -5,7 +5,7 @@ import '@cap.js/widget';
 import { generateRoomKey } from '../utils/security';
 
 const CreateRoomModal = ({ onClose, onRoomCreated }) => {
-  const API_BASE = process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '';
+  const API_BASE = import.meta.env.VITE_API_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '');
 
   const [settings, setSettings] = useState({
     messageTTL: 'none',

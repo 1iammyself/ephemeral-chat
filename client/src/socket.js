@@ -11,26 +11,28 @@ const isAllowedHostname = (hostname) => {
 
 // Get the current hostname and protocol
 const getServerUrl = () => {
-  // Use VITE_API_URL if explicitly set
+  // 1. Explicit environment variable (highest priority)
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
 
-  // In browser environment
+  // 2. Relative for the same host
   if (typeof window !== 'undefined') {
     const { protocol, hostname } = window.location;
 
-    // Only allow chat.kyere.me as production
-    if (isAllowedHostname(hostname)) {
+    // If we're on the production domain already, use it
+    if (hostname === 'chat.kyere.me') {
       return `${protocol}//${hostname}`;
     }
 
-    // For local development
-    return 'http://localhost:3001';
+    // For local development or other hosts, default to local if not set
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:3001';
+    }
   }
 
-  // Default fallback
-  return 'http://localhost:3001';
+  // 3. Fallback to same host (works for current Render monolithic setup)
+  return '';
 };
 
 const SERVER_URL = getServerUrl();
@@ -70,21 +72,14 @@ class SocketManager {
       this.socket = io(SERVER_URL, {
         withCredentials: true,
         reconnection: true,
-        reconnectionAttempts: this.maxReconnectAttempts,
+        reconnectionAttempts: Infinity, // Keep trying! Useful for waking up Render
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
-        timeout: 20000,
+        timeout: 45000, // Longer timeout for cold starts
         transports: ['websocket', 'polling'],
         autoConnect: true,
         forceNew: true,
-        upgrade: true,
-        rememberUpgrade: true,
-        path: '/socket.io/',
-        query: {},
-        extraHeaders: {
-          'Access-Control-Allow-Origin': window.location.origin,
-          'Access-Control-Allow-Credentials': 'true'
-        }
+        path: '/socket.io/'
       });
 
       // Debug events

@@ -5,6 +5,7 @@ import ChatRoom from './components/ChatRoom';
 import JoinRoomModal from './components/JoinRoomModal';
 import InviteHandler from './components/InviteHandler.jsx';
 import PWAHandler from './components/PWAHandler';
+import ServerStatus from './components/ServerStatus';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -36,6 +37,7 @@ function App() {
     <Router>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 transition-colors duration-200">
         <PWAHandler />
+        <ServerStatus />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/room/:roomCode" element={<ChatRoom />} />

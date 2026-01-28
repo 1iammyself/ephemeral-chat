@@ -59,7 +59,8 @@ const ImageReveal = ({ viewToken }) => {
         const fetchImage = async () => {
             setIsLoading(true);
             try {
-                const res = await fetch('/api/reveal-image', {
+                const apiBase = import.meta.env.VITE_API_URL || '';
+                const res = await fetch(`${apiBase}/api/reveal-image`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ viewToken })

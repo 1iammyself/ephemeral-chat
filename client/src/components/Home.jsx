@@ -4,7 +4,7 @@ import { MessageCircle, Users, Clock, Shield, Plus, ArrowRight, Zap, Wifi, User,
 import CreateRoomModal from './CreateRoomModal';
 import TraceHashModal from './TraceHashModal';
 import ThemeToggle from './ThemeToggle';
-import { joinWithVerbalCode } from '../utils/api';
+import { joinWithVerbalCode, checkRoom } from '../utils/api';
 import { toast } from 'react-toastify';
 
 import { RefreshButton } from './PWAHandler';
@@ -28,10 +28,9 @@ const Home = ({ children }) => {
     setIsJoining(true);
     try {
       // Check if room exists
-      const response = await fetch(`/api/rooms/${roomCode.toUpperCase()}`);
-      const data = await response.json();
+      const data = await checkRoom(roomCode.toUpperCase());
 
-      if (response.ok && data.exists) {
+      if (data.exists) {
         navigate(`/room/${roomCode.toUpperCase()}`);
       } else {
         alert('Room not found. Please check the room code.');
