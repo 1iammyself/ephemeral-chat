@@ -82,6 +82,13 @@ class SocketManager {
         path: '/socket.io/'
       });
 
+      // Apply any listeners that were registered before connection
+      this.listeners.forEach((callbacks, event) => {
+        callbacks.forEach(callback => {
+          this.socket.on(event, callback);
+        });
+      });
+
       // Debug events
       this.socket.on('connect', () => {
         console.log('🔌 Socket connected:', this.socket.id);
@@ -184,14 +191,13 @@ class SocketManager {
   }
 
   on(event, callback) {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, []);
+    }
+    this.listeners.get(event).push(callback);
+
     if (this.socket) {
       this.socket.on(event, callback);
-
-      // Store listener for cleanup
-      if (!this.listeners.has(event)) {
-        this.listeners.set(event, []);
-      }
-      this.listeners.get(event).push(callback);
     }
   }
 
