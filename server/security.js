@@ -221,6 +221,21 @@ class SecurityManager {
   }
 
   /**
+   * Resume a session with a new socket ID
+   * @param {string} token - Session token
+   * @param {string} newSocketId - New socket ID
+   * @returns {boolean} True if resumed
+   */
+  resumeSession(token, newSocketId) {
+    const session = this.sessionTokens.get(token);
+    if (session) {
+      session.socketId = newSocketId;
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Invalidate a session token
    * @param {string} token - Session token
    */

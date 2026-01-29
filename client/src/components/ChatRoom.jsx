@@ -113,6 +113,8 @@ const ChatRoom = () => {
   const [hasNewLogs, setHasNewLogs] = useState(false);
   const [offsets, setOffsets] = useState({ topic: 0, timer: 0 });
   const [dragState, setDragState] = useState(null); // { type: 'topic' | 'timer', startX: number, startOffset: number }
+  const [sessionToken, setSessionToken] = useState(null);
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const [safariNoticeShown, setSafariNoticeShown] = useState(() => {
     return localStorage.getItem('safariAudioNoticeShown') === 'true';
   });
@@ -215,10 +217,17 @@ const ChatRoom = () => {
         socketManager.setRoomType(response.room.settings?.persistenceMode || 'ephemeral');
 
         setCurrentUser({ id: socketManager.socket?.id, socketId: socketManager.socket?.id, nickname: response.nickname, isAdmin: myRole === 'host' || myRole === 'tier1' });
+
+        if (response.sessionToken) {
+          setSessionToken(response.sessionToken);
+        }
+
         setIsJoined(true);
         setShowJoinModal(false);
         setIsProcessingInvite(false);
         setIsWaitingForHost(false);
+        setIsReconnecting(false);
+        setError(null);
         return;
       }
       setError(response.error || 'Failed to join room');
@@ -263,11 +272,26 @@ const ChatRoom = () => {
 
   useEffect(() => {
     const socket = socketManager.connect();
-    const handleConnect = () => setIsConnected(true);
+    const handleConnect = () => {
+      setIsConnected(true);
+      if (isJoined && sessionToken) {
+        setIsReconnecting(true);
+        // Auto-rejoin using session token
+        performJoin({ sessionToken });
+      }
+    };
     const handleDisconnect = (reason) => {
       setIsConnected(false);
-      if (reason === 'io server disconnect') setError('You have been disconnected by the server');
-      else if (reason === 'transport close') setError('Connection lost. Trying to reconnect...');
+      if (reason === 'io server disconnect') {
+        setError('You have been disconnected by the server');
+      } else if (reason === 'transport close' || reason === 'ping timeout') {
+        // Don't show full screen error for background disconnects if we can rejoin
+        if (isJoined) {
+          setIsReconnecting(true);
+        } else {
+          setError('Connection lost. Trying to reconnect...');
+        }
+      }
     };
 
     const handleRoomJoined = async (data) => {
@@ -544,7 +568,13 @@ const ChatRoom = () => {
       socketManager.off('user-typing', handleUserTyping);
       socketManager.off('user-stop-typing', handleUserStopTyping);
       socketManager.off('room-reaction', handleRoomReaction);
-      if (process.env.NODE_ENV !== 'development') socketManager.disconnect();
+
+      // Explicitly leave the room before disconnecting
+      socketManager.emit('leave-room');
+
+      if (process.env.NODE_ENV !== 'development') {
+        socketManager.disconnect();
+      }
     };
   }, [roomCode, performJoin, roomKey]);
 
@@ -1013,6 +1043,14 @@ const ChatRoom = () => {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
+      {isReconnecting && (
+        <div className="absolute inset-0 z-[100] bg-black/20 backdrop-blur-[2px] flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-800 px-4 py-2 rounded-full shadow-lg flex items-center space-x-2">
+            <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Reconnecting...</span>
+          </div>
+        </div>
+      )}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 sm:py-3 sticky top-0 z-50">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 sm:space-x-4">

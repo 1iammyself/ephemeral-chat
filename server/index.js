@@ -1013,36 +1013,42 @@ io.on('connection', (socket) => {
 
   socket.on('join-room', async (data, callback) => {
     try {
-      const { roomCode, nickname, password, inviteToken, capToken } = data;
-      const userId = socket.id; // Use socket ID as user ID
+      const { roomCode, nickname, password, inviteToken, capToken, sessionToken, userId } = data;
 
-      // Validate credentials
-      const validation = authUtils.validateCredentials({ roomCode, password, nickname });
-      if (!validation.valid) {
-        logger.error(`Invalid credentials: ${validation.errors.join(', ')}`);
-        return callback({ success: false, error: validation.errors[0] });
-      }
+      // 1. Session Resumption Path
+      if (sessionToken) {
+        const session = securityManager.validateSession(sessionToken);
+        if (session && session.roomCode === roomCode) {
+          // Re-bind session to new socket
+          securityManager.resumeSession(sessionToken, socket.id);
 
-      // Verify Cap token (proof-of-work verification)
-      if (capToken) {
-        const isValid = await cap.validateToken(capToken);
-        if (!isValid) {
-          logger.error(`Invalid Cap token for room ${roomCode}`);
-          return callback({ success: false, error: 'Verification failed. Please try again.' });
+          socket.join(roomCode);
+          socket.roomCode = roomCode;
+          socket.nickname = nickname || session.nickname || generateRandomNickname();
+
+          const room = await roomManager.getRoom(roomCode);
+          if (room) {
+            const persistenceMode = room.settings?.persistenceMode || 'ephemeral';
+            const timeoutMs = persistenceMode !== 'ephemeral' ? 12 * 60 * 60 * 1000 : undefined;
+            securityManager.registerUserActivity(socket.id, userId || socket.id, roomCode, handleInactivityTimeout, timeoutMs);
+
+            const messages = await roomManager.getMessages(roomCode, socket.id);
+            const enrichedUsers = getEnrichedUsers(roomCode);
+
+            return callback({
+              success: true,
+              room: { ...room, ...roomData[roomCode] },
+              users: enrichedUsers,
+              messages,
+              nickname: socket.nickname,
+              sessionToken
+            });
+          }
         }
       }
 
-      // Check if user is locked out due to failed attempts
-      const lockStatus = securityManager.isLocked(socket.id);
-      if (lockStatus.locked) {
-        const remainingTime = Math.ceil((lockStatus.lockedUntil - Date.now()) / 1000 / 60);
-        return callback({
-          success: false,
-          error: `Too many failed attempts. Please try again in ${remainingTime} minutes.`
-        });
-      }
-
-      if (!isValidRoomCode(roomCode)) {
+      // 2. Standard Join Path
+      if (!roomCode || !isValidRoomCode(roomCode)) {
         logger.error(`Invalid room code format: ${roomCode}`);
         return callback({ success: false, error: 'Invalid room code format' });
       }
@@ -1125,6 +1131,12 @@ io.on('connection', (socket) => {
 
         const enrichedUsers = getEnrichedUsers(roomCode);
 
+        // Create a session token for reconnection support
+        const sessionToken = securityManager.createSession(socket.id, userId, roomCode);
+        // Store nickname in session for resumption
+        const session = securityManager.validateSession(sessionToken);
+        if (session) session.nickname = userNickname;
+
         callback({
           success: true,
           room: extendedRoom,
@@ -1132,7 +1144,8 @@ io.on('connection', (socket) => {
           messages,
           nickname: userNickname,
           isInviteOnly: result.room.settings?.isInviteOnly || false,
-          inactivityTimeoutMs: securityManager.INACTIVITY_TIMEOUT_MS
+          inactivityTimeoutMs: securityManager.INACTIVITY_TIMEOUT_MS,
+          sessionToken
         });
 
         // Notify others
@@ -1612,49 +1625,60 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('disconnect', async () => {
-    // logger.info(`🔌 User disconnected: ${socket.id}`);
+  const handleUserDeparture = async (isExplicit = false) => {
+    if (!socket.roomCode) return;
+
+    const roomCode = socket.roomCode;
+    const nickname = socket.nickname;
+    const socketId = socket.id;
+
+    // logger.info(`🚪 User ${nickname} (${socketId}) leaving room ${roomCode} (explicit: ${isExplicit})`);
 
     // Host Handover Logic
-    if (socket.roomCode) {
-      const room = roomData[socket.roomCode];
-      if (room && room.hostId === socket.id) {
-        // Host is leaving
-        const socketRoom = io.sockets.adapter.rooms.get(socket.roomCode);
-        const remainingMembers = Array.from(socketRoom || []).filter(id => id !== socket.id);
+    const room = roomData[roomCode];
+    if (room && room.hostId === socketId) {
+      const socketRoom = io.sockets.adapter.rooms.get(roomCode);
+      const remainingMembers = Array.from(socketRoom || []).filter(id => id !== socketId);
 
-        if (remainingMembers.length > 0) {
-          // Promote next user
-          const newHostId = remainingMembers[0];
-          room.hostId = newHostId;
-          io.to(newHostId).emit('promoted-to-host');
-          // logger.info(`Host handover in room ${socket.roomCode} to ${newHostId}`);
-        } else {
-          // Room empty
-          delete roomData[socket.roomCode];
-        }
+      if (remainingMembers.length > 0) {
+        const newHostId = remainingMembers[0];
+        room.hostId = newHostId;
+        io.to(newHostId).emit('promoted-to-host');
+      } else {
+        delete roomData[roomCode];
       }
     }
 
-    // Clear user activity tracking
-    securityManager.clearUserActivity(socket.id);
-
-    // Invalidate all sessions for this socket
-    securityManager.invalidateSocketSessions(socket.id);
-
-    if (socket.roomCode) {
-      await roomManager.leaveRoom(socket.roomCode, socket.id);
-
-      // Notify others
-      socket.to(socket.roomCode).emit('user-left', {
-        nickname: socket.nickname,
-        socketId: socket.id
-      });
-
-      // logger.info(`👤 ${socket.nickname} left room ${socket.roomCode}`);
+    if (isExplicit) {
+      // Clear user activity tracking and session ONLY on explicit exit
+      securityManager.clearUserActivity(socketId);
+      securityManager.invalidateSocketSessions(socketId);
     }
 
-    // Clean up rate limiting
+    // Leave in RoomManager
+    await roomManager.leaveRoom(roomCode, socketId);
+
+    // Notify others
+    const socketRoomSize = io.sockets.adapter.rooms.get(roomCode)?.size || 0;
+    socket.to(roomCode).emit('user-left', {
+      nickname: nickname,
+      socketId: socketId,
+      userCount: Math.max(0, socketRoomSize - 1)
+    });
+
+    // Actually leave the socket.io room
+    socket.leave(roomCode);
+    socket.roomCode = null;
+    socket.nickname = null;
+  };
+
+  socket.on('leave-room', async () => {
+    await handleUserDeparture(true);
+  });
+
+  socket.on('disconnect', async () => {
+    // logger.info(`🔌 User disconnected: ${socket.id}`);
+    await handleUserDeparture(false);
     rateLimits.delete(socket.id);
   });
 });
