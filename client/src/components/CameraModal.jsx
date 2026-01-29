@@ -10,11 +10,12 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
     const [facingMode, setFacingMode] = useState('user'); // 'user' for front, 'environment' for back
     const [previewImage, setPreviewImage] = useState(null);
     const [isCapturing, setIsCapturing] = useState(false);
+    const streamRef = useRef(null);
 
     const startCamera = useCallback(async () => {
         try {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(track => track.stop());
             }
 
             setError(null);
@@ -28,6 +29,7 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
             };
 
             const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+            streamRef.current = newStream;
             setStream(newStream);
             if (videoRef.current) {
                 videoRef.current.srcObject = newStream;
@@ -48,13 +50,24 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
     useEffect(() => {
         if (isOpen) {
             startCamera();
+        } else {
+            // Clean up when explicitly closed
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(track => track.stop());
+                streamRef.current = null;
+            }
+            setStream(null);
+            setPreviewImage(null);
+            setIsReady(false);
+            setError(null);
         }
         return () => {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(track => track.stop());
+                streamRef.current = null;
             }
         };
-    }, [isOpen, facingMode]);
+    }, [isOpen, startCamera]);
 
     const toggleCamera = () => {
         setFacingMode(prev => (prev === 'user' ? 'environment' : 'user'));
