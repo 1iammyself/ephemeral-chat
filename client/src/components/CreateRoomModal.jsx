@@ -454,7 +454,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 </label>
               </div>
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 sm:mb-3">
-                Set the maximum number of people who can join this room (1-7)
+                Set the maximum number of people who can join this room (1-10)
               </p>
               <div className="px-2 sm:px-3">
                 {/* +/- buttons with current value */}
@@ -472,28 +472,28 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                   </span>
                   <button
                     type="button"
-                    onClick={() => setSettings(prev => ({ ...prev, maxUsers: Math.min(7, prev.maxUsers + 1) }))}
-                    disabled={roomSettings.maxUsers >= 7}
+                    onClick={() => setSettings(prev => ({ ...prev, maxUsers: Math.min(10, prev.maxUsers + 1) }))}
+                    disabled={roomSettings.maxUsers >= 10}
                     className="w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-300 dark:disabled:text-gray-600 rounded-full text-xl font-bold transition-colors dark:text-white"
                   >
                     +
                   </button>
                 </div>
                 {/* Slider */}
-                <div className="flex items-center space-x-3 sm:space-x-4">
-                  <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">1</span>
+                <div className="mt-4 sm:mt-6">
                   <input
                     type="range"
                     min="1"
-                    max="7"
+                    max="10"
+                    step="1"
                     value={roomSettings.maxUsers}
-                    onChange={(e) => {
-                      const value = parseInt(e.target.value);
-                      setSettings(prev => ({ ...prev, maxUsers: value }));
-                    }}
-                    className="flex-1 h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+                    onChange={(e) => setSettings(prev => ({ ...prev, maxUsers: parseInt(e.target.value) }))}
+                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
                   />
-                  <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">7</span>
+                  <div className="flex justify-between mt-2 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium pb-2">
+                    <span>1</span>
+                    <span>10</span>
+                  </div>
                 </div>
               </div>
             </div>

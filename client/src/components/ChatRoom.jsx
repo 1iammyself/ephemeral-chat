@@ -51,6 +51,18 @@ import { getRandomIcebreaker } from '../utils/icebreakers';
 import { RefreshButton } from './PWAHandler';
 import { getCreatorId } from '../utils/creator';
 
+const SLASH_COMMANDS = [
+  { icon: BarChart2, label: 'Poll', value: '/poll', desc: 'Create a new poll' },
+  { icon: Phone, label: 'Voice Call', value: '/call', desc: 'Start a voice call' },
+  { icon: ImageIcon, label: 'Photo', value: '/photo', desc: 'Upload an image' },
+  { icon: Mic, label: 'Voice Note', value: '/voice', desc: 'Record a voice note' },
+  { icon: Smile, label: 'Icebreaker', value: '/ice', desc: 'Send a random question' },
+  { icon: Zap, label: 'Pulse', value: '/pulse', desc: 'Shake the room' },
+  { icon: Edit2, label: 'Topic', value: '/topic', desc: 'Set room topic', adminOnly: true },
+  { icon: Clock, label: 'Timer', value: '/timer', desc: 'Start a countdown', adminOnly: true },
+  { icon: Activity, label: 'Vibe', value: '/vibe', desc: 'Change room vibe', adminOnly: true }
+];
+
 // Safari detection (robust hybrid check)
 function isSafariBrowser() {
   const ua = navigator.userAgent;
@@ -115,6 +127,10 @@ const ChatRoom = () => {
   const [dragState, setDragState] = useState(null); // { type: 'topic' | 'timer', startX: number, startOffset: number }
   const [sessionToken, setSessionToken] = useState(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
+
+  // Suggestions State
+  const [suggestions, setSuggestions] = useState({ show: false, type: null, items: [], index: 0, query: '' });
+  const suggestionRef = useRef(null);
   const [safariNoticeShown, setSafariNoticeShown] = useState(() => {
     return localStorage.getItem('safariAudioNoticeShown') === 'true';
   });
@@ -599,10 +615,78 @@ const ChatRoom = () => {
       if (featureMenuRef.current && !featureMenuRef.current.contains(event.target)) {
         setShowFeatureMenu(false);
       }
+      if (suggestionRef.current && !suggestionRef.current.contains(event.target)) {
+        setSuggestions(prev => ({ ...prev, show: false }));
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Suggestions Logic
+  useEffect(() => {
+    const text = newMessage;
+    const lastWord = text.split(/\s/).pop();
+
+    if (text.startsWith('/')) {
+      const query = text.substring(1).toLowerCase();
+      const filtered = SLASH_COMMANDS.filter(cmd =>
+        (cmd.value.toLowerCase().includes(query) || cmd.label.toLowerCase().includes(query)) &&
+        (!cmd.adminOnly || canManageRoom(currentUserRole))
+      );
+      setSuggestions({
+        show: filtered.length > 0,
+        type: 'command',
+        items: filtered,
+        index: 0,
+        query
+      });
+    } else if (lastWord && lastWord.startsWith('@')) {
+      const query = lastWord.substring(1).toLowerCase();
+      const filtered = users
+        .filter(u => u.socketId !== socketManager.socket?.id)
+        .filter(u => u.nickname.toLowerCase().includes(query));
+
+      setSuggestions({
+        show: filtered.length > 0,
+        type: 'mention',
+        items: filtered,
+        index: 0,
+        query
+      });
+    } else {
+      setSuggestions(prev => ({ ...prev, show: false }));
+    }
+  }, [newMessage, users, currentUserRole]);
+
+  const applySuggestion = (item) => {
+    if (suggestions.type === 'command') {
+      setNewMessage(item.value + ' ');
+    } else if (suggestions.type === 'mention') {
+      const parts = newMessage.split(/\s/);
+      parts.pop();
+      setNewMessage(parts.join(' ') + (parts.length > 0 ? ' ' : '') + '@' + item.nickname + ' ');
+    }
+    setSuggestions(prev => ({ ...prev, show: false }));
+    messageInputRef.current?.focus();
+  };
+
+  const handleKeyDown = (e) => {
+    if (suggestions.show) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSuggestions(prev => ({ ...prev, index: (prev.index + 1) % prev.items.length }));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSuggestions(prev => ({ ...prev, index: (prev.index - 1 + prev.items.length) % prev.items.length }));
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        applySuggestion(suggestions.items[suggestions.index]);
+      } else if (e.key === 'Escape') {
+        setSuggestions(prev => ({ ...prev, show: false }));
+      }
+    }
+  };
 
   const onEmojiClick = (emojiData) => {
     setNewMessage(prev => prev + emojiData.emoji);
@@ -657,9 +741,75 @@ const ChatRoom = () => {
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || isSending || !isConnected) return;
+
+    // 1. Handle Slash Commands
+    if (newMessage.trim().startsWith('/')) {
+      const parts = newMessage.trim().split(/\s+/);
+      const cmd = parts[0].toLowerCase();
+      const args = parts.slice(1).join(' ');
+
+      switch (cmd) {
+        case '/poll': setShowPollModal(true); break;
+        case '/call':
+          if (users.length > 7) {
+            setError('Voice calls are disabled in rooms with more than 7 users for stability.');
+          } else {
+            handleStartCall();
+          }
+          break;
+        case '/photo':
+        case '/image': fileInputRef.current?.click(); break;
+        case '/voice':
+        case '/note': startRecording(); break;
+        case '/ice': handleSendIcebreaker(); break;
+        case '/pulse': handleSendPulse(); break;
+        case '/topic':
+          if (canManageRoom(currentUserRole)) {
+            if (args) handleSaveTopic(args);
+            else setShowTopicEditor(true);
+          } else setError('Admin permission required for /topic');
+          break;
+        case '/timer':
+          if (canManageRoom(currentUserRole)) {
+            const mins = parseInt(args);
+            if (!isNaN(mins)) handleStartTimer(mins * 60);
+            else setShowTimerModal(true);
+          } else setError('Admin permission required for /timer');
+          break;
+        case '/vibe':
+          if (canManageRoom(currentUserRole)) {
+            const vibe = getAllVibes().find(v => v.name.toLowerCase() === args.toLowerCase() || v.id === args.toLowerCase());
+            if (vibe) handleUpdateVibe(vibe.id);
+          }
+          break;
+        default:
+          // Just send as regular message if not a valid command
+          break;
+      }
+      if (cmd.startsWith('/')) {
+        const isValid = SLASH_COMMANDS.some(c => c.value === cmd);
+        if (isValid) {
+          setNewMessage('');
+          return;
+        }
+      }
+    }
+
     setIsSending(true);
     try {
       let content = newMessage.trim();
+
+      // Handle Mentions for Targeted Delivery
+      const mentionMatches = content.match(/@(\w+)/g) || [];
+      const mentionedSocketIds = mentionMatches.map(m => {
+        const nick = m.substring(1).toLowerCase();
+        const user = users.find(u => u.nickname.toLowerCase() === nick);
+        return user?.socketId;
+      }).filter(Boolean);
+
+      // If mentions exist, they take precedence
+      const finalRecipients = mentionedSocketIds.length > 0 ? mentionedSocketIds : selectedRecipients;
+
       let isEncrypted = false;
       let iv = null;
       if (roomKey) {
@@ -679,7 +829,7 @@ const ChatRoom = () => {
         content,
         isEncrypted,
         iv,
-        recipients: selectedRecipients,
+        recipients: finalRecipients,
         replyTo: replyData
       });
       socketManager.emit('user-activity');
@@ -1259,14 +1409,31 @@ const ChatRoom = () => {
 
                             <button
                               type="button"
-                              onClick={() => { handleStartCall(); setShowFeatureMenu(false); }}
-                              disabled={!isConnected || users.length < 2}
-                              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-green-50/50 dark:bg-green-900/10 hover:bg-green-100 dark:hover:bg-green-900/20 transition-all border border-green-100/20 dark:border-green-800/20 group"
+                              onClick={() => {
+                                if (users.length > 7) {
+                                  setError('Voice calls are limited to 7 users for stability.');
+                                } else {
+                                  handleStartCall();
+                                  setShowFeatureMenu(false);
+                                }
+                              }}
+                              disabled={!isConnected || users.length < 2 || users.length > 7}
+                              className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all border group ${users.length > 7
+                                  ? 'bg-gray-50/50 dark:bg-gray-800/20 border-gray-200/20 dark:border-gray-700/20 opacity-50 cursor-not-allowed'
+                                  : 'bg-green-50/50 dark:bg-green-900/10 hover:bg-green-100 dark:hover:bg-green-900/20 border-green-100/20 dark:border-green-800/20'
+                                }`}
+                              title={users.length > 7 ? "Disabled: Max 7 users for voice calls" : "Start Voice Call"}
                             >
-                              <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                <Phone className="w-5 h-5 text-green-500" />
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-transform ${users.length > 7
+                                  ? 'bg-gray-100 dark:bg-gray-800/50'
+                                  : 'bg-green-100 dark:bg-green-900/30 group-hover:scale-110'
+                                }`}>
+                                <Phone className={`w-5 h-5 ${users.length > 7 ? 'text-gray-400' : 'text-green-500'}`} />
                               </div>
-                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Voice Call</span>
+                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                {users.length > 7 ? 'Call Disabled' : 'Voice Call'}
+                              </span>
+                              {users.length > 7 && <span className="text-[10px] text-gray-500 mt-1">Max 7</span>}
                             </button>
 
                             <button
@@ -1397,7 +1564,58 @@ const ChatRoom = () => {
                         </div>
                       )}
                     </div>
-                    <input ref={messageInputRef} type="text" value={newMessage} onChange={(e) => { setNewMessage(e.target.value); handleTyping(); }} onCopy={(e) => e.preventDefault()} onCut={(e) => e.preventDefault()} onPaste={(e) => e.preventDefault()} placeholder="Type message..." className="flex-1 input-field py-2.5 sm:py-3 px-3 sm:px-4 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 text-sm sm:text-base" disabled={!isConnected || isSending} maxLength={500} />
+                    <div className="relative flex-1">
+                      {suggestions.show && (
+                        <div
+                          ref={suggestionRef}
+                          className="absolute bottom-full left-0 w-full mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl overflow-hidden z-[60] animate-in slide-in-from-bottom-2 duration-200"
+                        >
+                          <div className="max-h-48 overflow-y-auto">
+                            {suggestions.items.map((item, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => applySuggestion(item)}
+                                onMouseEnter={() => setSuggestions(prev => ({ ...prev, index: idx }))}
+                                className={`w-full flex items-center space-x-3 px-4 py-2.5 transition-colors text-left ${idx === suggestions.index ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300'}`}
+                              >
+                                {suggestions.type === 'command' ? (
+                                  <>
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${idx === suggestions.index ? 'bg-blue-100 dark:bg-blue-900/40' : 'bg-gray-100 dark:bg-gray-700'}`}>
+                                      <item.icon className="w-4 h-4" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-bold text-sm">{item.value}</div>
+                                      <div className="text-[10px] opacity-70 truncate">{item.desc}</div>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+                                      {item.nickname[0].toUpperCase()}
+                                    </div>
+                                    <div className="font-bold text-sm">@{item.nickname}</div>
+                                  </>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <input
+                        ref={messageInputRef}
+                        type="text"
+                        value={newMessage}
+                        onChange={(e) => { setNewMessage(e.target.value); handleTyping(); }}
+                        onKeyDown={handleKeyDown}
+                        onCopy={(e) => e.preventDefault()}
+                        onCut={(e) => e.preventDefault()}
+                        onPaste={(e) => e.preventDefault()}
+                        placeholder="Type message..."
+                        className="w-full input-field py-2.5 sm:py-3 px-3 sm:px-4 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 text-sm sm:text-base"
+                        disabled={!isConnected || isSending}
+                        maxLength={500}
+                      />
+                    </div>
                     <button type="submit" disabled={!newMessage.trim() || !isConnected || isSending} className="btn-primary px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl"><Send className="w-5 h-5" /></button>
                   </>
                 )}
