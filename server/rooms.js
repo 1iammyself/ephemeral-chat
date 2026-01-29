@@ -7,6 +7,12 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { generateRoomCode, sanitizeInput, logger } = require('./utils');
 const { WORDLIST } = require('./wordlist');
+const {
+  getPersistenceMode,
+  isValidPersistenceMode,
+  getLifetimeMs,
+  MAX_ROOMS_PER_CREATOR
+} = require('./utils/persistence');
 
 class RoomManager {
   constructor(redisClient = null) {
@@ -25,18 +31,54 @@ class RoomManager {
     this.joinLocks = new Map(); // roomCode -> Promise (Mutex for joining)
     this.viewTokens = new Map(); // token -> { messageId, userId, expiresAt, watermarkSeed }
 
+    // Creator tracking for persistent rooms
+    this.creatorRooms = new Map(); // creatorId -> Set([roomCodes])
+    this.participatedRooms = new Map(); // userId -> Set([roomCodes]) (for "Recent Rooms")
+    this.MAX_SERVER_ROOMS = 1500; // Server-wide limit for persistent rooms
+
     // Start garbage collector for in-memory messages
     if (!this.redis) {
       this.cleanupInterval = setInterval(() => this.pruneExpiredMessages(), 60 * 1000);
     }
+
+    // Periodic cleanup for expired persistent rooms
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupExpiredRooms();
+    }, 5 * 60 * 1000); // Every 5 minutes
   }
 
   /**
    * Create a new room
-   * @param {Object} settings - Room settings {messageTTL, password}
+   * @param {Object} settings - Room settings {messageTTL, password, creatorId, persistenceMode}
    * @returns {Promise<string>} Room code
    */
   async createRoom(settings = {}) {
+    const creatorId = settings.creatorId || null;
+    const persistenceMode = settings.persistenceMode || 'ephemeral';
+
+    // Validate persistence mode
+    if (!isValidPersistenceMode(persistenceMode)) {
+      throw new Error(`Invalid persistence mode: ${persistenceMode}`);
+    }
+
+    // Check per-creator room limit (5 rooms max)
+    if (creatorId) {
+      const creatorRoomCount = this.creatorRooms.get(creatorId)?.size || 0;
+      if (creatorRoomCount >= MAX_ROOMS_PER_CREATOR) {
+        throw new Error(`You have reached the maximum of ${MAX_ROOMS_PER_CREATOR} rooms. Please delete an existing room first.`);
+      }
+    }
+
+    // Check server-wide room limit (1500 total persistent rooms)
+    if (persistenceMode !== 'ephemeral') {
+      const totalPersistentRooms = Array.from(this.creatorRooms.values())
+        .reduce((sum, roomSet) => sum + roomSet.size, 0);
+
+      if (totalPersistentRooms >= this.MAX_SERVER_ROOMS) {
+        throw new Error('Server capacity reached. Please try again later.');
+      }
+    }
+
     let roomCode;
     let attempts = 0;
     const maxAttempts = 10;
@@ -50,7 +92,9 @@ class RoomManager {
       }
     } while (await this.roomExists(roomCode));
 
-    const lifetimeMinutes = settings.lifetimeMinutes || this.ROOM_DEFAULT_LIFETIME_MINUTES;
+    // Get lifetime from persistence mode configuration
+    const modeConfig = getPersistenceMode(persistenceMode);
+    const lifetimeMinutes = modeConfig.lifetimeMinutes;
 
     const room = {
       id: roomCode,
@@ -58,17 +102,29 @@ class RoomManager {
       expiresAt: new Date(Date.now() + (lifetimeMinutes * 60 * 1000)).toISOString(),
       users: [],
       messages: [],
+      creatorId: creatorId, // NEW: Store creator ID
       settings: {
         messageTTL: settings.messageTTL || 0,
         passwordHash: settings.password ? await bcrypt.hash(settings.password, 10) : null,
         isInviteOnly: settings.isInviteOnly || false,
         maxUsers: settings.maxUsers,
-        lifetimeMinutes: lifetimeMinutes // Store lifetime for reference
+        lifetimeMinutes: lifetimeMinutes,
+        persistenceMode: persistenceMode // NEW: Store persistence mode
       }
     };
 
     await this.saveRoom(roomCode, room);
-    this.setRoomExpiry(roomCode, lifetimeMinutes * 60 * 1000);
+
+    // Set room expiry with persistence mode awareness
+    this.setRoomExpiry(roomCode, lifetimeMinutes * 60 * 1000, persistenceMode);
+
+    // Track creator-to-room mapping
+    if (creatorId) {
+      if (!this.creatorRooms.has(creatorId)) {
+        this.creatorRooms.set(creatorId, new Set());
+      }
+      this.creatorRooms.get(creatorId).add(roomCode);
+    }
 
     // If it's an invite-only room, generate a permanent invite token
     if (room.settings.isInviteOnly) {
@@ -260,6 +316,15 @@ class RoomManager {
 
       // Add user to room
       room.users.push(user);
+
+      // Record participation for "Recent Rooms" visibility
+      if (userId) {
+        if (!this.participatedRooms.has(userId)) {
+          this.participatedRooms.set(userId, new Set());
+        }
+        this.participatedRooms.get(userId).add(roomCode);
+      }
+
       await this.saveRoom(roomCode, room);
 
       // If an invite token was used, consume it now after successful join
@@ -290,8 +355,18 @@ class RoomManager {
 
     room.users = room.users.filter(user => user.socketId !== socketId);
 
+    // Check if room should be deleted when empty
     if (room.users.length === 0) {
-      await this.deleteRoom(roomCode);
+      const persistenceMode = room.settings?.persistenceMode || 'ephemeral';
+      const modeConfig = getPersistenceMode(persistenceMode);
+
+      // Only delete if mode doesn't allow empty rooms (ephemeral only)
+      if (!modeConfig.allowEmpty) {
+        await this.deleteRoom(roomCode);
+      } else {
+        // Persistent rooms stay alive when empty
+        await this.saveRoom(roomCode, room);
+      }
     } else {
       await this.saveRoom(roomCode, room);
     }
@@ -544,22 +619,28 @@ class RoomManager {
    * Set room expiry timer
    * @param {string} roomCode - Room code
    * @param {number} [lifetimeMs] - Optional custom lifetime in milliseconds
+   * @param {string} [persistenceMode] - Persistence mode (ephemeral/gathering/social/extended)
    */
-  setRoomExpiry(roomCode, lifetimeMs) {
+  setRoomExpiry(roomCode, lifetimeMs, persistenceMode = 'ephemeral') {
     this.clearRoomTimer(roomCode);
 
     const expiryTime = lifetimeMs || this.ROOM_DEFAULT_LIFETIME_MS;
+    const modeConfig = getPersistenceMode(persistenceMode);
 
     const timer = setTimeout(async () => {
       // console.log(`Room ${roomCode} has expired after ${expiryTime / (60 * 1000)} minutes`);
       await this.deleteRoom(roomCode);
     }, expiryTime);
 
-    this.roomTimers.set(roomCode, timer);
+    this.roomTimers.set(roomCode, {
+      timer,
+      persistenceMode,
+      refreshOnActivity: modeConfig.refreshOnActivity
+    });
 
     // Log expiration time for debugging
     const expiryDate = new Date(Date.now() + expiryTime);
-    // console.log(`Room ${roomCode} will expire at: ${expiryDate.toISOString()}`);
+    // console.log(`Room ${roomCode} (${persistenceMode}) will expire at: ${expiryDate.toISOString()}`);
   }
 
   /**
@@ -567,7 +648,13 @@ class RoomManager {
    * @param {string} roomCode - Room code
    */
   refreshRoomExpiry(roomCode) {
-    this.setRoomExpiry(roomCode);
+    const timerData = this.roomTimers.get(roomCode);
+
+    // Only refresh if the room's persistence mode allows it (ephemeral only)
+    if (timerData && timerData.refreshOnActivity) {
+      this.setRoomExpiry(roomCode, null, timerData.persistenceMode);
+    }
+    // Persistent rooms don't refresh - they have fixed expiry from creation
   }
 
   /**
@@ -575,9 +662,9 @@ class RoomManager {
    * @param {string} roomCode - Room code
    */
   clearRoomTimer(roomCode) {
-    const timer = this.roomTimers.get(roomCode);
-    if (timer) {
-      clearTimeout(timer);
+    const timerData = this.roomTimers.get(roomCode);
+    if (timerData) {
+      clearTimeout(timerData.timer || timerData); // Handle both old and new format
       this.roomTimers.delete(roomCode);
     }
   }
@@ -589,9 +676,13 @@ class RoomManager {
   async deleteRoom(roomCode) {
     // console.log(`Deleting room ${roomCode} and cleaning up resources`);
 
+    // Get room before deleting for creator cleanup
+    const room = await this.getRoom(roomCode);
+
     // Clear any timers
     if (this.roomTimers.has(roomCode)) {
-      clearTimeout(this.roomTimers.get(roomCode));
+      const timerData = this.roomTimers.get(roomCode);
+      clearTimeout(timerData.timer || timerData);
       this.roomTimers.delete(roomCode);
     }
 
@@ -602,6 +693,17 @@ class RoomManager {
         this.cleanupToken(token);
       }
       this.roomToTokens.delete(roomCode);
+    }
+
+    // Remove from creator tracking
+    if (room && room.creatorId) {
+      const creatorRooms = this.creatorRooms.get(room.creatorId);
+      if (creatorRooms) {
+        creatorRooms.delete(roomCode);
+        if (creatorRooms.size === 0) {
+          this.creatorRooms.delete(room.creatorId);
+        }
+      }
     }
 
     // Delete from storage
@@ -1074,6 +1176,100 @@ class RoomManager {
     }
 
     return message;
+  }
+
+  /**
+   * Get all rooms created by a specific creator
+   * @param {string} creatorId - Creator ID
+   * @returns {Promise<Array>} Array of room objects
+   */
+  async getRoomsByCreator(creatorId) {
+    if (!creatorId) return [];
+
+    const roomCodes = this.creatorRooms.get(creatorId) || new Set();
+    const rooms = [];
+
+    for (const code of roomCodes) {
+      const room = await this.getRoom(code);
+      if (room) {
+        rooms.push(room);
+      } else {
+        // Room was deleted but not removed from tracking, clean up
+        this.creatorRooms.get(creatorId).delete(code);
+      }
+    }
+
+    return rooms;
+  }
+
+  /**
+   * Get all rooms a user has participated in
+   * @param {string} userId - User ID (device ID)
+   * @returns {Promise<Array>} Array of room objects
+   */
+  async getRoomsByParticipant(userId) {
+    if (!userId) return [];
+
+    const roomCodes = this.participatedRooms.get(userId) || new Set();
+    const rooms = [];
+
+    for (const code of roomCodes) {
+      const room = await this.getRoom(code);
+      if (room) {
+        rooms.push(room);
+      } else {
+        // Room was deleted, clean up tracking
+        this.participatedRooms.get(userId).delete(code);
+      }
+    }
+
+    return rooms;
+  }
+
+  /**
+   * Delete a room by creator (manual deletion)
+   * @param {string} roomCode - Room code to delete
+   * @param {string} creatorId - Creator ID requesting deletion
+   * @throws {Error} If unauthorized or room not found
+   */
+  async deleteRoomByCreator(roomCode, creatorId) {
+    const room = await this.getRoom(roomCode);
+
+    if (!room) {
+      throw new Error('Room not found');
+    }
+
+    if (room.creatorId !== creatorId) {
+      throw new Error('Unauthorized: You can only delete rooms you created');
+    }
+
+    await this.deleteRoom(roomCode);
+  }
+
+  /**
+   * Cleanup expired persistent rooms
+   * Called periodically by cleanup interval
+   */
+  async cleanupExpiredRooms() {
+    const now = new Date();
+    const roomsToDelete = [];
+
+    // Check in-memory rooms
+    for (const [roomCode, room] of this.rooms.entries()) {
+      if (room.expiresAt && new Date(room.expiresAt) < now) {
+        roomsToDelete.push(roomCode);
+      }
+    }
+
+    // Delete expired rooms
+    for (const roomCode of roomsToDelete) {
+      logger.info(`Cleanup: Deleting expired room ${roomCode}`);
+      await this.deleteRoom(roomCode);
+    }
+
+    if (roomsToDelete.length > 0) {
+      logger.info(`Cleanup: Deleted ${roomsToDelete.length} expired room(s)`);
+    }
   }
 
 }

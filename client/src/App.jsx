@@ -5,6 +5,7 @@ import ChatRoom from './components/ChatRoom';
 import JoinRoomModal from './components/JoinRoomModal';
 import InviteHandler from './components/InviteHandler.jsx';
 import PWAHandler from './components/PWAHandler';
+import MyRooms from './components/MyRooms'; // Import MyRooms component
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -38,6 +39,7 @@ function App() {
         <PWAHandler />
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/my-rooms" element={<MyRooms />} /> {/* Add MyRooms route */}
           <Route path="/room/:roomCode" element={<ChatRoom />} />
           <Route path="/join" element={
             <Home>

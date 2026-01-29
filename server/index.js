@@ -193,6 +193,15 @@ async function initializeRedis() {
   setInterval(() => {
     securityManager.cleanup();
   }, 60 * 60 * 1000); // Every hour
+
+  // Periodic cleanup for expired persistent rooms
+  setInterval(async () => {
+    try {
+      await roomManager.cleanupExpiredRooms();
+    } catch (error) {
+      logger.error('Error in room cleanup job:', error);
+    }
+  }, 5 * 60 * 1000); // Every 5 minutes
 }
 
 // Rate limiting function
@@ -416,9 +425,9 @@ app.post('/api/verbal-join', async (req, res) => {
 
 app.post('/api/rooms', async (req, res) => {
   try {
-    const { messageTTL, password, maxUsers, capToken } = req.body;
+    const { messageTTL, password, maxUsers, capToken, creatorId, persistenceMode } = req.body;
 
-    logger.info('HTTP room creation request:', { messageTTL, password, maxUsers, hasCapToken: !!capToken });
+    logger.info('HTTP room creation request:', { messageTTL, password, maxUsers, hasCapToken: !!capToken, creatorId: !!creatorId, persistenceMode });
 
     // Validate Cap token (proof-of-work verification)
     if (capToken) {
@@ -440,11 +449,19 @@ app.post('/api/rooms', async (req, res) => {
       settings.maxUsers = maxUsers;
     }
 
+    // NEW: Add creator ID and persistence mode
+    if (creatorId && typeof creatorId === 'string') {
+      settings.creatorId = sanitizeInput(creatorId);
+    }
+    if (persistenceMode && typeof persistenceMode === 'string') {
+      settings.persistenceMode = sanitizeInput(persistenceMode);
+    }
+
     const roomCode = await roomManager.createRoom(settings);
     res.json({ success: true, roomCode });
   } catch (error) {
     logger.error('Error creating room via HTTP:', error);
-    res.status(500).json({ error: 'Failed to create room' });
+    res.status(500).json({ error: error.message || 'Failed to create room' });
   }
 });
 
@@ -560,9 +577,94 @@ app.get('/api/agora/token', (req, res) => {
   }
 });
 
+// Get rooms by creator ID (My Rooms feature)
+app.get('/api/my-rooms', async (req, res) => {
+  try {
+    const { creatorId } = req.query;
+
+    if (!creatorId) {
+      return res.status(400).json({ error: 'Creator ID required' });
+    }
+
+    const createdRooms = await roomManager.getRoomsByCreator(creatorId);
+    const joinedRooms = await roomManager.getRoomsByParticipant(creatorId);
+
+    // Combine and deduplicate rooms by their ID
+    const allRoomsMap = new Map();
+    [...createdRooms, ...joinedRooms].forEach(room => {
+      allRoomsMap.set(room.id, room);
+    });
+    const rooms = Array.from(allRoomsMap.values());
+
+    // Calculate room status for each room using live count
+    const calculateRoomStatus = (room, liveCount) => {
+      const now = new Date();
+      const expiresAt = new Date(room.expiresAt);
+      const isExpired = expiresAt < now;
+      const hasUsers = liveCount > 0;
+
+      if (isExpired) return 'expired';
+      if (hasUsers) return 'active';
+      return 'recoverable'; // Empty but not expired
+    };
+
+    const enrichedRooms = rooms.map(room => {
+      // Use Socket.IO adapter for real-time accurate user count
+      const socketRoom = io.sockets.adapter.rooms.get(room.id);
+      const liveUserCount = socketRoom ? socketRoom.size : 0;
+
+      return {
+        roomCode: room.id,
+        createdAt: room.createdAt,
+        expiresAt: room.expiresAt,
+        persistenceMode: room.settings.persistenceMode || 'ephemeral',
+        status: calculateRoomStatus(room, liveUserCount),
+        userCount: liveUserCount,
+        isOwner: room.creatorId === creatorId,
+        timeRemaining: new Date(room.expiresAt) - new Date() // milliseconds
+      };
+    });
+
+    res.json(enrichedRooms);
+  } catch (error) {
+    logger.error('Error getting creator rooms:', error);
+    res.status(500).json({ error: 'Failed to retrieve rooms' });
+  }
+});
+
+// Delete room by creator (manual deletion)
+app.delete('/api/rooms/:roomCode/delete', async (req, res) => {
+  try {
+    const { roomCode } = req.params;
+    const { creatorId } = req.body;
+
+    if (!creatorId) {
+      return res.status(400).json({ error: 'Creator ID required' });
+    }
+
+    await roomManager.deleteRoomByCreator(roomCode, creatorId);
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('Error deleting room:', error);
+    res.status(403).json({ error: error.message });
+  }
+});
+
 
 io.on('connection', (socket) => {
   // logger.info(`🔌 User connected: ${socket.id}`);
+
+  // Reusable inactivity timeout handler
+  const handleInactivityTimeout = (socketId, userId, roomCode) => {
+    // logger.info(`⏰ User ${userId} timed out, disconnecting...`);
+    const targetSocket = io.sockets.sockets.get(socketId);
+    if (targetSocket) {
+      targetSocket.emit('inactivity-timeout', {
+        message: 'You have been disconnected due to inactivity'
+      });
+      targetSocket.disconnect(true);
+    }
+  };
 
   socket.on('create-room', async (data, callback) => {
     try {
@@ -988,16 +1090,11 @@ io.on('connection', (socket) => {
         socket.nickname = userNickname;
 
         // Register user activity and start inactivity timer
-        securityManager.registerUserActivity(socket.id, userId, roomCode, (socketId, userId, roomCode) => {
-          // logger.info(`⏰ User ${userId} timed out, disconnecting...`);
-          const socket = io.sockets.sockets.get(socketId);
-          if (socket) {
-            socket.emit('inactivity-timeout', {
-              message: 'You have been disconnected due to inactivity'
-            });
-            socket.disconnect(true);
-          }
-        });
+        // Relaxed timeout for persistent rooms (12 hours vs default 15 mins)
+        const persistenceMode = result.room.settings?.persistenceMode || 'ephemeral';
+        const timeoutMs = persistenceMode !== 'ephemeral' ? 12 * 60 * 60 * 1000 : undefined;
+
+        securityManager.registerUserActivity(socket.id, userId, roomCode, handleInactivityTimeout, timeoutMs);
 
         // Send room data to user
         // Pass socket.id to filter private messages correctly
@@ -1237,6 +1334,9 @@ io.on('connection', (socket) => {
       }
 
       await roomManager.addMessage(socket.roomCode, message);
+
+      // Update user activity on any message sent
+      securityManager.updateUserActivity(socket.id, handleInactivityTimeout);
 
       // Broadcast logic
       if (recipients && recipients.length > 0) {

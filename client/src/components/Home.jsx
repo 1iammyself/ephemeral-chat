@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, Users, Clock, Shield, Plus, ArrowRight, Zap, Wifi, User, Edit, Lock, KeyRound, Loader2 } from 'lucide-react';
+import { MessageCircle, Users, Clock, Shield, Plus, ArrowRight, Zap, Wifi, User, Edit, Lock, KeyRound, Loader2, Timer } from 'lucide-react';
 import CreateRoomModal from './CreateRoomModal';
 import TraceHashModal from './TraceHashModal';
 import ThemeToggle from './ThemeToggle';
@@ -151,6 +151,14 @@ const Home = ({ children }) => {
                   Create New Room
                 </button>
 
+                <button
+                  onClick={() => navigate('/my-rooms')}
+                  className="w-full flex justify-center items-center px-4 py-3 sm:py-3.5 text-base sm:text-lg font-semibold rounded-xl text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all transform active:scale-[0.98] border border-blue-200 dark:border-blue-800/50 mt-3"
+                >
+                  <Timer className="-ml-1 mr-2 h-5 w-5" />
+                  My Rooms
+                </button>
+
                 {/* Verbal Join Section */}
                 <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-700">
                   <p className="text-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
@@ -212,33 +220,38 @@ const Home = ({ children }) => {
               </div>
             </div>
           </div>
-        )}
+        )
+        }
 
         {/* Create Room Modal */}
-        {showCreateModal && (
-          <CreateRoomModal
-            onClose={() => setShowCreateModal(false)}
-            onRoomCreated={handleRoomCreated}
-          />
-        )}
+        {
+          showCreateModal && (
+            <CreateRoomModal
+              onClose={() => setShowCreateModal(false)}
+              onRoomCreated={handleRoomCreated}
+            />
+          )
+        }
 
         {/* Trace Hash Modal */}
-        {showTraceModal && (
-          <TraceHashModal
-            onClose={() => setShowTraceModal(false)}
-          />
-        )}
-      </main>
+        {
+          showTraceModal && (
+            <TraceHashModal
+              onClose={() => setShowTraceModal(false)}
+            />
+          )
+        }
+      </main >
 
       {/* Footer */}
-      <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 py-6 transition-colors duration-200">
+      < footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 py-6 transition-colors duration-200" >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="text-center text-sm text-gray-500 dark:text-gray-400">
             Ephemeral Chat offers a fast, secure, and anonymous experience
           </p>
         </div>
-      </footer>
-    </div>
+      </footer >
+    </div >
   );
 };
 

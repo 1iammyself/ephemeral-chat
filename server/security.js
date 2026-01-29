@@ -95,10 +95,13 @@ class SecurityManager {
    * @param {string} userId - User ID
    * @param {string} roomCode - Room code
    * @param {Function} onTimeout - Callback when user times out
+   * @param {number} overrideTimeoutMs - Optional custom timeout
    */
-  registerUserActivity(socketId, userId, roomCode, onTimeout) {
+  registerUserActivity(socketId, userId, roomCode, onTimeout, overrideTimeoutMs = null) {
     // Clear existing timeout if any
     this.clearUserActivity(socketId);
+
+    const timeoutMs = overrideTimeoutMs || this.INACTIVITY_TIMEOUT_MS;
 
     const timeoutId = setTimeout(() => {
       logger.info(`⏰ User ${userId} (${socketId}) timed out due to inactivity`);
@@ -106,24 +109,26 @@ class SecurityManager {
       if (onTimeout) {
         onTimeout(socketId, userId, roomCode);
       }
-    }, this.INACTIVITY_TIMEOUT_MS);
+    }, timeoutMs);
 
     this.userActivity.set(socketId, {
       lastActivity: Date.now(),
       userId,
       roomCode,
-      timeoutId
+      timeoutId,
+      timeoutMs // Store the timeout value used
     });
 
-    logger.info(`✅ Activity registered for user ${userId} (${socketId})`);
+    logger.info(`✅ Activity registered for user ${userId} (${socketId}) with ${timeoutMs / 60000}m timeout`);
   }
 
   /**
    * Update user activity (reset inactivity timer)
    * @param {string} socketId - Socket ID
    * @param {Function} onTimeout - Callback when user times out
+   * @param {number} overrideTimeoutMs - Optional custom timeout
    */
-  updateUserActivity(socketId, onTimeout) {
+  updateUserActivity(socketId, onTimeout, overrideTimeoutMs = null) {
     const activity = this.userActivity.get(socketId);
     if (!activity) {
       return false;
@@ -134,6 +139,8 @@ class SecurityManager {
       clearTimeout(activity.timeoutId);
     }
 
+    const timeoutMs = overrideTimeoutMs || activity.timeoutMs || this.INACTIVITY_TIMEOUT_MS;
+
     // Set new timeout
     const timeoutId = setTimeout(() => {
       logger.info(`⏰ User ${activity.userId} (${socketId}) timed out due to inactivity`);
@@ -141,10 +148,11 @@ class SecurityManager {
       if (onTimeout) {
         onTimeout(socketId, activity.userId, activity.roomCode);
       }
-    }, this.INACTIVITY_TIMEOUT_MS);
+    }, timeoutMs);
 
     activity.lastActivity = Date.now();
     activity.timeoutId = timeoutId;
+    activity.timeoutMs = timeoutMs;
 
     return true;
   }

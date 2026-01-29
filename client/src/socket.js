@@ -229,6 +229,23 @@ class SocketManager {
       socketId: this.socket?.id || null
     };
   }
+
+  setRoomType(persistenceMode) {
+    if (!this.socket) return;
+
+    log(`🛠️ Setting socket mode for: ${persistenceMode}`);
+    this.socket.roomType = persistenceMode;
+
+    // Adjust reconnection settings for persistent rooms for better stability
+    if (persistenceMode !== 'ephemeral') {
+      this.socket.io.opts.timeout = 60000;           // 1 minute
+      this.socket.io.opts.reconnectionDelay = 5000;  // 5 seconds
+    } else {
+      // Default ephemeral settings
+      this.socket.io.opts.timeout = 45000;
+      this.socket.io.opts.reconnectionDelay = 1000;
+    }
+  }
 }
 
 // Create singleton instance

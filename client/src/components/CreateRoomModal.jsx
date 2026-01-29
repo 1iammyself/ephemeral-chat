@@ -1,16 +1,18 @@
 import React, { useState, useCallback } from 'react';
-import { X, Settings, Clock, Lock, Copy, Check, Users, Shield, Share2 } from 'lucide-react';
+import { X, Check, Copy, Users, Lock, Unlock, Timer, Zap, PartyPopper, Sun, Sunset, Settings, Clock, Shield, Share2 } from 'lucide-react';
+import { sanitizeInput, generateRoomKey } from '../utils/security';
+import { getCreatorId } from '../utils/creator';
 import { useNavigate } from 'react-router-dom';
 import '@cap.js/widget';
-import { generateRoomKey } from '../utils/security';
 
 const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const API_BASE = import.meta.env.VITE_API_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '');
 
-  const [settings, setSettings] = useState({
+  const [roomSettings, setSettings] = useState({
     messageTTL: 'none',
     password: '',
-    maxUsers: 1
+    maxUsers: 10,
+    persistenceMode: 'ephemeral' // NEW: Default to ephemeral mode
   });
   const [capToken, setCapToken] = useState(null);
   const [isCapVerified, setIsCapVerified] = useState(false);
@@ -103,16 +105,21 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
       const key = generateRoomKey();
       setRoomKey(key);
 
+      // Get or generate creator ID
+      const creatorId = getCreatorId();
+
       const response = await fetch(`${API_BASE}/api/rooms`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          messageTTL: settings.messageTTL !== 'none' ? settings.messageTTL : undefined,
-          password: settings.password.trim() || undefined,
-          maxUsers: settings.maxUsers,
-          capToken: capToken
+          messageTTL: roomSettings.messageTTL !== 'none' ? roomSettings.messageTTL : undefined,
+          password: roomSettings.password.trim() || undefined,
+          maxUsers: roomSettings.maxUsers,
+          capToken: capToken,
+          creatorId: creatorId, // NEW: Include creator ID
+          persistenceMode: roomSettings.persistenceMode // NEW: Include persistence mode
         }),
       });
 
@@ -121,11 +128,11 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
       if (response.ok && data.roomCode) {
         setCreatedRoom({
           roomCode: data.roomCode,
-          password: settings.password.trim() || ''
+          password: roomSettings.password.trim() || ''
         });
 
         // Generate invite link automatically
-        const link = await generateInviteLink(data.roomCode, settings.password.trim() || undefined);
+        const link = await generateInviteLink(data.roomCode, roomSettings.password.trim() || undefined);
         if (link) {
           setInviteLink(`${link}#${key}`);
         }
@@ -328,6 +335,47 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
           </h2>
 
           <form onSubmit={handleCreate} autoComplete="off" className="space-y-4 sm:space-y-6">
+            {/* Persistence Mode Selection */}
+            <div>
+              <div className="flex items-center space-x-2 mb-2 sm:mb-3">
+                <Timer className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
+                <label className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">
+                  Room Duration
+                </label>
+              </div>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-3">
+                You can have up to 5 rooms at a time
+              </p>
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                {[
+                  { id: 'ephemeral', title: 'Quick Chat', duration: '10 min', icon: Zap, desc: 'Disappears when empty' },
+                  { id: 'gathering', title: 'Gathering', duration: '3 hours', icon: PartyPopper, desc: 'Stays alive when empty' },
+                  { id: 'social', title: 'Social', duration: '6 hours', icon: Sun, desc: 'Perfect for hangouts' },
+                  { id: 'extended', title: 'Extended', duration: '24 hours', icon: Sunset, desc: 'All-day event' }
+                ].map(mode => {
+                  const IconComponent = mode.icon;
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => setSettings(prev => ({ ...prev, persistenceMode: mode.id }))}
+                      className={`p-3 sm:p-4 border-2 rounded-lg transition-all text-left ${roomSettings.persistenceMode === mode.id
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                        }`}
+                    >
+                      <div className="flex items-center mb-1">
+                        <IconComponent className="w-5 h-5 mr-2 text-blue-600 dark:text-blue-400" />
+                        <div className="font-medium text-sm dark:text-white">{mode.title}</div>
+                      </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">{mode.duration}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">{mode.desc}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Message TTL Setting */}
             <div>
               <div className="flex items-center space-x-2 mb-2 sm:mb-3">
@@ -343,7 +391,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 {ttlOptions.map((option) => (
                   <label
                     key={option.value}
-                    className={`flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 rounded-lg border cursor-pointer transition-colors ${settings.messageTTL === option.value
+                    className={`flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 rounded-lg border cursor-pointer transition-colors ${roomSettings.messageTTL === option.value
                       ? 'border-primary-500 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/20'
                       : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
                       }`}
@@ -352,7 +400,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                       type="radio"
                       name="messageTTL"
                       value={option.value}
-                      checked={settings.messageTTL === option.value}
+                      checked={roomSettings.messageTTL === option.value}
                       onChange={(e) => setSettings(prev => ({ ...prev, messageTTL: e.target.value }))}
                       className="mt-1"
                     />
@@ -389,7 +437,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 name={`new_room_key_${Math.random().toString(36).substring(7)}`}
                 id="create-room-key-field"
                 placeholder="Enter access key (optional)"
-                value={settings.password}
+                value={roomSettings.password}
                 onChange={(e) => setSettings(prev => ({ ...prev, password: e.target.value }))}
                 onCopy={(e) => e.preventDefault()}
                 onCut={(e) => e.preventDefault()}
@@ -414,18 +462,18 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                   <button
                     type="button"
                     onClick={() => setSettings(prev => ({ ...prev, maxUsers: Math.max(1, prev.maxUsers - 1) }))}
-                    disabled={settings.maxUsers <= 1}
+                    disabled={roomSettings.maxUsers <= 1}
                     className="w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-300 dark:disabled:text-gray-600 rounded-full text-xl font-bold transition-colors dark:text-white"
                   >
                     −
                   </button>
                   <span className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400 w-16 text-center">
-                    {settings.maxUsers}
+                    {roomSettings.maxUsers}
                   </span>
                   <button
                     type="button"
                     onClick={() => setSettings(prev => ({ ...prev, maxUsers: Math.min(7, prev.maxUsers + 1) }))}
-                    disabled={settings.maxUsers >= 7}
+                    disabled={roomSettings.maxUsers >= 7}
                     className="w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-300 dark:disabled:text-gray-600 rounded-full text-xl font-bold transition-colors dark:text-white"
                   >
                     +
@@ -438,7 +486,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                     type="range"
                     min="1"
                     max="7"
-                    value={settings.maxUsers}
+                    value={roomSettings.maxUsers}
                     onChange={(e) => {
                       const value = parseInt(e.target.value);
                       setSettings(prev => ({ ...prev, maxUsers: value }));

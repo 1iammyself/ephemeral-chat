@@ -49,6 +49,7 @@ import { getVibeById, getAllVibes } from '../utils/vibes';
 import { canManageRoom } from '../utils/roles';
 import { getRandomIcebreaker } from '../utils/icebreakers';
 import { RefreshButton } from './PWAHandler';
+import { getCreatorId } from '../utils/creator';
 
 // Safari detection (robust hybrid check)
 function isSafariBrowser() {
@@ -171,7 +172,8 @@ const ChatRoom = () => {
 
   const performJoin = useCallback((params) => {
     const { nickname, password, capToken, inviteToken } = params;
-    const joinData = { roomCode, nickname, password, capToken };
+    const userId = getCreatorId(); // Use persistent device ID for participation tracking
+    const joinData = { roomCode, nickname, password, capToken, userId };
     if (inviteToken) joinData.inviteToken = inviteToken;
 
     socketManager.emit('join-room', joinData, async (response) => {
@@ -210,6 +212,7 @@ const ChatRoom = () => {
         setRoomVibe(response.room.vibe || 'default');
         setRoomTopic(response.room.topic || '');
         setActiveTimer(response.room.timer);
+        socketManager.setRoomType(response.room.settings?.persistenceMode || 'ephemeral');
 
         setCurrentUser({ id: socketManager.socket?.id, socketId: socketManager.socket?.id, nickname: response.nickname, isAdmin: myRole === 'host' || myRole === 'tier1' });
         setIsJoined(true);
@@ -293,6 +296,7 @@ const ChatRoom = () => {
       setRoomVibe(data.room.vibe || 'default');
       setRoomTopic(data.room.topic || '');
       setActiveTimer(data.room.timer);
+      socketManager.setRoomType(data.room.settings?.persistenceMode || 'ephemeral');
 
       setCurrentUser({ id: socketManager.socket?.id, socketId: socketManager.socket?.id, nickname: data.nickname, isAdmin: (myRole === 'host' || myRole === 'tier1') });
       setIsJoined(true);
