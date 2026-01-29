@@ -1216,7 +1216,12 @@ io.on('connection', (socket) => {
       }
 
       // Support for text, image, audio, and file messages
-      const { content, messageType = 'text', isViewOnce = false, imageData, pollData, recipients = [], replyTo, isEncrypted, iv, fileName, mimeType, fileSize } = data;
+      let { content, messageType = 'text', isViewOnce = false, imageData, pollData, recipients = [], replyTo, isEncrypted, iv, fileName, mimeType, fileSize } = data;
+
+      // Normalize content/imageData: If it's an image and content is provided but imageData isn't, use content for imageData
+      if (messageType === 'image' && !imageData && content) {
+        imageData = content;
+      }
 
       // For text messages, validate content
       if (messageType === 'text') {
@@ -1225,32 +1230,42 @@ io.on('connection', (socket) => {
         }
       }
 
-      // For image messages, validate imageData
+      // For image messages, validate imageData (only if not encrypted)
       if (messageType === 'image') {
-        if (!imageData || typeof imageData !== 'string' || !imageData.startsWith('data:image/')) {
-          socket.emit('error', { message: 'Invalid image data' });
-          return;
-        }
-        // Check image size (max 5MB)
-        const base64Size = imageData.length * 0.75; // Approximate size in bytes
-        if (base64Size > 5 * 1024 * 1024) {
-          socket.emit('error', { message: 'Image too large. Maximum size is 5MB.' });
-          return;
+        if (!isEncrypted) {
+          if (!imageData || typeof imageData !== 'string' || !imageData.startsWith('data:image/')) {
+            socket.emit('error', { message: 'Invalid image data' });
+            return;
+          }
+          // Check image size (max 5MB)
+          const base64Size = imageData.length * 0.75; // Approximate size in bytes
+          if (base64Size > 5 * 1024 * 1024) {
+            socket.emit('error', { message: 'Image too large. Maximum size is 5MB.' });
+            return;
+          }
+        } else {
+          // If encrypted, just ensure we have some data
+          if (!imageData || typeof imageData !== 'string') {
+            socket.emit('error', { message: 'Invalid encrypted image data' });
+            return;
+          }
         }
       }
 
-      // For audio messages, validate content
+      // For audio messages, validate content (only if not encrypted)
       if (messageType === 'audio') {
-        // Relaxed validation to allow raw base64 strings (without data URI prefix)
-        if (!content || typeof content !== 'string') {
-          socket.emit('error', { message: 'Invalid audio data' });
-          return;
-        }
-        // Check audio size (max 5MB)
-        const base64Size = content.length * 0.75; // Approximate size in bytes
-        if (base64Size > 5 * 1024 * 1024) {
-          socket.emit('error', { message: 'Audio too large. Maximum size is 5MB.' });
-          return;
+        if (!isEncrypted) {
+          // Relaxed validation to allow raw base64 strings (without data URI prefix)
+          if (!content || typeof content !== 'string') {
+            socket.emit('error', { message: 'Invalid audio data' });
+            return;
+          }
+          // Check audio size (max 5MB)
+          const base64Size = content.length * 0.75; // Approximate size in bytes
+          if (base64Size > 5 * 1024 * 1024) {
+            socket.emit('error', { message: 'Audio too large. Maximum size is 5MB.' });
+            return;
+          }
         }
       }
 
@@ -1270,17 +1285,17 @@ io.on('connection', (socket) => {
       let messageContent;
       if (messageType === 'image') {
         messageContent = imageData;
-      } else if (messageType === 'audio') {
+      } else if (messageType === 'audio' && !isEncrypted) {
         try {
-          // Convert audio to AAC
-          // logger.info('Converting audio to AAC...');
+          // Convert audio to AAC (only if not encrypted)
           messageContent = await convertAudioToAAC(content);
-          // logger.info('Audio conversion successful');
         } catch (error) {
           logger.error('Audio conversion failed:', error);
           socket.emit('error', { message: 'Failed to process audio message' });
           return;
         }
+      } else if (messageType === 'audio' && isEncrypted) {
+        messageContent = content; // Keep encrypted string as is
       } else if (messageType === 'poll') {
         if (!pollData || !pollData.question || !Array.isArray(pollData.options)) {
           socket.emit('error', { message: 'Invalid poll data' });
@@ -1309,7 +1324,7 @@ io.on('connection', (socket) => {
           allowMultiple: !!pollData.allowMultiple
         };
       } else {
-        messageContent = sanitizeInput(content.trim());
+        messageContent = isEncrypted ? content : sanitizeInput(content.trim());
       }
 
       const message = {

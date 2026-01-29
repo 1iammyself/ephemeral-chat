@@ -24,7 +24,8 @@ import {
   Zap,
   Reply,
   Activity,
-  Info
+  Info,
+  Camera
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -45,6 +46,7 @@ import TimerModal from './TimerModal';
 import EditMessageModal from './EditMessageModal';
 import DragDropOverlay from './DragDropOverlay';
 import ActivityLog from './ActivityLog';
+import CameraModal from './CameraModal';
 import { getVibeById, getAllVibes } from '../utils/vibes';
 import { canManageRoom } from '../utils/roles';
 import { getRandomIcebreaker } from '../utils/icebreakers';
@@ -52,6 +54,7 @@ import { RefreshButton } from './PWAHandler';
 import { getCreatorId } from '../utils/creator';
 
 const SLASH_COMMANDS = [
+  { icon: Camera, label: 'Camera', value: '/camera', desc: 'Take a photo' },
   { icon: BarChart2, label: 'Poll', value: '/poll', desc: 'Create a new poll' },
   { icon: Phone, label: 'Voice Call', value: '/call', desc: 'Start a voice call' },
   { icon: ImageIcon, label: 'Photo', value: '/photo', desc: 'Upload an image' },
@@ -113,6 +116,7 @@ const ChatRoom = () => {
   const [roomTopic, setRoomTopic] = useState('');
   const [showTopicEditor, setShowTopicEditor] = useState(false);
   const [showTimerModal, setShowTimerModal] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
   const [activeTimer, setActiveTimer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
@@ -749,6 +753,7 @@ const ChatRoom = () => {
       const args = parts.slice(1).join(' ');
 
       switch (cmd) {
+        case '/camera': setShowCameraModal(true); break;
         case '/poll': setShowPollModal(true); break;
         case '/call':
           if (users.length > 7) {
@@ -987,7 +992,8 @@ const ChatRoom = () => {
     }
   };
 
-  const uploadFile = (file) => {
+  const uploadFile = async (file, options = {}) => {
+    const { isViewOnce = false } = options;
     if (file.size > 10 * 1024 * 1024) {
       setError('File too large (max 10MB)');
       return;
@@ -995,11 +1001,36 @@ const ChatRoom = () => {
 
     setIsUploading(true);
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64Content = e.target.result.split(',')[1];
+    reader.onload = async (e) => {
+      const isImage = file.type.startsWith('image/');
+      // For images, we send the full data URI so it can be rendered in <img> tags
+      // For other files, we send raw base64 as before
+      let content = isImage ? e.target.result : e.target.result.split(',')[1];
+
+      let isEncrypted = false;
+      let iv = null;
+
+      if (roomKey) {
+        try {
+          const result = await encryptMessage(content, roomKey);
+          content = result.encrypted;
+          iv = result.iv;
+          isEncrypted = true;
+        } catch (error) {
+          console.error('Encryption failed for file:', error);
+          setError('Failed to encrypt file');
+          setIsUploading(false);
+          return;
+        }
+      }
+
       socketManager.emit('send-message', {
-        messageType: 'file',
-        content: base64Content,
+        messageType: isImage ? 'image' : 'file',
+        content: content,
+        imageData: isImage ? content : undefined, // Include imageData for server compatibility
+        isEncrypted,
+        iv,
+        isViewOnce,
         fileName: file.name,
         mimeType: file.type,
         fileSize: file.size,
@@ -1008,6 +1039,23 @@ const ChatRoom = () => {
       setIsUploading(false);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleCameraCapture = (imageData) => {
+    // Ensure modal state is updated
+    setShowCameraModal(false);
+
+    // Convert Base64 dataUrl back to a File object for the existing upload logic
+    fetch(imageData)
+      .then(res => res.blob())
+      .then(blob => {
+        const file = new File([blob], `camera_${Date.now()}.jpg`, { type: 'image/jpeg' });
+        uploadFile(file, { isViewOnce: true }); // Treat camera photos as view-once images
+      })
+      .catch(err => {
+        console.error('Failed to process captured image:', err);
+        setError('Failed to process captured image');
+      });
   };
 
   const handleEditMessage = (message) => {
@@ -1027,23 +1075,9 @@ const ChatRoom = () => {
   const handleImageUpload = useCallback(async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setError('Please select an image file');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image must be smaller than 5MB');
-      return;
-    }
-    setIsUploading(true);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      socketManager.emit('send-message', { messageType: 'image', imageData: e.target.result, isViewOnce: true, recipients: selectedRecipients });
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-    reader.readAsDataURL(file);
-  }, [selectedRecipients]);
+    uploadFile(file, { isViewOnce: true });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, [selectedRecipients, uploadFile]);
 
   const handleStartCall = useCallback(async () => {
     let recipients = selectedRecipients.length > 0
@@ -1397,6 +1431,18 @@ const ChatRoom = () => {
                             {/* Main Actions Grid */}
                             <button
                               type="button"
+                              onClick={() => { setShowCameraModal(true); setShowFeatureMenu(false); }}
+                              disabled={!isConnected}
+                              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-blue-50/50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all border border-blue-100/20 dark:border-blue-800/20 group"
+                            >
+                              <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                <Camera className="w-5 h-5 text-blue-500" />
+                              </div>
+                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Camera</span>
+                            </button>
+
+                            <button
+                              type="button"
                               onClick={() => { fileInputRef.current?.click(); setShowFeatureMenu(false); }}
                               disabled={!isConnected || isUploading}
                               className="flex flex-col items-center justify-center p-3 rounded-2xl bg-blue-50/50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all border border-blue-100/20 dark:border-blue-800/20 group"
@@ -1419,14 +1465,14 @@ const ChatRoom = () => {
                               }}
                               disabled={!isConnected || users.length < 2 || users.length > 7}
                               className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all border group ${users.length > 7
-                                  ? 'bg-gray-50/50 dark:bg-gray-800/20 border-gray-200/20 dark:border-gray-700/20 opacity-50 cursor-not-allowed'
-                                  : 'bg-green-50/50 dark:bg-green-900/10 hover:bg-green-100 dark:hover:bg-green-900/20 border-green-100/20 dark:border-green-800/20'
+                                ? 'bg-gray-50/50 dark:bg-gray-800/20 border-gray-200/20 dark:border-gray-700/20 opacity-50 cursor-not-allowed'
+                                : 'bg-green-50/50 dark:bg-green-900/10 hover:bg-green-100 dark:hover:bg-green-900/20 border-green-100/20 dark:border-green-800/20'
                                 }`}
                               title={users.length > 7 ? "Disabled: Max 7 users for voice calls" : "Start Voice Call"}
                             >
                               <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-transform ${users.length > 7
-                                  ? 'bg-gray-100 dark:bg-gray-800/50'
-                                  : 'bg-green-100 dark:bg-green-900/30 group-hover:scale-110'
+                                ? 'bg-gray-100 dark:bg-gray-800/50'
+                                : 'bg-green-100 dark:bg-green-900/30 group-hover:scale-110'
                                 }`}>
                                 <Phone className={`w-5 h-5 ${users.length > 7 ? 'text-gray-400' : 'text-green-500'}`} />
                               </div>
@@ -1681,6 +1727,11 @@ const ChatRoom = () => {
         isOpen={showTimerModal}
         onClose={() => setShowTimerModal(false)}
         onStart={handleStartTimer}
+      />
+      <CameraModal
+        isOpen={showCameraModal}
+        onClose={() => setShowCameraModal(false)}
+        onCapture={handleCameraCapture}
       />
       <EditMessageModal
         isOpen={!!editingMessage}
