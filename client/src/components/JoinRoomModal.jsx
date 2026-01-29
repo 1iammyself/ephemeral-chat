@@ -90,11 +90,11 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
           }
         } else {
           // Room doesn't exist, redirect to home
-          console.error('Room not found or error:', roomData);
+          // console.error('Room not found or error:', roomData);
           onCancel();
         }
       } catch (error) {
-        console.error('Error checking room:', error);
+        // console.error('Error checking room:', error);
         if (isMounted) {
           onCancel();
         }
@@ -124,7 +124,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
           setFromInvite(false); // Treat as normal join if invite invalid
         }
       } catch (error) {
-        console.error('Error validating invite token:', error);
+        // console.error('Error validating invite token:', error);
         setInviteValid(false);
         setFromInvite(false);
       }
