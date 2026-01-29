@@ -142,6 +142,8 @@ const ChatRoom = () => {
   const typingTimeoutRef = useRef(null);
   const { theme } = useTheme();
 
+  const [audioViewOnce, setAudioViewOnce] = useState(true);
+
   const messageInputRef = useRef(null);
 
   useEffect(() => {
@@ -1041,7 +1043,7 @@ const ChatRoom = () => {
     reader.readAsDataURL(file);
   };
 
-  const handleCameraCapture = (imageData) => {
+  const handleCameraCapture = (imageData, isViewOnce = true) => {
     // Ensure modal state is updated
     setShowCameraModal(false);
 
@@ -1050,7 +1052,7 @@ const ChatRoom = () => {
       .then(res => res.blob())
       .then(blob => {
         const file = new File([blob], `camera_${Date.now()}.jpg`, { type: 'image/jpeg' });
-        uploadFile(file, { isViewOnce: true }); // Treat camera photos as view-once images
+        uploadFile(file, { isViewOnce }); // Use the flag from camera modal
       })
       .catch(err => {
         console.error('Failed to process captured image:', err);
@@ -1180,7 +1182,7 @@ const ChatRoom = () => {
     const reader = new FileReader();
     reader.onloadend = () => {
       const base64Audio = reader.result.split(',')[1];
-      socketManager.emit('send-message', { messageType: 'audio', content: base64Audio, isViewOnce: true, recipients: selectedRecipients });
+      socketManager.emit('send-message', { messageType: 'audio', content: base64Audio, isViewOnce: audioViewOnce, recipients: selectedRecipients });
     };
     reader.readAsDataURL(audioBlob);
   };
@@ -1399,6 +1401,14 @@ const ChatRoom = () => {
                     <div className="flex items-center justify-between bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-2">
                       <div className="flex items-center space-x-3"><div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" /><span className="text-red-600 dark:text-red-400 font-medium font-mono">{formatDuration(recordingDuration)} / 0:30</span></div>
                       <div className="flex items-center space-x-2">
+                        <button
+                          type="button"
+                          onClick={() => setAudioViewOnce(!audioViewOnce)}
+                          className={`p-2 rounded-full font-bold text-[10px] w-8 h-8 flex items-center justify-center transition-colors ${audioViewOnce ? 'bg-red-500 text-white' : 'bg-transparent text-red-500 border border-red-500'}`}
+                          title={audioViewOnce ? "View Once Active" : "View Once Inactive"}
+                        >
+                          1x
+                        </button>
                         <button type="button" onClick={handleCancelRecording} className="p-2 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-full text-red-500"><Trash2 className="w-5 h-5" /></button>
                         <button type="button" onClick={handleStopRecording} className="p-2 bg-red-500 hover:bg-red-600 rounded-full text-white shadow-sm"><Send className="w-5 h-5" /></button>
                       </div>

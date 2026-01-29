@@ -9,7 +9,7 @@ import { X, Clock, Eye, AlertTriangle } from 'lucide-react';
 import ImageReveal from './ImageReveal';
 import socketManager from '../socket';
 
-const ImageViewer = ({ isOpen, onClose, imageUrl, duration = 30 }) => {
+const ImageViewer = ({ isOpen, onClose, imageUrl, duration = 30, isViewOnce = true }) => {
   const [timeLeft, setTimeLeft] = useState(duration);
   const [isVisible, setIsVisible] = useState(false);
   const [revealData, setRevealData] = useState({ viewToken: null, watermarkSeed: null });
@@ -84,8 +84,6 @@ const ImageViewer = ({ isOpen, onClose, imageUrl, duration = 30 }) => {
 
   // Calculate progress percentage for timer ring
   const progressPercentage = (timeLeft / duration) * 100;
-  const circumference = 2 * Math.PI * 20; // radius = 20
-  const strokeDashoffset = circumference - (progressPercentage / 100) * circumference;
 
   return (
     <div
@@ -126,8 +124,8 @@ const ImageViewer = ({ isOpen, onClose, imageUrl, duration = 30 }) => {
             </span>
           </div>
           <div className="flex flex-col">
-            <span className="text-white font-medium text-sm">View Once</span>
-            <span className="text-gray-400 text-xs">Disappears in {timeLeft}s</span>
+            <span className="text-white font-medium text-sm">{isViewOnce ? 'View Once' : 'Expires in'}</span>
+            <span className="text-gray-400 text-xs">{isViewOnce ? 'Disappears in ' : ''}{timeLeft}s</span>
           </div>
         </div>
       </div>
@@ -158,7 +156,7 @@ const ImageViewer = ({ isOpen, onClose, imageUrl, duration = 30 }) => {
           ) : (
             <img
               src={imageUrl}
-              alt="View once image"
+              alt="Shared content"
               className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
               style={{
                 userSelect: 'none',
@@ -175,15 +173,17 @@ const ImageViewer = ({ isOpen, onClose, imageUrl, duration = 30 }) => {
         </div>
       )}
 
-      {/* Warning Banner */}
-      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-10">
-        <div className="bg-amber-500/90 backdrop-blur-sm rounded-lg px-4 py-2 flex items-center space-x-2">
-          <AlertTriangle className="w-4 h-4 text-white" />
-          <p className="text-white text-sm font-medium">
-            This image will disappear after viewing
-          </p>
+      {/* Warning Banner - Only for View Once */}
+      {isViewOnce && (
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-10">
+          <div className="bg-amber-500/90 backdrop-blur-sm rounded-lg px-4 py-2 flex items-center space-x-2">
+            <AlertTriangle className="w-4 h-4 text-white" />
+            <p className="text-white text-sm font-medium">
+              This image will disappear after viewing
+            </p>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

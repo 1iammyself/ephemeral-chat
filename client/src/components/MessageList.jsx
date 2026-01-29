@@ -103,11 +103,17 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   }, [viewedMessages, currentUser]);
 
   const handleImageClick = useCallback((message) => {
-    if (isMessageViewed(message)) return;
+    // For view-once, prevent re-opening if already viewed
+    if (message.isViewOnce && isMessageViewed(message)) return;
+
     setViewingImage(message);
     setCurrentImageUrl(message.isViewOnce ? message.id : message.content);
-    socketManager.emit('message-viewed', { messageId: message.id });
-    setViewedMessages(prev => new Set([...prev, message.id]));
+
+    // Only mark as viewed/burned if it is actually view-once
+    if (message.isViewOnce) {
+      socketManager.emit('message-viewed', { messageId: message.id });
+      setViewedMessages(prev => new Set([...prev, message.id]));
+    }
   }, [isMessageViewed]);
 
   const handleAudioPlay = useCallback((message) => {
@@ -221,7 +227,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         className={isOwnMessage ? "" : "cursor-pointer"}
                         onClick={() => {
                           if (isOwnMessage) return;
-                          (isViewOnce && !hasBeenViewed) ? handleImageClick(message) : !isViewOnce && setViewingImage(message);
+                          handleImageClick(message);
                         }}
                       >
                         {isOwnMessage ? (
@@ -321,6 +327,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
         isOpen={!!viewingImage}
         onClose={handleViewerClose}
         imageUrl={currentImageUrl}
+        isViewOnce={viewingImage?.isViewOnce}
         duration={(() => {
           if (!messageTTL || messageTTL === 0) return 1800; // Never = 30m
           if (messageTTL < 30) return 30; // Min 30s

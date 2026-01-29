@@ -16,6 +16,8 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
     const [showFilters, setShowFilters] = useState(false);
     const streamRef = useRef(null);
 
+    const [isViewOnce, setIsViewOnce] = useState(true);
+
     const startCamera = useCallback(async () => {
         try {
             if (streamRef.current) {
@@ -58,6 +60,7 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
             setIsReady(false);
             setError(null);
             setCurrentFilter(FILTERS[0]);
+            setIsViewOnce(true); // Reset to default
         }
         return () => {
             if (streamRef.current) {
@@ -116,7 +119,7 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
 
     const handleConfirm = () => {
         if (previewImage) {
-            onCapture(previewImage);
+            onCapture(previewImage, isViewOnce);
             onClose();
         }
     };
@@ -256,13 +259,26 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
                             </button>
 
                             <button
+                                onClick={() => setIsViewOnce(!isViewOnce)}
+                                className={`flex flex-col items-center space-y-2 group flex-1`}
+                            >
+                                <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-90 ${isViewOnce ? 'bg-blue-500/20 text-blue-400 border-2 border-blue-500' : 'bg-white/10 text-white border-2 border-transparent'}`}>
+                                    <div className="relative font-bold text-lg">
+                                        1x
+                                        {!isViewOnce && <div className="absolute inset-0 flex items-center justify-center"><div className="w-full h-0.5 bg-white/50 rotate-45 transform origin-center"></div></div>}
+                                    </div>
+                                </div>
+                                <span className={`text-[10px] font-bold uppercase tracking-widest ${isViewOnce ? 'text-blue-400' : 'text-white/40'}`}>
+                                    {isViewOnce ? 'View Once' : 'Keep'}
+                                </span>
+                            </button>
+
+                            <button
                                 onClick={handleConfirm}
                                 className="w-20 h-20 rounded-full bg-white flex items-center justify-center text-black shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-105 active:scale-90 transition-all"
                             >
                                 <Check className="w-10 h-10" />
                             </button>
-
-                            <div className="flex-1" /> {/* Spacer */}
                         </>
                     ) : (
                         <>
