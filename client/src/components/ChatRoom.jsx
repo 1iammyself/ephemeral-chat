@@ -1242,11 +1242,20 @@ const ChatRoom = () => {
             <div className="min-w-0">
               <h1 className="text-base sm:text-lg font-bold truncate text-gray-900 dark:text-white leading-tight">Secure Chat</h1>
               <div className="flex items-center space-x-3 sm:space-x-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
-                {latency && (
-                  <div className="flex items-center space-x-1" title={`Latency: ${latency}ms`}>
-                    <Activity className={`w-4 h-4 ${latency < 100 ? 'text-green-500' : latency < 300 ? 'text-yellow-500' : 'text-red-500'}`} />
-                    <span className="hidden sm:inline">{latency}ms</span>
-                    <span className="sm:hidden text-xs">{latency}</span>
+                {latency !== null && (
+                  <div className="flex items-end space-x-0.5 h-4 pb-1" title={`Latency: ${latency}ms`}>
+                    {[1, 2, 3, 4].map((bar) => {
+                      const activeBars = latency < 100 ? 4 : latency < 200 ? 3 : latency < 400 ? 2 : 1;
+                      const isActive = bar <= activeBars;
+                      const colorClass = latency < 100 ? 'bg-green-500' : latency < 300 ? 'bg-yellow-500' : 'bg-red-500';
+                      return (
+                        <div
+                          key={bar}
+                          className={`w-0.5 rounded-t-[1px] transition-all duration-300 ${isActive ? colorClass : 'bg-gray-300 dark:bg-gray-600 opacity-40'}`}
+                          style={{ height: `${bar * 25}%` }}
+                        />
+                      );
+                    })}
                   </div>
                 )}
                 <div className="flex items-center space-x-1">
@@ -1439,18 +1448,6 @@ const ChatRoom = () => {
                                 <Camera className="w-5 h-5 text-blue-500" />
                               </div>
                               <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Camera</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => { fileInputRef.current?.click(); setShowFeatureMenu(false); }}
-                              disabled={!isConnected || isUploading}
-                              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-blue-50/50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all border border-blue-100/20 dark:border-blue-800/20 group"
-                            >
-                              <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                {isUploading ? <Loader2 className="w-5 h-5 text-blue-500 animate-spin" /> : <ImageIcon className="w-5 h-5 text-blue-500" />}
-                              </div>
-                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Photo</span>
                             </button>
 
                             <button

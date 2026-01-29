@@ -1,9 +1,10 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { X, Camera, RefreshCw, Check, AlertCircle } from 'lucide-react';
+import { X, Camera, RefreshCw, Check, AlertCircle, Image as ImageIcon } from 'lucide-react';
 
 const CameraModal = ({ isOpen, onClose, onCapture }) => {
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
+    const galleryInputRef = useRef(null);
     const [stream, setStream] = useState(null);
     const [isReady, setIsReady] = useState(false);
     const [error, setError] = useState(null);
@@ -22,10 +23,10 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
             const constraints = {
                 video: {
                     facingMode: facingMode,
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
                 },
-                audio: false // Pictures only
+                audio: false
             };
 
             const newStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -37,13 +38,7 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
             setIsReady(true);
         } catch (err) {
             console.error('Camera Error:', err);
-            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                setError('Camera permission denied. Please enable camera access in your browser settings.');
-            } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-                setError('No camera found on this device.');
-            } else {
-                setError('Failed to access camera. It might be used by another app.');
-            }
+            setError(err.name === 'NotAllowedError' ? 'Camera permission denied' : 'Could not access camera');
         }
     }, [facingMode]);
 
@@ -51,7 +46,6 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
         if (isOpen) {
             startCamera();
         } else {
-            // Clean up when explicitly closed
             if (streamRef.current) {
                 streamRef.current.getTracks().forEach(track => track.stop());
                 streamRef.current = null;
@@ -82,17 +76,25 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
         const canvas = canvasRef.current;
         const context = canvas.getContext('2d');
 
-        // Set canvas dimensions to match video stream
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-
-        // Draw video frame to canvas
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // Convert to Base64
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        // Convert to Base64 with high quality
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
         setPreviewImage(dataUrl);
         setIsCapturing(false);
+    };
+
+    const handleGallerySelect = (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            setPreviewImage(e.target.result);
+        };
+        reader.readAsDataURL(file);
     };
 
     const handleConfirm = () => {
@@ -104,120 +106,135 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
 
     const handleRetake = () => {
         setPreviewImage(null);
+        if (galleryInputRef.current) {
+            galleryInputRef.current.value = '';
+        }
     };
 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="relative w-full max-w-2xl bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex flex-col aspect-[4/3] sm:aspect-video">
+        <div className="fixed inset-0 z-[110] bg-black animate-in fade-in duration-300 flex flex-col">
+            {/* Hidden Gallery Input */}
+            <input
+                ref={galleryInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleGallerySelect}
+                className="hidden"
+            />
 
-                {/* Header */}
-                <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-20 bg-gradient-to-b from-black/60 to-transparent">
-                    <h3 className="text-white font-bold text-lg hidden sm:block">Camera</h3>
-                    <button
-                        onClick={onClose}
-                        className="p-2 bg-black/40 hover:bg-black/60 rounded-full text-white transition-colors"
-                    >
-                        <X className="w-6 h-6" />
-                    </button>
-                </div>
+            {/* Header Area */}
+            <div className="flex justify-end p-4 safe-area-inset-top">
+                <button
+                    onClick={onClose}
+                    className="p-2 hover:bg-white/10 rounded-full text-white transition-colors"
+                >
+                    <X className="w-8 h-8" />
+                </button>
+            </div>
 
-                {/* Viewfinder / Preview */}
-                <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+            {/* Viewfinder Area (Centered Window) */}
+            <div className="flex-1 flex items-center justify-center p-4 min-h-0">
+                <div className="relative w-full h-full max-w-sm sm:max-w-md max-h-[60vh] sm:max-h-[70vh] aspect-[3/4] sm:aspect-[4/5] bg-gray-950 rounded-[40px] overflow-hidden shadow-2xl border border-white/10">
                     {error ? (
-                        <div className="p-8 text-center max-w-sm">
-                            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
-                                <AlertCircle className="w-10 h-10" />
-                            </div>
-                            <p className="text-white font-medium mb-4">{error}</p>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-gray-900">
+                            <AlertCircle className="w-12 h-12 text-red-500/50 mb-4" />
+                            <p className="text-white text-sm font-medium mb-6 leading-relaxed px-4">{error}</p>
                             <button
                                 onClick={startCamera}
-                                className="btn-primary px-6 py-2 rounded-xl text-sm"
+                                className="px-8 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-sm font-bold transition-all active:scale-95"
                             >
                                 Try Again
                             </button>
                         </div>
-                    ) : previewImage ? (
-                        <img
-                            src={previewImage}
-                            alt="Capture Preview"
-                            className="w-full h-full object-contain animate-in zoom-in-95 duration-200"
-                        />
                     ) : (
-                        <>
+                        <div className="absolute inset-0">
+                            {/* Keep video persistent to avoid stream loss on retake */}
                             <video
                                 ref={videoRef}
                                 autoPlay
                                 playsInline
                                 muted
-                                className={`w-full h-full object-cover transition-opacity duration-500 ${isReady ? 'opacity-100' : 'opacity-0'}`}
+                                className={`w-full h-full object-cover transition-opacity duration-500 ${isReady && !previewImage ? 'opacity-100' : 'opacity-0'}`}
                             />
-                            {!isReady && (
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+
+                            {previewImage && (
+                                <img
+                                    src={previewImage}
+                                    alt="Preview"
+                                    className="absolute inset-0 w-full h-full object-cover animate-in zoom-in-95 duration-200"
+                                />
+                            )}
+
+                            {!isReady && !previewImage && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+                                    <div className="w-10 h-10 border-4 border-white/10 border-t-blue-500 rounded-full animate-spin" />
                                 </div>
                             )}
-                        </>
+                        </div>
                     )}
-                    <canvas ref={canvasRef} className="hidden" />
-                </div>
-
-                {/* Controls Overlay */}
-                <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8 bg-gradient-to-t from-black/80 to-transparent z-20">
-                    <div className="flex items-center justify-around max-w-md mx-auto">
-                        {previewImage ? (
-                            <>
-                                <button
-                                    onClick={handleRetake}
-                                    className="flex flex-col items-center group"
-                                >
-                                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white mb-2 transition-all">
-                                        <X className="w-6 h-6" />
-                                    </div>
-                                    <span className="text-[10px] sm:text-xs text-white/70 font-bold uppercase tracking-widest">Retake</span>
-                                </button>
-                                <button
-                                    onClick={handleConfirm}
-                                    className="flex flex-col items-center group scale-110"
-                                >
-                                    <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center text-white mb-2 shadow-lg shadow-green-500/40 transition-all">
-                                        <Check className="w-8 h-8" />
-                                    </div>
-                                    <span className="text-[10px] sm:text-xs text-green-400 font-bold uppercase tracking-widest">Send</span>
-                                </button>
-                            </>
-                        ) : (
-                            <>
-                                <button
-                                    onClick={toggleCamera}
-                                    disabled={!isReady || error}
-                                    className="flex flex-col items-center group disabled:opacity-30"
-                                >
-                                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white mb-2 transition-all group-active:scale-95">
-                                        <RefreshCw className="w-6 h-6" />
-                                    </div>
-                                    <span className="text-[10px] sm:text-xs text-white/70 font-bold uppercase tracking-widest">Flip</span>
-                                </button>
-
-                                <button
-                                    onClick={capturePhoto}
-                                    disabled={!isReady || error || isCapturing}
-                                    className="relative group disabled:opacity-50"
-                                >
-                                    {/* Ring */}
-                                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white flex items-center justify-center transition-all group-active:scale-95">
-                                        {/* Shutter Button */}
-                                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white group-hover:bg-white/90 scale-90 transition-all" />
-                                    </div>
-                                </button>
-
-                                <div className="w-12 h-12 sm:w-14 sm:h-14" /> {/* Spacer */}
-                            </>
-                        )}
-                    </div>
                 </div>
             </div>
+
+            {/* Controls Bar */}
+            <div className="px-8 py-8 sm:py-12 bg-black flex flex-col items-center safe-area-inset-bottom min-h-[160px]">
+                <div className="w-full max-w-xs flex items-center justify-between">
+                    {previewImage ? (
+                        <>
+                            <button
+                                onClick={handleRetake}
+                                className="flex flex-col items-center space-y-2 group flex-1"
+                            >
+                                <div className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all active:scale-90">
+                                    <RefreshCw className="w-6 h-6" />
+                                </div>
+                                <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Clear</span>
+                            </button>
+
+                            <button
+                                onClick={handleConfirm}
+                                className="w-20 h-20 rounded-full bg-white flex items-center justify-center text-black shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-105 active:scale-90 transition-all"
+                            >
+                                <Check className="w-10 h-10" />
+                            </button>
+
+                            <div className="flex-1" /> {/* Spacer */}
+                        </>
+                    ) : (
+                        <>
+                            <div className="flex-1 flex justify-center">
+                                <button
+                                    onClick={() => galleryInputRef.current?.click()}
+                                    className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all active:scale-90"
+                                >
+                                    <ImageIcon className="w-6 h-6 opacity-80" />
+                                </button>
+                            </div>
+
+                            <button
+                                onClick={capturePhoto}
+                                disabled={!isReady || error || isCapturing}
+                                className="w-20 h-20 rounded-full border-[6px] border-white/20 flex items-center justify-center active:scale-90 transition-all disabled:opacity-30"
+                            >
+                                <div className="w-[60px] h-[60px] rounded-full bg-white shadow-xl" />
+                            </button>
+
+                            <button
+                                onClick={toggleCamera}
+                                disabled={!isReady || error}
+                                className="flex flex-col items-center space-y-2 group flex-1 disabled:opacity-30"
+                            >
+                                <div className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all active:scale-90">
+                                    <RefreshCw className="w-6 h-6" />
+                                </div>
+                                <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Flip</span>
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
+            <canvas ref={canvasRef} className="hidden" />
         </div>
     );
 };

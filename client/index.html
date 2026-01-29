@@ -5,7 +5,8 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#1f2937" />
+  <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#030712" media="(prefers-color-scheme: dark)" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -25,7 +26,7 @@
     #splash-screen {
       position: fixed;
       inset: 0;
-      background: linear-gradient(to bottom right, #f8fafc, #eef2ff);
+      background: #f8fafc;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -35,7 +36,7 @@
     }
 
     .dark #splash-screen {
-      background: linear-gradient(to bottom right, #111827, #1f2937);
+      background: #030712;
     }
 
     .splash-content {
@@ -86,12 +87,21 @@
     }
 
     @keyframes spin {
-      to { transform: rotate(360deg); }
+      to {
+        transform: rotate(360deg);
+      }
     }
 
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     /* Hide splash when app is loaded */
@@ -115,7 +125,10 @@
   <div id="splash-screen">
     <div class="splash-content">
       <div class="splash-logo">
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
       </div>
       <h1 class="splash-title">Ephemeral Chat</h1>
       <p class="splash-subtitle">Secure, Temporary Chat Rooms. Loading your privacy...</p>
