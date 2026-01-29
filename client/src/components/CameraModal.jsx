@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { X, Camera, RefreshCw, Check, AlertCircle, Image as ImageIcon } from 'lucide-react';
+import { X, Camera, RefreshCw, Check, AlertCircle, Image as ImageIcon, Wand2 } from 'lucide-react';
+import { FILTERS } from '../utils/cameraFilters';
 
 const CameraModal = ({ isOpen, onClose, onCapture }) => {
     const videoRef = useRef(null);
@@ -11,6 +12,8 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
     const [facingMode, setFacingMode] = useState('user'); // 'user' for front, 'environment' for back
     const [previewImage, setPreviewImage] = useState(null);
     const [isCapturing, setIsCapturing] = useState(false);
+    const [currentFilter, setCurrentFilter] = useState(FILTERS[0]);
+    const [showFilters, setShowFilters] = useState(false);
     const streamRef = useRef(null);
 
     const startCamera = useCallback(async () => {
@@ -54,6 +57,7 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
             setPreviewImage(null);
             setIsReady(false);
             setError(null);
+            setCurrentFilter(FILTERS[0]);
         }
         return () => {
             if (streamRef.current) {
@@ -78,7 +82,20 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
 
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
+
+        // 1. Apply CSS Filter to Context
+        context.filter = currentFilter.css;
+
+        // 2. Draw Video Frame
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // 3. Reset Filter for Overlays
+        context.filter = 'none';
+
+        // 4. Apply Overlays (if any)
+        if (currentFilter.overlay) {
+            currentFilter.overlay(context, canvas.width, canvas.height);
+        }
 
         // Convert to Base64 with high quality
         const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
@@ -135,7 +152,7 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
             </div>
 
             {/* Viewfinder Area (Centered Window) */}
-            <div className="flex-1 flex items-center justify-center p-4 min-h-0">
+            <div className="flex-1 flex items-center justify-center p-4 min-h-0 relative">
                 <div className="relative w-full h-full max-w-sm sm:max-w-md max-h-[60vh] sm:max-h-[70vh] aspect-[3/4] sm:aspect-[4/5] bg-gray-950 rounded-[40px] overflow-hidden shadow-2xl border border-white/10">
                     {error ? (
                         <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-gray-900">
@@ -156,7 +173,8 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
                                 autoPlay
                                 playsInline
                                 muted
-                                className={`w-full h-full object-cover transition-opacity duration-500 ${isReady && !previewImage ? 'opacity-100' : 'opacity-0'}`}
+                                style={{ filter: currentFilter.css }}
+                                className={`w-full h-full object-cover transition-all duration-500 ${isReady && !previewImage ? 'opacity-100' : 'opacity-0'}`}
                             />
 
                             {previewImage && (
@@ -177,8 +195,53 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
                 </div>
             </div>
 
+            {/* Filter Toggle Button & Strip Area */}
+            {isReady && !previewImage && !error && (
+                <div className="w-full bg-black flex flex-col animate-in slide-in-from-bottom duration-300">
+
+                    {/* Filter Strip - Conditionally rendered */}
+                    {showFilters && (
+                        <div className="w-full py-4 border-b border-white/10">
+                            <div className="flex overflow-x-auto no-scrollbar space-x-4 px-6 snap-x justify-start sm:justify-center items-center h-20">
+                                {FILTERS.map((filter) => (
+                                    <button
+                                        key={filter.id}
+                                        onClick={() => setCurrentFilter(filter)}
+                                        className={`flex flex-col items-center space-y-2 flex-shrink-0 transition-all duration-200 snap-center ${currentFilter.id === filter.id ? 'scale-110' : 'opacity-50 hover:opacity-100 scale-95'}`}
+                                    >
+                                        <div className={`w-12 h-12 rounded-full border-2 overflow-hidden transition-all ${currentFilter.id === filter.id ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-white/30'}`}>
+                                            <div
+                                                className="w-full h-full bg-cover bg-center"
+                                                style={{
+                                                    backgroundImage: 'url("https://images.unsplash.com/photo-1557683316-973673baf926?w=200&h=200&fit=crop")',
+                                                    filter: filter.css
+                                                }}
+                                            />
+                                        </div>
+                                        <span className={`text-[9px] font-bold uppercase tracking-wider ${currentFilter.id === filter.id ? 'text-blue-400' : 'text-white'}`}>
+                                            {filter.name}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Filter Toggle Trigger (Small strip above controls) */}
+                    <div className="flex justify-center -mt-3 mb-1 relative z-20">
+                        <button
+                            onClick={() => setShowFilters(!showFilters)}
+                            className={`flex items-center space-x-2 px-4 py-1.5 rounded-full backdrop-blur-md border transition-all ${showFilters ? 'bg-blue-500/20 border-blue-500 text-blue-400' : 'bg-white/10 border-white/10 text-white hover:bg-white/20'}`}
+                        >
+                            <Wand2 className="w-3.5 h-3.5" />
+                            <span className="text-xs font-bold uppercase tracking-wide">Filters</span>
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Controls Bar */}
-            <div className="px-8 py-8 sm:py-12 bg-black flex flex-col items-center safe-area-inset-bottom min-h-[160px]">
+            <div className={`px-8 transition-all duration-300 bg-black flex flex-col items-center safe-area-inset-bottom ${showFilters ? 'py-4' : 'py-8 sm:py-12'}`}>
                 <div className="w-full max-w-xs flex items-center justify-between">
                     {previewImage ? (
                         <>
@@ -225,7 +288,9 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
                                 disabled={!isReady || error}
                                 className="flex flex-col items-center space-y-2 group flex-1 disabled:opacity-30"
                             >
-                                <div className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all active:scale-90">
+                                <div className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all active:scale-90"
+                                    onClick={(e) => { e.stopPropagation(); toggleCamera(); }}
+                                >
                                     <RefreshCw className="w-6 h-6" />
                                 </div>
                                 <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Flip</span>

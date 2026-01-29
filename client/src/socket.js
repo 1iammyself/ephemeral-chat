@@ -40,7 +40,7 @@ console.log('🌐 Connecting to server:', SERVER_URL);
 
 // Simple logging function
 const log = (message, data = null) => {
-  console.log(`[SOCKET] ${message}`, data || '');
+  // console.log(`[SOCKET] ${message}`, data || '');
 };
 
 class SocketManager {

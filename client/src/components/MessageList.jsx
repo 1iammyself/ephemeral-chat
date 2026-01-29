@@ -287,7 +287,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                 </div>
 
                 {/* Hover Actions: Reply, React, Edit */}
-                <div className={`absolute top-1/2 -translate-y-1/2 flex items-center space-x-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity duration-200 ${isOwnMessage ? 'right-full mr-3' : 'left-full ml-3'} z-0`}>
+                <div className={`absolute top-1/2 -translate-y-1/2 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${isOwnMessage ? 'right-full mr-3' : 'left-full ml-3'} z-0`}>
                   <button onClick={() => onReply(message)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400 hover:text-primary-500 transition-colors" title="Reply"><Reply className="w-4 h-4" /></button>
                   <div className="relative">
                     <button onClick={() => setActiveReactionId(activeReactionId === message.id ? null : message.id)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400 hover:text-primary-500 transition-colors" title="React"><Smile className="w-4 h-4" /></button>

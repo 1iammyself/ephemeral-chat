@@ -9,9 +9,9 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const API_BASE = import.meta.env.VITE_API_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '');
 
   const [roomSettings, setSettings] = useState({
-    messageTTL: 'none',
+    messageTTL: '30sec',
     password: '',
-    maxUsers: 10,
+    maxUsers: 1,
     persistenceMode: 'ephemeral' // NEW: Default to ephemeral mode
   });
   const [capToken, setCapToken] = useState(null);
@@ -53,8 +53,8 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   }, []);
 
   const ttlOptions = [
-    { value: 'none', label: 'Never (Default)', description: 'Messages stay until room expires' },
-    { value: '30sec', label: '30 Seconds', description: 'Messages disappear after 30 seconds' },
+    { value: 'none', label: 'Never', description: 'Messages stay until room expires' },
+    { value: '30sec', label: '30 Seconds (Default)', description: 'Messages disappear after 30 seconds' },
     { value: '1min', label: '1 Minute', description: 'Messages disappear after 1 minute' },
     { value: '5min', label: '5 Minutes', description: 'Messages disappear after 5 minutes' },
     { value: '30min', label: '30 Minutes', description: 'Messages disappear after 30 minutes' },
@@ -198,7 +198,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
       verbalCode: false
     });
     setSettings({
-      messageTTL: 'none',
+      messageTTL: '30sec',
       password: '',
       maxUsers: 1
     });

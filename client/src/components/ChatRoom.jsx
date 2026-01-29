@@ -1419,7 +1419,7 @@ const ChatRoom = () => {
                       </button>
 
                       {showFeatureMenu && (
-                        <div className="absolute bottom-full mb-3 left-0 z-50 bg-white/95 dark:bg-gray-800/95 rounded-3xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 p-3 sm:p-4 flex flex-col space-y-3 w-[280px] sm:w-80 animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/5">
+                        <div className="absolute bottom-full mb-3 left-0 z-50 bg-white/95 dark:bg-gray-800/95 rounded-3xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 p-2 sm:p-3 flex flex-col space-y-2 w-[280px] sm:w-80 animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/5">
                           {/* Floating Reaction Pill */}
                           <div className="flex items-center justify-between bg-gray-50/80 dark:bg-gray-900/80 rounded-2xl p-2 border border-gray-100/50 dark:border-gray-800/50 shadow-inner">
                             {['❤️', '🔥', '👏', '😂', '😮', '💯'].map(emoji => (
@@ -1436,18 +1436,18 @@ const ChatRoom = () => {
 
                           <div className="h-px bg-gray-100 dark:bg-gray-700/50 mx-1" />
 
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-3 gap-1.5">
                             {/* Main Actions Grid */}
                             <button
                               type="button"
                               onClick={() => { setShowCameraModal(true); setShowFeatureMenu(false); }}
                               disabled={!isConnected}
-                              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-blue-50/50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all border border-blue-100/20 dark:border-blue-800/20 group"
+                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all border border-blue-100/20 dark:border-blue-800/20 group"
                             >
-                              <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                <Camera className="w-5 h-5 text-blue-500" />
+                              <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+                                <Camera className="w-4 h-4 text-blue-500" />
                               </div>
-                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Camera</span>
+                              <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">Camera</span>
                             </button>
 
                             <button
@@ -1461,70 +1461,69 @@ const ChatRoom = () => {
                                 }
                               }}
                               disabled={!isConnected || users.length < 2 || users.length > 7}
-                              className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all border group ${users.length > 7
+                              className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all border group ${users.length > 7
                                 ? 'bg-gray-50/50 dark:bg-gray-800/20 border-gray-200/20 dark:border-gray-700/20 opacity-50 cursor-not-allowed'
                                 : 'bg-green-50/50 dark:bg-green-900/10 hover:bg-green-100 dark:hover:bg-green-900/20 border-green-100/20 dark:border-green-800/20'
                                 }`}
                               title={users.length > 7 ? "Disabled: Max 7 users for voice calls" : "Start Voice Call"}
                             >
-                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-transform ${users.length > 7
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-1 transition-transform ${users.length > 7
                                 ? 'bg-gray-100 dark:bg-gray-800/50'
                                 : 'bg-green-100 dark:bg-green-900/30 group-hover:scale-110'
                                 }`}>
-                                <Phone className={`w-5 h-5 ${users.length > 7 ? 'text-gray-400' : 'text-green-500'}`} />
+                                <Phone className={`w-4 h-4 ${users.length > 7 ? 'text-gray-400' : 'text-green-500'}`} />
                               </div>
-                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                                {users.length > 7 ? 'Call Disabled' : 'Voice Call'}
+                              <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">
+                                {users.length > 7 ? 'Disabled' : 'Voice Call'}
                               </span>
-                              {users.length > 7 && <span className="text-[10px] text-gray-500 mt-1">Max 7</span>}
                             </button>
 
                             <button
                               type="button"
                               onClick={() => { setShowPollModal(true); setShowFeatureMenu(false); }}
                               disabled={!isConnected}
-                              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-purple-50/50 dark:bg-purple-900/10 hover:bg-purple-100 dark:hover:bg-purple-900/20 transition-all border border-purple-100/20 dark:border-purple-800/20 group"
+                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-purple-50/50 dark:bg-purple-900/10 hover:bg-purple-100 dark:hover:bg-purple-900/20 transition-all border border-purple-100/20 dark:border-purple-800/20 group"
                             >
-                              <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                <BarChart2 className="w-5 h-5 text-purple-500" />
+                              <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+                                <BarChart2 className="w-4 h-4 text-purple-500" />
                               </div>
-                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Poll</span>
+                              <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">Poll</span>
                             </button>
 
                             <button
                               type="button"
                               onClick={() => { startRecording(); setShowFeatureMenu(false); }}
                               disabled={!isConnected}
-                              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-red-50/50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20 transition-all border border-red-100/20 dark:border-red-800/20 group"
+                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-red-50/50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20 transition-all border border-red-100/20 dark:border-red-800/20 group"
                             >
-                              <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                <Mic className="w-5 h-5 text-red-500" />
+                              <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+                                <Mic className="w-4 h-4 text-red-500" />
                               </div>
-                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Voice Note</span>
+                              <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">Voice Note</span>
                             </button>
 
                             <button
                               type="button"
                               onClick={handleSendIcebreaker}
                               disabled={!isConnected}
-                              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-cyan-50/50 dark:bg-cyan-900/10 hover:bg-cyan-100 dark:hover:bg-cyan-900/20 transition-all border border-cyan-100/20 dark:border-cyan-800/20 group"
+                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-cyan-50/50 dark:bg-cyan-900/10 hover:bg-cyan-100 dark:hover:bg-cyan-900/20 transition-all border border-cyan-100/20 dark:border-cyan-800/20 group"
                             >
-                              <div className="w-10 h-10 rounded-xl bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                <Smile className="w-5 h-5 text-cyan-500" />
+                              <div className="w-8 h-8 rounded-lg bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+                                <Smile className="w-4 h-4 text-cyan-500" />
                               </div>
-                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Icebreaker</span>
+                              <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">Icebreaker</span>
                             </button>
 
                             <button
                               type="button"
                               onClick={handleSendPulse}
                               disabled={!isConnected}
-                              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-yellow-50/50 dark:bg-yellow-900/10 hover:bg-yellow-100 dark:hover:bg-yellow-900/20 transition-all border border-yellow-100/20 dark:border-yellow-800/20 group"
+                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-yellow-50/50 dark:bg-yellow-900/10 hover:bg-yellow-100 dark:hover:bg-yellow-900/20 transition-all border border-yellow-100/20 dark:border-yellow-800/20 group"
                             >
-                              <div className="w-10 h-10 rounded-xl bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                <Zap className="w-5 h-5 text-yellow-500" />
+                              <div className="w-8 h-8 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+                                <Zap className="w-4 h-4 text-yellow-500" />
                               </div>
-                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Pulse</span>
+                              <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">Pulse</span>
                             </button>
                           </div>
 
