@@ -1,6 +1,7 @@
 package co.median.android;
 
 import android.Manifest;
+import android.app.Activity;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
@@ -198,7 +199,7 @@ public class MainActivity extends AppCompatActivity implements Observer,
     // Screenshot protection
     private boolean blockScreenshots = false;
     private boolean detectScreenshots = false;
-    private Activity.ScreenCaptureCallback screenCaptureCallback;
+    private android.app.Activity.ScreenCaptureCallback screenCaptureCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -648,11 +649,16 @@ public class MainActivity extends AppCompatActivity implements Observer,
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && this.detectScreenshots) {
             if (this.screenCaptureCallback == null) {
-                this.screenCaptureCallback = () -> {
-                    Toast.makeText(MainActivity.this, "Screenshot detected", Toast.LENGTH_SHORT).show();
-                    // Optional: send event to WebView
-                    runJavascript("median.onScreenshotDetected()");
-                };
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    this.screenCaptureCallback = new android.app.Activity.ScreenCaptureCallback() {
+                        @Override
+                        public void onScreenCaptured() {
+                            Toast.makeText(MainActivity.this, "Screenshot detected", Toast.LENGTH_SHORT).show();
+                            // Optional: send event to WebView
+                            runJavascript("median.onScreenshotDetected()");
+                        }
+                    };
+                }
             }
             registerScreenCaptureCallback(getMainExecutor(), this.screenCaptureCallback);
         }
