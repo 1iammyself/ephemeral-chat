@@ -20,7 +20,7 @@ class RoomManager {
     this.rooms = new Map(); // In-memory fallback
     this.roomTimers = new Map(); // For room expiry timers
     this.ROOM_EXPIRY_MS = (process.env.ROOM_EXPIRY_MINUTES || 10) * 60 * 1000;
-    this.INVITE_TOKEN_EXPIRY_MS = 25 * 60 * 1000; // 25 minutes expiry for invite tokens
+    this.INVITE_TOKEN_EXPIRY_MS = (process.env.INVITE_TOKEN_EXPIRY_MINUTES || 25) * 60 * 1000; // Default 25 minutes
     this.ROOM_DEFAULT_LIFETIME_MS = 2 * 60 * 60 * 1000; // 2 hours default room lifetime
     this.ROOM_DEFAULT_LIFETIME_MINUTES = 120; // 2 hours in minutes
 
@@ -160,6 +160,20 @@ class RoomManager {
       return roomData ? JSON.parse(roomData) : null;
     }
     return this.rooms.get(roomCode) || null;
+  }
+
+  /**
+   * Get inactivity timeout for a room based on its persistence mode
+   * @param {string} roomCode - Room code
+   * @returns {Promise<number>} Timeout in milliseconds
+   */
+  async getRoomTimeout(roomCode) {
+    const room = await this.getRoom(roomCode);
+    if (!room) return null;
+
+    const persistenceMode = room.settings?.persistenceMode || 'ephemeral';
+    const config = getPersistenceMode(persistenceMode);
+    return config ? config.socketTimeout : null;
   }
 
   /**

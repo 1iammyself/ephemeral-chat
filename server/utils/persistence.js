@@ -8,25 +8,25 @@ const PERSISTENCE_MODES = {
         lifetimeMinutes: 10,
         allowEmpty: false,        // Deletes when empty
         refreshOnActivity: true,  // Timer resets on messages/joins
-        socketTimeout: 30000      // 30 seconds
+        socketTimeout: 300000     // 5 minutes
     },
     gathering: {
         lifetimeMinutes: 180,     // 3 hours
         allowEmpty: true,         // Stays alive when empty
         refreshOnActivity: false, // Fixed expiry from creation
-        socketTimeout: 300000     // 5 minutes
+        socketTimeout: 600000     // 10 minutes
     },
     social: {
         lifetimeMinutes: 360,     // 6 hours
         allowEmpty: true,
         refreshOnActivity: false,
-        socketTimeout: 300000     // 5 minutes  
+        socketTimeout: 600000     // 10 minutes  
     },
     extended: {
         lifetimeMinutes: 1440,    // 24 hours
         allowEmpty: true,
         refreshOnActivity: false,
-        socketTimeout: 300000     // 5 minutes
+        socketTimeout: 600000     // 10 minutes
     }
 };
 

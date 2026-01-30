@@ -1028,8 +1028,7 @@ io.on('connection', (socket) => {
 
           const room = await roomManager.getRoom(roomCode);
           if (room) {
-            const persistenceMode = room.settings?.persistenceMode || 'ephemeral';
-            const timeoutMs = persistenceMode !== 'ephemeral' ? 12 * 60 * 60 * 1000 : undefined;
+            const timeoutMs = await roomManager.getRoomTimeout(roomCode);
             securityManager.registerUserActivity(socket.id, userId || socket.id, roomCode, handleInactivityTimeout, timeoutMs);
 
             const messages = await roomManager.getMessages(roomCode, socket.id);
@@ -1096,9 +1095,7 @@ io.on('connection', (socket) => {
         socket.nickname = userNickname;
 
         // Register user activity and start inactivity timer
-        // Relaxed timeout for persistent rooms (12 hours vs default 15 mins)
-        const persistenceMode = result.room.settings?.persistenceMode || 'ephemeral';
-        const timeoutMs = persistenceMode !== 'ephemeral' ? 12 * 60 * 60 * 1000 : undefined;
+        const timeoutMs = await roomManager.getRoomTimeout(roomCode);
 
         securityManager.registerUserActivity(socket.id, userId, roomCode, handleInactivityTimeout, timeoutMs);
 
