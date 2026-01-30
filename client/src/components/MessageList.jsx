@@ -188,11 +188,19 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
             data-id={message.id}
             className={`message-item group flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'} ${isVanishing ? 'message-vanishing' : ''} relative`}
           >
-            {/* Meta: Name and Time */}
             <div className={`flex items-center space-x-2 mb-1 px-1 text-[10px] font-bold uppercase tracking-tighter text-gray-400 dark:text-gray-500`}>
               {!isOwnMessage && <span className="text-primary-500 dark:text-primary-400">{message.sender.nickname}</span>}
               {!isOwnMessage && <span>•</span>}
               <span>{formatTime(message.timestamp)}</span>
+              {message.recipients && message.recipients.length > 0 && (
+                <>
+                  <span>•</span>
+                  <span className="text-amber-500 dark:text-amber-400 flex items-center gap-1">
+                    <Lock className="w-2.5 h-2.5" />
+                    Private
+                  </span>
+                </>
+              )}
             </div>
 
             <div className={`flex items-center w-full ${isOwnMessage ? 'justify-end pl-12' : 'justify-start pr-12'}`}>

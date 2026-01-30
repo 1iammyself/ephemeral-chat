@@ -814,6 +814,25 @@ const ChatRoom = () => {
         return user?.socketId;
       }).filter(Boolean);
 
+      // Strip leading mentions from content before sending
+      // This allows @nick to stay in the middle of a sentence, but clears it as a routing prefix
+      if (mentionMatches.length > 0) {
+        let strippedContent = content;
+        let changed = true;
+        while (changed) {
+          changed = false;
+          const match = strippedContent.match(/^@\w+\s*/);
+          if (match) {
+            strippedContent = strippedContent.substring(match[0].length);
+            changed = true;
+          }
+        }
+        // Only use stripped content if we didn't wipe everything out
+        if (strippedContent.trim()) {
+          content = strippedContent.trim();
+        }
+      }
+
       // If mentions exist, they take precedence
       const finalRecipients = mentionedSocketIds.length > 0 ? mentionedSocketIds : selectedRecipients;
 
