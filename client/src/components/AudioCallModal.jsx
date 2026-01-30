@@ -213,6 +213,7 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                             playsInline
                             muted
                             className="absolute bottom-4 right-4 w-24 h-32 object-cover rounded-lg border-2 border-white shadow-lg"
+                            style={{ transform: 'scaleX(-1)' }}
                         />
                     </div>
                 )}

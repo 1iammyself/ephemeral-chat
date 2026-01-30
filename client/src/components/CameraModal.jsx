@@ -89,8 +89,16 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
         // 1. Apply CSS Filter to Context
         context.filter = currentFilter.css;
 
-        // 2. Draw Video Frame
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        // 2. Draw Video Frame (Mirror if front camera)
+        if (facingMode === 'user') {
+            context.save();
+            context.translate(canvas.width, 0);
+            context.scale(-1, 1);
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            context.restore();
+        } else {
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        }
 
         // 3. Reset Filter for Overlays
         context.filter = 'none';
@@ -176,7 +184,10 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
                                 autoPlay
                                 playsInline
                                 muted
-                                style={{ filter: currentFilter.css }}
+                                style={{
+                                    filter: currentFilter.css,
+                                    transform: facingMode === 'user' ? 'scaleX(-1)' : 'none'
+                                }}
                                 className={`w-full h-full object-cover transition-all duration-500 ${isReady && !previewImage ? 'opacity-100' : 'opacity-0'}`}
                             />
 
