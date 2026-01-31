@@ -85,7 +85,7 @@ const ChatRoom = () => {
   const { roomCode } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(socketManager.isConnected);
   const [isJoined, setIsJoined] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(true);
   const [isProcessingInvite, setIsProcessingInvite] = useState(false);
@@ -286,6 +286,7 @@ const ChatRoom = () => {
         return;
       }
       if (response.success) {
+        setIsConnected(true);
         setRoom(response.room);
         let msgs = response.messages || [];
         if (roomKey) {
@@ -443,6 +444,13 @@ const ChatRoom = () => {
         performJoin({ sessionToken });
       }
     };
+    socket.on('connect', handleConnect);
+
+    // If already connected, trigger handlers immediately
+    if (socket.connected) {
+      handleConnect();
+    }
+
     const handleDisconnect = (reason) => {
       setIsConnected(false);
       if (reason === 'io server disconnect') {
@@ -458,6 +466,7 @@ const ChatRoom = () => {
     };
 
     const handleRoomJoined = async (data) => {
+      setIsConnected(true);
       setRoom(data.room);
       setUsers(data.users || []);
       let msgs = data.messages || [];
