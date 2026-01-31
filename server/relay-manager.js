@@ -6,6 +6,10 @@ const { logger } = require('./utils');
 let relayProcess = null;
 
 function startRelayServer() {
+    if (relayProcess) {
+        logger.info('e2ecp relay service is already running.');
+        return;
+    }
     const relayPort = 8080; // Hardcoded as per user requirement
     const rootDir = path.resolve(__dirname, '..');
     const e2ecpDir = path.join(rootDir, 'e2ecp');

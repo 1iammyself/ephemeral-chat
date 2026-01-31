@@ -13,6 +13,11 @@ const GhostWatermark = ({ nickname }) => {
     const [hashedUsername, setHashedUsername] = useState('');
     const [timestamp] = useState(new Date().toISOString().replace('T', ' ').substring(0, 19));
     const layerRef = useRef(null);
+    const isUnmounting = useRef(false);
+
+    useEffect(() => {
+        return () => { isUnmounting.current = true; };
+    }, []);
 
     // Generate a SHA-256 Hash for the username
     const hashUsername = async (username) => {
@@ -40,19 +45,19 @@ const GhostWatermark = ({ nickname }) => {
     }, [nickname]);
 
     useEffect(() => {
-        // Only start observing once the watermark is actually rendered
-        if (!hashedUsername || !layerRef.current) return;
+        const layer = layerRef.current;
+        if (!hashedUsername || !layer) return;
 
         const securityObserver = new MutationObserver((mutations) => {
-            const layer = layerRef.current;
-            if (!layer) {
+            if (isUnmounting.current) return;
+
+            if (!document.body.contains(layer)) {
                 window.location.href = "/";
                 return;
             }
 
             const style = window.getComputedStyle(layer);
-            if (style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity) < 0.01) {
-                alert("Security Violation: Watermark integrity compromised.");
+            if (style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity) < 0.05) {
                 window.location.href = "/";
             }
         });

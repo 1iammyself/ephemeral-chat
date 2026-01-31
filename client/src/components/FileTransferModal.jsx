@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, ExternalLink, Loader2 } from 'lucide-react';
+import socketManager from '../socket';
 
 const FileTransferModal = ({ onClose, roomCode, recipients = [] }) => {
     const [isLoading, setIsLoading] = useState(true);
@@ -16,16 +17,28 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [] }) => {
     // We proxy /e2ecp in both dev (vite) and prod (express) to the backend -> relay
     const baseUrl = '/e2ecp';
 
+    // Get current User ID (socket ID) to ensure consistent identity
+    const myId = socketManager.socket?.id || '';
+
     // Construct recipients string
     const recipientsStr = recipients.length > 0 ? recipients.join(',') : '';
 
-    const url = `${baseUrl}?room=${roomCode}${recipientsStr ? `&recipients=${recipientsStr}` : ''}`;
+    const url = `${baseUrl}?room=${roomCode}&userId=${myId}${recipientsStr ? `&recipients=${recipientsStr}` : ''}`;
 
     useEffect(() => {
-        // Auto-start the relay server when the modal opens, just in case
+        // 1. Auto-start the relay server
         fetch('/api/start-relay', { method: 'POST' })
             .catch(err => console.error("Failed to auto-start relay:", err));
-    }, []);
+
+        // 2. Send "Wake Up" signal to chat room peers
+        // We use the existing socket from the main app
+        if (socketManager.socket && socketManager.socket.connected) {
+            socketManager.socket.emit('file-transfer-intent', {
+                roomCode,
+                recipients: recipients
+            });
+        }
+    }, [roomCode, recipients]);
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">

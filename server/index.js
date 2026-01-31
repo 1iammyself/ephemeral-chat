@@ -299,6 +299,18 @@ app.get('/api/invite/:token', async (req, res) => {
   }
 });
 
+// Route to manually/on-demand start the relay server
+app.post('/api/start-relay', (req, res) => {
+  try {
+    startRelayServer();
+    res.json({ success: true, message: 'Relay server starting...' });
+  } catch (error) {
+    logger.error('Failed to start relay server via API:', error);
+    res.status(500).json({ success: false, error: 'Failed to start relay server' });
+  }
+});
+
+
 // Cap.js API endpoints for proof-of-work CAPTCHA
 app.post('/api/cap/challenge', async (req, res) => {
   try {
@@ -1661,6 +1673,27 @@ io.on('connection', (socket) => {
       io.to(data.to).emit('call-ended', payload);
     } else {
       socket.to(socket.roomCode).emit('call-ended', payload);
+    }
+  });
+
+  // File Transfer Wake-Up Signal
+  socket.on('file-transfer-intent', ({ roomCode, recipients }) => {
+    if (!socket.roomCode || socket.roomCode !== roomCode) return;
+
+    const payload = {
+      from: socket.nickname,
+      fromId: socket.id,
+      roomCode
+    };
+
+    if (recipients && recipients.length > 0) {
+      // Notify specific users
+      recipients.forEach(recipientId => {
+        io.to(recipientId).emit('file-transfer-invite', payload);
+      });
+    } else {
+      // Broadcast to all (except sender)
+      socket.to(roomCode).emit('file-transfer-invite', payload);
     }
   });
 

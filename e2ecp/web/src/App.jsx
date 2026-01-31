@@ -476,30 +476,73 @@ function ProgressBar({ progress, label }) {
 }
 
 
+async function generateMnemonic() {
+    const iconClasses = ICON_CLASSES;
+    const words = [];
+    for (let i = 0; i < 3; i++) {
+        const randomIcon = iconClasses[Math.floor(Math.random() * iconClasses.length)];
+        // remove 'fa-' prefix
+        words.push(randomIcon.replace("fa-", ""));
+    }
+    return words.join("-");
+}
+
+
 export default function App() {
+    const { isAuthenticated, user, loading: authLoading } = useAuth();
+    const { config, loading: configLoading } = useConfig();
+    const navigate = useNavigate();
+
     // Parse room from URL path (e.g., /myroom -> "myroom")
     const rawPath = window.location.pathname.slice(1).toLowerCase();
     const reservedPaths = ["login", "profile", "settings", "verify-email", "files"]; // Added "files" just in case
     const pathRoom = reservedPaths.includes(rawPath) ? "" : rawPath;
 
     // Parse query params for room and recipients
-    const searchParams = new URLSearchParams(window.location.search);
-    const queryRoom = searchParams.get('room');
-    const queryRecipients = searchParams.get('recipients');
+    const queryParams = new URLSearchParams(window.location.search);
+    const initialRoomId = queryParams.get("room") || window.location.pathname.substring(1);
+    const initialRecipients = queryParams.get("recipients") // comma separated IDs
+        ? queryParams.get("recipients").split(",")
+        : [];
+    const initialUsername = queryParams.get("username"); // Added username param
+    const initialUserId = queryParams.get("userId"); // Added userId param
 
-    const initialRoomId = pathRoom || queryRoom || "";
-
-    const [roomId, setRoomId] = useState(initialRoomId);
-    const onHomePage = initialRoomId === "";
-    const navigate = useNavigate();
-    const { isAuthenticated, logout, user } = useAuth();
-    const { storageEnabled, loading: configLoading } = useConfig();
+    const [roomId, setRoomId] = useState(initialRoomId || "");
     const [connected, setConnected] = useState(false);
-    const [peerCount, setPeerCount] = useState(1);
     const [status, setStatus] = useState("Not connected");
+    const [peerCount, setPeerCount] = useState(1);
+
+    // Multi-Peer State: Map<peerId, { mnemonic, pubKey, sessionStart }>
+    const [peers, setPeers] = useState(new Map());
+    const peersRef = useRef(new Map()); // Mutable ref for callbacks
+
+    const [myMnemonic, setMyMnemonic] = useState("");
+
+    // Multi-AES Keys: Map<peerId, CryptoKey>
+    const peerKeysRef = useRef(new Map());
+    const activeIncomingKeyRef = useRef(null); // Key for currently receiving file
+    const activeIncomingSenderIdRef = useRef(null); // Sender for currently receiving file
+    // Legacy Refs (for backward compat during refactor)
+    const socketRef = useRef(null);
+    const myMsgKeyRef = useRef(null);
+    const myMsgIvRef = useRef(null);
+
+    // Track our own identity - Use URL param if available
+    const myIdRef = useRef(initialUserId || null);
+    const clientIdRef = useRef(initialUserId || null); // Sync clientIdRef too
+
+    // Initialize Mnemonic
+    useEffect(() => {
+        if (initialUsername) {
+            setMyMnemonic(initialUsername);
+        } else {
+            // Fallback to random if no username provided
+            generateMnemonic().then(setMyMnemonic);
+        }
+    }, [initialUsername]);
+
     const [downloadUrl, setDownloadUrl] = useState(null);
     const [downloadName, setDownloadName] = useState(null);
-    const [myMnemonic, setMyMnemonic] = useState(null);
     const [peerMnemonic, setPeerMnemonic] = useState(null);
     const [hasAesKey, setHasAesKey] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(null);
@@ -529,7 +572,7 @@ export default function App() {
     const wsRef = useRef(null);
     const selfIdRef = useRef(null);
     const myMnemonicRef = useRef(null);
-    const clientIdRef = useRef(crypto.randomUUID());
+    // clientIdRef initialized above
     const roomInputRef = useRef(null);
     const fileInputRef = useRef(null);
 
@@ -583,17 +626,34 @@ export default function App() {
         log("Sent my public key");
     }
 
-    async function handlePeerPubKey(b64) {
+    async function handlePeerPubKey(b64, peerId, peerName) {
+        if (peerKeysRef.current.has(peerId)) return; // Already have key
+
         const rawPeer = base64ToUint8(b64);
         const peerPub = await importPeerPubKey(rawPeer);
         const sharedAes = await deriveSharedKey(
             myKeyPairRef.current.privateKey,
             peerPub,
         );
-        aesKeyRef.current = sharedAes;
-        havePeerPubRef.current = true;
-        setHasAesKey(true);
-        log("Derived shared AES key (E2EE ready)");
+
+        // Store key for this specific peer
+        peerKeysRef.current.set(peerId, sharedAes);
+
+        // Update peers state for UI
+        setPeers(prev => new Map(prev).set(peerId, {
+            id: peerId,
+            mnemonic: peerName,
+            connected: true
+        }));
+
+        // For backward compatibility (if needed for single peer logic, though we should move away from it)
+        if (!aesKeyRef.current) {
+            aesKeyRef.current = sharedAes; // Set primary key as first derived key
+            setPeerMnemonic(peerName);
+            setHasAesKey(true);
+        }
+
+        log(`Derived shared AES key for ${peerName}`);
     }
 
     function generateRandomRoomId() {
@@ -730,48 +790,40 @@ export default function App() {
             }
 
             if (msg.type === "pubkey") {
+                const peerId = msg.clientId || msg.from; // Use stable ID if available
                 const peerName = msg.mnemonic || msg.from;
-                setPeerMnemonic(peerName);
-                log(`Received peer public key from ${peerName}`);
-                const hadPeerPub = havePeerPubRef.current;
 
-                // Prevent duplicate processing - set flag immediately to prevent race condition
-                if (hadPeerPub) {
+                // Prevent duplicate processing
+                if (peerKeysRef.current.has(peerId)) {
                     return;
                 }
-                havePeerPubRef.current = true;
 
-                // Show connection notification with peer's icons
+                log(`Received peer public key from ${peerName}`);
+
+                // Show connection notification
                 const peerIcons = mnemonicToIcons(peerName);
                 toast.success(
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                        }}
-                    >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         {peerIcons.map((iconClass, index) => (
-                            <i
-                                key={index}
-                                className={`fas ${iconClass}`}
-                                aria-hidden="true"
-                                style={{ fontSize: "16px" }}
-                            ></i>
+                            <i key={index} className={`fas ${iconClass}`} style={{ fontSize: "16px" }}></i>
                         ))}
                         <span>{peerName.toUpperCase()} CONNECTED</span>
                     </div>,
                     { duration: 3000 },
                 );
 
-                await handlePeerPubKey(msg.pub);
+                await handlePeerPubKey(msg.pub, peerId, peerName);
+
+                // We always announce back so they can derive our key too
+                // (Optimization: could check if we already announced to them)
                 await announcePublicKey();
                 return;
             }
 
             if (msg.type === "peer_disconnected") {
+                const disconnectedPeerId = msg.peerId || msg.from;
                 const disconnectedPeerName =
-                    msg.mnemonic || msg.peerId || "Peer";
+                    msg.mnemonic || msg.from || "Peer";
                 log(`${disconnectedPeerName} disconnected`);
 
                 // Show disconnection notification with peer's icons
@@ -799,22 +851,21 @@ export default function App() {
                     { duration: 4000 },
                 );
 
-                // Reset peer state
-                setPeerMnemonic(null);
-                havePeerPubRef.current = false;
-                aesKeyRef.current = null;
-                setHasAesKey(false);
+                // Update multi-peer state
+                setPeers(prev => {
+                    const next = new Map(prev);
+                    next.delete(disconnectedPeerId);
+                    return next;
+                });
+                peerKeysRef.current.delete(disconnectedPeerId);
 
-                // Close current connection
-                if (wsRef.current) {
-                    wsRef.current.close();
+                // Handle legacy state if this was the primary peer
+                if (peerMnemonic === disconnectedPeerName) {
+                    setPeerMnemonic(null);
+                    havePeerPubRef.current = false;
+                    aesKeyRef.current = null;
+                    setHasAesKey(false);
                 }
-
-                // Rejoin the same room after a short delay
-                setTimeout(() => {
-                    log(`Rejoining room ${roomId}`);
-                    connectToRoom();
-                }, 500);
 
                 return;
             }
@@ -827,12 +878,15 @@ export default function App() {
                 let transferType = "file";
 
                 // Try to decrypt metadata to determine transfer type
-                if (msg.encrypted_metadata && msg.metadata_iv && aesKeyRef.current) {
+                const senderId = msg.from;
+                const peerKey = peerKeysRef.current.get(senderId) || aesKeyRef.current;
+
+                if (msg.encrypted_metadata && msg.metadata_iv && peerKey) {
                     try {
                         const metadataIV = base64ToUint8(msg.metadata_iv);
                         const encryptedMetadata = base64ToUint8(msg.encrypted_metadata);
                         const metadataBytes = await decryptBytes(
-                            aesKeyRef.current,
+                            peerKey,
                             metadataIV,
                             encryptedMetadata,
                         );
@@ -878,10 +932,17 @@ export default function App() {
             }
 
             if (msg.type === "file_start") {
-                if (!aesKeyRef.current) {
+                const senderId = msg.from;
+                const peerKey = peerKeysRef.current.get(senderId) || aesKeyRef.current;
+
+                if (!peerKey) {
                     log("Can't decrypt yet (no shared key)");
                     return;
                 }
+
+                // Store the key being used for this file session
+                activeIncomingKeyRef.current = peerKey;
+                activeIncomingSenderIdRef.current = senderId;
 
                 // Decrypt metadata
                 if (!msg.encrypted_metadata || !msg.metadata_iv) {
@@ -904,7 +965,7 @@ export default function App() {
                         msg.encrypted_metadata,
                     );
                     const metadataBytes = await decryptBytes(
-                        aesKeyRef.current,
+                        peerKey,
                         metadataIV,
                         encryptedMetadata,
                     );
@@ -974,7 +1035,7 @@ export default function App() {
                     const cipherChunk = base64ToUint8(msg.chunk_data);
 
                     const plainChunk = await decryptBytes(
-                        aesKeyRef.current,
+                        activeIncomingKeyRef.current || aesKeyRef.current,
                         chunkIV,
                         cipherChunk,
                     );
@@ -1140,12 +1201,13 @@ export default function App() {
                         const metadataJSON = JSON.stringify(transferMetadata);
                         const metadataBytes = new TextEncoder().encode(metadataJSON);
                         const { iv: metadataIV, ciphertext: encryptedMetadataBytes } =
-                            await encryptBytes(aesKeyRef.current, metadataBytes);
+                            await encryptBytes(activeIncomingKeyRef.current || aesKeyRef.current, metadataBytes);
 
                         sendMsg({
                             type: "transfer_received",
                             encrypted_metadata: uint8ToBase64(encryptedMetadataBytes),
                             metadata_iv: uint8ToBase64(metadataIV),
+                            recipients: activeIncomingSenderIdRef.current ? [activeIncomingSenderIdRef.current] : []
                         });
                     } catch (err) {
                         console.error("Failed to encrypt transfer_received metadata:", err);
@@ -1161,7 +1223,10 @@ export default function App() {
             }
 
             if (msg.type === "text_message") {
-                if (!aesKeyRef.current) {
+                const senderId = msg.from;
+                const peerKey = peerKeysRef.current.get(senderId) || aesKeyRef.current;
+
+                if (!peerKey) {
                     log("Can't decrypt text yet (no shared key)");
                     return;
                 }
@@ -1182,7 +1247,7 @@ export default function App() {
                         msg.encrypted_metadata,
                     );
                     const metadataBytes = await decryptBytes(
-                        aesKeyRef.current,
+                        peerKey,
                         metadataIV,
                         encryptedMetadata,
                     );
@@ -1205,12 +1270,13 @@ export default function App() {
                             const metadataJSON = JSON.stringify(transferMetadata);
                             const metadataBytes = new TextEncoder().encode(metadataJSON);
                             const { iv: metadataIV, ciphertext: encryptedMetadataBytes } =
-                                await encryptBytes(aesKeyRef.current, metadataBytes);
+                                await encryptBytes(peerKey, metadataBytes);
 
                             sendMsg({
                                 type: "transfer_received",
                                 encrypted_metadata: uint8ToBase64(encryptedMetadataBytes),
                                 metadata_iv: uint8ToBase64(metadataIV),
+                                recipients: [senderId]
                             });
                         } catch (err) {
                             console.error("Failed to encrypt transfer_received metadata:", err);
@@ -1410,20 +1476,51 @@ export default function App() {
                 metadata.is_multiple_files = true;
             }
 
+            // Determine targets (similar to file logic)
+            let targetPeers = [];
+            if (initialRecipients.length > 0) {
+                targetPeers = initialRecipients.filter(id => peerKeysRef.current.has(id));
+            } else {
+                targetPeers = Array.from(peerKeysRef.current.keys());
+            }
+
+            // Fallback or broadcast
+            if (targetPeers.length === 0 && peerKeysRef.current.size > 0 && initialRecipients.length === 0) {
+                targetPeers = Array.from(peerKeysRef.current.keys());
+            }
+
             // Encrypt metadata
             const metadataJSON = JSON.stringify(metadata);
             const metadataBytes = new TextEncoder().encode(metadataJSON);
-            const { iv: metadataIV, ciphertext: encryptedMetadataBytes } =
-                await encryptBytes(aesKeyRef.current, metadataBytes);
 
-            // Send file_start message with encrypted metadata only
-            const fileStartMsg = {
-                type: "file_start",
-                encrypted_metadata: uint8ToBase64(encryptedMetadataBytes),
-                metadata_iv: uint8ToBase64(metadataIV),
-            };
+            if (targetPeers.length === 0 && aesKeyRef.current) {
+                // Legacy single peer
+                const { iv: metadataIV, ciphertext: encryptedMetadataBytes } =
+                    await encryptBytes(aesKeyRef.current, metadataBytes);
 
-            sendMsg(fileStartMsg);
+                const fileStartMsg = {
+                    type: "file_start",
+                    encrypted_metadata: uint8ToBase64(encryptedMetadataBytes),
+                    metadata_iv: uint8ToBase64(metadataIV),
+                };
+                sendMsg(fileStartMsg);
+            } else {
+                // Multi-peer loop
+                for (const peerId of targetPeers) {
+                    const peerKey = peerKeysRef.current.get(peerId);
+                    if (!peerKey) continue;
+
+                    const { iv: metadataIV, ciphertext: encryptedMetadataBytes } =
+                        await encryptBytes(peerKey, metadataBytes);
+
+                    sendMsg({
+                        type: "file_start",
+                        encrypted_metadata: uint8ToBase64(encryptedMetadataBytes),
+                        metadata_iv: uint8ToBase64(metadataIV),
+                        recipients: [peerId]
+                    });
+                }
+            }
 
             // Reset ACK tracking
             pendingChunksRef.current = new Map();
@@ -1493,30 +1590,75 @@ export default function App() {
                     const { done, value } = await reader.read();
                     if (done) break;
 
-                    // Encrypt this chunk with its own IV
-                    const { iv, ciphertext } = await encryptBytes(
-                        aesKeyRef.current,
-                        value,
-                    );
+                    // Determine target peers
+                    let targetPeers = [];
+                    if (initialRecipients.length > 0) {
+                        targetPeers = initialRecipients.filter(id => peerKeysRef.current.has(id));
+                    } else {
+                        targetPeers = Array.from(peerKeysRef.current.keys());
+                    }
 
-                    const chunkData = uint8ToBase64(ciphertext);
-                    const ivB64 = uint8ToBase64(iv);
+                    if (targetPeers.length === 0 && peerKeysRef.current.size > 0 && initialRecipients.length === 0) {
+                        // Fallback for logic where initialRecipients is empty but we have peers (Broadcast)
+                        targetPeers = Array.from(peerKeysRef.current.keys());
+                    }
 
-                    // Track this chunk for potential retransmission
-                    pendingChunksRef.current.set(chunkNum, {
-                        chunkData: chunkData,
-                        ivB64: ivB64,
-                        sentTime: Date.now(),
-                        retries: 0,
-                    });
+                    // If we still have no targets, check legacy aesKey (1-to-1 fallback)
+                    if (targetPeers.length === 0 && aesKeyRef.current) {
+                        // Legacy single peer mode
+                        const { iv, ciphertext } = await encryptBytes(
+                            aesKeyRef.current,
+                            value,
+                        );
+                        const chunkData = uint8ToBase64(ciphertext);
+                        const ivB64 = uint8ToBase64(iv);
+                        pendingChunksRef.current.set(chunkNum, {
+                            chunkData: chunkData,
+                            ivB64: ivB64,
+                            sentTime: Date.now(),
+                            retries: 0,
+                        });
+                        sendMsg({
+                            type: "file_chunk",
+                            chunk_num: chunkNum,
+                            chunk_data: chunkData,
+                            iv_b64: ivB64,
+                        });
+                    } else {
+                        // Multi-peer mode: Encrypt and send for EACH target
+                        const activeRecipients = [];
 
-                    // Send chunk with its IV
-                    sendMsg({
-                        type: "file_chunk",
-                        chunk_num: chunkNum,
-                        chunk_data: chunkData,
-                        iv_b64: ivB64,
-                    });
+                        for (const peerId of targetPeers) {
+                            const peerKey = peerKeysRef.current.get(peerId);
+                            if (!peerKey) continue;
+
+                            const { iv, ciphertext } = await encryptBytes(
+                                peerKey,
+                                value,
+                            );
+                            const chunkData = uint8ToBase64(ciphertext);
+                            const ivB64 = uint8ToBase64(iv);
+
+                            // Send to specific recipient
+                            sendMsg({
+                                type: "file_chunk",
+                                chunk_num: chunkNum,
+                                chunk_data: chunkData,
+                                iv_b64: ivB64,
+                                recipients: [peerId] // Relay supports this field
+                            });
+                            activeRecipients.push(peerId);
+                        }
+
+                        // We track the *last* sent chunk for ARQ purposes (simplified)
+                        if (activeRecipients.length > 0) {
+                            pendingChunksRef.current.set(chunkNum, {
+                                sentTime: Date.now(),
+                                retries: 0,
+                                // We don't store data here to save memory in broadcast
+                            });
+                        }
+                    }
 
                     sentBytes += value.length;
                     const elapsed = (Date.now() - startTime) / 1000;
@@ -1601,20 +1743,47 @@ export default function App() {
                 text: textInput,
             };
 
-            // Encrypt metadata
-            const metadataJSON = JSON.stringify(metadata);
-            const metadataBytes = new TextEncoder().encode(metadataJSON);
-            const { iv: metadataIV, ciphertext: encryptedMetadataBytes } =
-                await encryptBytes(aesKeyRef.current, metadataBytes);
+            // Determine targets (similar to file logic)
+            let targetPeers = [];
+            if (initialRecipients.length > 0) {
+                targetPeers = initialRecipients.filter(id => peerKeysRef.current.has(id));
+            } else {
+                targetPeers = Array.from(peerKeysRef.current.keys());
+            }
 
-            // Send text_message with encrypted metadata
-            const textMsg = {
-                type: "text_message",
-                encrypted_metadata: uint8ToBase64(encryptedMetadataBytes),
-                metadata_iv: uint8ToBase64(metadataIV),
-            };
+            // Fallback or broadcast
+            if (targetPeers.length === 0 && peerKeysRef.current.size > 0 && initialRecipients.length === 0) {
+                targetPeers = Array.from(peerKeysRef.current.keys());
+            }
 
-            sendMsg(textMsg);
+            if (targetPeers.length === 0 && aesKeyRef.current) {
+                // Legacy single peer
+                const { iv: metadataIV, ciphertext: encryptedMetadataBytes } =
+                    await encryptBytes(aesKeyRef.current, metadataBytes);
+
+                const textMsg = {
+                    type: "text_message",
+                    encrypted_metadata: uint8ToBase64(encryptedMetadataBytes),
+                    metadata_iv: uint8ToBase64(metadataIV),
+                };
+                sendMsg(textMsg);
+            } else {
+                // Multi-peer loop
+                for (const peerId of targetPeers) {
+                    const peerKey = peerKeysRef.current.get(peerId);
+                    if (!peerKey) continue;
+
+                    const { iv: metadataIV, ciphertext: encryptedMetadataBytes } =
+                        await encryptBytes(peerKey, metadataBytes);
+
+                    sendMsg({
+                        type: "text_message",
+                        encrypted_metadata: uint8ToBase64(encryptedMetadataBytes),
+                        metadata_iv: uint8ToBase64(metadataIV),
+                        recipients: [peerId]
+                    });
+                }
+            }
 
             log(`Sent encrypted text`);
 
@@ -1907,16 +2076,16 @@ export default function App() {
                                             clipboard
                                         </span>
                                     </button>
-                                    {peerMnemonic && (
-                                        <>
+                                    {Array.from(peers.values()).map((peer) => (
+                                        <React.Fragment key={peer.id}>
                                             <i className="fas fa-arrows-left-right text-white text-lg sm:text-xl"></i>
                                             <IconBadge
-                                                mnemonic={peerMnemonic}
+                                                mnemonic={peer.mnemonic}
                                                 label="Peer"
                                                 className="shrink-0"
                                             />
-                                        </>
-                                    )}
+                                        </React.Fragment>
+                                    ))}
                                 </div>
                             )}
                         </div>

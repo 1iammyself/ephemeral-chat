@@ -283,6 +283,46 @@ const ChatRoom = () => {
     reactionLayerRef.current.appendChild(el);
   }, []);
 
+  const handleRoomReaction = useCallback((data) => {
+    const { emoji } = data;
+    spawnReaction(emoji);
+  }, [spawnReaction]);
+
+  const handleFileTransferInvite = useCallback(({ from, fromId, roomCode: targetRoomCode }) => {
+    // Determine if we should show this
+    if (fromId === socketManager.id) return; // Ignore self
+    if (targetRoomCode !== roomCode) return; // Ignore other rooms
+
+    toast((t) => (
+      <div className="flex flex-col gap-2 min-w-[200px]">
+        <div className="font-semibold flex items-center gap-2 text-gray-800 dark:text-gray-100">
+          <FileText className="w-5 h-5 text-indigo-500" />
+          <span>{from} wants to share files</span>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Open the file transfer window to connect.
+        </p>
+        <div className="flex gap-2 mt-1">
+          <button
+            onClick={() => {
+              toast.dismiss(t.id);
+              setShowFileModal(true);
+            }}
+            className="flex-1 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+          >
+            Open Files
+          </button>
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+          >
+            Ignore
+          </button>
+        </div>
+      </div>
+    ), { duration: 10000, position: 'top-right' });
+  }, [roomCode]);
+
   const sendRoomReaction = useCallback((emoji) => {
     const now = Date.now();
     if (now - lastReactionTime.current < 200) return; // Rate limit 5 per second locally
@@ -520,10 +560,6 @@ const ChatRoom = () => {
       });
     };
 
-    const handleRoomReaction = ({ emoji }) => {
-      spawnReaction(emoji);
-    };
-
     const handlePong = (startTime) => {
       setLatency(Date.now() - startTime);
     };
@@ -533,9 +569,7 @@ const ChatRoom = () => {
     socketManager.on('room-joined', handleRoomJoined);
     socketManager.on('new-message', handleNewMessage);
     socketManager.on('message-deleted', handleMessageDeleted);
-    socketManager.on('message-deleted', handleMessageDeleted);
     socketManager.on('message-updated', handleMessageUpdated);
-    socketManager.on('room-joined', handleRoomJoined);
     socketManager.on('user-joined', handleUserJoined);
     socketManager.on('room-left', handleUserLeft);
     socketManager.on('room-error', handleError);
@@ -555,10 +589,10 @@ const ChatRoom = () => {
     socketManager.on('timer-started', handleTimerStarted);
     socketManager.on('timer-stopped', handleTimerStopped);
     socketManager.on('pulse-received', handlePulseReceived);
-    socketManager.on('message-updated', handleMessageUpdated);
     socketManager.on('user-typing', handleUserTyping);
     socketManager.on('user-stop-typing', handleUserStopTyping);
     socketManager.on('room-reaction', handleRoomReaction);
+    socketManager.on('file-transfer-invite', handleFileTransferInvite);
 
     return () => {
       socketManager.off('connect', handleConnect);
@@ -567,9 +601,6 @@ const ChatRoom = () => {
       socketManager.off('new-message', handleNewMessage);
       socketManager.off('message-deleted', handleMessageDeleted);
       socketManager.off('message-updated', handleMessageUpdated);
-      socketManager.off('message-deleted', handleMessageDeleted);
-      socketManager.off('message-updated', handleMessageUpdated);
-      socketManager.off('room-joined', handleRoomJoined);
       socketManager.off('user-joined', handleUserJoined);
       socketManager.off('room-left', handleUserLeft);
       socketManager.off('room-error', handleError);
@@ -589,10 +620,10 @@ const ChatRoom = () => {
       socketManager.off('timer-started', handleTimerStarted);
       socketManager.off('timer-stopped', handleTimerStopped);
       socketManager.off('pulse-received', handlePulseReceived);
-      socketManager.off('message-updated', handleMessageUpdated);
       socketManager.off('user-typing', handleUserTyping);
       socketManager.off('user-stop-typing', handleUserStopTyping);
       socketManager.off('room-reaction', handleRoomReaction);
+      socketManager.off('file-transfer-invite', handleFileTransferInvite);
 
       // Explicitly leave the room before disconnecting
       socketManager.emit('leave-room');
@@ -601,7 +632,7 @@ const ChatRoom = () => {
         socketManager.disconnect();
       }
     };
-  }, [roomCode, performJoin, roomKey]);
+  }, [roomCode, performJoin, roomKey, handleFileTransferInvite]);
 
   useEffect(() => {
     if (!isConnected) return;
@@ -911,19 +942,6 @@ const ChatRoom = () => {
     socketManager.emit('add-reaction', { messageId, emoji });
   };
 
-  const handleSendPulse = () => {
-    socketManager.emit('send-pulse', { roomCode });
-    setShowFeatureMenu(false);
-
-    // Trigger pulse locally for sender as well
-    if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-    const container = document.querySelector('.chat-container');
-    if (container) {
-      container.classList.add('animate-shake');
-      setTimeout(() => container.classList.remove('animate-shake'), 500);
-    }
-  };
-
   const handleDragEnter = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -953,6 +971,11 @@ const ChatRoom = () => {
     typingTimeoutRef.current = setTimeout(() => {
       socketManager.emit('stop-typing', { roomCode });
     }, 1000);
+  };
+
+  const handleSendPulse = () => {
+    socketManager.emit('send-pulse', { roomCode });
+    setShowFeatureMenu(false);
   };
 
   const handleSendIcebreaker = () => {
@@ -1803,7 +1826,7 @@ const ChatRoom = () => {
           <FileTransferModal
             onClose={() => setShowFileModal(false)}
             roomCode={roomCode}
-            recipients={selectedRecipients.length > 0 ? selectedRecipients : []}
+            recipients={selectedRecipients.map(u => u.socketId)}
           />
         )
       }
