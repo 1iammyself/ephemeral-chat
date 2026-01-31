@@ -1,0 +1,26 @@
+276:    socketManager.emit('join-room', joinData, async (response) => {
+430:    socketManager.emit('send-room-reaction', { emoji });
+731:      socketManager.emit('leave-room');
+742:      socketManager.emit('latency-ping', Date.now());
+851:      socketManager.emit('knock', knockData);
+866:    socketManager.emit('approve-guest', { guestId, roomCode });
+871:    socketManager.emit('deny-guest', { guestId, roomCode });
+876:    socketManager.emit('set-user-role', { targetUserId, role, roomCode });
+880:    socketManager.emit('kick-user', { targetUserId, roomCode });
+990:      socketManager.emit('send-message', {
+997:      socketManager.emit('user-activity');
+1009:    socketManager.emit('send-message', { messageType: 'poll', pollData, recipients: selectedRecipients });
+1014:    socketManager.emit('vote-poll', { messageId, optionId });
+1018:    socketManager.emit('update-vibe', { vibeId, roomCode });
+1023:    socketManager.emit('set-room-topic', { topic, roomCode });
+1027:    socketManager.emit('start-timer', { duration, roomCode });
+1031:    socketManager.emit('stop-timer', { roomCode });
+1060:    socketManager.emit('add-reaction', { messageId, emoji });
+1087:    socketManager.emit('typing', { roomCode });
+1090:      socketManager.emit('stop-typing', { roomCode });
+1095:    socketManager.emit('send-pulse', { roomCode });
+1107:    socketManager.emit('send-message', {
+1112:    socketManager.emit('user-activity');
+1198:      socketManager.emit('send-message', {
+1238:      socketManager.emit('edit-message', {
+1354:      socketManager.emit('send-message', { messageType: 'audio', content: base64Audio, isViewOnce: audioViewOnce, recipients: selectedRecipients });

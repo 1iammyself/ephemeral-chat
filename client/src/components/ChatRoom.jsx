@@ -359,10 +359,15 @@ const ChatRoom = () => {
     spawnReaction(emoji);
   }, [spawnReaction]);
 
-  const handleFileTransferInvite = useCallback(({ from, fromId, roomCode: targetRoomCode }) => {
+  const handleFileTransferInvite = useCallback(({ from, fromId, roomCode: targetRoomCode, recipients: targetedTo }) => {
     // Determine if we should show this
     if (fromId === socketManager.socket?.id) return; // Ignore self
     if (targetRoomCode !== roomCode) return; // Ignore other rooms
+
+    // If targeted, check if we are a recipient
+    if (targetedTo && Array.isArray(targetedTo) && !targetedTo.includes(socketManager.socket?.id)) {
+      return; // Not for us
+    }
 
     // Add to activity log for recipient
     const log = {

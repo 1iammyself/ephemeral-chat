@@ -1694,10 +1694,11 @@ io.on('connection', (socket) => {
     const payload = {
       from,
       fromId,
-      roomCode
+      roomCode,
+      recipients: (recipients && recipients.length > 0) ? recipients : null
     };
 
-    if (recipients && Array.isArray(recipients) && recipients.length > 0) {
+    if (payload.recipients) {
       // Notify specific users
       recipients.forEach(recipientId => {
         logger.info(`   -> Sending invite to: ${recipientId}`);

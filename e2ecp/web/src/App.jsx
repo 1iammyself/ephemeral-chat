@@ -417,21 +417,21 @@ function IconBadge({ mnemonic, label, className = "" }) {
         <div className={`relative group ${className}`}>
             <div
                 tabIndex={0}
-                className="bg-white dark:bg-black text-black dark:text-white px-3 py-2 sm:px-4 sm:py-3 inline-flex items-center justify-center gap-2 border-2 sm:border-4 border-black dark:border-white font-black focus:outline-hidden transition-colors duration-200"
+                className="bg-gray-100/80 dark:bg-white/10 backdrop-blur-sm text-gray-900 dark:text-gray-100 px-4 py-2.5 inline-flex items-center justify-center gap-2.5 rounded-2xl border border-gray-200/50 dark:border-white/10 font-bold focus:outline-hidden transition-all duration-200 hover:bg-white dark:hover:bg-white/20 hover:shadow-lg hover:shadow-black/5"
                 aria-label={`${label}: ${mnemonic}`}
             >
                 {iconClasses.map((iconClass, index) => (
                     <i
                         key={index}
-                        className={`fas ${iconClass} text-xl sm:text-2xl md:text-3xl`}
+                        className={`fas ${iconClass} text-lg sm:text-xl opacity-80 group-hover:opacity-100 transition-opacity`}
                         aria-hidden="true"
                     ></i>
                 ))}
                 {label === "You" && (
-                    <span className="text-sm sm:text-base ml-1">(YOU)</span>
+                    <span className="text-xs font-black uppercase tracking-wider bg-primary-500/10 text-primary-600 dark:text-primary-400 px-2 py-0.5 rounded-lg ml-1">YOU</span>
                 )}
             </div>
-            <div className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150 bg-white dark:bg-black text-black dark:text-white border-2 border-black dark:border-white px-2 py-1 text-xs font-black uppercase whitespace-nowrap shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]">
+            <div className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all duration-200 bg-gray-900/90 dark:bg-white/90 text-white dark:text-gray-900 backdrop-blur-sm px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap shadow-xl transform scale-95 group-hover:scale-100 group-hover:-translate-y-[calc(100%+8px)]">
                 {mnemonic.toUpperCase()}
             </div>
         </div>
@@ -445,29 +445,34 @@ function ProgressBar({ progress, label }) {
     const cleanLabel = label.replace(/[\u{1F300}-\u{1F9FF}]/gu, "").trim();
 
     return (
-        <div className="bg-white dark:bg-black border-2 sm:border-4 border-black dark:border-white p-3 sm:p-4 mb-3 sm:mb-4 transition-colors duration-200">
-            <div className="text-sm sm:text-base font-black mb-2 uppercase text-black dark:text-white">
-                {cleanLabel}
-            </div>
-            <div className="relative w-full h-6 sm:h-8 bg-gray-300 dark:bg-white border-2 sm:border-4 border-black dark:border-white">
-                <div
-                    className="absolute top-0 left-0 h-full bg-black dark:bg-black transition-all duration-300"
-                    style={{ width: `${progress.percent}%` }}
-                />
-                <div
-                    className="absolute inset-0 flex items-center justify-center text-xs sm:text-sm font-bold"
-                    style={{ mixBlendMode: "difference", color: "white" }}
-                >
+        <div className="bg-gray-50/50 dark:bg-white/5 border border-gray-100 dark:border-white/5 p-4 sm:p-5 rounded-2xl mb-4 backdrop-blur-sm transition-all duration-300">
+            <div className="flex justify-between items-end mb-3">
+                <div className="text-sm font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    {cleanLabel}
+                </div>
+                <div className="text-xl font-black text-primary-600 dark:text-primary-400">
                     {progress.percent}%
                 </div>
             </div>
+            <div className="relative w-full h-3 sm:h-4 bg-gray-200/50 dark:bg-white/10 rounded-full overflow-hidden">
+                <div
+                    className="absolute top-0 left-0 h-full bg-linear-to-r from-primary-500 to-primary-600 rounded-full transition-all duration-300 shadow-[0_0_20px_rgba(59,130,246,0.3)]"
+                    style={{ width: `${progress.percent}%` }}
+                />
+            </div>
             {(progress.speed > 0 || progress.eta > 0) && (
-                <div className="mt-2 text-xs sm:text-sm font-bold flex flex-wrap gap-x-4 gap-y-1 text-black dark:text-white">
+                <div className="mt-3 text-xs font-bold flex flex-wrap gap-x-6 gap-y-1 text-gray-500 dark:text-gray-400">
                     {progress.speed > 0 && (
-                        <span>Speed: {formatSpeed(progress.speed)}</span>
+                        <span className="flex items-center gap-1.5">
+                            <i className="fas fa-bolt text-primary-500/70"></i>
+                            {formatSpeed(progress.speed)}
+                        </span>
                     )}
                     {progress.eta > 0 && progress.percent < 100 && (
-                        <span>ETA: {formatTime(progress.eta)}</span>
+                        <span className="flex items-center gap-1.5">
+                            <i className="fas fa-clock text-primary-500/70"></i>
+                            {formatTime(progress.eta)}
+                        </span>
                     )}
                 </div>
             )}
@@ -2018,100 +2023,87 @@ export default function App() {
                 <div className="max-w-4xl w-full flex-grow flex flex-col justify-center">
                     {/* Header */}
                     <div
-                        className="bg-black dark:bg-black text-white border-4 sm:border-8 border-black dark:border-white p-4 sm:p-6 mb-3 sm:mb-6 flex items-start justify-between gap-4 transition-colors duration-200 header-shadow"
-                        style={{
-                            clipPath:
-                                "polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%)",
-                        }}
+                        className="glass dark:glass-dark rounded-3xl p-6 sm:p-8 mb-6 flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6 transition-all duration-300 shadow-2xl shadow-black/5"
                     >
-                        <div className="flex-1">
-                            <h1 className="text-3xl sm:text-5xl md:text-6xl font-black uppercase tracking-tight">
+                        <div className="flex-1 text-center sm:text-left w-full">
+                            <h1 className="text-4xl sm:text-6xl font-black tracking-tighter mb-2 bg-linear-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
                                 <a
                                     href="/"
-                                    className="text-white no-underline cursor-pointer hover:text-white hover:underline"
+                                    className="no-underline hover:opacity-80 transition-opacity"
                                 >
                                     TRANSFER
                                 </a>
                             </h1>
-                            <p className="text-sm sm:text-lg md:text-xl font-bold leading-tight mb-2 sm:mb-3">
-                                SECURELY TRANSFER FILES OR FOLDERS BETWEEN MACHINES
+                            <p className="text-sm sm:text-lg font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-6">
+                                End-to-End Encrypted File Relay
                             </p>
-                            {isAuthenticated && user && (
-                                <p className="text-sm sm:text-base mt-1 text-black dark:text-white">{user.email}</p>
-                            )}
-                            {myMnemonic && (
-                                <div className="mt-3 sm:mt-4 flex flex-wrap items-center gap-2">
+
+                            <div className="mt-4 flex flex-wrap items-center justify-center sm:justify-start gap-4">
+                                <div className="flex items-center gap-3">
                                     <IconBadge
                                         mnemonic={myMnemonic}
                                         label="You"
-                                        className="shrink-0"
+                                        className="shrink-0 scale-90 sm:scale-100"
                                     />
-                                    <i className="fas fa-arrows-left-right text-white text-lg sm:text-xl"></i>
-                                    <button
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            const url = `${window.location.protocol}//${window.location.host}/${roomId}`;
-                                            navigator.clipboard
-                                                .writeText(url)
-                                                .then(() => {
-                                                    toast.success(
-                                                        "Copied to clipboard",
-                                                    );
-                                                })
-                                                .catch((err) => {
-                                                    toast.error("Failed to copy");
-                                                    console.error(
-                                                        "Failed to copy:",
-                                                        err,
-                                                    );
-                                                });
-                                        }}
-                                        className="bg-white dark:bg-black text-black dark:text-white px-2 py-1 sm:px-3 sm:py-1 inline-flex items-center justify-center border-2 sm:border-4 border-black dark:border-white font-black text-sm sm:text-lg uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-white dark:hover:text-black transition-colors"
-                                        title="Copy URL to clipboard"
-                                        type="button"
-                                    >
-                                        {roomId ? roomId.toUpperCase() : "ROOM"}
-                                        <span className="sr-only">
-                                            Copy {window.location.host}/{roomId} to
-                                            clipboard
-                                        </span>
-                                    </button>
-                                    {Array.from(peers.values()).map((peer) => (
-                                        <React.Fragment key={peer.id}>
-                                            <i className="fas fa-arrows-left-right text-white text-lg sm:text-xl"></i>
-                                            <IconBadge
-                                                mnemonic={peer.mnemonic}
-                                                label="Peer"
-                                                className="shrink-0"
-                                            />
-                                        </React.Fragment>
-                                    ))}
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] font-black text-primary-500 uppercase tracking-widest opacity-60">SENDER</span>
+                                        <span className="text-xs font-bold text-gray-500 truncate max-w-[100px]">{myMnemonic}</span>
+                                    </div>
                                 </div>
-                            )}
+
+                                {Array.from(peers.values()).length > 0 ? (
+                                    <div className="flex flex-wrap items-center gap-4">
+                                        <i className="fas fa-arrow-right text-primary-500/50 hidden sm:block"></i>
+                                        {Array.from(peers.values()).map((peer) => (
+                                            <div key={peer.id} className="flex items-center gap-3">
+                                                <IconBadge
+                                                    mnemonic={peer.mnemonic}
+                                                    label="Peer"
+                                                    className="shrink-0 scale-90 sm:scale-100"
+                                                />
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] font-black text-green-500 uppercase tracking-widest opacity-60">READY</span>
+                                                    <span className="text-xs font-bold text-gray-500 truncate max-w-[100px]">{peer.mnemonic}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-3 opacity-40 grayscale">
+                                        <i className="fas fa-arrow-right text-gray-400"></i>
+                                        <div className="w-10 h-10 rounded-2xl border-2 border-dashed border-gray-400 flex items-center justify-center">
+                                            <i className="fas fa-user-plus text-xs"></i>
+                                        </div>
+                                        <span className="text-xs font-bold tracking-widest text-gray-400 uppercase">WAITING...</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
+
                         {myMnemonic && !peerMnemonic && roomId && (
-                            <div className="flex-shrink-0 ml-auto w-20 sm:w-auto">
-                                <QRCodeSVG
-                                    value={`${window.location.origin}/${roomId}`}
-                                    size={140}
-                                    level="M"
-                                    fgColor="#ffffff"
-                                    bgColor="#000000"
-                                    className="w-full h-auto"
-                                />
+                            <div className="flex-shrink-0 animate-in fade-in zoom-in duration-500">
+                                <div className="p-3 bg-white rounded-2xl shadow-xl shadow-black/10">
+                                    <QRCodeSVG
+                                        value={`${window.location.origin}/${roomId}`}
+                                        size={100}
+                                        level="M"
+                                        fgColor="#111827"
+                                        bgColor="#ffffff"
+                                        className="rounded-lg"
+                                    />
+                                </div>
                             </div>
                         )}
                     </div>
 
                     {/* Connection Panel - only show on home page */}
                     {!pathRoom && (
-                        <div className="bg-gray-200 dark:bg-black border-4 sm:border-8 border-black dark:border-white p-4 sm:p-6 mb-3 sm:mb-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] sm:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:sm:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)] text-gray-900 dark:text-white transition-colors duration-200">
-                            {/* <h2 className="text-2xl sm:text-3xl font-black mb-3 sm:mb-4 uppercase">ROOM</h2> */}
-                            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-3 sm:mb-4">
+                        <div className="card p-6 sm:p-8 mb-6 animate-in slide-in-from-bottom-4 duration-500">
+                            <div className="flex flex-col sm:flex-row gap-4 mb-6">
                                 <input
                                     ref={roomInputRef}
                                     type="text"
-                                    placeholder="ENTER ROOM ID OR PRESS CONNECT"
+                                    placeholder="Enter Room Code..."
                                     value={roomId}
                                     disabled={connected}
                                     onChange={(e) => {
@@ -2123,91 +2115,34 @@ export default function App() {
                                         !connected &&
                                         handleConnect()
                                     }
-                                    className={`flex-1 border-2 sm:border-4 p-3 sm:p-4 text-base sm:text-xl font-bold uppercase bg-white dark:bg-black dark:text-white disabled:bg-gray-300 dark:disabled:bg-gray-500 disabled:cursor-not-allowed focus:outline-hidden focus:ring-4 transition-colors duration-200 ${roomIdError ? "border-red-600 focus:ring-red-600" : "border-black dark:border-white focus:ring-black dark:focus:ring-white"}`}
+                                    className={`input-field text-lg ${roomIdError ? "border-red-500/50 ring-2 ring-red-500/20" : ""}`}
                                 />
                                 <button
                                     onClick={handleConnect}
                                     disabled={connected}
-                                    className={`border-2 sm:border-4 border-black dark:border-white px-6 py-3 sm:px-8 sm:py-4 text-base sm:text-xl font-black uppercase transition-all whitespace-nowrap ${connected
-                                        ? "bg-gray-400 dark:bg-gray-500 cursor-not-allowed"
-                                        : "bg-white dark:bg-black dark:text-white hover:translate-x-1 hover:translate-y-1 hover:shadow-none active:translate-x-2 active:translate-y-2 cursor-pointer"
-                                        } shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]`}
+                                    className={`btn-primary px-8 text-base tracking-widest whitespace-nowrap h-[54px] ${connected ? "opacity-30 cursor-not-allowed" : ""}`}
                                 >
-                                    {connected ? "CONNECTED" : "CONNECT"}
+                                    {connected ? "CONNECTED" : "CONNECT ROOM"}
                                 </button>
                             </div>
                             <div
-                                className={`border-2 sm:border-4 border-black dark:border-white p-2 sm:p-3 font-bold text-sm sm:text-base md:text-lg break-words transition-colors duration-200 ${roomIdError ? "bg-red-600 text-white" : "bg-black dark:bg-black text-white"}`}
+                                className={`rounded-xl p-4 font-bold text-sm sm:text-base break-words transition-all duration-300 flex items-center gap-3 ${roomIdError ? "bg-red-500/10 text-red-600 border border-red-500/20" : "bg-primary-500/5 text-primary-600 border border-primary-500/10"}`}
                             >
-                                {roomIdError ? (
-                                    <>ERROR: {roomIdError.toUpperCase()}</>
-                                ) : connected && myMnemonic ? (
-                                    peerMnemonic ? (
-                                        <>
-                                            CONNECTED AS {myMnemonic.toUpperCase()}{" "}
-                                            (
-                                            <span
-                                                className="inline-flex items-center gap-1 ml-1"
-                                                title={`Your icons for ${myMnemonic}`}
-                                            >
-                                                {myIconClasses.map(
-                                                    (iconClass, index) => (
-                                                        <i
-                                                            key={index}
-                                                            className={`fas ${iconClass}`}
-                                                            aria-hidden="true"
-                                                        ></i>
-                                                    ),
-                                                )}
-                                            </span>
-                                            ) TO {peerMnemonic.toUpperCase()} (
-                                            <span
-                                                className="inline-flex items-center gap-1 ml-1"
-                                                title={`Peer icons for ${peerMnemonic}`}
-                                            >
-                                                {peerIconClasses.map(
-                                                    (iconClass, index) => (
-                                                        <i
-                                                            key={index}
-                                                            className={`fas ${iconClass}`}
-                                                            aria-hidden="true"
-                                                        ></i>
-                                                    ),
-                                                )}
-                                            </span>
-                                            )
-                                        </>
+                                <i className={`fas ${roomIdError ? "fa-exclamation-triangle" : "fa-shield-halved"}`}></i>
+                                <span>
+                                    {roomIdError ? (
+                                        <>ERROR: {roomIdError.toUpperCase()}</>
                                     ) : (
-                                        <>
-                                            CONNECTED AS {myMnemonic.toUpperCase()}{" "}
-                                            (
-                                            <span
-                                                className="inline-flex items-center gap-1 ml-1"
-                                                title={`Your icons for ${myMnemonic}`}
-                                            >
-                                                {myIconClasses.map(
-                                                    (iconClass, index) => (
-                                                        <i
-                                                            key={index}
-                                                            className={`fas ${iconClass}`}
-                                                            aria-hidden="true"
-                                                        ></i>
-                                                    ),
-                                                )}
-                                            </span>
-                                            )
-                                        </>
-                                    )
-                                ) : (
-                                    <>STATUS: {status.toUpperCase()}</>
-                                )}
+                                        <>STATUS: {status.toUpperCase()}</>
+                                    )}
+                                </span>
                             </div>
                         </div>
                     )}
 
                     {/* File Transfer Panel */}
                     {connected && (
-                        <div className="bg-gray-300 dark:bg-black border-4 sm:border-8 border-black dark:border-white p-4 sm:p-6 mb-3 sm:mb-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] sm:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:sm:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)] text-gray-900 dark:text-white transition-colors duration-200">
+                        <div className="card p-6 sm:p-8 mb-6 animate-in slide-in-from-bottom-8 duration-700">
                             {uploadProgress && (
                                 <ProgressBar
                                     progress={uploadProgress}
@@ -2223,11 +2158,11 @@ export default function App() {
                             )}
 
                             <div
-                                className={`border-2 sm:border-4 border-black dark:border-white p-6 sm:p-8 text-center transition-all duration-200 ${hasAesKey
+                                className={`rounded-3xl p-8 sm:p-12 text-center transition-all duration-300 border-2 border-dashed ${hasAesKey
                                     ? isDragging
-                                        ? "bg-yellow-300 dark:bg-yellow-600 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)] scale-105"
-                                        : "bg-white dark:bg-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
-                                    : "bg-gray-400 dark:bg-gray-500"
+                                        ? "bg-primary-500/10 border-primary-500 scale-[1.02] shadow-2xl shadow-primary-500/10"
+                                        : "bg-gray-50/50 dark:bg-white/5 border-gray-200 dark:border-white/10 hover:border-primary-400/50"
+                                    : "bg-gray-100/50 dark:bg-black/20 border-gray-200/50 dark:border-white/5 opacity-50"
                                     }`}
                                 onDragOver={handleDragOver}
                                 onDragEnter={handleDragEnter}
@@ -2236,11 +2171,16 @@ export default function App() {
                             >
                                 {hasAesKey ? (
                                     isDragging ? (
-                                        <div className="font-black uppercase text-xl sm:text-2xl text-black dark:text-white">
-                                            📁 DROP FILES OR FOLDER HERE
+                                        <div className="flex flex-col items-center gap-4">
+                                            <div className="w-20 h-20 rounded-full bg-primary-500 flex items-center justify-center text-white text-3xl animate-bounce">
+                                                <i className="fas fa-file-arrow-up"></i>
+                                            </div>
+                                            <div className="font-black uppercase tracking-tight text-2xl text-primary-600 dark:text-primary-400">
+                                                Drop to Securely Send
+                                            </div>
                                         </div>
                                     ) : (
-                                        <>
+                                        <div className="max-w-md mx-auto">
                                             <input
                                                 ref={fileInputRef}
                                                 type="file"
@@ -2249,99 +2189,83 @@ export default function App() {
                                                 disabled={!hasAesKey}
                                                 multiple
                                             />
-                                            <button
-                                                onClick={() =>
-                                                    fileInputRef.current?.click()
-                                                }
-                                                disabled={!hasAesKey}
-                                                className="block w-full border-2 border-black dark:border-white p-4 font-black uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-white dark:hover:text-black transition-colors text-sm sm:text-base md:text-lg disabled:cursor-not-allowed disabled:bg-gray-400 dark:disabled:bg-gray-500 text-black dark:text-white"
-                                            >
-                                                CLICK OR DROP FILES HERE
-                                            </button>
 
-                                            {/* Text input section */}
-                                            <div className="mt-4 pt-4 border-t-2 border-black dark:border-white">
-                                                <div className="flex gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={textInput}
-                                                        onChange={(e) =>
-                                                            setTextInput(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        onKeyDown={(e) =>
-                                                            e.key === "Enter" &&
-                                                            handleTextSend()
-                                                        }
-                                                        placeholder="Type your message here..."
-                                                        disabled={!hasAesKey}
-                                                        className="flex-1 border-2 border-black dark:border-white p-2 text-sm sm:text-base font-bold bg-white dark:bg-black dark:text-white disabled:bg-gray-300 dark:disabled:bg-gray-500 disabled:cursor-not-allowed focus:outline-hidden focus:ring-2 focus:ring-black dark:focus:ring-white"
-                                                    />
-                                                    <button
-                                                        onClick={handleTextSend}
-                                                        disabled={
-                                                            !hasAesKey ||
-                                                            !textInput.trim()
-                                                        }
-                                                        className="border-2 border-black dark:border-white px-4 py-2 text-sm sm:text-base font-black uppercase transition-all whitespace-nowrap bg-black dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-300 cursor-pointer disabled:bg-gray-400 disabled:cursor-not-allowed"
-                                                    >
-                                                        SEND
-                                                    </button>
+                                            <div className="flex flex-col items-center gap-6">
+                                                <div
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                    className="w-24 h-24 rounded-[30px] bg-linear-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white text-4xl shadow-xl shadow-primary-500/30 cursor-pointer hover:scale-110 active:scale-95 transition-all group"
+                                                >
+                                                    <i className="fas fa-plus group-hover:rotate-90 transition-transform duration-300"></i>
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    <p className="text-xl font-black text-gray-900 dark:text-white">ENCRYPTED TRANSFER</p>
+                                                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Select files or drag & drop</p>
+                                                </div>
+
+                                                {/* Text input section */}
+                                                <div className="w-full mt-4 pt-8 border-t border-gray-100 dark:border-white/5">
+                                                    <div className="flex gap-3">
+                                                        <input
+                                                            type="text"
+                                                            value={textInput}
+                                                            onChange={(e) =>
+                                                                setTextInput(
+                                                                    e.target.value,
+                                                                )
+                                                            }
+                                                            onKeyDown={(e) =>
+                                                                e.key === "Enter" &&
+                                                                handleTextSend()
+                                                            }
+                                                            placeholder="Send a secure snippet..."
+                                                            disabled={!hasAesKey}
+                                                            className="flex-1 input-field"
+                                                        />
+                                                        <button
+                                                            onClick={handleTextSend}
+                                                            disabled={
+                                                                !hasAesKey ||
+                                                                !textInput.trim()
+                                                            }
+                                                            className="btn-primary w-14 shrink-0 flex items-center justify-center"
+                                                        >
+                                                            <i className="fas fa-paper-plane"></i>
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </>
+                                        </div>
                                     )
                                 ) : (
-                                    <div className="flex items-center justify-center gap-2 font-black uppercase text-sm sm:text-base text-gray-900 dark:text-white">
-                                        <span>
-                                            {`WAITING FOR PEER TO JOIN ${window.location.host}/${roomId}`.toUpperCase()}
-                                        </span>
-                                        <button
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                const url = `${window.location.protocol}//${window.location.host}/${roomId}`;
-                                                navigator.clipboard
-                                                    .writeText(url)
-                                                    .then(() => {
-                                                        toast.success(
-                                                            "Copied to clipboard",
-                                                        );
-                                                    })
-                                                    .catch((err) => {
-                                                        toast.error(
-                                                            "Failed to copy",
-                                                        );
-                                                        console.error(
-                                                            "Failed to copy:",
-                                                            err,
-                                                        );
-                                                    });
-                                            }}
-                                            className="text-black dark:text-white hover:opacity-70 transition-opacity cursor-pointer bg-transparent"
-                                            title="Copy URL to clipboard"
-                                            type="button"
-                                        >
-                                            <i
-                                                className="fas fa-copy"
-                                                aria-hidden="true"
-                                            ></i>
-                                        </button>
+                                    <div className="flex flex-col items-center gap-4 py-4">
+                                        <div className="w-16 h-16 rounded-full border-4 border-gray-300 border-t-primary-500 animate-spin mb-2"></div>
+                                        <div className="space-y-1">
+                                            <p className="font-black text-gray-400 uppercase tracking-widest text-sm">Waiting for connection...</p>
+                                            <p className="text-xs text-gray-500 font-bold max-w-[200px] mx-auto opacity-70">Share the link above to start the secure exchange</p>
+                                        </div>
                                     </div>
                                 )}
                             </div>
 
                             {downloadUrl && (
-                                <div className="mt-3 sm:mt-4 bg-white dark:bg-black border-2 sm:border-4 border-black dark:border-white p-3 sm:p-4 transition-colors duration-200">
-                                    <div className="text-base sm:text-xl font-black mb-2 text-black dark:text-white">
-                                        FILE READY:
+                                <div className="mt-6 glass dark:glass-dark rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4 animate-in slide-in-from-top-4">
+                                    <div className="flex items-center gap-4 overflow-hidden">
+                                        <div className="w-12 h-12 rounded-xl bg-green-500/10 text-green-600 flex items-center justify-center text-xl shrink-0">
+                                            <i className="fas fa-check-circle"></i>
+                                        </div>
+                                        <div className="flex flex-col overflow-hidden">
+                                            <span className="text-[10px] font-black text-green-500 uppercase tracking-widest">FILE READY</span>
+                                            <span className="text-sm font-bold truncate dark:text-white" title={downloadName}>{downloadName}</span>
+                                        </div>
                                     </div>
                                     <a
                                         href={downloadUrl}
                                         download={downloadName}
-                                        className="text-lg sm:text-2xl font-black underline hover:no-underline text-black dark:text-white break-all"
+                                        className="btn-primary flex items-center gap-2 whitespace-nowrap w-full sm:w-auto justify-center"
                                     >
-                                        {downloadName}
+                                        <i className="fas fa-download"></i>
+                                        DOWNLOAD
                                     </a>
                                 </div>
                             )}
@@ -2351,22 +2275,25 @@ export default function App() {
 
                 {/* Error Modal */}
                 {showErrorModal && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4 transition-colors duration-200">
-                        <div className="bg-white dark:bg-black border-4 sm:border-8 border-black dark:border-white p-6 sm:p-8 max-w-md w-full shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)] transition-colors duration-200">
-                            <h2 className="text-2xl sm:text-4xl font-black mb-4 uppercase text-center text-black dark:text-white">
-                                MAXIMUM ROOMS
+                    <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 transition-all duration-300">
+                        <div className="card p-8 max-w-md w-full text-center">
+                            <div className="w-20 h-20 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center text-3xl mx-auto mb-6">
+                                <i className="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <h2 className="text-2xl font-black mb-3 uppercase tracking-tighter text-black dark:text-white">
+                                LIMIT REACHED
                             </h2>
-                            <p className="text-lg sm:text-xl font-bold mb-6 text-center text-black dark:text-white">
-                                TRY AGAIN LATER
+                            <p className="text-gray-500 dark:text-gray-400 font-bold mb-8">
+                                Maximum rooms active. Please try again later.
                             </p>
                             <button
                                 onClick={() => {
                                     setShowErrorModal(false);
                                     setRoomId("");
                                 }}
-                                className="w-full border-2 sm:border-4 border-black dark:border-white bg-black dark:bg-white text-white dark:text-black px-6 py-3 sm:py-4 text-lg sm:text-xl font-black uppercase hover:bg-gray-900 dark:hover:bg-gray-300 transition-colors cursor-pointer"
+                                className="btn-primary w-full"
                             >
-                                OK
+                                CONTINUE
                             </button>
                         </div>
                     </div>
@@ -2375,46 +2302,40 @@ export default function App() {
                 {/* About Modal */}
                 {showAboutModal && (
                     <div
-                        className="fixed inset-0 bg-[rgba(15,15,15,0.7)] dark:bg-[rgba(0,0,0,0.8)] flex items-center justify-center z-50 p-4 transition-colors duration-200"
+                        className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 transition-all duration-300"
                         onClick={() => setShowAboutModal(false)}
                     >
                         <div
-                            className="bg-white dark:bg-black border-4 sm:border-8 border-black dark:border-white p-6 sm:p-8 max-w-md sm:max-w-lg w-full text-black dark:text-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)] transition-colors duration-200"
+                            className="card p-8 max-w-lg w-full text-black dark:text-white"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <h2 className="text-2xl sm:text-3xl font-black uppercase mb-3 text-center">
-                                WHAT IS e2ecp?
+                            <h2 className="text-3xl font-black uppercase tracking-tighter mb-4 text-center">
+                                SECURE EXCHANGE
                             </h2>
-                            <p className="text-sm sm:text-base font-bold mb-3 text-center">
-                                e2ecp allows two computers to transfer files with
-                                end-to-end encryption via a zero-knowledge relay.
+                            <p className="text-base font-bold text-gray-500 dark:text-gray-400 mb-4 text-center">
+                                Direct end-to-end encrypted transfers via a zero-knowledge relay. No data is stored on the server.
                             </p>
-                            <p className="text-sm sm:text-base font-bold mb-4 text-center">
-                                Use the CLI to transfer files between web or
-                                terminals:
-                                <br />
-                                <code className="bg-gray-200 dark:bg-white dark:text-black px-2 py-1 rounded">
+                            <div className="bg-primary-500/5 rounded-2xl p-6 mb-6 border border-primary-500/10 text-center">
+                                <p className="text-xs font-black text-primary-500 uppercase tracking-widest mb-2">CLI ACCESS</p>
+                                <code className="text-sm font-mono font-bold text-primary-600 dark:text-primary-400 break-all select-all">
                                     curl https://e2ecp.com | bash
                                 </code>
-                            </p>
-                            <div className="mb-4 text-center">
+                            </div>
+                            <div className="flex justify-center gap-6 mb-8">
                                 <a
                                     href="https://github.com/schollz/e2ecp"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 text-black dark:text-white hover:text-gray-700 dark:hover:text-gray-300 transition-colors font-bold text-lg sm:text-xl"
+                                    className="text-gray-400 hover:text-primary-500 transition-colors text-3xl"
                                     aria-label="View on GitHub"
                                 >
-                                    <i
-                                        className="fab fa-github text-2xl sm:text-3xl"
-                                        aria-hidden="true"
-                                    ></i>
+                                    <i className="fab fa-github"></i>
                                 </a>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setShowAboutModal(false)}
-                                className="w-full border-2 sm:border-4 border-black dark:border-white bg-black dark:bg-white text-white dark:text-black px-4 py-2 sm:py-3 text-sm sm:text-lg font-black uppercase hover:bg-gray-900 dark:hover:bg-gray-300 transition-colors cursor-pointer"
+                                className="btn-secondary w-full"
                             >
                                 Close
                             </button>
@@ -2424,43 +2345,40 @@ export default function App() {
 
                 {/* Download Confirmation Modal */}
                 {showDownloadConfirmModal && pendingDownload && (
-                    <div className="fixed inset-0 bg-[rgba(15,15,15,0.7)] dark:bg-[rgba(0,0,0,0.8)] flex items-center justify-center z-50 p-4 transition-colors duration-200">
+                    <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 transition-all duration-300">
                         <div
-                            className="bg-white dark:bg-black border-4 sm:border-8 border-black dark:border-white p-6 sm:p-8 max-w-md sm:max-w-lg w-full text-black dark:text-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)] transition-colors duration-200"
+                            className="card p-8 max-w-lg w-full text-black dark:text-white"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <h2 className="text-2xl sm:text-3xl font-black uppercase mb-4 text-center">
-                                DOWNLOAD FILE?
+                            <h2 className="text-3xl font-black uppercase tracking-tighter mb-6 text-center">
+                                RECEIVE FILE?
                             </h2>
-                            <div className="bg-gray-200 dark:bg-white border-2 sm:border-4 border-black dark:border-black p-4 mb-4 transition-colors duration-200 dark:text-black">
-                                <p className="text-sm sm:text-base font-bold mb-2">
-                                    <span className="uppercase">Name:</span>{" "}
-                                    {pendingDownload.name}
-                                </p>
-                                <p className="text-sm sm:text-base font-bold mb-2">
-                                    <span className="uppercase">Type:</span>{" "}
-                                    {pendingDownload.type}
-                                </p>
-                                <p className="text-sm sm:text-base font-bold">
-                                    <span className="uppercase">Size:</span>{" "}
-                                    {pendingDownload.size}
-                                </p>
+                            <div className="bg-gray-50 dark:bg-white/5 rounded-2xl p-6 mb-6 border border-gray-100 dark:border-white/5 space-y-3">
+                                <div className="flex justify-between">
+                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">NAME</span>
+                                    <span className="text-sm font-bold truncate ml-4">{pendingDownload.name}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">TYPE</span>
+                                    <span className="text-sm font-bold">{pendingDownload.type.toUpperCase()}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">SIZE</span>
+                                    <span className="text-sm font-bold">{pendingDownload.size}</span>
+                                </div>
                             </div>
-                            <p className="text-sm sm:text-base font-bold mb-6 text-center">
-                                Do you want to download this {pendingDownload.type}?
-                            </p>
-                            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                            <div className="flex flex-col sm:flex-row gap-4">
                                 <button
                                     type="button"
                                     onClick={handleCancelDownload}
-                                    className="flex-1 border-2 sm:border-4 border-black dark:border-white bg-white dark:bg-black text-black dark:text-white px-4 py-3 sm:py-4 text-base sm:text-lg font-black uppercase hover:bg-gray-200 dark:hover:bg-white dark:hover:text-black transition-colors cursor-pointer shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none active:translate-x-2 active:translate-y-2"
+                                    className="btn-secondary flex-1"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="button"
                                     onClick={handleConfirmDownload}
-                                    className="flex-1 border-2 sm:border-4 border-black dark:border-white bg-black dark:bg-white text-white dark:text-black px-4 py-3 sm:py-4 text-base sm:text-lg font-black uppercase hover:bg-gray-900 dark:hover:bg-gray-300 transition-colors cursor-pointer shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none active:translate-x-2 active:translate-y-2"
+                                    className="btn-primary flex-1"
                                 >
                                     Download
                                 </button>
@@ -2471,16 +2389,16 @@ export default function App() {
 
                 {/* Text Message Modal */}
                 {showTextModal && receivedText && (
-                    <div className="fixed inset-0 bg-[rgba(15,15,15,0.7)] dark:bg-[rgba(0,0,0,0.8)] flex items-center justify-center z-50 p-4">
+                    <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
                         <div
-                            className="bg-white dark:bg-black border-4 sm:border-8 border-black dark:border-white p-6 sm:p-8 max-w-md sm:max-w-lg w-full text-black dark:text-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)]"
+                            className="card p-8 max-w-lg w-full text-black dark:text-white"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <h2 className="text-2xl sm:text-3xl font-black uppercase mb-4 text-center">
-                                RECEIVED TEXT
+                            <h2 className="text-3xl font-black uppercase tracking-tighter mb-6 text-center">
+                                ENCRYPTED TEXT
                             </h2>
-                            <div className="bg-gray-200 dark:bg-white border-2 sm:border-4 border-black dark:border-black p-4 mb-4 relative dark:text-black">
-                                <div className="text-sm sm:text-base font-bold break-words whitespace-pre-wrap max-h-96 overflow-y-auto">
+                            <div className="bg-gray-50 dark:bg-white/5 rounded-2xl p-6 mb-6 border border-gray-100 dark:border-white/5 relative group">
+                                <div className="text-sm font-mono font-medium leading-relaxed break-words whitespace-pre-wrap max-h-96 overflow-y-auto pr-8">
                                     {receivedText}
                                 </div>
                                 <button
@@ -2489,25 +2407,22 @@ export default function App() {
                                             .writeText(receivedText)
                                             .then(() => {
                                                 toast.success(
-                                                    "Text copied to clipboard!",
+                                                    "Copied to clipboard",
                                                 );
                                             })
                                             .catch((err) => {
-                                                toast.error("Failed to copy text");
+                                                toast.error("Failed to copy");
                                                 console.error(
                                                     "Failed to copy:",
                                                     err,
                                                 );
                                             });
                                     }}
-                                    className="absolute top-2 right-2 bg-black dark:bg-white text-white dark:text-black border-2 border-black dark:border-white p-2 hover:bg-gray-800 dark:hover:bg-gray-300 transition-colors cursor-pointer"
+                                    className="absolute top-4 right-4 text-gray-400 hover:text-primary-500 transition-colors"
                                     title="Copy to clipboard"
                                     type="button"
                                 >
-                                    <i
-                                        className="fas fa-copy"
-                                        aria-hidden="true"
-                                    ></i>
+                                    <i className="fas fa-copy"></i>
                                 </button>
                             </div>
                             <button
@@ -2516,7 +2431,7 @@ export default function App() {
                                     setShowTextModal(false);
                                     setReceivedText(null);
                                 }}
-                                className="w-full border-2 sm:border-4 border-black dark:border-white bg-black dark:bg-white text-white dark:text-black px-4 py-3 sm:py-4 text-base sm:text-lg font-black uppercase hover:bg-gray-900 dark:hover:bg-gray-300 transition-colors cursor-pointer shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none active:translate-x-2 active:translate-y-2"
+                                className="btn-secondary w-full"
                             >
                                 Close
                             </button>
