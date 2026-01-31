@@ -39,13 +39,13 @@ type Room struct {
 }
 
 type IncomingMessage struct {
-	Type              string `json:"type"`
-	RoomID            string `json:"roomId,omitempty"`
-	ClientID          string `json:"clientId,omitempty"`
-	Pub               string `json:"pub,omitempty"`
-	IvB64             string `json:"iv_b64,omitempty"`
-	DataB64           string `json:"data_b64,omitempty"`
-	ChunkData         string `json:"chunk_data,omitempty"`
+	Type              string   `json:"type"`
+	RoomID            string   `json:"roomId,omitempty"`
+	ClientID          string   `json:"clientId,omitempty"`
+	Pub               string   `json:"pub,omitempty"`
+	IvB64             string   `json:"iv_b64,omitempty"`
+	DataB64           string   `json:"data_b64,omitempty"`
+	ChunkData         string   `json:"chunk_data,omitempty"`
 	ChunkNum          int      `json:"chunk_num,omitempty"`
 	EncryptedMetadata string   `json:"encrypted_metadata,omitempty"` // Zero-knowledge metadata
 	MetadataIV        string   `json:"metadata_iv,omitempty"`        // IV for encrypted metadata
@@ -281,9 +281,10 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := &Client{
-		ID:   fmt.Sprintf("peer-%p", conn),
-		Conn: conn,
-		IP:   clientIP,
+		ID:       fmt.Sprintf("peer-%p", conn),
+		Conn:     conn,
+		IP:       clientIP,
+		Mnemonic: r.URL.Query().Get("username"),
 	}
 
 	logger.Debug("New client", "clientId", client.ID, "ip", clientIP)
@@ -309,7 +310,10 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 			if in.ClientID != "" {
 				client.ID = in.ClientID
 			}
-			client.Mnemonic = GenerateMnemonic(client.ID)
+			// Use provided mnemonic if already set (from query param), otherwise generate from ID
+			if client.Mnemonic == "" {
+				client.Mnemonic = GenerateMnemonic(client.ID)
+			}
 
 			if client.RoomID == in.RoomID {
 				resp := OutgoingMessage{

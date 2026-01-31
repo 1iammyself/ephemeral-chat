@@ -290,8 +290,18 @@ const ChatRoom = () => {
 
   const handleFileTransferInvite = useCallback(({ from, fromId, roomCode: targetRoomCode }) => {
     // Determine if we should show this
-    if (fromId === socketManager.id) return; // Ignore self
+    if (fromId === socketManager.socket?.id) return; // Ignore self
     if (targetRoomCode !== roomCode) return; // Ignore other rooms
+
+    // Add to activity log for recipient
+    const log = {
+      id: `log_ft_${Date.now()}`,
+      type: 'system',
+      content: `${from} invited you to a secure file transfer`,
+      timestamp: new Date().toISOString()
+    };
+    setActivityLogs(prev => [log, ...prev].slice(0, 50));
+    setHasNewLogs(true);
 
     toast((t) => (
       <div className="flex flex-col gap-2 min-w-[200px]">
@@ -1495,7 +1505,22 @@ const ChatRoom = () => {
                             {/* Files Button */}
                             <button
                               type="button"
-                              onClick={() => { setShowFileModal(true); setShowFeatureMenu(false); }}
+                              onClick={() => {
+                                setShowFileModal(true);
+                                setShowFeatureMenu(false);
+                                // Add to activity log for the sender
+                                const recipientNames = selectedRecipients.length > 0
+                                  ? `targeting ${selectedRecipients.map(id => users.find(u => u.socketId === id)?.nickname || id).join(', ')}`
+                                  : 'as a broadcast';
+
+                                const log = {
+                                  id: `log_ft_${Date.now()}`,
+                                  type: 'system',
+                                  content: `You initiated a secure file transfer intent ${recipientNames}`,
+                                  timestamp: new Date().toISOString()
+                                };
+                                setActivityLogs(prev => [log, ...prev].slice(0, 50));
+                              }}
                               disabled={!isConnected}
                               className="flex flex-col items-center justify-center p-2 rounded-xl bg-indigo-50/50 dark:bg-indigo-900/10 hover:bg-indigo-100 dark:hover:bg-indigo-900/20 transition-all border border-indigo-100/20 dark:border-indigo-800/20 group"
                             >
@@ -1826,7 +1851,8 @@ const ChatRoom = () => {
           <FileTransferModal
             onClose={() => setShowFileModal(false)}
             roomCode={roomCode}
-            recipients={selectedRecipients.map(u => u.socketId)}
+            recipients={selectedRecipients}
+            currentUserNickname={currentUser?.nickname}
           />
         )
       }

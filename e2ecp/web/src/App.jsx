@@ -717,7 +717,7 @@ export default function App() {
         // Fix: Ensure we connect through the proxy path '/e2ecp' if we are served from there
         // This directs the request to localhost:3001/e2ecp/ws -> proxy -> localhost:8080/ws
         const basePath = window.location.pathname.startsWith('/e2ecp') ? '/e2ecp' : '';
-        const wsUrl = `${protocol}//${host}${basePath}/ws`;
+        const wsUrl = `${protocol}//${host}${basePath}/ws?username=${encodeURIComponent(myMnemonicRef.current || initialUsername || '')}`;
 
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;

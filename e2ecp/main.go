@@ -57,11 +57,13 @@ var serveCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		port, _ := cmd.Flags().GetInt("port")
 		// Check for PORT environment variable (Render support)
-		if envPort := os.Getenv("PORT"); envPort != "" {
+		// Only use it if the flag wasn't explicitly changed by the user
+		if envPort := os.Getenv("PORT"); envPort != "" && !cmd.Flags().Changed("port") {
 			if p, err := strconv.Atoi(envPort); err == nil {
 				port = p
 			}
 		}
+		fmt.Printf("Starting relay server on port %d\n", port)
 		maxRooms, _ := cmd.Flags().GetInt("max-rooms")
 		maxRoomsPerIP, _ := cmd.Flags().GetInt("max-rooms-per-ip")
 		dbURL, _ := cmd.Flags().GetString("db-url")
@@ -216,7 +218,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "Log level (debug, info, warn, error)")
 	rootCmd.PersistentFlags().StringVar(&domain, "domain", "https://e2ecp.com", "Domain name for the server")
 
-	serveCmd.Flags().IntP("port", "p", 3001, "Port to listen on")
+	serveCmd.Flags().IntP("port", "p", 8080, "Port to run the relay server on")
 	serveCmd.Flags().Int("max-rooms", 10, "Maximum number of concurrent rooms allowed on the server")
 	serveCmd.Flags().Int("max-rooms-per-ip", 2, "Maximum number of rooms per IP address")
 	serveCmd.Flags().String("db-url", "", "PostgreSQL connection string for session logging (falls back to DATABASE_URL; empty to disable)")

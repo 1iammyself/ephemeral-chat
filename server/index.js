@@ -168,7 +168,6 @@ const io = socketIo(server, {
   pingInterval: 45000, // 45 seconds
   cookie: false,
   serveClient: false,
-  allowEIO3: true, // Enable Socket.IO v3 compatibility
   perMessageDeflate: false // Disable to prevent Base64 corruption
 });
 
@@ -1680,19 +1679,26 @@ io.on('connection', (socket) => {
   socket.on('file-transfer-intent', ({ roomCode, recipients }) => {
     if (!socket.roomCode || socket.roomCode !== roomCode) return;
 
+    const from = socket.nickname || 'Unknown';
+    const fromId = socket.id;
+
+    logger.info(`📁 [Intent] From: ${from} recipients: ${recipients?.length || 'all'}`);
+
     const payload = {
-      from: socket.nickname,
-      fromId: socket.id,
+      from,
+      fromId,
       roomCode
     };
 
-    if (recipients && recipients.length > 0) {
+    if (recipients && Array.isArray(recipients) && recipients.length > 0) {
       // Notify specific users
       recipients.forEach(recipientId => {
+        logger.info(`   -> Sending invite to: ${recipientId}`);
         io.to(recipientId).emit('file-transfer-invite', payload);
       });
     } else {
       // Broadcast to all (except sender)
+      logger.info(`   -> Broadcasting invite to room: ${roomCode}`);
       socket.to(roomCode).emit('file-transfer-invite', payload);
     }
   });
@@ -1780,6 +1786,22 @@ async function startServer() {
       logger.info(`🚀 Ephemeral Chat server running on port ${PORT}`);
       logger.info(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`📡 Server ready to accept connections`);
+
+      // Handle WebSocket upgrades for the e2ecp proxy
+      server.on('upgrade', (req, socket, head) => {
+        if (req.url.startsWith('/e2ecp')) {
+          logger.info(`[Socket Upgrade] Proxying WebSocket for ${req.url}`);
+          e2ecpProxy.upgrade(req, socket, head);
+        }
+      });
+    });
+
+    server.on('error', (err) => {
+      logger.error('Server error:', err);
+      if (err.code === 'EADDRINUSE') {
+        logger.error(`Port ${PORT} is already in use. Please close other instances.`);
+        process.exit(1);
+      }
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

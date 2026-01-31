@@ -86,19 +86,19 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       proxy: {
         '/api': {
-          target: 'http://localhost:3001',
+          target: 'http://127.0.0.1:3001',
           changeOrigin: true,
           secure: false,
           ws: true
         },
         '/socket.io': {
-          target: 'http://localhost:3001',
+          target: 'http://127.0.0.1:3001',
           changeOrigin: true,
           secure: false,
           ws: true
         },
         '/e2ecp': {
-          target: 'http://localhost:3001',
+          target: 'http://127.0.0.1:3001',
           changeOrigin: true,
           secure: false,
           ws: true
@@ -107,7 +107,7 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       hmr: {
         protocol: 'ws',
-        host: 'localhost'
+        host: '127.0.0.1'
       }
     },
     build: {

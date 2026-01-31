@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ExternalLink, Loader2 } from 'lucide-react';
 import socketManager from '../socket';
 
-const FileTransferModal = ({ onClose, roomCode, recipients = [] }) => {
+const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNickname = '' }) => {
     const [isLoading, setIsLoading] = useState(true);
 
     // Construct the e2ecp URL with query parameters
@@ -23,7 +23,7 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [] }) => {
     // Construct recipients string
     const recipientsStr = recipients.length > 0 ? recipients.join(',') : '';
 
-    const url = `${baseUrl}?room=${roomCode}&userId=${myId}${recipientsStr ? `&recipients=${recipientsStr}` : ''}`;
+    const url = `${baseUrl}?room=${roomCode}&userId=${myId}${currentUserNickname ? `&username=${encodeURIComponent(currentUserNickname)}` : ''}${recipientsStr ? `&recipients=${recipientsStr}` : ''}`;
 
     useEffect(() => {
         // 1. Auto-start the relay server
