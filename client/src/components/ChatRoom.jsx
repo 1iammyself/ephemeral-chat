@@ -57,6 +57,7 @@ import { getRandomIcebreaker } from '../utils/icebreakers';
 import { RefreshButton } from './PWAHandler';
 import { getCreatorId } from '../utils/creator';
 import FileTransferModal from './FileTransferModal';
+import { toast } from 'react-toastify';
 
 const SLASH_COMMANDS = [
   { icon: Camera, label: 'Camera', value: '/camera', desc: 'Take a photo' },
@@ -372,7 +373,7 @@ const ChatRoom = () => {
     setActivityLogs(prev => [log, ...prev].slice(0, 50));
     setHasNewLogs(true);
 
-    toast((t) => (
+    toast(({ closeToast }) => (
       <div className="flex flex-col gap-2 min-w-[200px]">
         <div className="font-semibold flex items-center gap-2 text-gray-800 dark:text-gray-100">
           <FileText className="w-5 h-5 text-indigo-500" />
@@ -384,7 +385,7 @@ const ChatRoom = () => {
         <div className="flex gap-2 mt-1">
           <button
             onClick={() => {
-              toast.dismiss(t.id);
+              closeToast();
               setShowFileModal(true);
             }}
             className="flex-1 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
@@ -392,14 +393,14 @@ const ChatRoom = () => {
             Open Files
           </button>
           <button
-            onClick={() => toast.dismiss(t.id)}
+            onClick={closeToast}
             className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
           >
             Ignore
           </button>
         </div>
       </div>
-    ), { duration: 10000, position: 'top-right' });
+    ), { autoClose: false, position: "top-right" });
   }, [roomCode]);
 
   const sendRoomReaction = useCallback((emoji) => {

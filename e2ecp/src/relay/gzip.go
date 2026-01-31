@@ -38,7 +38,7 @@ func (g gzipFileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Try to open the .gz version from the embedded filesystem
 	if fs, ok := g.handler.(spaHandler); ok {
-		gzPath := path + ".gz"
+		gzPath := strings.TrimPrefix(path, "/") + ".gz"
 		gzFile, err := fs.staticFS.Open(gzPath)
 		if err == nil {
 			defer gzFile.Close()
@@ -101,7 +101,7 @@ func detectContentType(path string) string {
 	case strings.HasSuffix(path, ".css"):
 		return "text/css; charset=utf-8"
 	case strings.HasSuffix(path, ".js"):
-		return "application/javascript; charset=utf-8"
+		return "application/javascript"
 	case strings.HasSuffix(path, ".json"):
 		return "application/json"
 	case strings.HasSuffix(path, ".png"):

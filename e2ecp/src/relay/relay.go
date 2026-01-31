@@ -490,16 +490,40 @@ func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		path = "/index.html"
 	}
 
-	f, err := h.staticFS.Open(path)
+	// fs.FS (embedded) doesn't like leading slashes
+	fsPath := strings.TrimPrefix(path, "/")
+
+	// Set debug headers
+	w.Header().Set("X-Debug-Path", path)
+	w.Header().Set("X-Debug-FS-Path", fsPath)
+
+	f, err := h.staticFS.Open(fsPath)
 	if err == nil {
 		f.Close()
+
+		// Force MIME type for known extensions to avoid registry issues on Windows
+		if ct := detectContentType(path); ct != "" {
+			w.Header().Set("Content-Type", ct)
+		}
+
+		logger.Info("Serving static file", "path", path, "fsPath", fsPath)
 		http.FileServer(h.staticFS).ServeHTTP(w, r)
 		return
 	}
 
-	// File not found, serve index.html for client-side routing
-	index, err := h.staticFS.Open("/index.html")
+	logger.Info("Static file not found", "path", path, "fsPath", fsPath, "error", err)
+
+	// Don't serve index.html for assets to avoid MIME type errors
+	if strings.Contains(path, "/assets/") || strings.HasSuffix(path, ".js") || strings.HasSuffix(path, ".css") || strings.HasSuffix(path, ".woff2") {
+		logger.Warn("Asset not found - 404", "path", path)
+		http.NotFound(w, r)
+		return
+	}
+
+	// File not found, serve index.html for client-side routing (SPA support)
+	index, err := h.staticFS.Open("index.html")
 	if err != nil {
+		logger.Error("Failed to open index.html fallback", "error", err)
 		http.NotFound(w, r)
 		return
 	}
@@ -507,10 +531,12 @@ func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	stat, err := index.Stat()
 	if err != nil {
+		logger.Error("Failed to stat index.html", "error", err)
 		http.NotFound(w, r)
 		return
 	}
 
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	http.ServeContent(w, r, "index.html", stat.ModTime(), index.(io.ReadSeeker))
 }
 
@@ -577,9 +603,12 @@ func Start(port int, maxRoomsLimit int, maxRoomsPerIPLimit int, dbURL string, st
 	spaHandlerInstance := spaHandler{staticFS: http.FS(distFS), installScript: installScript}
 	mux.Handle("/", newGzipFileHandler(spaHandlerInstance))
 
+	// Also handle /e2ecp/ path by stripping prefix to support vite base path
+	mux.Handle("/e2ecp/", http.StripPrefix("/e2ecp", newGzipFileHandler(spaHandlerInstance)))
+
 	handler := cors.AllowAll().Handler(mux)
 	addr := fmt.Sprintf(":%d", port)
-	logger.Debug("share relay starting", "address", fmt.Sprintf("ws://localhost%s", addr))
+	logger.Info("Relay server is ready", "address", fmt.Sprintf("http://localhost%s", addr))
 	if err := http.ListenAndServe(addr, handler); err != nil {
 		logger.Error("Server failed", "error", err)
 	}

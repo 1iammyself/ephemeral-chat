@@ -29,7 +29,7 @@ const { convertAudioToAAC } = require('./utils/audio-converter');
 
 const { RtcTokenBuilder, RtcRole } = require('agora-token');
 const { createProxyMiddleware } = require('http-proxy-middleware');
-const { startRelayServer } = require('./relay-manager');
+const { startRelayServer, registerTransfer, unregisterTransfer } = require('./relay-manager');
 
 // Initialize Cap.js for proof-of-work CAPTCHA
 const cap = new Cap({
@@ -47,8 +47,8 @@ async function initializeServer() {
   // Initialize Redis if configured
   await initializeRedis();
 
-  // Start e2ecp relay process
-  startRelayServer();
+  // Start e2ecp relay process - REMOVED (Lazy loaded now)
+  // startRelayServer();
 
   logger.info('✅ Server initialized');
 }
@@ -99,23 +99,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// Proxy logic for e2ecp
-// e2ecp runs on RELAY_PORT (default 8080) locally
-const relayPort = process.env.RELAY_PORT || 8080;
-const e2ecpProxy = createProxyMiddleware({
-  target: `http://127.0.0.1:${relayPort}`,
-  changeOrigin: true,
-  ws: true,
-  pathRewrite: { '^/e2ecp': '' },
-  logLevel: 'silent',
-  onError: (err, req, res) => {
-    const msg = `[Proxy Error] Failed to connect to relay at ${req.protocol}://${req.hostname}:${relayPort}${req.url}`;
-    logger.error(msg, err);
-    res.status(504).send(`Proxy Error: Could not reach file transfer service on port ${relayPort}. Is it running?`);
-  }
-});
-
-app.use('/e2ecp', e2ecpProxy);
+// Proxy logic for e2ecp - REMOVED (Client connects directly to 8080)
+// const relayPort = process.env.RELAY_PORT || 8080;
+// const e2ecpProxy = createProxyMiddleware({ ... });
+// app.use('/e2ecp', e2ecpProxy);
 
 // Detect environment
 
@@ -703,6 +690,24 @@ io.on('connection', (socket) => {
       targetSocket.disconnect(true);
     }
   };
+
+  // File Transfer Logic
+  socket.on('file-transfer-start', async () => {
+    try {
+      await registerTransfer(socket.id);
+      // Tell client where the file server is
+      // Hardcoded to 8080 for now as per architecture plan, or use env var
+      const fileServerUrl = process.env.VITE_FILE_SERVER_URL || 'http://localhost:8080';
+      socket.emit('file-server-ready', { url: fileServerUrl });
+    } catch (error) {
+      logger.error('Failed to start file server:', error);
+      socket.emit('file-server-error', { error: 'Failed to start file server' });
+    }
+  });
+
+  socket.on('file-transfer-end', () => {
+    unregisterTransfer(socket.id);
+  });
 
   socket.on('create-room', async (data, callback) => {
     try {
@@ -1756,9 +1761,16 @@ io.on('connection', (socket) => {
     await handleUserDeparture(true);
   });
 
-  socket.on('disconnect', async () => {
-    // logger.info(`🔌 User disconnected: ${socket.id}`);
+  socket.on('disconnect', async (reason) => {
+    // logger.info(`🔌 User disconnected: ${socket.id} (Reason: ${reason})`);
+
+    // Cleanup file transfer tracking
+    unregisterTransfer(socket.id);
+
+    // Handle user departure logic
     await handleUserDeparture(false);
+
+    // Remove from rate limits
     rateLimits.delete(socket.id);
   });
 });
@@ -1788,14 +1800,6 @@ async function startServer() {
       logger.info(`🚀 Ephemeral Chat server running on port ${PORT}`);
       logger.info(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`📡 Server ready to accept connections`);
-
-      // Handle WebSocket upgrades for the e2ecp proxy
-      server.on('upgrade', (req, socket, head) => {
-        if (req.url.startsWith('/e2ecp')) {
-          logger.info(`[Socket Upgrade] Proxying WebSocket for ${req.url}`);
-          e2ecpProxy.upgrade(req, socket, head);
-        }
-      });
     });
 
     server.on('error', (err) => {

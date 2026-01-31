@@ -13,9 +13,8 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNick
     // We'll trust the plan which says "Files feature... redirects users to the @[e2ecp] interface"
     // but "potentially as a pop-up".
 
-    // Determine e2ecp URL basis
-    // We proxy /e2ecp in both dev (vite) and prod (express) to the backend -> relay
-    const baseUrl = '/e2ecp';
+    // State for the dynamic file server URL
+    const [fileServerUrl, setFileServerUrl] = useState(null);
 
     // Get current User ID (socket ID) to ensure consistent identity
     const myId = socketManager.socket?.id || '';
@@ -23,21 +22,39 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNick
     // Construct recipients string
     const recipientsStr = recipients.length > 0 ? recipients.join(',') : '';
 
-    const url = `${baseUrl}?room=${roomCode}&userId=${myId}${currentUserNickname ? `&username=${encodeURIComponent(currentUserNickname)}` : ''}${recipientsStr ? `&recipients=${recipientsStr}` : ''}`;
+    // Construct the full URL only when fileServerUrl is available
+    const url = fileServerUrl
+        ? `${fileServerUrl}?room=${roomCode}&userId=${myId}${currentUserNickname ? `&username=${encodeURIComponent(currentUserNickname)}` : ''}${recipientsStr ? `&recipients=${recipientsStr}` : ''}`
+        : '';
 
     useEffect(() => {
-        // 1. Auto-start the relay server
-        fetch('/api/start-relay', { method: 'POST' })
-            .catch(err => console.error("Failed to auto-start relay:", err));
+        // 1. Setup Socket Listeners
+        const handleServerReady = ({ url }) => {
+            // console.log("[FileTransfer] Server ready at:", url);
+            setFileServerUrl(url);
+            // isLoading will be handled by iframe onLoad, but we can also set it here if we want to show loading until server is up
+        };
 
-        // 2. Send "Wake Up" signal to chat room peers
-        // We use the existing socket from the main app
-        if (socketManager.socket && socketManager.socket.connected) {
+        if (socketManager.socket) {
+            socketManager.socket.on('file-server-ready', handleServerReady);
+
+            // 2. Request File Server Start
+            socketManager.socket.emit('file-transfer-start');
+
+            // 3. Send "Wake Up" signal to chat room peers (notify intent)
             socketManager.socket.emit('file-transfer-intent', {
                 roomCode,
                 recipients: recipients
             });
         }
+
+        return () => {
+            // Cleanup
+            if (socketManager.socket) {
+                socketManager.socket.off('file-server-ready', handleServerReady);
+                socketManager.socket.emit('file-transfer-end');
+            }
+        };
     }, [roomCode, recipients]);
 
     return (
@@ -84,7 +101,7 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNick
                         src={url}
                         className="w-full h-full border-0"
                         title="Encrypted File Transfer"
-                        onLoad={() => setIsLoading(false)}
+                        onLoad={() => url && setIsLoading(false)}
                         allow="camera; microphone; clipboard-read; clipboard-write; display-capture"
                     />
                 </div>
