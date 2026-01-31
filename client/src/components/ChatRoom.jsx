@@ -373,35 +373,53 @@ const ChatRoom = () => {
     setActivityLogs(prev => [log, ...prev].slice(0, 50));
     setHasNewLogs(true);
 
+    // Trigger Pulse to alert the user visually
+    triggerPulse();
+
+    // Prevent duplicate toasts using fixed toastId
+    if (toast.isActive('file-transfer-invite')) return;
+
     toast(({ closeToast }) => (
-      <div className="flex flex-col gap-2 min-w-[200px]">
-        <div className="font-semibold flex items-center gap-2 text-gray-800 dark:text-gray-100">
-          <FileText className="w-5 h-5 text-indigo-500" />
-          <span>{from} wants to share files</span>
+      <div className="flex flex-col gap-1.5 min-w-[240px] p-1">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl">
+            <FileText className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white leading-tight">
+              {from}
+            </h3>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">
+              Secure file transfer request
+            </p>
+          </div>
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Open the file transfer window to connect.
-        </p>
-        <div className="flex gap-2 mt-1">
+
+        <div className="flex gap-2 mt-3 pt-2 border-t border-gray-100 dark:border-gray-800">
           <button
             onClick={() => {
               closeToast();
               setShowFileModal(true);
             }}
-            className="flex-1 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
           >
             Open Files
           </button>
           <button
             onClick={closeToast}
-            className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg text-xs font-semibold hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors active:scale-95"
           >
             Ignore
           </button>
         </div>
       </div>
-    ), { autoClose: false, position: "top-right" });
-  }, [roomCode]);
+    ), {
+      toastId: 'file-transfer-invite',
+      autoClose: false,
+      position: "top-right",
+      className: 'dark:bg-gray-900/90 dark:backdrop-blur-md border border-gray-100 dark:border-gray-800 rounded-2xl shadow-2xl p-2'
+    });
+  }, [roomCode, triggerPulse]);
 
   const sendRoomReaction = useCallback((emoji) => {
     const now = Date.now();
