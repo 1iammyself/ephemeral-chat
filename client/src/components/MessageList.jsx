@@ -156,7 +156,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   }
 
   return (
-    <div className="flex flex-col space-y-6 pb-4">
+    <div className="flex flex-col space-y-1 sm:space-y-2 pb-4">
       {messages.map((message) => {
         const isOwnMessage = currentUser && (message.sender.socketId === currentUser.socketId || message.sender.id === currentUser.id);
         const isExpired = messageTimers.get(message.id) === 'expired';
@@ -172,7 +172,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
         // Viewed View-Once Content Layout
         if (isViewOnce && hasBeenViewed && !(isAudio && playingAudioId === message.id)) {
           return (
-            <div key={message.id} className={`flex ${isOwnMessage ? 'justify-end pr-1' : 'justify-start pl-1'} mb-4`}>
+            <div key={message.id} className={`flex ${isOwnMessage ? 'justify-end pr-1' : 'justify-start pl-1'} mb-1 sm:mb-2`}>
               <div className="max-w-[70%] px-4 py-2 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-dashed border-gray-200 dark:border-gray-800 text-gray-400 dark:text-gray-500 italic text-xs flex items-center space-x-2">
                 <Lock className="w-3 h-3" />
                 <span>Opened view-once {isImage ? 'photo' : 'audio'}</span>
@@ -203,10 +203,10 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
               )}
             </div>
 
-            <div className={`flex items-center w-full ${isOwnMessage ? 'justify-end pl-12' : 'justify-start pr-12'}`}>
-              <div className="relative group/bubble">
+            <div className={`flex items-center w-full ${isOwnMessage ? 'justify-end pl-8 sm:pl-12' : 'justify-start pr-8 sm:pr-12'}`}>
+              <div className="relative group/bubble max-w-[85%] sm:max-w-lg md:max-w-xl">
                 <div
-                  className={`relative z-10 rounded-2xl shadow-sm transition-all duration-300 ${message.messageType === 'poll' ? '' : 'px-4 py-3'
+                  className={`relative z-10 rounded-2xl shadow-sm transition-all duration-300 ${message.messageType === 'poll' ? '' : 'px-3 py-2 sm:px-4 sm:py-3 box-border'
                     } ${isOwnMessage
                       ? 'bg-primary-600 dark:bg-primary-700 text-white rounded-tr-none'
                       : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 dark:text-gray-100 rounded-tl-none'
@@ -250,7 +250,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                             <span className="text-xs font-bold uppercase tracking-wide">Tap to View</span>
                           </div>
                         ) : (
-                          <img src={message.content} alt="shared" className="max-w-xs max-h-64 object-cover rounded-lg shadow-inner" />
+                          <img src={message.content} alt="shared" className="max-w-[200px] sm:max-w-md max-h-48 sm:max-h-96 object-cover rounded-lg shadow-inner" />
                         )}
                       </div>
                     ) : isAudio ? (

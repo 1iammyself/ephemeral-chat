@@ -1453,7 +1453,9 @@ io.on('connection', (socket) => {
   // Pulse
   socket.on('send-pulse', ({ roomCode }) => {
     // Rate limit pulse
-    if (!checkRateLimit(socket.id)) return;
+    if (!checkRateLimit(socket.id)) {
+      return socket.emit('error', { message: 'Pulse rate limit exceeded' });
+    }
 
     if (roomCode && socket.roomCode === roomCode) {
       socket.to(roomCode).emit('pulse-received', { from: socket.nickname });

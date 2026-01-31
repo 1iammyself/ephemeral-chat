@@ -2,12 +2,14 @@ import React, { useState, useCallback } from 'react';
 import { X, Check, Copy, Users, Lock, Unlock, Timer, Zap, PartyPopper, Sun, Sunset, Settings, Clock, Shield, Share2 } from 'lucide-react';
 import { sanitizeInput, generateRoomKey } from '../utils/security';
 import { getCreatorId } from '../utils/creator';
+import { useTheme } from '../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import '@cap.js/widget';
 
 const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const API_BASE = import.meta.env.VITE_API_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '');
 
+  const { theme } = useTheme();
   const [roomSettings, setSettings] = useState({
     messageTTL: '30sec',
     password: '',
@@ -518,6 +520,9 @@ Verbal Code: ${verbalCode || 'N/A'}
                 <cap-widget
                   ref={setCapWidgetRef}
                   data-cap-api-endpoint={`${API_BASE}/api/cap/`}
+                  data-theme={theme}
+                  theme={theme}
+                  mode={theme}
                   className="w-full"
                 />
               </div>

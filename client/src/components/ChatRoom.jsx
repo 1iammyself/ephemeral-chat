@@ -23,9 +23,13 @@ import {
   Edit2,
   Zap,
   Reply,
+  FileText,
   Activity,
   Info,
-  Camera
+  Camera,
+  PanelLeft,
+  PanelRight,
+  GripVertical
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -53,7 +57,6 @@ import { getRandomIcebreaker } from '../utils/icebreakers';
 import { RefreshButton } from './PWAHandler';
 import { getCreatorId } from '../utils/creator';
 import FileTransferModal from './FileTransferModal';
-import { FileText } from 'lucide-react';
 
 const SLASH_COMMANDS = [
   { icon: Camera, label: 'Camera', value: '/camera', desc: 'Take a photo' },
@@ -85,6 +88,55 @@ const ChatRoom = () => {
   const [isJoined, setIsJoined] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(true);
   const [isProcessingInvite, setIsProcessingInvite] = useState(false);
+  const [showFileModal, setShowFileModal] = useState(false);
+  const [fileTransferInvites, setFileTransferInvites] = useState([]);
+
+  // Sidebar State
+  const [sidebarPosition, setSidebarPosition] = useState('right');
+  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const sidebarRef = useRef(null);
+
+  // Sidebar Resize Logic
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizingSidebar) return;
+
+      let newWidth;
+      if (sidebarPosition === 'right') {
+        newWidth = window.innerWidth - e.clientX;
+      } else {
+        newWidth = e.clientX;
+      }
+
+      // Constrain width
+      if (newWidth < 200) newWidth = 200;
+      if (newWidth > 600) newWidth = 600;
+
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingSidebar(false);
+    };
+
+    if (isResizingSidebar) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none'; // Prevent text selection while resizing
+    } else {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizingSidebar, sidebarPosition]);
   const [room, setRoom] = useState(null);
   const [messages, setMessages] = useState([]);
   const [users, setUsers] = useState([]);
@@ -133,7 +185,6 @@ const ChatRoom = () => {
   const [dragState, setDragState] = useState(null); // { type: 'topic' | 'timer', startX: number, startOffset: number }
   const [sessionToken, setSessionToken] = useState(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
-  const [showFileModal, setShowFileModal] = useState(false);
 
   // Suggestions State
   const [suggestions, setSuggestions] = useState({ show: false, type: null, items: [], index: 0, query: '' });
@@ -196,6 +247,24 @@ const ChatRoom = () => {
     const hash = window.location.hash.substring(1);
     if (hash) setRoomKey(hash);
   }, [location]);
+
+  const triggerPulse = useCallback(() => {
+    if (navigator.vibrate) {
+      try {
+        navigator.vibrate([50, 50, 50]);
+      } catch (e) {
+        // Ignore vibration errors
+      }
+    }
+    const container = document.querySelector('.chat-container');
+    if (container) {
+      container.classList.remove('animate-shake');
+      // Trigger reflow
+      void container.offsetWidth;
+      container.classList.add('animate-shake');
+      setTimeout(() => container.classList.remove('animate-shake'), 500);
+    }
+  }, []);
 
   const performJoin = useCallback((params) => {
     const { nickname, password, capToken, inviteToken } = params;
@@ -543,12 +612,7 @@ const ChatRoom = () => {
     };
 
     const handlePulseReceived = ({ from }) => {
-      if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-      const container = document.querySelector('.chat-container');
-      if (container) {
-        container.classList.add('animate-shake');
-        setTimeout(() => container.classList.remove('animate-shake'), 500);
-      }
+      triggerPulse();
       const log = { id: `log_${Date.now()}`, type: 'pulse', content: `${from} sent a pulse`, timestamp: new Date().toISOString() };
       setActivityLogs(prev => [log, ...prev].slice(0, 50));
       if (!showActivityLogs) setHasNewLogs(true);
@@ -642,7 +706,7 @@ const ChatRoom = () => {
         socketManager.disconnect();
       }
     };
-  }, [roomCode, performJoin, roomKey, handleFileTransferInvite]);
+  }, [roomCode, performJoin, roomKey, handleFileTransferInvite, triggerPulse]);
 
   useEffect(() => {
     if (!isConnected) return;
@@ -940,6 +1004,22 @@ const ChatRoom = () => {
   };
 
   const handleReply = (message) => {
+    // Automatic Private Reply Logic
+    if (message.recipients && message.recipients.length > 0) {
+      // It's a private message
+      if (message.sender.socketId === socketManager.socket?.id) {
+        // I sent this message, so replying means sending to the same recipients
+        setSelectedRecipients(message.recipients);
+      } else {
+        // I received this message, so replying means responding to the sender
+        // (and potentially other recipients if we implemented Reply All, but let's stick to sender for now as standard "Reply")
+        setSelectedRecipients([message.sender.socketId]);
+
+        // If it was a multi-party private message, we might want to include others, 
+        // but for now, ensure we at least reply to the sender privately.
+      }
+    }
+
     setReplyingTo(message);
     messageInputRef.current?.focus();
   };
@@ -985,6 +1065,12 @@ const ChatRoom = () => {
 
   const handleSendPulse = () => {
     socketManager.emit('send-pulse', { roomCode });
+    triggerPulse(); // Immediate local feedback
+
+    // Add local log for sender
+    const log = { id: `log_${Date.now()}`, type: 'pulse', content: `You sent a pulse`, timestamp: new Date().toISOString() };
+    setActivityLogs(prev => [log, ...prev].slice(0, 50));
+
     setShowFeatureMenu(false);
   };
 
@@ -1329,6 +1415,13 @@ const ChatRoom = () => {
             </div>
           </div>
           <div className="flex items-center space-x-2 sm:space-x-3">
+            <button
+              onClick={() => setSidebarPosition(prev => prev === 'right' ? 'left' : 'right')}
+              className="hidden lg:flex p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300"
+              title={`Move sidebar to ${sidebarPosition === 'right' ? 'left' : 'right'}`}
+            >
+              {sidebarPosition === 'right' ? <PanelLeft className="w-5 h-5" /> : <PanelRight className="w-5 h-5" />}
+            </button>
             <RefreshButton />
             <ThemeToggle />
             <button onClick={() => setShowMobileMenu(true)} className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 relative">
@@ -1390,8 +1483,8 @@ const ChatRoom = () => {
 
       {error && <div className="mx-4 mt-2 bg-red-100 dark:bg-red-900/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-2 rounded-lg text-sm text-center md:w-fit md:mx-auto">{error}</div>}
 
-      <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 flex flex-col">
+      <div className={`flex-1 flex overflow-hidden ${sidebarPosition === 'left' ? 'flex-row-reverse' : ''}`}>
+        <div className="flex-1 flex flex-col min-w-0">
           <div className="flex-1 overflow-y-auto pl-4 lg:pl-10 pr-2 scrollbar-thin">
             <MessageList
               messages={messages}
@@ -1757,7 +1850,21 @@ const ChatRoom = () => {
             </div>
           </div>
         </div>
-        <div className="hidden lg:block w-64 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+
+        {/* Desktop Sidebar */}
+        <div
+          className={`hidden lg:flex flex-col relative bg-white dark:bg-gray-800 ${sidebarPosition === 'right' ? 'border-l' : 'border-r'} border-gray-200 dark:border-gray-700 transition-all duration-75`}
+          style={{ width: `${sidebarWidth}px` }}
+          ref={sidebarRef}
+        >
+          {/* Resize Handle */}
+          <div
+            className={`absolute top-0 bottom-0 w-1.5 cursor-col-resize z-50 hover:bg-blue-500/50 transition-colors flex items-center justify-center opacity-0 hover:opacity-100 ${sidebarPosition === 'right' ? '-left-0.5' : '-right-0.5'}`}
+            onMouseDown={() => setIsResizingSidebar(true)}
+          >
+            <div className="w-0.5 h-8 bg-gray-300 dark:bg-gray-600 rounded-full" />
+          </div>
+
           <UserList
             users={users}
             currentUser={currentUser}
