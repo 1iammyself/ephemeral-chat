@@ -4,6 +4,7 @@
  */
 
 require('dotenv').config();
+console.log('[DEBUG] server/index.js loaded');
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -25,7 +26,10 @@ const {
   logger
 } = require('./utils');
 const { convertAudioToAAC } = require('./utils/audio-converter');
+
 const { RtcTokenBuilder, RtcRole } = require('agora-token');
+const { createProxyMiddleware } = require('http-proxy-middleware');
+const { startRelayServer } = require('./relay-manager');
 
 // Initialize Cap.js for proof-of-work CAPTCHA
 const cap = new Cap({
@@ -38,9 +42,14 @@ const cap = new Cap({
 logger.info('🔌 Using in-memory storage for rooms and messages');
 
 async function initializeServer() {
+  console.log('[DEBUG] Inside initializeServer...');
   logger.info('🚀 Starting server with in-memory storage...');
   // Initialize Redis if configured
   await initializeRedis();
+
+  // Start e2ecp relay process
+  startRelayServer();
+
   logger.info('✅ Server initialized');
 }
 
@@ -89,6 +98,24 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+// Proxy logic for e2ecp
+// e2ecp runs on RELAY_PORT (default 8080) locally
+const relayPort = process.env.RELAY_PORT || 8080;
+const e2ecpProxy = createProxyMiddleware({
+  target: `http://127.0.0.1:${relayPort}`,
+  changeOrigin: true,
+  ws: true,
+  pathRewrite: { '^/e2ecp': '' },
+  logLevel: 'silent',
+  onError: (err, req, res) => {
+    const msg = `[Proxy Error] Failed to connect to relay at ${req.protocol}://${req.hostname}:${relayPort}${req.url}`;
+    logger.error(msg, err);
+    res.status(504).send(`Proxy Error: Could not reach file transfer service on port ${relayPort}. Is it running?`);
+  }
+});
+
+app.use('/e2ecp', e2ecpProxy);
 
 // Detect environment
 
@@ -1727,7 +1754,11 @@ async function startServer() {
   }
 }
 
-startServer().catch(logger.error);
+console.log('[DEBUG] Calling startServer()...');
+startServer().catch(err => {
+  console.error('[DEBUG] startServer failed:', err);
+  logger.error(err);
+});
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {

@@ -1,0 +1,112 @@
+package relay
+
+import (
+	"github.com/gorilla/websocket"
+	"google.golang.org/protobuf/proto"
+)
+
+// Convert JSON IncomingMessage to Protobuf PBIncomingMessage
+func incomingToPB(msg *IncomingMessage) *PBIncomingMessage {
+	return &PBIncomingMessage{
+		Type:              msg.Type,
+		RoomId:            msg.RoomID,
+		ClientId:          msg.ClientID,
+		Pub:               msg.Pub,
+		IvB64:             msg.IvB64,
+		DataB64:           msg.DataB64,
+		ChunkData:         msg.ChunkData,
+		ChunkNum:          int32(msg.ChunkNum),
+		EncryptedMetadata: msg.EncryptedMetadata,
+		MetadataIv:        msg.MetadataIV,
+		Recipients:        msg.Recipients,
+	}
+}
+
+// Convert Protobuf PBIncomingMessage to JSON IncomingMessage
+func pbToIncoming(pb *PBIncomingMessage) *IncomingMessage {
+	return &IncomingMessage{
+		Type:              pb.Type,
+		RoomID:            pb.RoomId,
+		ClientID:          pb.ClientId,
+		Pub:               pb.Pub,
+		IvB64:             pb.IvB64,
+		DataB64:           pb.DataB64,
+		ChunkData:         pb.ChunkData,
+		ChunkNum:          int(pb.ChunkNum),
+		EncryptedMetadata: pb.EncryptedMetadata,
+		MetadataIV:        pb.MetadataIv,
+		Recipients:        pb.Recipients,
+	}
+}
+
+// Convert JSON OutgoingMessage to Protobuf PBOutgoingMessage
+func outgoingToPB(msg *OutgoingMessage) *PBOutgoingMessage {
+	return &PBOutgoingMessage{
+		Type:              msg.Type,
+		From:              msg.From,
+		Mnemonic:          msg.Mnemonic,
+		RoomId:            msg.RoomID,
+		Pub:               msg.Pub,
+		IvB64:             msg.IvB64,
+		DataB64:           msg.DataB64,
+		ChunkData:         msg.ChunkData,
+		ChunkNum:          int32(msg.ChunkNum),
+		SelfId:            msg.SelfID,
+		Peers:             msg.Peers,
+		Count:             int32(msg.Count),
+		Error:             msg.Error,
+		EncryptedMetadata: msg.EncryptedMetadata,
+		MetadataIv:        msg.MetadataIV,
+		PeerId:            msg.PeerID,
+		Recipients:        msg.Recipients,
+	}
+}
+
+// Convert Protobuf PBOutgoingMessage to JSON OutgoingMessage
+func pbToOutgoing(pb *PBOutgoingMessage) *OutgoingMessage {
+	return &OutgoingMessage{
+		Type:              pb.Type,
+		From:              pb.From,
+		Mnemonic:          pb.Mnemonic,
+		RoomID:            pb.RoomId,
+		Pub:               pb.Pub,
+		IvB64:             pb.IvB64,
+		DataB64:           pb.DataB64,
+		ChunkData:         pb.ChunkData,
+		ChunkNum:          int(pb.ChunkNum),
+		SelfID:            pb.SelfId,
+		Peers:             pb.Peers,
+		Count:             int(pb.Count),
+		Error:             pb.Error,
+		EncryptedMetadata: pb.EncryptedMetadata,
+		MetadataIV:        pb.MetadataIv,
+		PeerID:            pb.PeerId,
+		Recipients:        pb.Recipients,
+	}
+}
+
+// Encode OutgoingMessage to protobuf binary format
+func encodeProtobuf(msg *OutgoingMessage) ([]byte, error) {
+	pb := outgoingToPB(msg)
+	return proto.Marshal(pb)
+}
+
+// Decode protobuf binary to IncomingMessage
+func decodeProtobuf(data []byte) (*IncomingMessage, error) {
+	pb := &PBIncomingMessage{}
+	if err := proto.Unmarshal(data, pb); err != nil {
+		return nil, err
+	}
+	return pbToIncoming(pb), nil
+}
+
+// Helper to send a protobuf message to a websocket connection
+func sendMessage(client *Client, msg *OutgoingMessage) error {
+	data, err := encodeProtobuf(msg)
+	if err != nil {
+		return err
+	}
+	client.WriteMutex.Lock()
+	defer client.WriteMutex.Unlock()
+	return client.Conn.WriteMessage(websocket.BinaryMessage, data)
+}

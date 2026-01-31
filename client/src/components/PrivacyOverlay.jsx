@@ -11,6 +11,10 @@ const PrivacyOverlay = () => {
 
     useEffect(() => {
         const lock = () => {
+            // If the blur event is caused by an iframe (e.g. file transfer), don't lock
+            if (document.activeElement && document.activeElement.tagName === 'IFRAME') {
+                return;
+            }
             setIsLocked(true);
             document.body.classList.add('protected-mode');
         };

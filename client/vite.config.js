@@ -96,6 +96,12 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: false,
           ws: true
+        },
+        '/e2ecp': {
+          target: 'http://localhost:3001',
+          changeOrigin: true,
+          secure: false,
+          ws: true
         }
       },
       host: '0.0.0.0',

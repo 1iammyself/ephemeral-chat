@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package relay;
+
+option go_package = "github.com/schollz/share/src/relay";
+
+// PBIncomingMessage represents messages received by the relay server from clients
+message PBIncomingMessage {
+  string type = 1;
+  string room_id = 2;
+  string client_id = 3;
+  string pub = 4;
+  string iv_b64 = 7;
+  string data_b64 = 8;
+  string chunk_data = 9;
+  int32 chunk_num = 10;
+  string encrypted_metadata = 20;    // Encrypted metadata (file info, local relay info, etc.)
+  string metadata_iv = 21;           // IV for encrypted_metadata
+  repeated string recipients = 23;   // IDs of specific recipients (empty = broadcast)
+}
+
+// PBOutgoingMessage represents messages sent by the relay server to clients
+message PBOutgoingMessage {
+  string type = 1;
+  string from = 2;
+  string mnemonic = 3;
+  string room_id = 4;
+  string pub = 5;
+  string iv_b64 = 8;
+  string data_b64 = 9;
+  string chunk_data = 10;
+  int32 chunk_num = 11;
+  string self_id = 13;
+  repeated string peers = 14;
+  int32 count = 15;
+  string error = 16;
+  string encrypted_metadata = 20;    // Encrypted metadata (file info, local relay info, etc.)
+  string metadata_iv = 21;           // IV for encrypted_metadata
+  string peer_id = 22;               // ID of disconnected peer
+  repeated string recipients = 23;   // IDs of specific recipients
+}

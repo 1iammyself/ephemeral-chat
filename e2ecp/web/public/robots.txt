@@ -1,0 +1,6 @@
+# Allow all bots to crawl all pages
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://e2ecp.com/sitemap.xml

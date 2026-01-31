@@ -1,0 +1,367 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - "v*"
+      - "*.*.*"
+  pull_request:
+    branches: [ main ]
+
+defaults:
+  run:
+    working-directory: .
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "stable"
+
+      - name: Install web dependencies
+        run: cd web && npm install
+
+      - name: Build server
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          if [[ "$VERSION" == "refs/heads/"* ]]; then
+            VERSION="dev"
+          fi
+          make server LDFLAGS="-X main.Version=$VERSION"
+
+      - name: Run tests
+        run: go test -v -cover ./...
+
+      - name: Verify binary
+        run: ./e2ecp --help || ./e2ecp -h || echo "Binary created successfully"
+
+      - name: Zip binary (macOS)
+        run: zip -9 e2ecp_macos.zip e2ecp
+
+      - name: Upload artifact (macOS)
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2ecp_macos.zip
+          path: e2ecp_macos.zip
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "stable"
+
+      - name: Install web dependencies
+        run: cd web && npm install
+
+      - name: Build server
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          if [[ "$VERSION" == "refs/heads/"* ]]; then
+            VERSION="dev"
+          fi
+          make server LDFLAGS="-X main.Version=$VERSION"
+
+      - name: Run tests
+        run: go test -v -cover ./...
+
+      - name: Verify binary
+        run: ./e2ecp --help || ./e2ecp -h || echo "Binary created successfully"
+
+      - name: Zip binary (Linux)
+        run: zip -9 e2ecp_linux.zip e2ecp
+
+      - name: Upload artifact (Linux)
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2ecp_linux.zip
+          path: e2ecp_linux.zip
+          if-no-files-found: error
+
+  linux-armv7:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "stable"
+
+      - name: Install web dependencies
+        run: cd web && npm install
+
+      - name: Build web
+        run: cd web && npm run build
+
+      - name: Build server (ARM v7)
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          if [[ "$VERSION" == "refs/heads/"* ]]; then
+            VERSION="dev"
+          fi
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -ldflags "-X main.Version=$VERSION -extldflags '-static'" -o e2ecp .
+
+      - name: Verify binary exists
+        run: |
+          if [ -f e2ecp ]; then
+            echo "Binary created successfully"
+            ls -lh e2ecp
+          else
+            echo "Binary not found"
+            exit 1
+          fi
+
+      - name: Zip binary (Linux ARM v7)
+        run: zip -9 e2ecp_linux_armv7.zip e2ecp
+
+      - name: Upload artifact (Linux ARM v7)
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2ecp_linux_armv7.zip
+          path: e2ecp_linux_armv7.zip
+          if-no-files-found: error
+
+  linux-armv6:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "stable"
+
+      - name: Install web dependencies
+        run: cd web && npm install
+
+      - name: Build web
+        run: cd web && npm run build
+
+      - name: Build server (ARM v6)
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          if [[ "$VERSION" == "refs/heads/"* ]]; then
+            VERSION="dev"
+          fi
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6 go build -ldflags "-X main.Version=$VERSION -extldflags '-static'" -o e2ecp .
+
+      - name: Verify binary exists
+        run: |
+          if [ -f e2ecp ]; then
+            echo "Binary created successfully"
+            ls -lh e2ecp
+          else
+            echo "Binary not found"
+            exit 1
+          fi
+
+      - name: Zip binary (Linux ARM v6)
+        run: zip -9 e2ecp_linux_armv6.zip e2ecp
+
+      - name: Upload artifact (Linux ARM v6)
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2ecp_linux_armv6.zip
+          path: e2ecp_linux_armv6.zip
+          if-no-files-found: error
+
+  linux-arm64:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "stable"
+
+      - name: Install web dependencies
+        run: cd web && npm install
+
+      - name: Build web
+        run: cd web && npm run build
+
+      - name: Build server (ARM64)
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          if [[ "$VERSION" == "refs/heads/"* ]]; then
+            VERSION="dev"
+          fi
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-X main.Version=$VERSION -extldflags '-static'" -o e2ecp .
+
+      - name: Verify binary exists
+        run: |
+          if [ -f e2ecp ]; then
+            echo "Binary created successfully"
+            ls -lh e2ecp
+          else
+            echo "Binary not found"
+            exit 1
+          fi
+
+      - name: Zip binary (Linux ARM64)
+        run: zip -9 e2ecp_linux_arm64.zip e2ecp
+
+      - name: Upload artifact (Linux ARM64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2ecp_linux_arm64.zip
+          path: e2ecp_linux_arm64.zip
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "stable"
+
+      - name: Install web dependencies
+        shell: pwsh
+        run: cd web; npm install
+
+      - name: Build web
+        shell: pwsh
+        run: cd web; npm run build
+
+      - name: Run tests
+        shell: pwsh
+        run: go test -v -cover ./...
+
+      - name: Build Go binary
+        shell: pwsh
+        run: |
+          $VERSION = $env:GITHUB_REF -replace '^refs/tags/', ''
+          if ($VERSION -like 'refs/heads/*') {
+            $VERSION = 'dev'
+          }
+          $env:CGO_ENABLED = '0'
+          go build -ldflags "-X main.Version=$VERSION -extldflags '-static'" -o e2ecp.exe .
+
+      - name: Verify binary
+        shell: pwsh
+        run: |
+          if (Test-Path e2ecp.exe) {
+            Write-Output "Binary created successfully"
+          } else {
+            Write-Error "Binary not found"
+            exit 1
+          }
+
+      - name: Zip binary (Windows)
+        shell: pwsh
+        run: Compress-Archive -Path e2ecp.exe -DestinationPath e2ecp_windows.zip -Force
+
+      - name: Upload artifact (Windows)
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2ecp_windows.zip
+          path: e2ecp_windows.zip
+          if-no-files-found: error
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "stable"
+
+      - name: Install web dependencies
+        run: cd web && npm install
+
+      - name: Build server binary
+        run: make server
+
+      - name: Install Playwright dependencies
+        run: npm install
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+
+  release:
+    name: Create GitHub Release (on tags)
+    runs-on: ubuntu-latest
+    needs: [macos, linux, linux-armv6, linux-armv7, linux-arm64, windows, e2e-tests]
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./dist
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -l ./dist
+
+      - name: Create Release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/e2ecp_macos.zip
+            dist/e2ecp_linux.zip
+            dist/e2ecp_linux_armv6.zip
+            dist/e2ecp_linux_armv7.zip
+            dist/e2ecp_linux_arm64.zip
+            dist/e2ecp_windows.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

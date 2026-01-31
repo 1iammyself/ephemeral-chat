@@ -52,6 +52,8 @@ import { canManageRoom } from '../utils/roles';
 import { getRandomIcebreaker } from '../utils/icebreakers';
 import { RefreshButton } from './PWAHandler';
 import { getCreatorId } from '../utils/creator';
+import FileTransferModal from './FileTransferModal';
+import { FileText } from 'lucide-react';
 
 const SLASH_COMMANDS = [
   { icon: Camera, label: 'Camera', value: '/camera', desc: 'Take a photo' },
@@ -131,6 +133,7 @@ const ChatRoom = () => {
   const [dragState, setDragState] = useState(null); // { type: 'topic' | 'timer', startX: number, startOffset: number }
   const [sessionToken, setSessionToken] = useState(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const [showFileModal, setShowFileModal] = useState(false);
 
   // Suggestions State
   const [suggestions, setSuggestions] = useState({ show: false, type: null, items: [], index: 0, query: '' });
@@ -1466,6 +1469,18 @@ const ChatRoom = () => {
                           <div className="h-px bg-gray-100 dark:bg-gray-700/50 mx-1" />
 
                           <div className="grid grid-cols-3 gap-1.5">
+                            {/* Files Button */}
+                            <button
+                              type="button"
+                              onClick={() => { setShowFileModal(true); setShowFeatureMenu(false); }}
+                              disabled={!isConnected}
+                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-indigo-50/50 dark:bg-indigo-900/10 hover:bg-indigo-100 dark:hover:bg-indigo-900/20 transition-all border border-indigo-100/20 dark:border-indigo-800/20 group"
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+                                <FileText className="w-4 h-4 text-indigo-500" />
+                              </div>
+                              <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">Files</span>
+                            </button>
                             {/* Main Actions Grid */}
                             <button
                               type="button"
@@ -1783,6 +1798,15 @@ const ChatRoom = () => {
         onClose={() => setShowActivityLogs(false)}
         logs={activityLogs}
       />
+      {
+        showFileModal && (
+          <FileTransferModal
+            onClose={() => setShowFileModal(false)}
+            roomCode={roomCode}
+            recipients={selectedRecipients.length > 0 ? selectedRecipients : []}
+          />
+        )
+      }
     </div >
   );
 };
