@@ -1,213 +1,213 @@
-import groovy.json.JsonSlurper
+/*
+ * Copyright 2019 Google Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-apply plugin: 'com.android.application'
-apply plugin: 'kotlin-android'
-//[enabled by builder] apply plugin: 'com.google.gms.google-services'
-//[enabled by builder] apply plugin: 'com.google.firebase.crashlytics'
+import groovy.xml.MarkupBuilder
 
-ext {
-    fbAppId = ""
-    fbClientToken = ""
-    onesignalAppId = ""
-    adMobAppId = ""
-    googleServiceInvalid = "false"
-    auth0Domain = ""
-    auth0Scheme = ""
-    snapchatClientId = ""
-    branchLiveKey = ""
-    branchTestKey = ""
-    branchTestMode = "false"
+plugins {
+    id 'com.android.application'
 }
 
-tasks.register('parseAppConfig') {
-    def jsonFile = file('src/main/assets/appConfig.json')
-    def parsedJson = new JsonSlurper().parseText(jsonFile.text)
-    if (parsedJson.services.facebook) {
-        if (parsedJson.services.facebook.appId) {
-            fbAppId = parsedJson.services.facebook.appId
-        }
-        if (parsedJson.services.facebook.clientToken) {
-            fbClientToken = parsedJson.services.facebook.clientToken
-        }
-    }
-    if (parsedJson.services.socialLogin && parsedJson.services.socialLogin.facebookLogin) {
-        if (parsedJson.services.socialLogin.facebookLogin.appId) {
-            fbAppId = parsedJson.services.socialLogin.facebookLogin.appId
-        }
-        if (parsedJson.services.socialLogin.facebookLogin.clientToken) {
-            fbClientToken = parsedJson.services.socialLogin.facebookLogin.clientToken
-        }
-    }
-    if (parsedJson.services.oneSignal && parsedJson.services.oneSignal.applicationId) {
-        onesignalAppId = parsedJson.services.oneSignal.applicationId
-    }
-    if (parsedJson.services.admob && parsedJson.services.admob.admobAndroid && parsedJson.services.admob.admobAndroid.applicationId) {
-        adMobAppId = parsedJson.services.admob.admobAndroid.applicationId
-    }
-    if (parsedJson.services.auth0) {
-        if (parsedJson.services.auth0.domain) {
-            auth0Domain = parsedJson.services.auth0.domain
-        }
-        if (parsedJson.services.auth0.scheme) {
-            auth0Scheme = parsedJson.services.auth0.scheme
-        }
-    }
-    if (parsedJson.services.socialShare && parsedJson.services.socialShare.snapchat) {
-        if (parsedJson.services.socialShare.snapchat.clientId) {
-            snapchatClientId = parsedJson.services.socialShare.snapchat.clientId
-        }
-    }
-    if (parsedJson.services.branch) {
-        if (parsedJson.services.branch.liveKey){
-            branchLiveKey = parsedJson.services.branch.liveKey
-        }
-        if (parsedJson.services.branch.testKey) {
-            branchTestKey = parsedJson.services.branch.testKey
-        }
-        if (parsedJson.services.branch.testMode != null) {
-            branchTestMode = parsedJson.services.branch.testMode.toString()
-        } else {
-            branchTestMode = "false"
-        }
-    }
-}
-
-tasks.register('checkGoogleService') {
-    plugins.withId("com.google.gms.google-services") {
-        def googleServiceJsonFile = file('google-services.json')
-        if (project.file(googleServiceJsonFile).exists()) {
-            if (googleServiceJsonFile.text.isEmpty()) {
-                googleServiceInvalid = "true"
-            }
-        } else {
-            googleServiceInvalid = "true"
-        }
-    }
-}
-
-build.dependsOn parseAppConfig
-build.dependsOn checkGoogleService
+def twaManifest = [
+    applicationId: 'me.kyere.chat',
+    hostName: 'chat.kyere.me', // The domain being opened in the TWA.
+    launchUrl: '/', // The start path for the TWA. Must be relative to the domain.
+    name: 'Ephemeral Chat', // The application name.
+    launcherName: 'EphChat', // The name shown on the Android Launcher.
+    themeColor: '#4F46E5', // The color used for the status bar.
+    themeColorDark: '#4F46E5', // The color used for the dark status bar.
+    navigationColor: '#4F46E5', // The color used for the navigation bar.
+    navigationColorDark: '#4F46E5', // The color used for the dark navbar.
+    navigationDividerColor: '#4F46E5', // The navbar divider color.
+    navigationDividerColorDark: '#4F46E5', // The dark navbar divider color.
+    backgroundColor: '#1F2937', // The color used for the splash screen background.
+    enableNotifications: true, // Set to true to enable notification delegation.
+    // Every shortcut must include the following fields:
+    // - name: String that will show up in the shortcut.
+    // - short_name: Shorter string used if |name| is too long.
+    // - url: Absolute path of the URL to launch the app with (e.g '/create').
+    // - icon: Name of the resource in the drawable folder to use as an icon.
+    shortcuts: [[name:'Join Chat', short_name:'Join', url:'https://chat.kyere.me/join', icon:'shortcut_0']],
+    // The duration of fade out animation in milliseconds to be played when removing splash screen.
+    splashScreenFadeOutDuration: 300,
+    generatorApp: 'PWABuilder', // Application that generated the Android Project
+    // The fallback strategy for when Trusted Web Activity is not available. Possible values are
+    // 'customtabs' and 'webview'.
+    fallbackType: 'customtabs',
+    enableSiteSettingsShortcut: 'true',
+    orientation: 'portrait',
+]
 
 android {
+    compileSdkVersion 36
+    namespace "me.kyere.chat"
     defaultConfig {
-        compileSdk 36
+        applicationId "me.kyere.chat"
         minSdkVersion 23
-        targetSdkVersion 36
-        applicationId "co.median.android.lppypbj"
-        versionCode 3
-        multiDexEnabled true
-        vectorDrawables.useSupportLibrary = true
+        targetSdkVersion 35
+        versionCode 1
+        versionName "1.0.0.0"
 
-        manifestPlaceholders = [manifestApplicationId: "${applicationId}",
-                                onesignal_app_id: onesignalAppId,
-                                onesignal_google_project_number: "",
-                                admob_app_id: adMobAppId,
-                                facebook_app_id: fbAppId,
-                                facebook_client_token: fbClientToken,
-                                auth0Domain: auth0Domain, auth0Scheme: auth0Scheme,
-                                snapchat_client_id: snapchatClientId,
-                                branch_live_key: branchLiveKey,
-                                branch_test_key: branchTestKey, 
-                                branch_test_mode: branchTestMode ]
-    }
+        // The name for the application
+        resValue "string", "appName", twaManifest.name
 
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
-    }
+        // The name for the application on the Android Launcher
+        resValue "string", "launcherName", twaManifest.launcherName
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+        // The URL that will be used when launching the TWA from the Android Launcher
+        def launchUrl = "https://" + twaManifest.hostName + twaManifest.launchUrl
+        resValue "string", "launchUrl", launchUrl
 
-    signingConfigs {
-        release {
-            storeFile file("../../keystore_path/keystore.jks")
-            storePassword "Nov15@2005"
-            keyAlias "ephemeral"
-            keyPassword "Nov15@2005"
+        
+
+        
+            // The URL the Web Manifest for the Progressive Web App that the TWA points to. This
+            // is used by Chrome OS and Meta Quest to open the Web version of the PWA instead of
+            // the TWA, as it will probably give a better user experience for non-mobile devices.
+            resValue "string", "webManifestUrl", 'https://chat.kyere.me/manifest.json'
+        
+
+        
+            // This is used by Meta Quest.
+            resValue "string", "fullScopeUrl", 'https://chat.kyere.me/'
+        
+
+        
+
+        // The hostname is used when building the intent-filter, so the TWA is able to
+        // handle Intents to open host url of the application.
+        resValue "string", "hostName", twaManifest.hostName
+
+        // This attribute sets the status bar color for the TWA. It can be either set here or in
+        // `res/values/colors.xml`. Setting in both places is an error and the app will not
+        // compile. If not set, the status bar color defaults to #FFFFFF - white.
+        resValue "color", "colorPrimary", twaManifest.themeColor
+
+        // This attribute sets the dark status bar color for the TWA. It can be either set here or in
+        // `res/values/colors.xml`. Setting in both places is an error and the app will not
+        // compile. If not set, the status bar color defaults to #000000 - white.
+        resValue "color", "colorPrimaryDark", twaManifest.themeColorDark
+
+        // This attribute sets the navigation bar color for the TWA. It can be either set here or
+        // in `res/values/colors.xml`. Setting in both places is an error and the app will not
+        // compile. If not set, the navigation bar color defaults to #FFFFFF - white.
+        resValue "color", "navigationColor", twaManifest.navigationColor
+
+        // This attribute sets the dark navigation bar color for the TWA. It can be either set here
+        // or in `res/values/colors.xml`. Setting in both places is an error and the app will not
+        // compile. If not set, the navigation bar color defaults to #000000 - black.
+        resValue "color", "navigationColorDark", twaManifest.navigationColorDark
+
+        // This attribute sets the navbar divider color for the TWA. It can be either 
+        // set here or in `res/values/colors.xml`. Setting in both places is an error and the app 
+        // will not compile. If not set, the divider color defaults to #00000000 - transparent.
+        resValue "color", "navigationDividerColor", twaManifest.navigationDividerColor
+
+        // This attribute sets the dark navbar divider color for the TWA. It can be either 
+        // set here or in `res/values/colors.xml`. Setting in both places is an error and the 
+        //app will not compile. If not set, the divider color defaults to #000000 - black.
+        resValue "color", "navigationDividerColorDark", twaManifest.navigationDividerColorDark
+
+        // Sets the color for the background used for the splash screen when launching the
+        // Trusted Web Activity.
+        resValue "color", "backgroundColor", twaManifest.backgroundColor
+
+        // Defines a provider authority for the Splash Screen
+        resValue "string", "providerAuthority", twaManifest.applicationId + '.fileprovider'
+
+        // The enableNotification resource is used to enable or disable the
+        // TrustedWebActivityService, by changing the android:enabled and android:exported
+        // attributes
+        resValue "bool", "enableNotification", twaManifest.enableNotifications.toString()
+
+        twaManifest.shortcuts.eachWithIndex { shortcut, index ->
+            resValue "string", "shortcut_name_$index", "$shortcut.name"
+            resValue "string", "shortcut_short_name_$index", "$shortcut.short_name"
         }
-        upload {
-            storeFile file("../../upload.keystore")
-            storePassword "password"
-            keyAlias "upload"
-            keyPassword "password"
-        }
-    }
 
+        // The splashScreenFadeOutDuration resource is used to set the duration of fade out animation in milliseconds
+        // to be played when removing splash screen. The default is 0 (no animation).
+        resValue "integer", "splashScreenFadeOutDuration", twaManifest.splashScreenFadeOutDuration.toString()
+
+        resValue "string", "generatorApp", twaManifest.generatorApp
+
+        resValue "string", "fallbackType", twaManifest.fallbackType
+
+        resValue "bool", "enableSiteSettingsShortcut", twaManifest.enableSiteSettingsShortcut
+        resValue "string", "orientation", twaManifest.orientation
+
+        
+    }
     buildTypes {
-        debug {
-	        applicationIdSuffix ".debug"
-        }
         release {
             minifyEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-project.txt'
-            debuggable project.getProperties().get("enableLogsInRelease").toBoolean()
-            signingConfig signingConfigs.release
-        }
-        upload {
-            minifyEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-project.txt'
-            matchingFallbacks = ['release']
-            debuggable project.getProperties().get("enableLogsInRelease").toBoolean()
-            signingConfig signingConfigs.upload
-        }
-        buildTypes.each {
-            it.buildConfigField 'boolean', 'GOOGLE_SERVICE_INVALID', googleServiceInvalid
         }
     }
-
-    flavorDimensions = ["webview"]
-
-    productFlavors {
-        normal {
-            dimension "webview"
-        }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
-    namespace 'co.median.android'
-    testNamespace '${applicationId}.test'
-    buildFeatures {
-        buildConfig true
-    }
-
-    viewBinding {
-        enabled = true
+    lintOptions {
+        checkReleaseBuilds false
     }
 }
 
-configurations {
-    medianPlugin.extendsFrom(implementation)
+task generateShorcutsFile {
+    assert twaManifest.shortcuts.size() < 5, "You can have at most 4 shortcuts."
+    twaManifest.shortcuts.eachWithIndex { s, i ->
+        assert s.name != null, 'Missing `name` in shortcut #' + i
+        assert s.short_name != null, 'Missing `short_name` in shortcut #' + i
+        assert s.url != null, 'Missing `icon` in shortcut #' + i
+        assert s.icon != null, 'Missing `url` in shortcut #' + i
+    }
+
+    def shortcutsFile = new File("$projectDir/src/main/res/xml", "shortcuts.xml")
+
+    def xmlWriter = new StringWriter()
+    def xmlMarkup = new MarkupBuilder(new IndentPrinter(xmlWriter, "    ", true))
+
+    xmlMarkup
+        .'shortcuts'('xmlns:android': 'http://schemas.android.com/apk/res/android') {
+            twaManifest.shortcuts.eachWithIndex { s, i ->
+                'shortcut'(
+                        'android:shortcutId': 'shortcut' + i,
+                        'android:enabled': 'true',
+                        'android:icon': '@drawable/' + s.icon,
+                        'android:shortcutShortLabel': '@string/shortcut_short_name_' + i,
+                        'android:shortcutLongLabel': '@string/shortcut_name_' + i) {
+                    'intent'(
+                            'android:action': 'android.intent.action.MAIN',
+                            'android:targetPackage': twaManifest.applicationId,
+                            'android:targetClass': twaManifest.applicationId + '.LauncherActivity',
+                            'android:data': s.url)
+                    'categories'('android:name': 'android.intent.category.LAUNCHER')
+                }
+            }
+        }
+    shortcutsFile.text = xmlWriter.toString() + '\n'
+}
+
+preBuild.dependsOn(generateShorcutsFile)
+
+repositories {
+    
 }
 
 dependencies {
-    /**** dependencies used by all apps ****/
-    implementation "androidx.core:core-ktx:1.17.0"
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
-    implementation 'androidx.webkit:webkit:1.14.0'
-    implementation 'androidx.core:core-splashscreen:1.2.0'
-    implementation "co.median.android:icons:$iconsVersion"
-    implementation "co.median.android:core:$coreVersion"
-    /**** end all apps ****/
-
-    /**** add-on module dependencies ****/
-    /**** end modules ****/
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
     
-    /**** Google Android and Play Services dependencies ****/
-    implementation 'androidx.multidex:multidex:2.0.1'
-    implementation 'androidx.cardview:cardview:1.0.0'
-    implementation 'androidx.browser:browser:1.9.0'
-    implementation 'androidx.appcompat:appcompat:1.7.1'
-    implementation 'com.google.android.material:material:1.13.0'
-    implementation "androidx.drawerlayout:drawerlayout:1.2.0"
-    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.2.0'
-    implementation 'androidx.preference:preference-ktx:1.2.1'
-    implementation 'com.google.android.gms:play-services-location:21.3.0'
-    /**** end google ****/
-
-    /**** local dependencies ****/
-    implementation fileTree(dir: 'libs', include: '*.jar')
-    implementation fileTree(dir: 'libs', include: '*.aar')
-    /**** end local ****/
+        implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.6.2'
+    
 }
-
-apply from: file("../plugins.gradle"); applyNativeModulesAppBuildGradle(project)

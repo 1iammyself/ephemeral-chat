@@ -84,7 +84,8 @@
   "lang": "en-US",
   "display_override": [
     "window-controls-overlay",
-    "minimal-ui"
+    "standalone",
+    "fullscreen"
   ],
   "handle_links": "auto",
   "launch_handler": {
