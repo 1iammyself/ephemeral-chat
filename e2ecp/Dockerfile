@@ -1,14 +1,25 @@
-# Dockerfile for e2ecp relay server
-# This is a runtime-only Dockerfile that uses a pre-built binary
-FROM scratch
+# Stage 1: Build the frontend
+FROM node:20-alpine AS frontend-builder
+WORKDIR /app/web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
+COPY web/ ./
+RUN npm run build
 
-# Copy the pre-built binary
-COPY e2ecp /e2ecp
+# Stage 2: Build the backend (Go)
+FROM golang:1.25-alpine AS backend-builder
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+# Copy built frontend assets to the expected location for embedding
+COPY --from=frontend-builder /app/web/dist ./web/dist
+RUN go build -o e2ecp main.go
 
-# Expose the default port
-EXPOSE 3001
-
-# Run the relay server with default settings
-# Override with: docker run -p PORT:PORT e2ecp-relay --port PORT [other flags]
-ENTRYPOINT ["/e2ecp", "serve"]
-CMD ["--port", "3001", "--max-rooms", "10", "--max-rooms-per-ip", "2", "--log-level", "info"]
+# Stage 3: Runtime image
+FROM alpine:latest
+WORKDIR /app
+RUN apk --no-cache add ca-certificates
+COPY --from=backend-builder /app/e2ecp /app/e2ecp
+EXPOSE 8080
+CMD ["/app/e2ecp", "serve", "--max-rooms", "100"]

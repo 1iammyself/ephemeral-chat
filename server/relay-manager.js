@@ -10,6 +10,11 @@ let stopTimeout = null;
 let pendingStartPromise = null;
 
 function startRelayServer() {
+    if (process.env.VITE_FILE_SERVER_URL) {
+        logger.info(`[relay] External file server configured at ${process.env.VITE_FILE_SERVER_URL}. Skipping local spawn.`);
+        return Promise.resolve();
+    }
+
     if (relayProcess) {
         // If there's a pending stop, cancel it because we are needed again
         if (stopTimeout) {
