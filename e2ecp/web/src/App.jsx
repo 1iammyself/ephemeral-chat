@@ -500,7 +500,7 @@ export default function App() {
 
     // Parse room from URL path (e.g., /myroom -> "myroom")
     const rawPath = window.location.pathname.slice(1).toLowerCase();
-    const reservedPaths = ["login", "profile", "settings", "verify-email", "files"]; // Added "files" just in case
+    const reservedPaths = ["files"]; // Cleaned up unused paths
     const pathRoom = reservedPaths.includes(rawPath) ? "" : rawPath;
 
     // Parse query params for room and recipients
@@ -553,15 +553,11 @@ export default function App() {
     const [uploadProgress, setUploadProgress] = useState(null);
     const [downloadProgress, setDownloadProgress] = useState(null);
     const [showErrorModal, setShowErrorModal] = useState(false);
-    const [showAboutModal, setShowAboutModal] = useState(false);
     const [showDownloadConfirmModal, setShowDownloadConfirmModal] =
         useState(false);
     const [pendingDownload, setPendingDownload] = useState(null);
     const [isDragging, setIsDragging] = useState(false);
     const [roomIdError, setRoomIdError] = useState(null);
-    const [textInput, setTextInput] = useState("");
-    const [receivedText, setReceivedText] = useState(null);
-    const [showTextModal, setShowTextModal] = useState(false);
 
     // Auto-join effect
     useEffect(() => {
@@ -1226,75 +1222,6 @@ export default function App() {
                 }
                 return;
             }
-
-            if (msg.type === "text_message") {
-                const senderId = msg.from;
-                const peerKey = peerKeysRef.current.get(senderId) || aesKeyRef.current;
-
-                if (!peerKey) {
-                    log("Can't decrypt text yet (no shared key)");
-                    return;
-                }
-
-                // Decrypt metadata to get text
-                if (!msg.encrypted_metadata || !msg.metadata_iv) {
-                    console.error(
-                        "Missing encrypted metadata for text message",
-                    );
-                    log("Missing encrypted metadata for text message");
-                    return;
-                }
-
-                try {
-                    // Decrypt metadata
-                    const metadataIV = base64ToUint8(msg.metadata_iv);
-                    const encryptedMetadata = base64ToUint8(
-                        msg.encrypted_metadata,
-                    );
-                    const metadataBytes = await decryptBytes(
-                        peerKey,
-                        metadataIV,
-                        encryptedMetadata,
-                    );
-                    const metadataJSON = new TextDecoder().decode(
-                        metadataBytes,
-                    );
-                    const metadata = JSON.parse(metadataJSON);
-
-                    // Display the text
-                    if (metadata.is_text && metadata.text) {
-                        setReceivedText(metadata.text);
-                        setShowTextModal(true);
-                        log("Received text message");
-
-                        // Send transfer received confirmation to sender with encrypted metadata
-                        try {
-                            const transferMetadata = {
-                                transfer_type: "text",
-                            };
-                            const metadataJSON = JSON.stringify(transferMetadata);
-                            const metadataBytes = new TextEncoder().encode(metadataJSON);
-                            const { iv: metadataIV, ciphertext: encryptedMetadataBytes } =
-                                await encryptBytes(peerKey, metadataBytes);
-
-                            sendMsg({
-                                type: "transfer_received",
-                                encrypted_metadata: uint8ToBase64(encryptedMetadataBytes),
-                                metadata_iv: uint8ToBase64(metadataIV),
-                                recipients: [senderId]
-                            });
-                        } catch (err) {
-                            console.error("Failed to encrypt transfer_received metadata:", err);
-                            // Fall back to sending without metadata
-                            sendMsg({ type: "transfer_received" });
-                        }
-                    }
-                } catch (err) {
-                    console.error("Failed to decrypt text message:", err);
-                    log("Failed to decrypt text message");
-                }
-                return;
-            }
         };
 
         ws.onclose = () => {
@@ -1644,7 +1571,6 @@ export default function App() {
                             const chunkData = uint8ToBase64(ciphertext);
                             const ivB64 = uint8ToBase64(iv);
 
-                            // Send to specific recipient
                             sendMsg({
                                 type: "file_chunk",
                                 chunk_num: chunkNum,
@@ -1712,10 +1638,13 @@ export default function App() {
             clearInterval(retransmitTimerRef.current);
             retransmitTimerRef.current = null;
 
-            // Send file_end message
-            sendMsg({
-                type: "file_end",
-            });
+            // Send file_end message to targets
+            for (const peerId of targetPeers) {
+                sendMsg({
+                    type: "file_end",
+                    recipients: [peerId]
+                });
+            }
 
             const elapsed = (Date.now() - startTime) / 1000;
             const speed = fileToSend.size / elapsed;
@@ -1734,75 +1663,7 @@ export default function App() {
         }
     }
 
-    async function handleTextSend() {
-        if (!textInput.trim() || !aesKeyRef.current) {
-            return;
-        }
 
-        try {
-            log(`Sending text message`);
-
-            // Create metadata with text
-            const metadata = {
-                is_text: true,
-                text: textInput,
-            };
-
-            // Determine targets (similar to file logic)
-            let targetPeers = [];
-            if (initialRecipients.length > 0) {
-                targetPeers = initialRecipients.filter(id => peerKeysRef.current.has(id));
-            } else {
-                targetPeers = Array.from(peerKeysRef.current.keys());
-            }
-
-            // Fallback or broadcast
-            if (targetPeers.length === 0 && peerKeysRef.current.size > 0 && initialRecipients.length === 0) {
-                targetPeers = Array.from(peerKeysRef.current.keys());
-            }
-
-            if (targetPeers.length === 0 && aesKeyRef.current) {
-                // Legacy single peer
-                const { iv: metadataIV, ciphertext: encryptedMetadataBytes } =
-                    await encryptBytes(aesKeyRef.current, metadataBytes);
-
-                const textMsg = {
-                    type: "text_message",
-                    encrypted_metadata: uint8ToBase64(encryptedMetadataBytes),
-                    metadata_iv: uint8ToBase64(metadataIV),
-                };
-                sendMsg(textMsg);
-            } else {
-                // Multi-peer loop
-                for (const peerId of targetPeers) {
-                    const peerKey = peerKeysRef.current.get(peerId);
-                    if (!peerKey) continue;
-
-                    const { iv: metadataIV, ciphertext: encryptedMetadataBytes } =
-                        await encryptBytes(peerKey, metadataBytes);
-
-                    sendMsg({
-                        type: "text_message",
-                        encrypted_metadata: uint8ToBase64(encryptedMetadataBytes),
-                        metadata_iv: uint8ToBase64(metadataIV),
-                        recipients: [peerId]
-                    });
-                }
-            }
-
-            log(`Sent encrypted text`);
-
-            // Clear the input
-            setTextInput("");
-
-            // Show success notification
-            toast.success("Text sent!", { duration: 2000 });
-        } catch (err) {
-            console.error(err);
-            log("Failed to send text: " + (err.message || "unknown error"));
-            toast.error("Failed to send text");
-        }
-    }
 
     // Drag and drop handlers
     function handleDragOver(e) {
@@ -2006,7 +1867,7 @@ export default function App() {
 
     // Update page title based on room
     useEffect(() => {
-        document.title = roomId ? `e2ecp · ${roomId.toUpperCase()}` : "e2ecp";
+        document.title = roomId ? `${roomId.toUpperCase()}` : "e2ecp";
     }, [roomId]);
 
     // Auto-focus room input on page load if no room in URL
@@ -2026,17 +1887,14 @@ export default function App() {
                         className="glass dark:glass-dark rounded-3xl p-6 sm:p-8 mb-6 flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6 transition-all duration-300 shadow-2xl shadow-black/5"
                     >
                         <div className="flex-1 text-center sm:text-left w-full">
-                            <h1 className="text-4xl sm:text-6xl font-black tracking-tighter mb-2 bg-linear-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
+                            <h1 className="text-3xl sm:text-4xl font-black tracking-tighter mb-2 bg-linear-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
                                 <a
                                     href="/"
                                     className="no-underline hover:opacity-80 transition-opacity"
                                 >
-                                    TRANSFER
+                                    E2ECP
                                 </a>
                             </h1>
-                            <p className="text-sm sm:text-lg font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-6">
-                                End-to-End Encrypted File Relay
-                            </p>
 
                             <div className="mt-4 flex flex-wrap items-center justify-center sm:justify-start gap-4">
                                 <div className="flex items-center gap-3">
@@ -2122,7 +1980,7 @@ export default function App() {
                                     disabled={connected}
                                     className={`btn-primary px-8 text-base tracking-widest whitespace-nowrap h-[54px] ${connected ? "opacity-30 cursor-not-allowed" : ""}`}
                                 >
-                                    {connected ? "CONNECTED" : "CONNECT ROOM"}
+                                    {connected ? "JOINED" : "JOIN ROOM"}
                                 </button>
                             </div>
                             <div
@@ -2198,42 +2056,12 @@ export default function App() {
                                                     <i className="fas fa-plus group-hover:rotate-90 transition-transform duration-300"></i>
                                                 </div>
 
-                                                <div className="space-y-2">
-                                                    <p className="text-xl font-black text-gray-900 dark:text-white">ENCRYPTED TRANSFER</p>
-                                                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Select files or drag & drop</p>
+                                                <div className="space-y-1">
+                                                    <p className="text-lg font-black text-gray-900 dark:text-white uppercase">Ready</p>
+                                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">DRAG OR CLICK</p>
                                                 </div>
 
-                                                {/* Text input section */}
-                                                <div className="w-full mt-4 pt-8 border-t border-gray-100 dark:border-white/5">
-                                                    <div className="flex gap-3">
-                                                        <input
-                                                            type="text"
-                                                            value={textInput}
-                                                            onChange={(e) =>
-                                                                setTextInput(
-                                                                    e.target.value,
-                                                                )
-                                                            }
-                                                            onKeyDown={(e) =>
-                                                                e.key === "Enter" &&
-                                                                handleTextSend()
-                                                            }
-                                                            placeholder="Send a secure snippet..."
-                                                            disabled={!hasAesKey}
-                                                            className="flex-1 input-field"
-                                                        />
-                                                        <button
-                                                            onClick={handleTextSend}
-                                                            disabled={
-                                                                !hasAesKey ||
-                                                                !textInput.trim()
-                                                            }
-                                                            className="btn-primary w-14 shrink-0 flex items-center justify-center"
-                                                        >
-                                                            <i className="fas fa-paper-plane"></i>
-                                                        </button>
-                                                    </div>
-                                                </div>
+
                                             </div>
                                         </div>
                                     )
@@ -2241,8 +2069,8 @@ export default function App() {
                                     <div className="flex flex-col items-center gap-4 py-4">
                                         <div className="w-16 h-16 rounded-full border-4 border-gray-300 border-t-primary-500 animate-spin mb-2"></div>
                                         <div className="space-y-1">
-                                            <p className="font-black text-gray-400 uppercase tracking-widest text-sm">Waiting for connection...</p>
-                                            <p className="text-xs text-gray-500 font-bold max-w-[200px] mx-auto opacity-70">Share the link above to start the secure exchange</p>
+                                            <p className="font-black text-gray-400 uppercase tracking-widest text-xs">Waiting...</p>
+                                            <p className="text-[10px] text-gray-500 font-bold max-w-[180px] mx-auto opacity-70">SHARE LINK TO START</p>
                                         </div>
                                     </div>
                                 )}
@@ -2299,49 +2127,7 @@ export default function App() {
                     </div>
                 )}
 
-                {/* About Modal */}
-                {showAboutModal && (
-                    <div
-                        className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 transition-all duration-300"
-                        onClick={() => setShowAboutModal(false)}
-                    >
-                        <div
-                            className="card p-8 max-w-lg w-full text-black dark:text-white"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <h2 className="text-3xl font-black uppercase tracking-tighter mb-4 text-center">
-                                SECURE EXCHANGE
-                            </h2>
-                            <p className="text-base font-bold text-gray-500 dark:text-gray-400 mb-4 text-center">
-                                Direct end-to-end encrypted transfers via a zero-knowledge relay. No data is stored on the server.
-                            </p>
-                            <div className="bg-primary-500/5 rounded-2xl p-6 mb-6 border border-primary-500/10 text-center">
-                                <p className="text-xs font-black text-primary-500 uppercase tracking-widest mb-2">CLI ACCESS</p>
-                                <code className="text-sm font-mono font-bold text-primary-600 dark:text-primary-400 break-all select-all">
-                                    curl https://e2ecp.com | bash
-                                </code>
-                            </div>
-                            <div className="flex justify-center gap-6 mb-8">
-                                <a
-                                    href="https://github.com/schollz/e2ecp"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-gray-400 hover:text-primary-500 transition-colors text-3xl"
-                                    aria-label="View on GitHub"
-                                >
-                                    <i className="fab fa-github"></i>
-                                </a>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setShowAboutModal(false)}
-                                className="btn-secondary w-full"
-                            >
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                )}
+
 
                 {/* Download Confirmation Modal */}
                 {showDownloadConfirmModal && pendingDownload && (
@@ -2387,57 +2173,7 @@ export default function App() {
                     </div>
                 )}
 
-                {/* Text Message Modal */}
-                {showTextModal && receivedText && (
-                    <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
-                        <div
-                            className="card p-8 max-w-lg w-full text-black dark:text-white"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <h2 className="text-3xl font-black uppercase tracking-tighter mb-6 text-center">
-                                ENCRYPTED TEXT
-                            </h2>
-                            <div className="bg-gray-50 dark:bg-white/5 rounded-2xl p-6 mb-6 border border-gray-100 dark:border-white/5 relative group">
-                                <div className="text-sm font-mono font-medium leading-relaxed break-words whitespace-pre-wrap max-h-96 overflow-y-auto pr-8">
-                                    {receivedText}
-                                </div>
-                                <button
-                                    onClick={() => {
-                                        navigator.clipboard
-                                            .writeText(receivedText)
-                                            .then(() => {
-                                                toast.success(
-                                                    "Copied to clipboard",
-                                                );
-                                            })
-                                            .catch((err) => {
-                                                toast.error("Failed to copy");
-                                                console.error(
-                                                    "Failed to copy:",
-                                                    err,
-                                                );
-                                            });
-                                    }}
-                                    className="absolute top-4 right-4 text-gray-400 hover:text-primary-500 transition-colors"
-                                    title="Copy to clipboard"
-                                    type="button"
-                                >
-                                    <i className="fas fa-copy"></i>
-                                </button>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setShowTextModal(false);
-                                    setReceivedText(null);
-                                }}
-                                className="btn-secondary w-full"
-                            >
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                )}
+
             </div>
         </div>
     );
