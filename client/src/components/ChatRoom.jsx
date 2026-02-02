@@ -1298,7 +1298,8 @@ const ChatRoom = () => {
       await webRTCService.startCall(roomCode, recipientList);
       setShowCallModal(true);
     } catch (err) {
-      setError('Failed to start call. Please check microphone permissions.');
+      console.error('Call failed:', err);
+      setError(`Failed to start call: ${err.message || 'Check microphone permissions'}`);
     }
   }, [users, currentUser, roomCode, selectedRecipients]);
 
@@ -1338,7 +1339,8 @@ const ChatRoom = () => {
         });
       }, 1000);
     } catch (err) {
-      setError('Could not access microphone.');
+      console.error('Error starting recording:', err);
+      setError(`Microphone access failed: ${err.message || 'Check permissions'}`);
     }
   };
 

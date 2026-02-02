@@ -4,7 +4,7 @@
  * Re-implemented based on reference implementation
  */
 
-import socketManager from './socket';
+import socketManager from './socket-simple';
 import { EXPRESS_TURN, AGORA, METERED } from './utils/credentials';
 // Agora SDK will be loaded dynamically when needed
 let AgoraRTC = null;
@@ -156,6 +156,9 @@ class WebRTCService {
             });
 
             // Get local media stream
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error("Media devices not accessible. Ensure usage of HTTPS or localhost.");
+            }
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     echoCancellation: true,
