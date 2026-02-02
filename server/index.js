@@ -821,7 +821,6 @@ io.on('connection', (socket) => {
       }
     } else {
       room.lobbyCount++;
-      room.lobbyCount++;
 
       // Notify all managers (host and tier1)
       const managers = Array.from(io.sockets.sockets.values()).filter(s => {
@@ -839,17 +838,6 @@ io.on('connection', (socket) => {
     }
 
     socket.emit('knock-pending');
-  });
-
-  socket.on('approve-guest', ({ guestId, roomCode }) => {
-    // Verify requester is host
-    if (roomData[roomCode]?.hostId !== socket.id) return;
-
-    const guestSocket = io.sockets.sockets.get(guestId);
-    if (guestSocket) {
-      if (roomData[roomCode].lobbyCount > 0) roomData[roomCode].lobbyCount--;
-      guestSocket.emit('knock-approved', { isHost: false });
-    }
   });
 
   socket.on('deny-guest', ({ guestId, roomCode }) => {
