@@ -447,6 +447,16 @@ class WebRTCService {
             const pc = await this.createPeerConnection(data.fromSocketId);
             await pc.setRemoteDescription(data.offer);
 
+            // Process pending ICE candidates
+            const peer = this.peers.get(data.fromSocketId);
+            if (peer && peer.pendingCandidates) {
+                console.log(`Processing ${peer.pendingCandidates.length} buffered ICE candidates`);
+                for (const candidate of peer.pendingCandidates) {
+                    await pc.addIceCandidate(candidate).catch(e => console.warn('Failed to add buffered candidate:', e));
+                }
+                peer.pendingCandidates = [];
+            }
+
         } catch (error) {
             console.error('Failed to handle call offer:', error);
             this.rejectCall(data.callId);
@@ -461,6 +471,15 @@ class WebRTCService {
             const peer = this.peers.get(data.fromSocketId);
             if (peer && peer.connection) {
                 await peer.connection.setRemoteDescription(data.answer);
+
+                // Process pending ICE candidates
+                if (peer.pendingCandidates) {
+                    console.log(`Processing ${peer.pendingCandidates.length} buffered ICE candidates`);
+                    for (const candidate of peer.pendingCandidates) {
+                        await peer.connection.addIceCandidate(candidate).catch(e => console.warn('Failed to add buffered candidate:', e));
+                    }
+                    peer.pendingCandidates = [];
+                }
 
                 // If this is the first answer, set active
                 if (!this.currentCallState.isCallActive) {
@@ -479,11 +498,21 @@ class WebRTCService {
     /**
      * Handle ICE candidate
      */
+    /**
+     * Handle ICE candidate
+     */
     async handleIceCandidate(data) {
         try {
             const peer = this.peers.get(data.fromSocketId);
             if (peer && peer.connection) {
-                await peer.connection.addIceCandidate(data.candidate);
+                // Buffer candidates if remote description is not yet set
+                if (!peer.connection.remoteDescription && !peer.connection.remoteDescriptionString) {
+                    if (!peer.pendingCandidates) peer.pendingCandidates = [];
+                    peer.pendingCandidates.push(data.candidate);
+                    console.log(`Buffered ICE candidate from ${data.fromSocketId} (no remote description)`);
+                } else {
+                    await peer.connection.addIceCandidate(data.candidate);
+                }
             }
         } catch (error) {
             console.error('Failed to handle ICE candidate:', error);
