@@ -161,12 +161,10 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
 
     const shareText = `Join my private, secure chat room!
 
-Link: ${inviteLink}
-Verbal Code: ${verbalCode || 'N/A'}
-`;
+Verbal Code: ${verbalCode || 'N/A'}`;
 
     const shareData = {
-      title: 'Join my Ephemeral Chat',
+      title: 'Ephemeral Chat',
       text: shareText,
       url: inviteLink
     };
@@ -178,14 +176,16 @@ Verbal Code: ${verbalCode || 'N/A'}
       } catch (err) {
         // User cancelled or share failed - fallback to copy
         if (err.name !== 'AbortError') {
-          copyToClipboard(shareText, 'inviteLink');
-          alert('Invite details copied to clipboard!');
+          const fullText = `${shareText}\n\nLink: ${inviteLink}`;
+          copyToClipboard(fullText, 'inviteLink');
+          alert('Invite details copied!');
         }
       }
     } else {
       // Fallback: copy to clipboard on desktop
-      copyToClipboard(shareText, 'inviteLink');
-      alert('Invite details copied to clipboard! Paste it to share.');
+      const fullText = `${shareText}\n\nLink: ${inviteLink}`;
+      copyToClipboard(fullText, 'inviteLink');
+      alert('Invite details copied! Paste it to share.');
     }
   };
 

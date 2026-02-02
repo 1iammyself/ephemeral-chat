@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { generateInviteLink } from '../utils/api';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { toast } from 'react-toastify';
-import { X, Loader2, Check, AlertCircle } from 'lucide-react';
+import { X, Loader2, Check, AlertCircle, Share2 } from 'lucide-react';
 
 const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -76,6 +76,34 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
     setIsVerbalCopied(true);
     toast.success('Verbal code copied!');
     setTimeout(() => setIsVerbalCopied(false), 2000);
+  };
+
+  const handleShare = async () => {
+    if (!inviteLink) return;
+
+    const shareText = `Join my private, secure chat room!
+
+Verbal Code: ${verbalCode || 'N/A'}`;
+
+    const shareData = {
+      title: 'Ephemeral Chat',
+      text: shareText,
+      url: inviteLink
+    };
+
+    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          navigator.clipboard.writeText(`${shareText}\n\nLink: ${inviteLink}`);
+          toast.success('Invite details copied!');
+        }
+      }
+    } else {
+      navigator.clipboard.writeText(`${shareText}\n\nLink: ${inviteLink}`);
+      toast.success('Invite details copied!');
+    }
   };
 
   if (!isOpen) return null;
@@ -198,7 +226,7 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
                   />
                   <CopyToClipboard text={inviteLink} onCopy={handleCopy}>
                     <button
-                      className={`inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 dark:border-gray-600 rounded-r-md bg-white dark:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${isCopied ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300' : ''
+                      className={`inline-flex items-center px-4 py-2 border border-l-0 border-r-0 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${isCopied ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300' : ''
                         }`}
                     >
                       {isCopied ? (
@@ -207,10 +235,17 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
                           Copied!
                         </>
                       ) : (
-                        'Copy Link'
+                        'Copy'
                       )}
                     </button>
                   </CopyToClipboard>
+                  <button
+                    onClick={handleShare}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-r-md bg-green-500 dark:bg-green-600 text-sm font-medium text-white hover:bg-green-600 dark:hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-green-500"
+                    title="Share Invite"
+                  >
+                    <Share2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
 

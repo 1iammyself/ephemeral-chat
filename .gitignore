@@ -64,3 +64,4 @@ Thumbs.db
 tmp/
 temp/
 .data/tokensList.json
+android/app/release/
