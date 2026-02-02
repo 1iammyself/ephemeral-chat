@@ -847,7 +847,7 @@ class RoomManager {
   /**
    * Convert an invite token to a 4-word verbal code
    * @param {string} token - The invite token
-   * @returns {string} A 4-word verbal code (e.g., "clarity-compass-journey-peace")
+   * @returns {string} A 4-word verbal code (e.g., "clarity compass journey peace")
    */
   tokenToVerbalCode(token) {
     const hash = crypto.createHash('sha256').update(token).digest();
@@ -856,7 +856,7 @@ class RoomManager {
       const idx = hash[i] % WORDLIST.length;
       words.push(WORDLIST[idx]);
     }
-    return words.join('-');
+    return words.join(' ');
   }
 
   /**

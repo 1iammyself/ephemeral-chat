@@ -1,51 +1,60 @@
 /**
  * Themed Wordlist for Verbal Join Codes
- * Categories: Academic, Learning, Mental Health, Wellness
+ * Categories: Nature, Animals, Colors, Objects, Food, Actions, Time, People
  * 
  * 256 words × 4 positions = 4 billion combinations (32 bits entropy)
  * Enough for verbal security with rate limiting
  */
 
 const WORDLIST = [
-    // Academic & Learning (A-Z themed)
-    'algebra', 'anchor', 'archive', 'aurora', 'beacon', 'bloom', 'bridge', 'canvas',
-    'chapter', 'cipher', 'clarity', 'compass', 'cosmos', 'craft', 'crystal', 'curious',
-    'dawn', 'decode', 'delta', 'depth', 'discover', 'draft', 'dream', 'echo',
-    'ember', 'emerge', 'enlighten', 'epoch', 'essence', 'evolve', 'explore', 'fable',
-    'faculty', 'flourish', 'focus', 'forge', 'formula', 'foster', 'fountain', 'frame',
-    'frontier', 'fusion', 'galaxy', 'garden', 'gather', 'genesis', 'gentle', 'glow',
-    'golden', 'grace', 'gradient', 'granite', 'graph', 'gratitude', 'growth', 'guide',
-    'harmony', 'haven', 'healing', 'heart', 'heritage', 'hero', 'horizon', 'humble',
+    // Categories for Verbal Join Codes
+    // Nature & Environment
+    'air', 'bay', 'beach', 'bird', 'bush', 'cave', 'clay', 'cliff',
+    'cloud', 'coast', 'desert', 'dust', 'earth', 'field', 'fire', 'flood',
+    'flower', 'forest', 'grass', 'hill', 'ice', 'island', 'lake', 'leaf',
+    'moon', 'mountain', 'ocean', 'path', 'rain', 'river', 'rock', 'sand',
 
-    // Mental Health & Wellness
-    'idea', 'ignite', 'illuminate', 'imagine', 'immerse', 'impact', 'improve', 'impulse',
-    'infinite', 'insight', 'inspire', 'instinct', 'intent', 'intuition', 'invent', 'invest',
-    'journey', 'journal', 'joy', 'jubilee', 'keen', 'kernel', 'keystone', 'kindle',
-    'kinetic', 'knowing', 'knowledge', 'ladder', 'lantern', 'lattice', 'launch', 'lavender',
-    'layer', 'legacy', 'lesson', 'lever', 'library', 'light', 'liminal', 'linear',
-    'listen', 'logic', 'lotus', 'lucid', 'lunar', 'maple', 'margin', 'marvel',
-    'mastery', 'meadow', 'meaning', 'meditate', 'melody', 'memoir', 'memory', 'mend',
-    'mental', 'mentor', 'merit', 'method', 'mindful', 'mirror', 'mission', 'moment',
+    // Animals & Creatures
+    'ant', 'bear', 'bee', 'cat', 'cow', 'crab', 'deer', 'dog',
+    'duck', 'eagle', 'fish', 'fly', 'frog', 'goat', 'goose', 'hawk',
+    'horse', 'lamb', 'lion', 'mouse', 'owl', 'pig', 'rabbit', 'rat',
+    'seal', 'shark', 'sheep', 'snake', 'spider', 'swan', 'tiger', 'wolf',
 
-    // Growth & Resilience
-    'mosaic', 'motive', 'mountain', 'mural', 'muse', 'nature', 'nectar', 'nerve',
-    'neural', 'neutral', 'noble', 'north', 'notable', 'notion', 'nourish', 'novel',
-    'nucleus', 'nurture', 'oak', 'oasis', 'observe', 'ocean', 'odyssey', 'olive',
-    'omega', 'onward', 'open', 'optimist', 'orbit', 'orchid', 'origin', 'outline',
-    'outlook', 'oxygen', 'pace', 'palette', 'panorama', 'paradigm', 'parallel', 'parcel',
-    'passage', 'passion', 'path', 'patience', 'pattern', 'pause', 'peace', 'peak',
-    'pearl', 'pebble', 'pendulum', 'perceive', 'persist', 'phoenix', 'phrase', 'pillar',
-    'pinnacle', 'pioneer', 'pivot', 'pixel', 'placid', 'planet', 'plateau', 'pledge',
+    // Colors & Shapes
+    'black', 'blue', 'brown', 'gold', 'gray', 'green', 'orange', 'pink',
+    'purple', 'red', 'silver', 'white', 'yellow', 'circle', 'square', 'star',
+    'bright', 'dark', 'clear', 'round', 'flat', 'sharp', 'soft', 'hard',
+    'long', 'short', 'thick', 'thin', 'wide', 'narrow', 'deep', 'high',
 
-    // Positive Psychology
-    'plume', 'poetry', 'polaris', 'ponder', 'portal', 'positive', 'potential', 'practice',
-    'praxis', 'precise', 'presence', 'present', 'preserve', 'prism', 'process', 'profound',
-    'progress', 'promise', 'proof', 'prosper', 'protect', 'prowess', 'pulse', 'purpose',
-    'puzzle', 'pyramid', 'quartz', 'quest', 'quiet', 'radiant', 'radius', 'rainbow',
-    'range', 'rapport', 'reach', 'reason', 'rebound', 'recall', 'reclaim', 'recover',
-    'reflect', 'reform', 'refuge', 'regain', 'relate', 'relax', 'release', 'relief',
-    'renew', 'repair', 'replenish', 'resonate', 'respect', 'restore', 'retreat', 'reveal',
-    'revive', 'rhythm', 'ridge', 'ripple', 'rise', 'ritual', 'river', 'robust'
+    // Daily Objects
+    'bag', 'ball', 'bell', 'belt', 'boat', 'book', 'box', 'can',
+    'cap', 'card', 'case', 'chair', 'clock', 'coat', 'cup', 'desk',
+    'door', 'fork', 'glass', 'hat', 'key', 'knife', 'lamp', 'lock',
+    'pen', 'phone', 'plate', 'ring', 'shoe', 'soap', 'spoon', 'watch',
+
+    // Food & Drink
+    'apple', 'bread', 'cake', 'cheese', 'corn', 'egg', 'fruit', 'grape',
+    'honey', 'juice', 'bean', 'lemon', 'meat', 'milk', 'nut', 'onion',
+    'pear', 'pie', 'plum', 'pork', 'rice', 'salt', 'soup', 'sugar',
+    'tea', 'toast', 'water', 'wheat', 'wine', 'meal', 'snack', 'treat',
+
+    // Common Actions
+    'bring', 'build', 'call', 'catch', 'clean', 'come', 'dance', 'draw',
+    'drink', 'drive', 'eat', 'fall', 'find', 'give', 'go', 'help',
+    'hold', 'jump', 'keep', 'know', 'laugh', 'look', 'make', 'play',
+    'read', 'run', 'say', 'sing', 'sit', 'sleep', 'smile', 'swim',
+
+    // Time & Place
+    'after', 'again', 'back', 'before', 'below', 'city', 'close', 'day',
+    'early', 'east', 'end', 'farm', 'far', 'front', 'home', 'left',
+    'main', 'near', 'night', 'north', 'now', 'once', 'open', 'out',
+    'past', 'place', 'right', 'side', 'south', 'town', 'west', 'year',
+
+    // People & Feelings
+    'boy', 'child', 'dad', 'dear', 'face', 'family', 'friend', 'girl',
+    'glad', 'good', 'hand', 'happy', 'head', 'kind', 'life', 'love',
+    'man', 'mom', 'name', 'nice', 'old', 'own', 'proud', 'quiet',
+    'real', 'safe', 'small', 'smart', 'son', 'true', 'woman', 'young'
 ];
 
 // Ensure exactly 256 words for clean bit alignment
