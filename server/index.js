@@ -1687,13 +1687,15 @@ io.on('connection', (socket) => {
     };
 
     if (payload.recipients) {
-      // Notify specific users
-      recipients.forEach(recipientId => {
+      // Notify specific users, but EXCLUDE the sender even if they are in the list
+      const targetIds = recipients.filter(id => id !== socket.id);
+
+      targetIds.forEach(recipientId => {
         logger.info(`   -> Sending invite to: ${recipientId}`);
         io.to(recipientId).emit('file-transfer-invite', payload);
       });
     } else {
-      // Broadcast to all (except sender)
+      // Broadcast to all (except sender) - socket.to() already handles this exclusion
       logger.info(`   -> Broadcasting invite to room: ${roomCode}`);
       socket.to(roomCode).emit('file-transfer-invite', payload);
     }

@@ -361,22 +361,29 @@ const ChatRoom = () => {
 
   const handleFileTransferInvite = useCallback(({ from, fromId, roomCode: targetRoomCode, recipients: targetedTo }) => {
     // Determine if we should show this
-    if (fromId === socketManager.socket?.id) return; // Ignore self
+    const myId = socketManager.socket?.id;
+    if (fromId === myId) return; // Ignore self
     if (targetRoomCode !== roomCode) return; // Ignore other rooms
 
     // If targeted, check if we are a recipient
-    if (targetedTo && Array.isArray(targetedTo) && !targetedTo.includes(socketManager.socket?.id)) {
+    if (targetedTo && Array.isArray(targetedTo) && !targetedTo.includes(myId)) {
       return; // Not for us
     }
 
     // Add to activity log for recipient
     const log = {
-      id: `log_ft_${Date.now()}`,
+      id: `log_ft_recv_${Date.now()}_${Math.random()}`,
       type: 'system',
       content: `${from} invited you to a secure file transfer`,
       timestamp: new Date().toISOString()
     };
-    setActivityLogs(prev => [log, ...prev].slice(0, 50));
+    setActivityLogs(prev => {
+      // Prevent duplicate activity log entries for the same invite
+      if (prev.some(l => l.content === log.content && (Date.now() - new Date(l.timestamp).getTime() < 2000))) {
+        return prev;
+      }
+      return [log, ...prev].slice(0, 50);
+    });
     setHasNewLogs(true);
 
     // Trigger Pulse to alert the user visually
@@ -1650,7 +1657,7 @@ const ChatRoom = () => {
                                   : 'as a broadcast';
 
                                 const log = {
-                                  id: `log_ft_${Date.now()}`,
+                                  id: `log_ft_init_${Date.now()}`,
                                   type: 'system',
                                   content: `You initiated a secure file transfer intent ${recipientNames}`,
                                   timestamp: new Date().toISOString()
