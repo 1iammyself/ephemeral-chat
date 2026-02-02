@@ -1103,8 +1103,6 @@ const ChatRoom = () => {
     // Add local log for sender
     const log = { id: `log_${Date.now()}`, type: 'pulse', content: `You sent a pulse`, timestamp: new Date().toISOString() };
     setActivityLogs(prev => [log, ...prev].slice(0, 50));
-
-    setShowFeatureMenu(false);
   };
 
   const handleSendIcebreaker = () => {
@@ -1612,17 +1610,29 @@ const ChatRoom = () => {
                       {showFeatureMenu && (
                         <div className="absolute bottom-full mb-3 left-0 z-50 bg-white/95 dark:bg-gray-800/95 rounded-3xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 p-2 sm:p-3 flex flex-col space-y-2 w-[280px] sm:w-80 animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/5">
                           {/* Floating Reaction Pill */}
-                          <div className="flex items-center justify-between bg-gray-50/80 dark:bg-gray-900/80 rounded-2xl p-2 border border-gray-100/50 dark:border-gray-800/50 shadow-inner">
-                            {['❤️', '🔥', '👏', '😂', '😮', '💯'].map(emoji => (
-                              <button
-                                key={emoji}
-                                type="button"
-                                onClick={() => sendRoomReaction(emoji)}
-                                className="p-1 sm:p-2 hover:bg-white dark:hover:bg-gray-700 rounded-lg transition-all hover:scale-125 active:scale-95"
-                              >
-                                <span className="text-xl sm:text-2xl leading-none">{emoji}</span>
-                              </button>
-                            ))}
+                          <div className="flex items-center gap-1 bg-gray-50/80 dark:bg-gray-900/80 rounded-2xl p-1 px-1.5 border border-gray-100/50 dark:border-gray-800/50 shadow-inner">
+                            <div className="flex items-center flex-1 justify-around">
+                              {['❤️', '🔥', '👏', '😂', '😮', '💯'].map(emoji => (
+                                <button
+                                  key={emoji}
+                                  type="button"
+                                  onClick={() => sendRoomReaction(emoji)}
+                                  className="p-1 hover:bg-white dark:hover:bg-gray-700 rounded-lg transition-all hover:scale-125 active:scale-95"
+                                >
+                                  <span className="text-xl leading-none">{emoji}</span>
+                                </button>
+                              ))}
+                            </div>
+                            <div className="w-px h-6 bg-gray-200 dark:bg-gray-700/50 mx-0.5" />
+                            <button
+                              type="button"
+                              onClick={handleSendPulse}
+                              disabled={!isConnected}
+                              className="w-8 h-8 flex items-center justify-center bg-yellow-400 hover:bg-yellow-500 text-white rounded-lg transition-all hover:scale-110 active:scale-95 shadow-sm shadow-yellow-400/20 group flex-shrink-0"
+                              title="Send Pulse Alert"
+                            >
+                              <Zap className="w-4 h-4 fill-current" />
+                            </button>
                           </div>
 
                           <div className="h-px bg-gray-100 dark:bg-gray-700/50 mx-1" />
@@ -1732,17 +1742,7 @@ const ChatRoom = () => {
                               <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">Icebreaker</span>
                             </button>
 
-                            <button
-                              type="button"
-                              onClick={handleSendPulse}
-                              disabled={!isConnected}
-                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-yellow-50/50 dark:bg-yellow-900/10 hover:bg-yellow-100 dark:hover:bg-yellow-900/20 transition-all border border-yellow-100/20 dark:border-yellow-800/20 group"
-                            >
-                              <div className="w-8 h-8 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
-                                <Zap className="w-4 h-4 text-yellow-500" />
-                              </div>
-                              <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">Pulse</span>
-                            </button>
+
                           </div>
 
                           {/* Admin Section */}
