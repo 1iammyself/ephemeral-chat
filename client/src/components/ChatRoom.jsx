@@ -236,6 +236,17 @@ const ChatRoom = () => {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
+  // Ref to track state without triggering re-renders in effects
+  const stateRef = useRef({
+    isJoined: false,
+    sessionToken: null
+  });
+
+  useEffect(() => {
+    stateRef.current.isJoined = isJoined;
+    stateRef.current.sessionToken = sessionToken;
+  }, [isJoined, sessionToken]);
+
   // Check for invite token and room key
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -329,6 +340,10 @@ const ChatRoom = () => {
       setError(response.error || 'Failed to join room');
       setIsProcessingInvite(false);
       setIsWaitingForHost(false);
+      setIsReconnecting(false); // Stop spinner
+      if (response.error && response.error.includes('not found')) {
+        setIsJoined(false); // Kick user out if room is gone
+      }
     });
   }, [roomCode, navigate, roomKey]);
 
@@ -450,16 +465,25 @@ const ChatRoom = () => {
     const socket = socketManager.connect();
     const handleConnect = () => {
       setIsConnected(true);
-      if (isJoined && sessionToken) {
+      // Read current state from ref to avoid dependency cycle
+      const { isJoined: joined, sessionToken: token } = stateRef.current;
+
+      if (joined && token) {
         setIsReconnecting(true);
-        // Auto-rejoin using session token
-        performJoin({ sessionToken });
+        // Auto-rejoin using session token and stored credentials to prevent random nickname generation
+        const storedParams = joinParamsRef.current || {};
+        performJoin({
+          sessionToken: token,
+          nickname: storedParams.nickname,
+          password: storedParams.password,
+          capToken: storedParams.capToken
+        });
       }
     };
     socket.on('connect', handleConnect);
 
-    // If already connected, trigger handlers immediately
-    if (socket.connected) {
+    // Initial check (only if not already joined, to avoid double-join logic)
+    if (socket.connected && !stateRef.current.isJoined) {
       handleConnect();
     }
 
@@ -746,7 +770,7 @@ const ChatRoom = () => {
         socketManager.disconnect();
       }
     };
-  }, [roomCode, performJoin, roomKey, handleFileTransferInvite, triggerPulse]);
+  }, [roomCode, performJoin, roomKey, handleFileTransferInvite, triggerPulse]); // Removed isJoined, sessionToken to prevent cleanup on state change
 
   useEffect(() => {
     if (!isConnected) return;
