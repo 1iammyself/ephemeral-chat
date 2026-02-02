@@ -40,45 +40,61 @@ class WebRTCService {
 
         // ICE servers for NAT traversal
         // Hierarchy: 1. Google STUN (Fast), 2. Metered (Global/Reliable), 3. ExpressTURN (Failover)
+        // Debug credentials
+        console.log('WebRTC Credentials Loaded:', {
+            HasMetered: !!METERED.username,
+            HasExpress: !!EXPRESS_TURN.username
+        });
+
+        // ICE servers for NAT traversal
         this.iceServers = [
             // Google STUN (Priority 1)
             { urls: "stun:stun.l.google.com:19302" },
-
-            // Metered Global Relay (Priority 2)
-            { urls: "stun:stun.relay.metered.ca:80" },
-            {
-                urls: "turn:global.relay.metered.ca:80",
-                username: METERED.username,
-                credential: METERED.credential
-            },
-            {
-                urls: "turn:global.relay.metered.ca:80?transport=tcp",
-                username: METERED.username,
-                credential: METERED.credential
-            },
-            {
-                urls: "turn:global.relay.metered.ca:443",
-                username: METERED.username,
-                credential: METERED.credential
-            },
-            {
-                urls: "turns:global.relay.metered.ca:443?transport=tcp",
-                username: METERED.username,
-                credential: METERED.credential
-            },
-
-            // ExpressTURN (Priority 3)
-            {
-                urls: "turn:free.expressturn.com:3478?transport=udp",
-                username: EXPRESS_TURN.username,
-                credential: EXPRESS_TURN.credential
-            },
-            {
-                urls: "turn:free.expressturn.com:3478?transport=tcp",
-                username: EXPRESS_TURN.username,
-                credential: EXPRESS_TURN.credential
-            }
+            // Metered Global Relay STUN
+            { urls: "stun:stun.relay.metered.ca:80" }
         ];
+
+        // Add Metered TURN if credentials exist
+        if (METERED.username && METERED.credential) {
+            this.iceServers.push(
+                {
+                    urls: "turn:global.relay.metered.ca:80",
+                    username: METERED.username,
+                    credential: METERED.credential
+                },
+                {
+                    urls: "turn:global.relay.metered.ca:80?transport=tcp",
+                    username: METERED.username,
+                    credential: METERED.credential
+                },
+                {
+                    urls: "turn:global.relay.metered.ca:443",
+                    username: METERED.username,
+                    credential: METERED.credential
+                },
+                {
+                    urls: "turns:global.relay.metered.ca:443?transport=tcp",
+                    username: METERED.username,
+                    credential: METERED.credential
+                }
+            );
+        }
+
+        // Add ExpressTURN if credentials exist
+        if (EXPRESS_TURN.username && EXPRESS_TURN.credential) {
+            this.iceServers.push(
+                {
+                    urls: "turn:free.expressturn.com:3478?transport=udp",
+                    username: EXPRESS_TURN.username,
+                    credential: EXPRESS_TURN.credential
+                },
+                {
+                    urls: "turn:free.expressturn.com:3478?transport=tcp",
+                    username: EXPRESS_TURN.username,
+                    credential: EXPRESS_TURN.credential
+                }
+            );
+        }
 
         this.setupSocketHandlers();
     }
