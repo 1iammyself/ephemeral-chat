@@ -161,7 +161,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
 
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center h-full">
+      <div className="flex-1 flex items-center justify-center">
         <div className="text-center text-gray-500 dark:text-gray-400">
           <User className="w-12 h-12 mx-auto mb-4 opacity-30" />
           <p className="text-lg font-medium mb-1">No messages yet</p>
