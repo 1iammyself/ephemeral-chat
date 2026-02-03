@@ -1,5 +1,4 @@
 # 👻 Ephemeral Chat
-**The Gold Standard for Zero-Persistence, Encrypted Communication.**
 
 Ephemeral Chat is a high-security, anonymous messaging platform built for users who demand absolute privacy. No accounts, no logs.
 
