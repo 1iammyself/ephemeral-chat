@@ -198,43 +198,8 @@ const ChatRoom = () => {
   const { theme } = useTheme();
 
   const [audioViewOnce, setAudioViewOnce] = useState(true);
-  const [viewportHeight, setViewportHeight] = useState('100dvh');
-  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
-  // Mobile Keyboard & Viewport Fix
-  useEffect(() => {
-    if (!window.visualViewport) return;
 
-    const handleViewportChange = () => {
-      const height = window.visualViewport.height;
-
-      // Use 100dvh as the base, only override with visualViewport height when keyboard is likely open
-      // This prevents the "jumping" behavior when the address bar hides/shows
-      requestAnimationFrame(() => {
-        if (height < window.innerHeight * 0.85) {
-          setViewportHeight(`${height}px`);
-          setIsKeyboardOpen(true);
-        } else {
-          setViewportHeight('100dvh');
-          setIsKeyboardOpen(false);
-        }
-      });
-
-      if (height < window.innerHeight * 0.85) {
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, 300);
-      }
-    };
-
-    window.visualViewport.addEventListener('resize', handleViewportChange);
-    window.visualViewport.addEventListener('scroll', handleViewportChange);
-
-    return () => {
-      window.visualViewport.removeEventListener('resize', handleViewportChange);
-      window.visualViewport.removeEventListener('scroll', handleViewportChange);
-    };
-  }, []);
 
   const messageInputRef = useRef(null);
 
@@ -1465,8 +1430,7 @@ const ChatRoom = () => {
 
   return (
     <div
-      className={`flex flex-col transition-colors duration-500 chat-container ${getVibeById(roomVibe).bgClass}`}
-      style={{ height: viewportHeight }}
+      className={`h-screen flex flex-col transition-colors duration-500 chat-container ${getVibeById(roomVibe).bgClass}`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}

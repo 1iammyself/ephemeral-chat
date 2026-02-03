@@ -4,14 +4,7 @@
 
 @layer base {
 
-  html,
-  body {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    position: fixed;
+  html {
     font-family: 'Inter', system-ui, sans-serif;
   }
 
@@ -336,12 +329,4 @@
   user-select: none;
   z-index: 9999;
   filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
-}
-
-/* Mobile Web Browser: Increase main chat room height */
-@media only screen and (max-width: 768px) {
-  .chat-container .flex-1.flex.flex-col.min-w-0>.flex-1.overflow-y-auto {
-    flex-basis: 70vh;
-    min-height: 70vh;
-  }
 }
