@@ -208,18 +208,22 @@ const ChatRoom = () => {
     const handleViewportChange = () => {
       const height = window.visualViewport.height;
 
-      // Use requestAnimationFrame for pixel-perfect sync with browser UI changes
+      // Use 100dvh as the base, only override with visualViewport height when keyboard is likely open
+      // This prevents the "jumping" behavior when the address bar hides/shows
       requestAnimationFrame(() => {
-        setViewportHeight(`${height}px`);
+        if (height < window.innerHeight * 0.85) {
+          setViewportHeight(`${height}px`);
+          setIsKeyboardOpen(true);
+        } else {
+          setViewportHeight('100dvh');
+          setIsKeyboardOpen(false);
+        }
       });
 
-      if (height < window.innerHeight * 0.8) {
-        setIsKeyboardOpen(true);
+      if (height < window.innerHeight * 0.85) {
         setTimeout(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         }, 300);
-      } else {
-        setIsKeyboardOpen(false);
       }
     };
 
@@ -1595,7 +1599,7 @@ const ChatRoom = () => {
             />
             <div ref={messagesEndRef} />
           </div>
-          <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 pb-[env(safe-area-inset-bottom)] sm:pb-0">
+          <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
             {typingUsers.size > 0 && (
               <div className="px-4 py-1 text-xs text-gray-500 dark:text-gray-400 italic animate-pulse bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
                 {Array.from(typingUsers.values()).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
@@ -1623,7 +1627,7 @@ const ChatRoom = () => {
                 <button onClick={() => setSelectedRecipients([])} className="text-xs text-blue-500 hover:text-blue-700 dark:hover:text-blue-200 underline">Clear selection</button>
               </div>
             )}
-            <div className="px-2 pt-2 sm:px-4 sm:pt-4 pb-2 sm:pb-4">
+            <div className="px-2 pt-2 sm:px-4 sm:pt-4 pb-0 sm:pb-4">
               <form onSubmit={handleSendMessage} className="flex items-center space-x-1.5 sm:space-x-3">
                 {isRecording ? (
                   <div className="flex-1 flex flex-col space-y-2">
