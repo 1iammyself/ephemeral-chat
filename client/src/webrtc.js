@@ -5,9 +5,6 @@
  */
 
 import socketManager from './socket';
-import { EXPRESS_TURN, AGORA, METERED } from './utils/credentials';
-// Agora SDK will be loaded dynamically when needed
-let AgoraRTC = null;
 
 // Call states
 export const CallState = {
@@ -39,62 +36,18 @@ class WebRTCService {
         };
 
         // ICE servers for NAT traversal
-        // Hierarchy: 1. Google STUN (Fast), 2. Metered (Global/Reliable), 3. ExpressTURN (Failover)
-        // Debug credentials
-        console.log('WebRTC Credentials Loaded:', {
-            HasMetered: !!METERED.username,
-            HasExpress: !!EXPRESS_TURN.username
-        });
+        let configuredIceServers = [];
+        try {
+            if (import.meta.env.VITE_ICE_SERVERS) {
+                configuredIceServers = JSON.parse(import.meta.env.VITE_ICE_SERVERS);
+            }
+        } catch (e) {
+            console.warn('Failed to parse VITE_ICE_SERVERS', e);
+        }
 
-        // ICE servers for NAT traversal
-        this.iceServers = [
-            // Google STUN (Priority 1)
-            { urls: "stun:stun.l.google.com:19302" },
-            // Metered Global Relay STUN
+        this.iceServers = configuredIceServers.length > 0 ? configuredIceServers : [
             { urls: "stun:stun.relay.metered.ca:80" }
         ];
-
-        // Add Metered TURN if credentials exist
-        if (METERED.username && METERED.credential) {
-            this.iceServers.push(
-                {
-                    urls: "turn:global.relay.metered.ca:80",
-                    username: METERED.username,
-                    credential: METERED.credential
-                },
-                {
-                    urls: "turn:global.relay.metered.ca:80?transport=tcp",
-                    username: METERED.username,
-                    credential: METERED.credential
-                },
-                {
-                    urls: "turn:global.relay.metered.ca:443",
-                    username: METERED.username,
-                    credential: METERED.credential
-                },
-                {
-                    urls: "turns:global.relay.metered.ca:443?transport=tcp",
-                    username: METERED.username,
-                    credential: METERED.credential
-                }
-            );
-        }
-
-        // Add ExpressTURN if credentials exist
-        if (EXPRESS_TURN.username && EXPRESS_TURN.credential) {
-            this.iceServers.push(
-                {
-                    urls: "turn:free.expressturn.com:3478?transport=udp",
-                    username: EXPRESS_TURN.username,
-                    credential: EXPRESS_TURN.credential
-                },
-                {
-                    urls: "turn:free.expressturn.com:3478?transport=tcp",
-                    username: EXPRESS_TURN.username,
-                    credential: EXPRESS_TURN.credential
-                }
-            );
-        }
 
         this.setupSocketHandlers();
     }
@@ -172,9 +125,6 @@ class WebRTCService {
             });
 
             // Get local media stream
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                throw new Error("Media devices not accessible. Ensure usage of HTTPS or localhost.");
-            }
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     echoCancellation: true,
@@ -183,14 +133,6 @@ class WebRTCService {
                 },
                 video: false
             });
-
-            // If group call (5 or more total participants), bypass P2P and use Agora
-            // STUN/TURN handles 3 and 4 users well enough
-            if (recipients.length > 3) {
-                console.log('Group call detected (5+ users), switching to Agora');
-                await this.switchToAgora('group-call', { roomCode, recipients });
-                return;
-            }
 
             // Initiate connection for each recipient
             for (const recipient of recipients) {
@@ -361,20 +303,6 @@ class WebRTCService {
             console.log(`📞 Remote track received from ${socketId}`);
             const stream = event.streams[0];
 
-            // Attach and play remote audio stream for this peer
-            if (stream && event.track && event.track.kind === 'audio') {
-                let audioElem = document.getElementById(`remote-audio-${socketId}`);
-                if (!audioElem) {
-                    audioElem = document.createElement('audio');
-                    audioElem.id = `remote-audio-${socketId}`;
-                    audioElem.autoplay = true;
-                    audioElem.style.display = 'none';
-                    document.body.appendChild(audioElem);
-                }
-                audioElem.srcObject = stream;
-                audioElem.play().catch(e => console.warn('Remote audio play failed:', e));
-            }
-
             // Update peers map
             const peer = this.peers.get(socketId);
             if (peer) {
@@ -391,17 +319,11 @@ class WebRTCService {
             });
         };
 
-        // Handle connection state changes and detect firewall blocks
+        // Handle connection state changes
         pc.onconnectionstatechange = () => {
             const state = pc.connectionState;
             console.log(`Connection state for ${socketId}: ${state}`);
             if (state === 'failed' || state === 'disconnected' || state === 'closed') {
-                // If P2P failed, attempt to switch to Agora
-                if (!this._switchedToAgora) {
-                    console.warn('P2P connection failure detected, switching to Agora');
-                    this.switchToAgora('connection-failure');
-                }
-
                 // Remove this peer
                 this.peers.delete(socketId);
 
@@ -409,7 +331,7 @@ class WebRTCService {
                 newStreams.delete(socketId);
                 this.updateCallState({ remoteStreams: newStreams });
 
-                // If no peers left, end call
+                // If no peers left, end call?
                 if (this.peers.size === 0) {
                     this.endCall();
                 }
@@ -447,16 +369,6 @@ class WebRTCService {
             const pc = await this.createPeerConnection(data.fromSocketId);
             await pc.setRemoteDescription(data.offer);
 
-            // Process pending ICE candidates
-            const peer = this.peers.get(data.fromSocketId);
-            if (peer && peer.pendingCandidates) {
-                console.log(`Processing ${peer.pendingCandidates.length} buffered ICE candidates`);
-                for (const candidate of peer.pendingCandidates) {
-                    await pc.addIceCandidate(candidate).catch(e => console.warn('Failed to add buffered candidate:', e));
-                }
-                peer.pendingCandidates = [];
-            }
-
         } catch (error) {
             console.error('Failed to handle call offer:', error);
             this.rejectCall(data.callId);
@@ -471,15 +383,6 @@ class WebRTCService {
             const peer = this.peers.get(data.fromSocketId);
             if (peer && peer.connection) {
                 await peer.connection.setRemoteDescription(data.answer);
-
-                // Process pending ICE candidates
-                if (peer.pendingCandidates) {
-                    console.log(`Processing ${peer.pendingCandidates.length} buffered ICE candidates`);
-                    for (const candidate of peer.pendingCandidates) {
-                        await peer.connection.addIceCandidate(candidate).catch(e => console.warn('Failed to add buffered candidate:', e));
-                    }
-                    peer.pendingCandidates = [];
-                }
 
                 // If this is the first answer, set active
                 if (!this.currentCallState.isCallActive) {
@@ -498,21 +401,11 @@ class WebRTCService {
     /**
      * Handle ICE candidate
      */
-    /**
-     * Handle ICE candidate
-     */
     async handleIceCandidate(data) {
         try {
             const peer = this.peers.get(data.fromSocketId);
             if (peer && peer.connection) {
-                // Buffer candidates if remote description is not yet set
-                if (!peer.connection.remoteDescription && !peer.connection.remoteDescriptionString) {
-                    if (!peer.pendingCandidates) peer.pendingCandidates = [];
-                    peer.pendingCandidates.push(data.candidate);
-                    console.log(`Buffered ICE candidate from ${data.fromSocketId} (no remote description)`);
-                } else {
-                    await peer.connection.addIceCandidate(data.candidate);
-                }
+                await peer.connection.addIceCandidate(data.candidate);
             }
         } catch (error) {
             console.error('Failed to handle ICE candidate:', error);
@@ -565,171 +458,6 @@ class WebRTCService {
         return false;
     }
 }
-
-// --- Hybrid failover helpers ---
-
-// Monitor network quality for P2P calls
-WebRTCService.prototype._startStatsMonitor = function () {
-    if (this._statsInterval || this._switchedToAgora) return;
-
-    this._statsInterval = setInterval(async () => {
-        if (!this.peers || this.peers.size === 0 || this._switchedToAgora) return;
-
-        for (const [socketId, peer] of this.peers) {
-            const pc = peer.connection;
-            if (!pc) continue;
-
-            try {
-                const stats = await pc.getStats();
-                stats.forEach(report => {
-                    if (report.type === 'inbound-rtp' && (report.kind === 'video' || report.mediaType === 'video')) {
-                        const packetsLost = report.packetsLost || 0;
-                        const packetsReceived = report.packetsReceived || 0;
-                        const lossRatio = packetsReceived > 0 ? packetsLost / packetsReceived : 0;
-                        if (lossRatio > 0.05) {
-                            console.warn('High packet loss detected for', socketId, lossRatio);
-                            this.switchToAgora('poor-network');
-                        }
-                    }
-                });
-            } catch (e) {
-                console.warn('Failed to get stats for', socketId, e);
-            }
-        }
-    }, 5000);
-};
-
-WebRTCService.prototype._stopStatsMonitor = function () {
-    if (this._statsInterval) {
-        clearInterval(this._statsInterval);
-        this._statsInterval = null;
-    }
-};
-
-// Switch to Agora: clean up P2P and start Agora SDK
-WebRTCService.prototype.switchToAgora = async function (reason, opts = {}) {
-    if (this._switchedToAgora) return;
-    this._switchedToAgora = true;
-
-    console.log('Switching to Agora due to:', reason);
-    this.updateCallState({ isCallActive: false });
-
-    // Stop stats monitor
-    this._stopStatsMonitor();
-
-    // Close and cleanup P2P
-    if (this.localStream) {
-        this.localStream.getTracks().forEach(t => t.stop());
-        this.localStream = null;
-    }
-
-    this.peers.forEach(peer => {
-        if (peer.connection) try { peer.connection.close(); } catch (e) { }
-    });
-    this.peers.clear();
-
-    // Dynamically import Agora (browser-ready SDK expected)
-    try {
-        if (!AgoraRTC) {
-            // Load Agora SDK from CDN via script tag to avoid bundling into application
-            const loadScript = (src) => new Promise((resolve, reject) => {
-                // Do not add duplicate script tags
-                if (document.querySelector(`script[data-src="${src}"]`)) {
-                    // wait for it to be ready
-                    const existing = document.querySelector(`script[data-src="${src}"]`);
-                    if (existing.getAttribute('data-ready') === 'true') return resolve();
-                    existing.addEventListener('load', () => resolve());
-                    existing.addEventListener('error', (e) => reject(e));
-                    return;
-                }
-
-                const s = document.createElement('script');
-                s.src = src;
-                s.async = true;
-                s.setAttribute('data-src', src);
-                s.addEventListener('load', () => {
-                    s.setAttribute('data-ready', 'true');
-                    resolve();
-                });
-                s.addEventListener('error', (e) => reject(e));
-                document.head.appendChild(s);
-            });
-
-            try {
-                await loadScript('https://unpkg.com/agora-rtc-sdk-ng/dist/AgoraRTC_N-production.js');
-                // The UMD build exposes a global - try known names
-                AgoraRTC = window.AgoraRTC || window.A || window.Agora || null;
-                if (!AgoraRTC) {
-                    throw new Error('Agora global not found after loading CDN script');
-                }
-                console.log('Loaded Agora SDK from CDN (script tag)');
-            } catch (err) {
-                console.error('Failed to load Agora SDK from CDN:', err);
-                // Explicitly throw so caller can handle and show an error to the user
-                throw err;
-            }
-        }
-
-        const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
-
-        // Use appId from credentials or server
-        const channel = this.currentRoomCode || (opts.roomCode || `room_${Date.now()}`);
-        let token = null;
-        let appId = AGORA.appId;
-
-        try {
-            const apiBase = import.meta.env.VITE_API_URL || '';
-            const response = await fetch(`${apiBase}/api/agora/token?channelName=${channel}`);
-            const data = await response.json();
-            if (data.success) {
-                token = data.token;
-                appId = data.appId || appId;
-                console.log('Successfully fetched Agora token from server');
-            }
-        } catch (err) {
-            console.warn('Failed to fetch Agora token, falling back to configured token:', err);
-            token = AGORA.token || null;
-        }
-
-        const uid = AGORA.uid || 0;
-
-        await client.join(appId, channel, token, uid);
-
-        // Create and publish local audio/video tracks
-        const [microphoneTrack, cameraTrack] = await AgoraRTC.createMicrophoneAndCameraTracks();
-        await client.publish([microphoneTrack, cameraTrack]);
-
-        console.log('Agora joined and published tracks');
-        this.updateCallState({ isCallActive: true, isConnected: true });
-
-        // Optionally, setup remote user subscribed handlers
-        client.on('user-published', async (user, mediaType) => {
-            await client.subscribe(user, mediaType);
-            let stream = null;
-            if (mediaType === 'audio' && user.audioTrack) {
-                stream = new MediaStream([user.audioTrack.getMediaStreamTrack()]);
-                user.audioTrack.play();
-            }
-            if (mediaType === 'video' && user.videoTrack) {
-                stream = new MediaStream([user.videoTrack.getMediaStreamTrack()]);
-            }
-            if (stream) {
-                const newStreams = new Map(this.currentCallState.remoteStreams);
-                newStreams.set(`agora_${user.uid}`, stream);
-                this.updateCallState({ remoteStreams: newStreams });
-            }
-        });
-
-        // Store agora client for potential future use
-        this._agoraClient = client;
-
-    } catch (e) {
-        console.error('Failed to initialize Agora fallback', e);
-        // In case Agora fails, there's nothing more we can do here; keep state updated
-        this.updateCallState({ isCallActive: false, isConnected: false });
-    }
-};
-
 
 // Create singleton instance
 export const webRTCService = new WebRTCService();
