@@ -198,6 +198,37 @@ const ChatRoom = () => {
   const { theme } = useTheme();
 
   const [audioViewOnce, setAudioViewOnce] = useState(true);
+  const [viewportHeight, setViewportHeight] = useState('100dvh');
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+
+  // Mobile Keyboard & Viewport Fix
+  useEffect(() => {
+    if (!window.visualViewport) return;
+
+    const handleViewportChange = () => {
+      const height = window.visualViewport.height;
+      setViewportHeight(`${height}px`);
+
+      // Heuristic to detect keyboard: visible height significantly less than screen height
+      if (height < window.innerHeight * 0.8) {
+        setIsKeyboardOpen(true);
+        // Scroll to bottom when keyboard opens
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 300);
+      } else {
+        setIsKeyboardOpen(false);
+      }
+    };
+
+    window.visualViewport.addEventListener('resize', handleViewportChange);
+    window.visualViewport.addEventListener('scroll', handleViewportChange);
+
+    return () => {
+      window.visualViewport.removeEventListener('resize', handleViewportChange);
+      window.visualViewport.removeEventListener('scroll', handleViewportChange);
+    };
+  }, []);
 
   const messageInputRef = useRef(null);
 
@@ -1428,7 +1459,8 @@ const ChatRoom = () => {
 
   return (
     <div
-      className={`h-[100dvh] flex flex-col transition-colors duration-500 chat-container ${getVibeById(roomVibe).bgClass}`}
+      className={`flex flex-col transition-colors duration-500 chat-container ${getVibeById(roomVibe).bgClass}`}
+      style={{ height: viewportHeight }}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -1837,22 +1869,29 @@ const ChatRoom = () => {
                     <div className="relative" ref={emojiPickerRef}>
                       <button
                         type="button"
-                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                        onClick={() => {
+                          if (!showEmojiPicker) {
+                            messageInputRef.current?.blur();
+                          }
+                          setShowEmojiPicker(!showEmojiPicker);
+                        }}
                         disabled={!isConnected}
                         className={`p-2.5 sm:p-3 rounded-xl transition-colors ${showEmojiPicker ? 'bg-gray-100 dark:bg-gray-700 text-blue-500' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
                       >
                         <Smile className="w-5 h-5" />
                       </button>
                       {showEmojiPicker && (
-                        <div className="absolute bottom-full mb-2 left-0 z-50">
+                        <div className="absolute bottom-full mb-2 left-0 z-50 animate-in fade-in zoom-in slide-in-from-bottom-2 duration-200">
                           <EmojiPicker
                             onEmojiClick={onEmojiClick}
                             theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
                             lazyLoadEmojis={true}
                             skinTonesDisabled
-                            searchPlaceHolder="Search emojis..."
-                            width={320}
-                            height={400}
+                            autoFocusSearch={false}
+                            searchPlaceholder="Search emojis..."
+                            width={window.innerWidth < 640 ? 280 : 320}
+                            height={window.innerWidth < 640 ? 350 : 400}
+                            previewConfig={{ showPreview: false }}
                           />
                         </div>
                       )}
@@ -1903,6 +1942,16 @@ const ChatRoom = () => {
                         onCopy={(e) => e.preventDefault()}
                         onCut={(e) => e.preventDefault()}
                         onPaste={(e) => e.preventDefault()}
+                        onFocus={() => {
+                          // Force a small scroll into view for some mobile browsers
+                          setTimeout(() => {
+                            messageInputRef.current?.scrollIntoView({ block: 'center' });
+                          }, 100);
+                        }}
+                        onBlur={() => {
+                          // Fix for iOS Safari "pushed up" layout bug
+                          window.scrollTo(0, 0);
+                        }}
                         placeholder="Type message..."
                         className="w-full input-field py-2.5 sm:py-3 px-3 sm:px-4 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 text-sm sm:text-base"
                         disabled={!isConnected || isSending}

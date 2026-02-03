@@ -1,20 +1,36 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, FileText, Download, Check, CheckCheck, Pencil, X } from 'lucide-react';
+import EmojiPicker, { Theme } from 'emoji-picker-react';
+import { useTheme } from '../context/ThemeContext';
 import ImageViewer from './ImageViewer';
 import AudioPlayer from './AudioPlayer';
 import PollMessage from './PollMessage';
 import socketManager from '../socket';
 
-const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '😡'];
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '🔥', '🙏'];
 
 const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit }) => {
   const [activeReactionId, setActiveReactionId] = useState(null);
+  const [showFullPicker, setShowFullPicker] = useState(false);
+  const { theme } = useTheme();
   const [messageTimers, setMessageTimers] = useState(new Map());
   const [viewingImage, setViewingImage] = useState(null);
   const [currentImageUrl, setCurrentImageUrl] = useState(null);
   const [viewedMessages, setViewedMessages] = useState(new Set());
   const [playingAudioId, setPlayingAudioId] = useState(null);
   const [newMessages, setNewMessages] = useState(new Set());
+
+  // Click away listener for reaction bar
+  useEffect(() => {
+    const handleClickAway = (e) => {
+      if (activeReactionId && !e.target.closest('.reaction-container')) {
+        setActiveReactionId(null);
+        setShowFullPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickAway);
+    return () => document.removeEventListener('mousedown', handleClickAway);
+  }, [activeReactionId]);
 
   // Listen for message-viewed events from server
   useEffect(() => {
@@ -156,11 +172,9 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   }
 
   return (
-    <div className="flex flex-col space-y-1 sm:space-y-2 pb-4">
-      {messages.map((message) => {
+    <div className="flex flex-col space-y-2 sm:space-y-3 pb-4 px-2 sm:px-4">
+      {messages.filter(m => messageTimers.get(m.id) !== 'expired').map((message, index) => {
         const isOwnMessage = currentUser && (message.sender.socketId === currentUser.socketId || message.sender.id === currentUser.id);
-        const isExpired = messageTimers.get(message.id) === 'expired';
-        if (isExpired) return null;
 
         const isVanishing = messageTimers.get(message.id) === 'vanishing';
         const timeLeft = getTimeLeft(message);
@@ -168,6 +182,31 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
         const isAudio = message.messageType === 'audio';
         const isViewOnce = message.isViewOnce;
         const hasBeenViewed = isMessageViewed(message);
+
+        // Adaptive Picker Logic
+        const isLongMessage = isImage || isAudio || message.messageType === 'file' || message.messageType === 'poll' || (message.content && message.content.length > 25);
+        let pickerPositionClass = '';
+        if (isOwnMessage) {
+          // Own Message: Actions are on the LEFT of the bubble
+          if (isLongMessage) {
+            // Mobile: Grow Right (Over message) to avoid left screen edge
+            // Desktop: Grow Left (Into whitespace)
+            pickerPositionClass = 'left-0 origin-bottom-left sm:left-auto sm:right-0 sm:origin-bottom-right';
+          } else {
+            // Short: Grow Left (Into whitespace)
+            pickerPositionClass = 'right-0 origin-bottom-right';
+          }
+        } else {
+          // Other Message: Actions are on the RIGHT of the bubble
+          if (isLongMessage) {
+            // Mobile: Grow Left (Over message) to avoid right screen edge
+            // Desktop: Grow Right (Into whitespace)
+            pickerPositionClass = 'right-0 origin-bottom-right sm:right-auto sm:left-0 sm:origin-bottom-left';
+          } else {
+            // Short: Grow Right (Into whitespace)
+            pickerPositionClass = 'left-0 origin-bottom-left';
+          }
+        }
 
         // Viewed View-Once Content Layout
         if (isViewOnce && hasBeenViewed && !(isAudio && playingAudioId === message.id)) {
@@ -186,7 +225,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
             id={message.id}
             key={message.id}
             data-id={message.id}
-            className={`message-item group flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'} ${isVanishing ? 'message-vanishing' : ''} relative`}
+            className={`message-item group flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'} ${isVanishing ? 'message-vanishing' : ''} relative ${activeReactionId === message.id ? 'z-[60]' : 'z-auto'}`}
           >
             <div className={`flex items-center space-x-2 mb-1 px-1 text-[10px] font-bold uppercase tracking-tighter text-gray-400 dark:text-gray-500`}>
               {!isOwnMessage && <span className="text-primary-500 dark:text-primary-400">{message.sender.nickname}</span>}
@@ -204,7 +243,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
             </div>
 
             <div className={`flex items-center w-full ${isOwnMessage ? 'justify-end pl-8 sm:pl-12' : 'justify-start pr-8 sm:pr-12'}`}>
-              <div className="relative group/bubble max-w-[85%] sm:max-w-lg md:max-w-xl">
+              <div className="relative group/bubble max-w-[70%] sm:max-w-lg md:max-w-xl">
                 <div
                   className={`relative z-10 rounded-2xl shadow-sm transition-all duration-300 ${message.messageType === 'poll' ? '' : 'px-3 py-2 sm:px-4 sm:py-3 box-border'
                     } ${isOwnMessage
@@ -301,15 +340,71 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                 </div>
 
                 {/* Hover Actions: Reply, React, Edit */}
-                <div className={`absolute top-1/2 -translate-y-1/2 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${isOwnMessage ? 'right-full mr-3' : 'left-full ml-3'} z-0`}>
+                <div className={`absolute top-1/2 -translate-y-1/2 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${isOwnMessage ? 'right-full mr-3' : 'left-full ml-3'} z-20 select-none`}>
                   <button onClick={() => onReply(message)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400 hover:text-primary-500 transition-colors" title="Reply"><Reply className="w-4 h-4" /></button>
-                  <div className="relative">
-                    <button onClick={() => setActiveReactionId(activeReactionId === message.id ? null : message.id)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400 hover:text-primary-500 transition-colors" title="React"><Smile className="w-4 h-4" /></button>
+                  <div className="relative reaction-container">
+                    <button
+                      onClick={() => {
+                        if (activeReactionId === message.id) {
+                          setActiveReactionId(null);
+                          setShowFullPicker(false);
+                        } else {
+                          setActiveReactionId(message.id);
+                          setShowFullPicker(false);
+                        }
+                      }}
+                      className={`p-1.5 rounded-lg transition-all duration-200 ${activeReactionId === message.id ? 'bg-primary-500 text-white shadow-lg scale-110' : 'text-gray-400 hover:text-primary-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                      title="React"
+                    >
+                      <Smile className="w-4 h-4" />
+                    </button>
+
                     {activeReactionId === message.id && (
-                      <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 shadow-2xl rounded-full p-1 flex items-center space-x-1 border border-gray-100 dark:border-gray-700 z-50">
-                        {QUICK_REACTIONS.map(emoji => (
-                          <button key={emoji} onClick={() => { onReact(message.id, emoji); setActiveReactionId(null); }} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-lg hover:scale-125 transition-transform">{emoji}</button>
-                        ))}
+                      <div className={`absolute ${index < 3 ? 'top-full mt-3' : 'bottom-full mb-3'} ${pickerPositionClass} z-50 flex flex-col items-center`}>
+                        {!showFullPicker ? (
+                          <div className="bg-white/90 dark:bg-gray-800/95 backdrop-blur-md shadow-2xl rounded-full p-1.5 flex items-center space-x-1 border border-gray-100/50 dark:border-gray-700/50 whitespace-nowrap animate-in fade-in zoom-in slide-in-from-top-2 duration-300">
+                            {QUICK_REACTIONS.map(emoji => (
+                              <button
+                                key={emoji}
+                                onClick={() => { onReact(message.id, emoji); setActiveReactionId(null); }}
+                                className="w-10 h-10 flex items-center justify-center hover:bg-primary-500/10 dark:hover:bg-primary-500/20 rounded-full text-2xl transition-all duration-200 hover:scale-125 hover:-translate-y-1"
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                            <div className="w-[1px] h-6 bg-gray-200 dark:bg-gray-700 mx-1" />
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowFullPicker(true);
+                              }}
+                              className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 hover:text-primary-500 transition-all duration-200"
+                            >
+                              <Plus className="w-5 h-5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="bg-white dark:bg-gray-900 shadow-2xl rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden animate-in fade-in zoom-in slide-in-from-top-4 duration-300 ring-1 ring-black/5 dark:ring-white/5">
+                            <div className="p-2 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">All Emojis</span>
+                              <button onClick={() => setShowFullPicker(false)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"><X className="w-3 h-3 text-gray-400" /></button>
+                            </div>
+                            <EmojiPicker
+                              theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
+                              onEmojiClick={(emojiData) => {
+                                onReact(message.id, emojiData.emoji);
+                                setActiveReactionId(null);
+                                setShowFullPicker(false);
+                              }}
+                              width={280}
+                              height={350}
+                              skinTonesDisabled
+                              autoFocusSearch={false}
+                              searchPlaceholder="Search..."
+                              previewConfig={{ showPreview: false }}
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
