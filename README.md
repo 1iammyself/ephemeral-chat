@@ -39,7 +39,6 @@ Watch how Ephemeral Chat redefines private communication:
 ---
 
 ## ⚡ Advanced Features
-## ⚡ Advanced Features
 
 ### 🔐 Ironclad Privacy
 - **E2EE (AES-GCM)**: Military-grade 256-bit encryption performed entirely in-browser. Keys are stored in the URL fragment (`#`) and never traverse the network.
@@ -48,32 +47,26 @@ Watch how Ephemeral Chat redefines private communication:
     - **iOS Guard**: Automatic black-screen overlay to prevent sensitive snapshots in the App Switcher.
     - **Ghost Watermark**: Dynamic, drifting watermark Layer that rotates and moves to deter AI-based OCR and screenshot reconstruction.
 - **Stealth Password Entry**: Invisible input system for room passwords—no characters, no dots, zero visual footprint.
-### 🔐 Ironclad Privacy
-- **E2EE (AES-GCM)**: Military-grade 256-bit encryption performed entirely in-browser. Keys are stored in the URL fragment (`#`) and never traverse the network.
-- **Snapshot Protection**: 
-    - **Privacy Blur**: Instant grayscale blur applied to the UI when focus is lost.
-    - **iOS Guard**: Automatic black-screen overlay to prevent sensitive snapshots in the App Switcher.
-    - **Ghost Watermark**: Dynamic, drifting watermark Layer that rotates and moves to deter AI-based OCR and screenshot reconstruction.
-- **Stealth Password Entry**: Invisible input system for room passwords—no characters, no dots, zero visual footprint.
+
+### 🎨 Modern UI & UX
+- **Glassmorphic Emoji Reactions**: Sleek, animated reaction system with backdrop-blur effects and curated quick-access emojis.
+- **Adaptive Interface**: Intelligent positioning of pickers and menus that dynamically avoid screen edges and keyboard overlap.
+- **Micro-Animations**: High-performance transitions for message delivery, editing, and reactions.
+
+### 📱 Perfect Mobile Experience
+- **Visual Viewport Sync**: Pixel-perfect layout adjustment using the `VisualViewport` API to eliminate keyboard-driven "dead space."
+- **Flush Input System**: Zero-gap integration with mobile browser UI bars using native `safe-area-inset` support.
+- **Contextual Mobile Actions**: Gesture-optimized hover-to-reveal simulation for a clean, native-feeling chat experience.
 
 ### 🎙️ Elite Communication
-- **Hybrid Voice Engine**: A state-of-the-art failover system. Starts with **WebRTC P2P** for low latency and auto-scales to **Agora RTM/RTC** if network conditions degrade or participant count increases.
-- **Universal Voice Notes**: Backend FFmpeg pipeline converts recordings to AAC (.m4a) on-the-fly, ensuring flawless playback across iOS, Android, and Desktop.
-- **Targeted Messaging**: Granular control over message recipients within a room, orchestrated via a secure server relay.
+- **Hybrid Voice Engine**: State-of-the-art failover system that auto-scales from WebRTC P2P to Agora RTM/RTC based on network conditions.
+- **Universal Voice Notes**: Real-time FFmpeg conversion to AAC (.m4a) for flawless playback across all mobile and desktop browsers.
+- **Targeted Messaging**: Secure server relay for granular control over message recipients within a room.
 
 ### 🛡️ System Integrity
 - **Proof-of-Work CAPTCHA**: Custom `@cap.js/widget` implementation for anti-spam without compromising user anonymity.
-- **Zero-Persistence**: All data resides in volatile memory (RAM). Once the last user departs, the environment is scrubbed.
-- **Micro-interactions**: Animated message delivery and "vanishing" effects powered by optimized CSS transforms.
-### 🎙️ Elite Communication
-- **Hybrid Voice Engine**: A state-of-the-art failover system. Starts with **WebRTC P2P** for low latency and auto-scales to **Agora RTM/RTC** if network conditions degrade or participant count increases.
-- **Universal Voice Notes**: Backend FFmpeg pipeline converts recordings to AAC (.m4a) on-the-fly, ensuring flawless playback across iOS, Android, and Desktop.
-- **Targeted Messaging**: Granular control over message recipients within a room, orchestrated via a secure server relay.
-
-### 🛡️ System Integrity
-- **Proof-of-Work CAPTCHA**: Custom `@cap.js/widget` implementation for anti-spam without compromising user anonymity.
-- **Zero-Persistence**: All data resides in volatile memory (RAM). Once the last user departs, the environment is scrubbed.
-- **Micro-interactions**: Animated message delivery and "vanishing" effects powered by optimized CSS transforms.
+- **Zero-Persistence**: All data resides in volatile RAM; environments are scrubbed instantly once the last user departs.
+- **Optimized Performance**: Hardware-accelerated CSS transforms for smooth interactions on low-end devices.
 
 ---
 
@@ -146,22 +139,7 @@ We use a sophisticated failover logic for audio calls:
 
 <details>
 <summary><b>🔒 Security & Encryption Deep Dive</b></summary>
-<summary><b>🔒 Security & Encryption Deep Dive</b></summary>
 
-Using **Web Crypto API (AES-GCM 256-bit)**:
-1. **Key Generation**: A cryptographically strong pseudo-random key is generated on the client.
-2. **Key Storage**: The key is stored in `window.location.hash`. Fragment identifiers are client-side only and are **never** included in HTTP requests.
-3. **Encryption**: Every message is encrypted with a unique Initialization Vector (IV).
-4. **Targeting**: Private messages are encrypted and tagged with specific recipient IDs for the server to relay exclusively to the intended sockets.
-
-</details>
-
-<details>
-<summary><b>📱 Multi-Platform Architecture</b></summary>
-
-- **PWA**: Fully offline-capable service workers using Workbox.
-- **TWA (Android)**: Wrapped via Trusted Web Activity for Google Play Store distribution, utilizing Digital Asset Links for seamless verification.
-- **Microsoft Store**: Packaged PWA optimized for Windows 10/11 system integration.
 Using **Web Crypto API (AES-GCM 256-bit)**:
 1. **Key Generation**: A cryptographically strong pseudo-random key is generated on the client.
 2. **Key Storage**: The key is stored in `window.location.hash`. Fragment identifiers are client-side only and are **never** included in HTTP requests.
