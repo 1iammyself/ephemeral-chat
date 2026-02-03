@@ -1563,7 +1563,7 @@ const ChatRoom = () => {
             />
             <div ref={messagesEndRef} />
           </div>
-          <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 sticky bottom-0 z-50">
             {typingUsers.size > 0 && (
               <div className="px-4 py-1 text-xs text-gray-500 dark:text-gray-400 italic animate-pulse bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
                 {Array.from(typingUsers.values()).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
