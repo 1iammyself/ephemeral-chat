@@ -141,96 +141,86 @@ const ChatRoom = () => {
 
   // Visual Viewport handler for mobile keyboard and browser chrome
   useEffect(() => {
-    // Detect iOS Safari
+    // Detect iOS (includes Chrome on iOS since all iOS browsers use WebKit)
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    const isIOSSafari = isIOS && isSafari;
 
     const updateViewportHeight = () => {
       const vv = window.visualViewport;
       
       if (vv) {
-        // The visual viewport gives us the actual visible area
         const vh = vv.height;
         document.documentElement.style.setProperty('--vh', `${vh * 0.01}px`);
+        document.documentElement.style.setProperty('--chat-height', `${vh}px`);
         
-        // Calculate bottom offset (keyboard height or browser chrome)
         const bottomOffset = window.innerHeight - vh - vv.offsetTop;
         document.documentElement.style.setProperty('--keyboard-height', `${Math.max(0, bottomOffset)}px`);
-        
-        // Set the actual pixel height for the chat container
-        // For iOS Safari, also account for the top offset (address bar)
-        if (isIOSSafari) {
-          // iOS Safari: Use viewport height and position the container from the top
-          document.documentElement.style.setProperty('--chat-height', `${vh}px`);
-          document.documentElement.style.setProperty('--viewport-offset-top', `${vv.offsetTop}px`);
-        } else {
-          document.documentElement.style.setProperty('--chat-height', `${vh}px`);
-          document.documentElement.style.setProperty('--viewport-offset-top', '0px');
-        }
       } else {
-        // Fallback for browsers without visualViewport
         const vh = window.innerHeight;
         document.documentElement.style.setProperty('--vh', `${vh * 0.01}px`);
         document.documentElement.style.setProperty('--keyboard-height', '0px');
         document.documentElement.style.setProperty('--chat-height', `${vh}px`);
-        document.documentElement.style.setProperty('--viewport-offset-top', '0px');
       }
     };
 
-    // For iOS Safari, we need additional handling
-    const handleTouchMove = () => {
-      if (isIOSSafari) {
-        // Debounced update during scroll/touch
-        requestAnimationFrame(updateViewportHeight);
+    const scrollToTop = () => {
+      // Scroll the window back to top to keep header visible
+      window.scrollTo(0, 0);
+      document.body.scrollTop = 0;
+      document.documentElement.scrollTop = 0;
+    };
+
+    const handleFocusIn = (e) => {
+      if (isIOS && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+        // When keyboard opens on iOS, it scrolls the page - we need to counteract this
+        // Wait for keyboard to appear and iOS to do its auto-scroll, then scroll back
+        setTimeout(() => {
+          scrollToTop();
+          updateViewportHeight();
+        }, 100);
+        setTimeout(() => {
+          scrollToTop();
+          updateViewportHeight();
+        }, 300);
+        setTimeout(() => {
+          scrollToTop();
+          updateViewportHeight();
+        }, 500);
       }
     };
 
-    const handleFocusIn = () => {
-      // When an input is focused, wait a bit for keyboard to appear then update
-      setTimeout(updateViewportHeight, 100);
-      setTimeout(updateViewportHeight, 300);
-    };
-
-    const handleFocusOut = () => {
-      // When input loses focus, wait for keyboard to hide then update
-      setTimeout(updateViewportHeight, 100);
+    const handleVisualViewportScroll = () => {
+      if (isIOS) {
+        // When iOS scrolls the visual viewport (to show keyboard), scroll back to top
+        scrollToTop();
+      }
+      updateViewportHeight();
     };
 
     // Initial call
     updateViewportHeight();
-    // Call again after a short delay to catch any late layout changes
-    setTimeout(updateViewportHeight, 100);
 
-    // Listen for viewport changes (keyboard open/close, browser chrome show/hide)
+    // Listen for viewport changes
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', updateViewportHeight);
-      window.visualViewport.addEventListener('scroll', updateViewportHeight);
+      window.visualViewport.addEventListener('scroll', handleVisualViewportScroll);
     }
     window.addEventListener('resize', updateViewportHeight);
-    window.addEventListener('orientationchange', updateViewportHeight);
+    window.addEventListener('orientationchange', () => {
+      setTimeout(updateViewportHeight, 100);
+    });
     
-    // iOS Safari specific listeners
-    if (isIOSSafari) {
-      document.addEventListener('touchmove', handleTouchMove, { passive: true });
-      document.addEventListener('focusin', handleFocusIn);
-      document.addEventListener('focusout', handleFocusOut);
-    }
+    // Focus listener for iOS keyboard
+    document.addEventListener('focusin', handleFocusIn);
 
     return () => {
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', updateViewportHeight);
-        window.visualViewport.removeEventListener('scroll', updateViewportHeight);
+        window.visualViewport.removeEventListener('scroll', handleVisualViewportScroll);
       }
       window.removeEventListener('resize', updateViewportHeight);
       window.removeEventListener('orientationchange', updateViewportHeight);
-      
-      if (isIOSSafari) {
-        document.removeEventListener('touchmove', handleTouchMove);
-        document.removeEventListener('focusin', handleFocusIn);
-        document.removeEventListener('focusout', handleFocusOut);
-      }
+      document.removeEventListener('focusin', handleFocusIn);
     };
   }, []);
 
