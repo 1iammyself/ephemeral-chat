@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, Users, Clock, Shield, Plus, ArrowRight, Zap, Wifi, User, Edit, Lock, KeyRound, Loader2, Timer } from 'lucide-react';
+import { MessageCircle, UserX, Clock, Shield, Plus, Zap, Wifi, Edit, Lock, KeyRound, Loader2, Timer } from 'lucide-react';
 import CreateRoomModal from './CreateRoomModal';
 import TraceHashModal from './TraceHashModal';
 import ThemeToggle from './ThemeToggle';
@@ -89,14 +89,14 @@ const Home = ({ children }) => {
       description: "Low-latency connections"
     },
     {
-      icon: User,
-      title: "Anonymous",
+      icon: UserX,
+      title: "No user account",
       description: "No registration needed"
     },
     {
       icon: Edit,
       title: "Pick Nickname",
-      description: "Just choose a name"
+      description: "Choose a name"
     },
     {
       icon: Clock,
@@ -136,7 +136,7 @@ const Home = ({ children }) => {
                 Secure, Temporary Chat Rooms
               </h2>
               <p className="mt-5 max-w-2xl mx-auto text-xl text-gray-500 dark:text-gray-400">
-                Create or join a room to start chatting. Your messages disappear when you leave!
+                Create or join a room to start chatting.
               </p>
             </div>
 
@@ -171,7 +171,7 @@ const Home = ({ children }) => {
                         type="text"
                         value={verbalCode}
                         onChange={(e) => setVerbalCode(e.target.value)}
-                        placeholder="clarity-compass-journey-peace"
+                        placeholder="clarity compass journey peace"
                         data-allow-copy="true"
                         className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
                         disabled={isJoiningVerbal}
@@ -247,7 +247,7 @@ const Home = ({ children }) => {
       < footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 py-6 transition-colors duration-200" >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-            Ephemeral Chat offers a fast, secure, and anonymous experience
+            Ephemeral Chat offers a fast, secure, and private experience
           </p>
         </div>
       </footer >

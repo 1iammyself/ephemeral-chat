@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MessageCircle, Lock, Users, AlertCircle, Check, Loader2, Shield, Clock, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTheme } from '../context/ThemeContext';
 import '@cap.js/widget';
 
 const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite = false, isWaitingForHost = false }) => {
   const API_BASE = import.meta.env.VITE_API_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '');
   const location = useLocation();
   const navigate = useNavigate();
+  const { theme } = useTheme();
   const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
   const [roomInfo, setRoomInfo] = useState(null);
@@ -310,10 +312,11 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
               <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
                 Complete this quick verification to prove you're human
               </p>
-              <div className="flex justify-center">
+              <div className="flex justify-center [&_cap-widget]:!bg-transparent [&_cap-widget_*]:!bg-gray-100 dark:[&_cap-widget_*]:!bg-gray-700 [&_cap-widget]:rounded-lg">
                 <cap-widget
                   ref={setCapWidgetRef}
                   data-cap-api-endpoint={`${API_BASE}/api/cap/`}
+                  data-theme={theme}
                   className="w-full"
                 />
               </div>

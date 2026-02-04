@@ -516,7 +516,7 @@ Verbal Code: ${verbalCode || 'N/A'}`;
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 sm:mb-3">
                 Complete this quick verification to prove you're human
               </p>
-              <div className="flex justify-center">
+              <div className="flex justify-center [&_cap-widget]:!bg-transparent [&_cap-widget_*]:!bg-gray-100 dark:[&_cap-widget_*]:!bg-gray-700 [&_cap-widget]:rounded-lg">
                 <cap-widget
                   ref={setCapWidgetRef}
                   data-cap-api-endpoint={`${API_BASE}/api/cap/`}

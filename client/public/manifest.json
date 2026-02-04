@@ -2,7 +2,7 @@
   "id": "com.ephemeral-chat.app",
   "name": "Ephemeral Chat",
   "short_name": "EphChat",
-  "description": "Secure, anonymous, and ephemeral chat rooms. Messages disappear when you leave, ensuring your privacy and security. No registration required.",
+  "description": "Secure, Private, and ephemeral chat rooms. Messages disappear when you leave, ensuring your privacy and security. No registration required.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

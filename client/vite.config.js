@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => {
         manifest: {
           name: 'Ephemeral Chat',
           short_name: 'EphChat',
-          description: 'Secure, anonymous, and ephemeral chat application',
+          description: 'Secure, Private, and ephemeral chat application',
           theme_color: '#4F46E5',
           background_color: '#1f2937',
           display: 'standalone',

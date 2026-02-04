@@ -23,7 +23,7 @@ const GhostWatermark = ({ nickname }) => {
     const hashUsername = async (username) => {
         try {
             // Ensure username is lowercase for consistent hashing
-            const normalizedUsername = (username || 'anonymous').toLowerCase();
+            const normalizedUsername = (username || 'Private').toLowerCase();
             const encoder = new TextEncoder();
             const data = encoder.encode(normalizedUsername);
             const hashBuffer = await crypto.subtle.digest('SHA-256', data);

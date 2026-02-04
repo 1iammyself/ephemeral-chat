@@ -1,6 +1,6 @@
 /**
  * Ephemeral Chat Server
- * Express + Socket.IO server for anonymous, temporary chat rooms
+ * Express + Socket.IO server for Private, temporary chat rooms
  */
 
 require('dotenv').config();
@@ -406,7 +406,7 @@ app.post('/api/rooms/:roomCode/invite', async (req, res) => {
 /**
  * Join room using verbal code
  * POST /api/verbal-join
- * Body: { verbalCode: "clarity-compass-journey-peace" }
+ * Body: { verbalCode: "clarity compass journey peace" }
  */
 app.post('/api/verbal-join', async (req, res) => {
   try {

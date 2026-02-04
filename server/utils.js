@@ -23,7 +23,7 @@ function generateRoomCode() {
  */
 function generateRandomNickname() {
   const adjectives = [
-    'Anonymous', 'Mystery', 'Secret', 'Hidden', 'Phantom', 'Shadow',
+    'Private', 'Mystery', 'Secret', 'Hidden', 'Phantom', 'Shadow',
     'Silent', 'Quiet', 'Swift', 'Clever', 'Bright', 'Quick'
   ];
 

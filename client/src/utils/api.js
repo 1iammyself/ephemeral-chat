@@ -64,7 +64,7 @@ export const validateInviteToken = async (token, roomCode) => {
 
 /**
  * Join a room using a verbal code
- * @param {string} verbalCode - 4-word verbal code (e.g., "clarity-compass-journey-peace")
+ * @param {string} verbalCode - 4-word verbal code (e.g., "clarity compass journey peace")
  * @returns {Promise<{success: boolean, roomCode: string, token: string, requiresPassword: boolean}>}
  */
 export const joinWithVerbalCode = async (verbalCode) => {

@@ -1,6 +1,6 @@
 # 👻 Ephemeral Chat
 
-Ephemeral Chat is a high-security, anonymous messaging platform built for users who demand absolute privacy. No accounts, no logs.
+Ephemeral Chat is a high-security, Private messaging platform built for users who demand absolute privacy. No accounts, no logs.
 
   <p align="center">
     <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"></a>

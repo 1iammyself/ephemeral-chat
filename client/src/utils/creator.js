@@ -1,6 +1,6 @@
 /**
  * Creator ID management for persistent rooms
- * Uses localStorage to maintain anonymous creator identity
+ * Uses localStorage to maintain Private creator identity
  */
 
 const CREATOR_ID_KEY = 'eph-creator-id';
