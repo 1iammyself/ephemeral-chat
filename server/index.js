@@ -916,7 +916,7 @@ io.on('connection', (socket) => {
   });
 
   // Kick user - host can kick anyone, tier1 can kick tier2 and users
-  socket.on('kick-user', ({ targetUserId, roomCode }) => {
+  socket.on('kick-user', async ({ targetUserId, roomCode }) => {
     const room = roomData[roomCode];
     if (!room) return;
 
@@ -944,6 +944,9 @@ io.on('connection', (socket) => {
       // Force disconnect from room
       targetSocket.leave(roomCode);
       targetSocket.roomCode = null;
+
+      // Remove user from roomManager to properly decrement user count
+      await roomManager.leaveRoom(roomCode, targetUserId);
 
       // Remove from userRoles if exists
       if (room.userRoles?.[targetUserId]) {
