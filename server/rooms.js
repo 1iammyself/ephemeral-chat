@@ -19,8 +19,9 @@ class RoomManager {
     this.redis = redisClient;
     this.rooms = new Map(); // In-memory fallback
     this.roomTimers = new Map(); // For room expiry timers
-    this.ROOM_EXPIRY_MS = (process.env.ROOM_EXPIRY_MINUTES || 10) * 60 * 1000;
-    this.INVITE_TOKEN_EXPIRY_MS = (process.env.INVITE_TOKEN_EXPIRY_MINUTES || 25) * 60 * 1000; // Default 25 minutes
+    this.ROOM_EXPIRY_MS = parseInt(process.env.ROOM_EXPIRY_MINUTES || 10) * 60 * 1000;
+    // Invite token expiry - increased default for mobile users who may take longer to join
+    this.INVITE_TOKEN_EXPIRY_MS = parseInt(process.env.INVITE_TOKEN_EXPIRY_MINUTES || 30) * 60 * 1000; // Default 30 minutes
     this.ROOM_DEFAULT_LIFETIME_MS = 2 * 60 * 60 * 1000; // 2 hours default room lifetime
     this.ROOM_DEFAULT_LIFETIME_MINUTES = 120; // 2 hours in minutes
 

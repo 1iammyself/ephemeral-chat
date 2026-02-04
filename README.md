@@ -105,11 +105,16 @@ cp client/.env.example client/.env
 <details>
 <summary>🔑 <b>Click to see Environment Variables Guide</b></summary>
 
-| Variable | Description |
-| :--- | :--- |
-| `VITE_AGORA_APP_ID` | Your Agora project ID |
-| `INACTIVITY_TIMEOUT` | Minutes before a room is cleared |
-| `CAP_SECRET` | Secret key for Captcha system |
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `VITE_AGORA_APP_ID` | Your Agora project ID | - |
+| `INACTIVITY_TIMEOUT_MINUTES` | Minutes before a user is timed out for inactivity | 60 |
+| `INVITE_TOKEN_EXPIRY_MINUTES` | Minutes before an invite token expires | 30 |
+| `LOCKOUT_DURATION_MINUTES` | Minutes a user is locked out after max failed attempts | 15 |
+| `MAX_FAILED_ATTEMPTS` | Number of failed attempts before lockout | 10 |
+| `RECONNECT_GRACE_MINUTES` | Grace period for mobile users to reconnect after disconnect | 5 |
+| `CAP_SECRET` | Secret key for Captcha system | - |
+| `ROOM_EXPIRY_MINUTES` | Default room expiry in minutes | 10 |
 
 </details>
 

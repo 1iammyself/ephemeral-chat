@@ -12,16 +12,27 @@ class SecurityManager {
     this.userActivity = new Map(); // socketId -> { lastActivity, userId, roomCode, timeoutId }
     this.sessionTokens = new Map(); // sessionToken -> { socketId, userId, roomCode, createdAt }
 
-    // Configuration
-    this.INACTIVITY_TIMEOUT_MS = parseInt(process.env.INACTIVITY_TIMEOUT_MINUTES || 15) * 60 * 1000; // 15 minutes default
+    // Configuration - Mobile-friendly defaults
+    // Inactivity timeout: How long before a user is considered inactive (default 60 min for mobile users)
+    this.INACTIVITY_TIMEOUT_MS = parseInt(process.env.INACTIVITY_TIMEOUT_MINUTES || 60) * 60 * 1000;
     this.SESSION_TOKEN_LENGTH = 32;
-    this.MAX_FAILED_ATTEMPTS = 5;
-    this.LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes lockout
+    // Failed attempts before lockout (increased for mobile users who may have connectivity issues)
+    this.MAX_FAILED_ATTEMPTS = parseInt(process.env.MAX_FAILED_ATTEMPTS || 10);
+    // Lockout duration after max failed attempts (use env variable, default 15 min)
+    this.LOCKOUT_DURATION_MS = parseInt(process.env.LOCKOUT_DURATION_MINUTES || 15) * 60 * 1000;
+    // Grace period for reconnection (5 minutes) - allows seamless rejoin after screen sleep
+    this.RECONNECT_GRACE_PERIOD_MS = parseInt(process.env.RECONNECT_GRACE_MINUTES || 5) * 60 * 1000;
 
     // Failed authentication attempts tracking
     this.failedAttempts = new Map(); // identifier -> { count, lockedUntil }
+    // Disconnected sessions grace period tracking
+    this.disconnectedSessions = new Map(); // sessionToken -> { disconnectedAt, socketId, userId, roomCode }
 
-    logger.info(`🔒 Security Manager initialized with ${this.INACTIVITY_TIMEOUT_MS / 1000}s inactivity timeout`);
+    logger.info(`🔒 Security Manager initialized:`);
+    logger.info(`   - Inactivity timeout: ${this.INACTIVITY_TIMEOUT_MS / 60000} minutes`);
+    logger.info(`   - Max failed attempts: ${this.MAX_FAILED_ATTEMPTS}`);
+    logger.info(`   - Lockout duration: ${this.LOCKOUT_DURATION_MS / 60000} minutes`);
+    logger.info(`   - Reconnect grace period: ${this.RECONNECT_GRACE_PERIOD_MS / 60000} minutes`);
   }
 
   /**
@@ -335,6 +346,56 @@ class SecurityManager {
   }
 
   /**
+   * Track a disconnected session for grace period reconnection
+   * Mobile users often disconnect temporarily (screen sleep, network switch)
+   * @param {string} sessionToken - The session token
+   * @param {string} socketId - The disconnected socket ID
+   * @param {string} userId - User ID
+   * @param {string} roomCode - Room code
+   */
+  trackDisconnectedSession(sessionToken, socketId, userId, roomCode) {
+    if (!sessionToken) return;
+    
+    this.disconnectedSessions.set(sessionToken, {
+      disconnectedAt: Date.now(),
+      socketId,
+      userId,
+      roomCode
+    });
+    
+    logger.info(`📱 Tracking disconnected session for user ${userId} in room ${roomCode} (grace period: ${this.RECONNECT_GRACE_PERIOD_MS / 60000}m)`);
+  }
+
+  /**
+   * Check if a session is within the grace period for seamless reconnection
+   * @param {string} sessionToken - The session token
+   * @returns {Object|null} Session info if within grace period, null otherwise
+   */
+  checkGracePeriod(sessionToken) {
+    const disconnectedSession = this.disconnectedSessions.get(sessionToken);
+    if (!disconnectedSession) return null;
+
+    const elapsed = Date.now() - disconnectedSession.disconnectedAt;
+    if (elapsed <= this.RECONNECT_GRACE_PERIOD_MS) {
+      logger.info(`✅ Session within grace period (${Math.round(elapsed / 1000)}s elapsed)`);
+      return disconnectedSession;
+    }
+
+    // Grace period expired, clean up
+    this.disconnectedSessions.delete(sessionToken);
+    logger.info(`⏰ Grace period expired for session (${Math.round(elapsed / 1000)}s elapsed)`);
+    return null;
+  }
+
+  /**
+   * Clear a disconnected session (user successfully reconnected)
+   * @param {string} sessionToken - The session token
+   */
+  clearDisconnectedSession(sessionToken) {
+    this.disconnectedSessions.delete(sessionToken);
+  }
+
+  /**
    * Clean up expired sessions and activity tracking
    * Should be called periodically
    */
@@ -356,7 +417,14 @@ class SecurityManager {
       }
     }
 
-    logger.info(`🧹 Security cleanup completed. Active sessions: ${this.sessionTokens.size}, Active users: ${this.userActivity.size}`);
+    // Clean up expired grace period sessions
+    for (const [token, session] of this.disconnectedSessions.entries()) {
+      if (now - session.disconnectedAt > this.RECONNECT_GRACE_PERIOD_MS) {
+        this.disconnectedSessions.delete(token);
+      }
+    }
+
+    logger.info(`🧹 Security cleanup completed. Active sessions: ${this.sessionTokens.size}, Active users: ${this.userActivity.size}, Grace period sessions: ${this.disconnectedSessions.size}`);
   }
 
   /**
@@ -367,8 +435,10 @@ class SecurityManager {
     return {
       activeUsers: this.userActivity.size,
       activeSessions: this.sessionTokens.size,
+      gracePeriodSessions: this.disconnectedSessions.size,
       lockedIdentifiers: Array.from(this.failedAttempts.values()).filter(a => a.lockedUntil && Date.now() < a.lockedUntil).length,
-      inactivityTimeoutMinutes: this.INACTIVITY_TIMEOUT_MS / 60000
+      inactivityTimeoutMinutes: this.INACTIVITY_TIMEOUT_MS / 60000,
+      reconnectGraceMinutes: this.RECONNECT_GRACE_PERIOD_MS / 60000
     };
   }
 }

@@ -1049,12 +1049,19 @@ io.on('connection', (socket) => {
     try {
       const { roomCode, nickname, password, inviteToken, capToken, sessionToken, userId } = data;
 
-      // 1. Session Resumption Path
+      // 1. Session Resumption Path (Mobile-friendly: check grace period for disconnected sessions)
       if (sessionToken) {
         const session = securityManager.validateSession(sessionToken);
+        
+        // Check if this is a reconnection within grace period
+        const gracePeriodSession = securityManager.checkGracePeriod(sessionToken);
+        
         if (session && session.roomCode === roomCode) {
           // Re-bind session to new socket
           securityManager.resumeSession(sessionToken, socket.id);
+          
+          // Clear from disconnected sessions tracking (successful reconnect)
+          securityManager.clearDisconnectedSession(sessionToken);
 
           socket.join(roomCode);
           socket.roomCode = roomCode;
@@ -1062,11 +1069,38 @@ io.on('connection', (socket) => {
 
           const room = await roomManager.getRoom(roomCode);
           if (room) {
+            // Re-add user to room if they were removed during disconnect
+            const existingUser = room.users.find(u => u.socketId === socket.id);
+            if (!existingUser) {
+              // User was removed, re-add them
+              room.users.push({
+                id: userId || socket.id,
+                socketId: socket.id,
+                nickname: socket.nickname,
+                joinedAt: new Date().toISOString()
+              });
+              await roomManager.saveRoom(roomCode, room);
+            }
+            
             const timeoutMs = await roomManager.getRoomTimeout(roomCode);
             securityManager.registerUserActivity(socket.id, userId || socket.id, roomCode, handleInactivityTimeout, timeoutMs);
 
             const messages = await roomManager.getMessages(roomCode, socket.id);
             const enrichedUsers = getEnrichedUsers(roomCode);
+
+            logger.info(`📱 User ${socket.nickname} reconnected to room ${roomCode} (session resumed)`);
+
+            // Notify others that user is back
+            socket.to(roomCode).emit('user-joined', {
+              user: {
+                socketId: socket.id,
+                id: socket.id,
+                nickname: socket.nickname,
+                role: roomData[roomCode]?.userRoles?.[socket.id] || (roomData[roomCode]?.hostId === socket.id ? 'host' : 'user')
+              },
+              roomUsers: enrichedUsers,
+              isReconnect: true
+            });
 
             return callback({
               success: true,
@@ -1077,6 +1111,16 @@ io.on('connection', (socket) => {
               sessionToken
             });
           }
+        } else if (gracePeriodSession && gracePeriodSession.roomCode === roomCode) {
+          // Session expired but within grace period - allow seamless reconnection
+          logger.info(`📱 Grace period reconnection for user in room ${roomCode}`);
+          
+          // Create a new session for this reconnection
+          const newSessionToken = securityManager.createSession(socket.id, userId || socket.id, roomCode);
+          securityManager.clearDisconnectedSession(sessionToken);
+          
+          // Continue with standard join but skip knock/approval for returning users
+          // (Fall through to standard join path but the user should be allowed back)
         }
       }
 
@@ -1732,6 +1776,18 @@ io.on('connection', (socket) => {
       // Clear user activity tracking and session ONLY on explicit exit
       securityManager.clearUserActivity(socketId);
       securityManager.invalidateSocketSessions(socketId);
+    } else {
+      // Non-explicit disconnect (network issues, screen sleep, etc.)
+      // Track the session for grace period reconnection (mobile-friendly)
+      // Find the session token for this socket
+      const stats = securityManager.getStats();
+      for (const [token, session] of securityManager.sessionTokens.entries()) {
+        if (session.socketId === socketId) {
+          securityManager.trackDisconnectedSession(token, socketId, session.userId, roomCode);
+          // Don't invalidate session - allow reconnection within grace period
+          break;
+        }
+      }
     }
 
     // Leave in RoomManager
