@@ -6,11 +6,9 @@ import JoinRoomModal from './components/JoinRoomModal';
 import InviteHandler from './components/InviteHandler.jsx';
 import PWAHandler from './components/PWAHandler';
 import MyRooms from './components/MyRooms'; // Import MyRooms component
+import AndroidAppBanner from './components/AndroidAppBanner';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-
-// Simple placeholder for InstallPrompt component
-const InstallPrompt = () => null;
 
 function App() {
   // Global copy/cut/paste guard with a small whitelist
@@ -38,7 +36,7 @@ function App() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 transition-colors duration-200">
         <PWAHandler />
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<><Home /><AndroidAppBanner /></>} />
           <Route path="/my-rooms" element={<MyRooms />} /> {/* Add MyRooms route */}
           <Route path="/room/:roomCode" element={<ChatRoom />} />
           <Route path="/join" element={
@@ -49,7 +47,6 @@ function App() {
           <Route path="/invite/:token" element={<InviteHandler />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-        <InstallPrompt />
         <ToastContainer />
       </div>
     </Router>
