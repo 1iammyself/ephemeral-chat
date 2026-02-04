@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MessageCircle, UserX, Clock, Shield, Plus, Zap, Wifi, Edit, Lock, KeyRound, Loader2, Timer } from 'lucide-react';
 import CreateRoomModal from './CreateRoomModal';
 import TraceHashModal from './TraceHashModal';
@@ -16,7 +16,56 @@ const Home = ({ children }) => {
   const [showTraceModal, setShowTraceModal] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [isJoiningVerbal, setIsJoiningVerbal] = useState(false);
+  const [urlParamsProcessed, setUrlParamsProcessed] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Auto-open create room modal if ?action=create is in URL (from Chrome extension)
+  // Auto-join with verbal code if ?join= is in URL (from Chrome extension)
+  useEffect(() => {
+    // Only process URL params once
+    if (urlParamsProcessed) return;
+    
+    const action = searchParams.get('action');
+    const joinCode = searchParams.get('join');
+    
+    if (action === 'create') {
+      setUrlParamsProcessed(true);
+      // Clear the URL params first by replacing history
+      window.history.replaceState({}, '', window.location.pathname);
+      // Then open the modal
+      setShowCreateModal(true);
+    } else if (joinCode) {
+      setUrlParamsProcessed(true);
+      // Decode the verbal code (handles %20 -> spaces)
+      const decodedCode = decodeURIComponent(joinCode).trim().toLowerCase();
+      // Clear the URL params first
+      window.history.replaceState({}, '', window.location.pathname);
+      
+      // Validate and auto-join
+      const words = decodedCode.split(/\s+/).filter(w => w.length > 0);
+      if (words.length === 4) {
+        setIsJoiningVerbal(true);
+        setVerbalCode(decodedCode);
+        
+        // Trigger the verbal join
+        joinWithVerbalCode(decodedCode)
+          .then(result => {
+            if (result.success) {
+              navigate(`/invite/${result.token}`);
+            }
+          })
+          .catch(error => {
+            toast.error(typeof error === 'string' ? error : 'Invalid or expired code');
+          })
+          .finally(() => {
+            setIsJoiningVerbal(false);
+          });
+      } else {
+        toast.error('Invalid verbal code format. Please enter 4 words.');
+      }
+    }
+  }, [searchParams, urlParamsProcessed, navigate]);
 
   const handleJoinRoom = async (e) => {
     e.preventDefault();

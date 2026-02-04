@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "Ephemeral Chat",
+  "description": "Secure, privacy-first ephemeral chat rooms. Quick access to create or join chat rooms from any tab.",
+  "version": "1.0.0",
+  "author": "Caleb Kyere Boateng",
+  "homepage_url": "https://chat.kyere.me",
+  
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    },
+    "default_title": "Ephemeral Chat",
+    "default_popup": "popup/popup.html"
+  },
+  
+  "permissions": [
+    "storage",
+    "notifications",
+    "alarms"
+  ],
+  
+  "host_permissions": [
+    "https://chat.kyere.me/*"
+  ],
+  
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  
+  "content_scripts": [
+    {
+      "matches": ["https://chat.kyere.me/*"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ],
+  
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
