@@ -138,6 +138,102 @@ const ChatRoom = () => {
       document.body.style.userSelect = '';
     };
   }, [isResizingSidebar, sidebarPosition]);
+
+  // Visual Viewport handler for mobile keyboard and browser chrome
+  useEffect(() => {
+    // Detect iOS Safari
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const isIOSSafari = isIOS && isSafari;
+
+    const updateViewportHeight = () => {
+      const vv = window.visualViewport;
+      
+      if (vv) {
+        // The visual viewport gives us the actual visible area
+        const vh = vv.height;
+        document.documentElement.style.setProperty('--vh', `${vh * 0.01}px`);
+        
+        // Calculate bottom offset (keyboard height or browser chrome)
+        const bottomOffset = window.innerHeight - vh - vv.offsetTop;
+        document.documentElement.style.setProperty('--keyboard-height', `${Math.max(0, bottomOffset)}px`);
+        
+        // Set the actual pixel height for the chat container
+        // For iOS Safari, also account for the top offset (address bar)
+        if (isIOSSafari) {
+          // iOS Safari: Use viewport height and position the container from the top
+          document.documentElement.style.setProperty('--chat-height', `${vh}px`);
+          document.documentElement.style.setProperty('--viewport-offset-top', `${vv.offsetTop}px`);
+        } else {
+          document.documentElement.style.setProperty('--chat-height', `${vh}px`);
+          document.documentElement.style.setProperty('--viewport-offset-top', '0px');
+        }
+      } else {
+        // Fallback for browsers without visualViewport
+        const vh = window.innerHeight;
+        document.documentElement.style.setProperty('--vh', `${vh * 0.01}px`);
+        document.documentElement.style.setProperty('--keyboard-height', '0px');
+        document.documentElement.style.setProperty('--chat-height', `${vh}px`);
+        document.documentElement.style.setProperty('--viewport-offset-top', '0px');
+      }
+    };
+
+    // For iOS Safari, we need additional handling
+    const handleTouchMove = () => {
+      if (isIOSSafari) {
+        // Debounced update during scroll/touch
+        requestAnimationFrame(updateViewportHeight);
+      }
+    };
+
+    const handleFocusIn = () => {
+      // When an input is focused, wait a bit for keyboard to appear then update
+      setTimeout(updateViewportHeight, 100);
+      setTimeout(updateViewportHeight, 300);
+    };
+
+    const handleFocusOut = () => {
+      // When input loses focus, wait for keyboard to hide then update
+      setTimeout(updateViewportHeight, 100);
+    };
+
+    // Initial call
+    updateViewportHeight();
+    // Call again after a short delay to catch any late layout changes
+    setTimeout(updateViewportHeight, 100);
+
+    // Listen for viewport changes (keyboard open/close, browser chrome show/hide)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateViewportHeight);
+      window.visualViewport.addEventListener('scroll', updateViewportHeight);
+    }
+    window.addEventListener('resize', updateViewportHeight);
+    window.addEventListener('orientationchange', updateViewportHeight);
+    
+    // iOS Safari specific listeners
+    if (isIOSSafari) {
+      document.addEventListener('touchmove', handleTouchMove, { passive: true });
+      document.addEventListener('focusin', handleFocusIn);
+      document.addEventListener('focusout', handleFocusOut);
+    }
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', updateViewportHeight);
+        window.visualViewport.removeEventListener('scroll', updateViewportHeight);
+      }
+      window.removeEventListener('resize', updateViewportHeight);
+      window.removeEventListener('orientationchange', updateViewportHeight);
+      
+      if (isIOSSafari) {
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('focusin', handleFocusIn);
+        document.removeEventListener('focusout', handleFocusOut);
+      }
+    };
+  }, []);
+
   const [room, setRoom] = useState(null);
   const [messages, setMessages] = useState([]);
   const [users, setUsers] = useState([]);
@@ -1413,6 +1509,17 @@ const ChatRoom = () => {
 
   const toggleRecipient = (socketId) => setSelectedRecipients(prev => prev.includes(socketId) ? prev.filter(id => id !== socketId) : [...prev, socketId]);
 
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    const originalOverscroll = document.body.style.overscrollBehavior;
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.overscrollBehavior = originalOverscroll;
+    };
+  }, []);
+
   if (error && !isJoined) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -1430,7 +1537,7 @@ const ChatRoom = () => {
 
   return (
     <div
-      className={`h-screen flex flex-col transition-colors duration-500 chat-container ${getVibeById(roomVibe).bgClass}`}
+      className={`flex flex-col transition-colors duration-500 chat-container overflow-hidden ${getVibeById(roomVibe).bgClass}`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -1444,7 +1551,7 @@ const ChatRoom = () => {
           </div>
         </div>
       )}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 sm:py-3 sticky top-0 z-50">
+  <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 sm:py-3 sticky top-0 z-50 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 sm:space-x-4">
             <button onClick={() => navigate('/')} className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
@@ -1549,9 +1656,9 @@ const ChatRoom = () => {
 
       {error && <div className="mx-4 mt-2 bg-red-100 dark:bg-red-900/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-2 rounded-lg text-sm text-center md:w-fit md:mx-auto">{error}</div>}
 
-      <div className={`flex-1 flex overflow-hidden ${sidebarPosition === 'left' ? 'flex-row-reverse' : ''}`}>
-        <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex-1 overflow-y-auto pl-4 lg:pl-10 pr-2 scrollbar-thin">
+      <div className={`flex-1 flex overflow-hidden min-h-0 ${sidebarPosition === 'left' ? 'flex-row-reverse' : ''}`}>
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
+          <div className="flex-1 min-h-0 overflow-y-auto pl-4 lg:pl-10 pr-2 scrollbar-thin overscroll-contain touch-pan-y chat-messages-area">
             <MessageList
               messages={messages}
               currentUser={currentUser}
@@ -1563,7 +1670,7 @@ const ChatRoom = () => {
             />
             <div ref={messagesEndRef} />
           </div>
-          <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 sticky bottom-0 z-50">
+          <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 sticky bottom-0 z-50 shrink-0 chat-input-area">
             {typingUsers.size > 0 && (
               <div className="px-4 py-1 text-xs text-gray-500 dark:text-gray-400 italic animate-pulse bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
                 {Array.from(typingUsers.values()).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
