@@ -416,10 +416,10 @@ app.post('/api/verbal-join', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Verbal code is required' });
     }
 
-    // Validate format: 4 words separated by hyphens
-    const words = verbalCode.toLowerCase().trim().split('-');
+    // Validate format: 4 words separated by spaces
+    const words = verbalCode.toLowerCase().trim().split(/\s+/);
     if (words.length !== 4) {
-      return res.status(400).json({ success: false, error: 'Invalid code format. Expected 4 words separated by hyphens.' });
+      return res.status(400).json({ success: false, error: 'Invalid code format. Expected 4 words separated by spaces.' });
     }
 
     // Look up the token by verbal code

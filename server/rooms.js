@@ -865,7 +865,8 @@ class RoomManager {
    * @returns {{token: string, roomCode: string} | null} The matching token data or null
    */
   findTokenByVerbalCode(verbalCode) {
-    const normalizedCode = verbalCode.toLowerCase().trim();
+    // Normalize: lowercase, trim, and collapse multiple spaces to single space
+    const normalizedCode = verbalCode.toLowerCase().trim().replace(/\s+/g, ' ');
 
     for (const [token, tokenData] of this.inviteTokens.entries()) {
       // Skip expired tokens

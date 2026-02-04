@@ -52,10 +52,10 @@ const Home = ({ children }) => {
       return;
     }
 
-    // Validate format: 4 words separated by hyphens
-    const words = trimmedCode.split('-');
+    // Validate format: 4 words separated by spaces
+    const words = trimmedCode.split(' ').filter(w => w.length > 0);
     if (words.length !== 4) {
-      toast.error('Please enter 4 words separated by hyphens');
+      toast.error('Please enter 4 words separated by spaces');
       return;
     }
 
