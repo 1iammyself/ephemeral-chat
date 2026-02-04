@@ -1,0 +1,145 @@
+{
+  "name": "ephemeral-chat",
+  "version": "1.0.0",
+  "description": "Secure, Temporary Chat Rooms - Desktop App",
+  "main": "main.js",
+  "author": {
+    "name": "Ephemeral Chat",
+    "email": "contact@kyere.me"
+  },
+  "homepage": "https://chat.kyere.me",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cLLeB/ephemeral-chat"
+  },
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win --x64",
+    "build:win:nsis": "electron-builder --win nsis",
+    "build:win:appx": "electron-builder --win appx",
+    "build:win:store": "electron-builder --win appx",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "build:all": "electron-builder --win --mac --linux",
+    "publish": "electron-builder --win --publish always"
+  },
+  "build": {
+    "appId": "me.kyere.chat",
+    "productName": "Ephemeral Chat",
+    "copyright": "Copyright © 2026 Ephemeral Chat",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "icons/**/*",
+      "sounds/**/*"
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "cLLeB",
+      "repo": "ephemeral-chat"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "appx",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "icons/icon.ico",
+      "publisherName": "Caleb Kwabena Kyere Boateng",
+      "signingHashAlgorithms": ["sha256"],
+      "signDlls": true
+    },
+    "appx": {
+      "displayName": "Ephemeral Chat",
+      "identityName": "CalebKwabenaKyereBoateng.Ephchat",
+      "publisher": "CN=6EF69D7C-8974-4D42-8DAD-1C77D5292526",
+      "publisherDisplayName": "Caleb Kwabena Kyere Boateng",
+      "applicationId": "EphemeralChat",
+      "languages": ["en-US"],
+      "showNameOnTiles": true,
+      "backgroundColor": "#4F46E5",
+      "artifactName": "${productName}-${version}-${os}-${arch}.msix"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Ephemeral Chat",
+      "installerIcon": "icons/icon.ico",
+      "uninstallerIcon": "icons/icon.ico",
+      "installerHeaderIcon": "icons/icon.ico",
+      "deleteAppDataOnUninstall": true
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "icons/icon.icns",
+      "category": "public.app-category.social-networking",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "title": "${productName} ${version}",
+      "icon": "icons/icon.icns"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "icons",
+      "category": "Chat;Network;InstantMessaging",
+      "desktop": {
+        "StartupNotify": "true",
+        "Terminal": "false",
+        "Type": "Application",
+        "Categories": "Chat;Network;InstantMessaging"
+      }
+    },
+    "protocols": {
+      "name": "Ephemeral Chat",
+      "schemes": [
+        "ephemeral",
+        "ephemeral-chat"
+      ]
+    }
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "electron-store": "^8.1.0",
+    "electron-updater": "^6.7.3"
+  }
+}

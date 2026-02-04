@@ -144,18 +144,34 @@ const ChatRoom = () => {
     // Detect iOS (includes Chrome on iOS since all iOS browsers use WebKit)
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    
+    // Track if an input is currently focused (keyboard should be open)
+    let inputFocused = false;
+    // Store the initial viewport height (before keyboard)
+    let initialHeight = window.innerHeight;
 
     const updateViewportHeight = () => {
       const vv = window.visualViewport;
       
       if (vv) {
-        const vh = vv.height;
-        document.documentElement.style.setProperty('--vh', `${vh * 0.01}px`);
-        document.documentElement.style.setProperty('--chat-height', `${vh}px`);
+        // Detect if keyboard is likely open by comparing heights
+        const heightDiff = initialHeight - vv.height;
+        const keyboardLikelyOpen = inputFocused && heightDiff > 150;
         
-        const bottomOffset = window.innerHeight - vh - vv.offsetTop;
-        document.documentElement.style.setProperty('--keyboard-height', `${Math.max(0, bottomOffset)}px`);
+        let targetHeight;
+        if (keyboardLikelyOpen) {
+          // Keyboard is open - use visual viewport height (smaller)
+          targetHeight = vv.height;
+        } else {
+          // No keyboard - use inner height (full screen minus browser chrome)
+          targetHeight = window.innerHeight;
+        }
+        
+        document.documentElement.style.setProperty('--vh', `${targetHeight * 0.01}px`);
+        document.documentElement.style.setProperty('--chat-height', `${targetHeight}px`);
+        document.documentElement.style.setProperty('--keyboard-height', keyboardLikelyOpen ? `${heightDiff}px` : '0px');
       } else {
+        // Fallback for browsers without visualViewport
         const vh = window.innerHeight;
         document.documentElement.style.setProperty('--vh', `${vh * 0.01}px`);
         document.documentElement.style.setProperty('--keyboard-height', '0px');
@@ -164,63 +180,85 @@ const ChatRoom = () => {
     };
 
     const scrollToTop = () => {
-      // Scroll the window back to top to keep header visible
       window.scrollTo(0, 0);
       document.body.scrollTop = 0;
       document.documentElement.scrollTop = 0;
     };
 
     const handleFocusIn = (e) => {
-      if (isIOS && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
-        // When keyboard opens on iOS, it scrolls the page - we need to counteract this
-        // Wait for keyboard to appear and iOS to do its auto-scroll, then scroll back
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        inputFocused = true;
+        // Wait for keyboard animation then update
         setTimeout(() => {
-          scrollToTop();
+          if (isIOS) scrollToTop();
           updateViewportHeight();
         }, 100);
         setTimeout(() => {
-          scrollToTop();
+          if (isIOS) scrollToTop();
           updateViewportHeight();
         }, 300);
         setTimeout(() => {
-          scrollToTop();
+          if (isIOS) scrollToTop();
           updateViewportHeight();
         }, 500);
       }
     };
 
-    const handleVisualViewportScroll = () => {
-      if (isIOS) {
-        // When iOS scrolls the visual viewport (to show keyboard), scroll back to top
+    const handleFocusOut = () => {
+      inputFocused = false;
+      // Wait for keyboard to hide then update
+      setTimeout(updateViewportHeight, 100);
+      setTimeout(updateViewportHeight, 300);
+    };
+
+    const handleVisualViewportChange = () => {
+      // Only scroll to top on iOS if input is focused
+      if (isIOS && inputFocused) {
         scrollToTop();
       }
       updateViewportHeight();
     };
 
+    const handleResize = () => {
+      // Update initial height when resizing without keyboard
+      if (!inputFocused) {
+        initialHeight = window.innerHeight;
+      }
+      updateViewportHeight();
+    };
+
+    // Store initial height
+    initialHeight = window.innerHeight;
+    
     // Initial call
     updateViewportHeight();
 
     // Listen for viewport changes
     if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', updateViewportHeight);
-      window.visualViewport.addEventListener('scroll', handleVisualViewportScroll);
+      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
+      window.visualViewport.addEventListener('scroll', handleVisualViewportChange);
     }
-    window.addEventListener('resize', updateViewportHeight);
+    window.addEventListener('resize', handleResize);
     window.addEventListener('orientationchange', () => {
-      setTimeout(updateViewportHeight, 100);
+      setTimeout(() => {
+        initialHeight = window.innerHeight;
+        updateViewportHeight();
+      }, 100);
     });
     
-    // Focus listener for iOS keyboard
+    // Focus listeners for keyboard tracking
     document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
 
     return () => {
       if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', updateViewportHeight);
-        window.visualViewport.removeEventListener('scroll', handleVisualViewportScroll);
+        window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
+        window.visualViewport.removeEventListener('scroll', handleVisualViewportChange);
       }
-      window.removeEventListener('resize', updateViewportHeight);
-      window.removeEventListener('orientationchange', updateViewportHeight);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
       document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
     };
   }, []);
 

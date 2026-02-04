@@ -65,3 +65,24 @@ tmp/
 temp/
 .data/tokensList.json
 android/app/release/
+
+# Electron app
+electron-app/node_modules/
+electron-app/dist/
+electron-app/*.pfx
+electron-app/*.p12
+electron-app/electron-builder.env
+electron-app/icons/icons/
+
+# Chrome extension (if building locally)
+chrome-extension/*.pem
+
+# Build artifacts
+*.exe
+*.appx
+*.msix
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+*.snap
