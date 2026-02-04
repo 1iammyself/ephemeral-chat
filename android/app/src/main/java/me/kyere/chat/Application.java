@@ -15,15 +15,51 @@
  */
 package me.kyere.chat;
 
-
+import android.app.Activity;
+import android.app.Application.ActivityLifecycleCallbacks;
+import android.os.Bundle;
+import android.view.WindowManager;
 
 public class Application extends android.app.Application {
 
-  
-
   @Override
   public void onCreate() {
-      super.onCreate();
-      
+    super.onCreate();
+
+    registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
+      @Override
+      public void onActivityCreated(Activity activity, Bundle savedInstanceState) {
+        applySecureFlag(activity);
+      }
+
+      @Override
+      public void onActivityResumed(Activity activity) {
+        applySecureFlag(activity);
+      }
+
+      @Override
+      public void onActivityStarted(Activity activity) {
+      }
+
+      @Override
+      public void onActivityPaused(Activity activity) {
+      }
+
+      @Override
+      public void onActivityStopped(Activity activity) {
+      }
+
+      @Override
+      public void onActivitySaveInstanceState(Activity activity, Bundle outState) {
+      }
+
+      @Override
+      public void onActivityDestroyed(Activity activity) {
+      }
+    });
+  }
+
+  private static void applySecureFlag(Activity activity) {
+    activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
   }
 }

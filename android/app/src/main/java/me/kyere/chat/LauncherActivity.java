@@ -19,18 +19,16 @@ import android.content.pm.ActivityInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.view.WindowManager; // Added import for WindowManager
+import android.view.WindowManager;
 
 public class LauncherActivity
         extends com.google.androidbrowserhelper.trusted.LauncherActivity {
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // This line blocks screenshots and screen recordings
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, 
-                             WindowManager.LayoutParams.FLAG_SECURE);
-
         super.onCreate(savedInstanceState);
+
+        applySecureFlag();
         
         // Setting an orientation crashes the app due to the transparent background on Android 8.0
         // Oreo and below. We only set the orientation on Oreo and above. This only affects the
@@ -41,6 +39,16 @@ public class LauncherActivity
         } else {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        applySecureFlag();
+    }
+
+    private void applySecureFlag() {
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
     }
 
     @Override
