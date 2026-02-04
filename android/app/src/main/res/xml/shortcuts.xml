@@ -1,6 +1,7 @@
-<shortcuts xmlns:android='http://schemas.android.com/apk/res/android'>
-    <shortcut android:shortcutId='shortcut0' android:enabled='true' android:icon='@drawable/shortcut_0' android:shortcutShortLabel='@string/shortcut_short_name_0' android:shortcutLongLabel='@string/shortcut_name_0'>
-        <intent android:action='android.intent.action.MAIN' android:targetPackage='me.kyere.chat' android:targetClass='me.kyere.chat.LauncherActivity' android:data='https://chat.kyere.me/join' />
-        <categories android:name='android.intent.category.LAUNCHER' />
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="shortcut0" android:enabled="true" android:icon="@drawable/shortcut_0" android:shortcutShortLabel="@string/shortcut_short_name_0" android:shortcutLongLabel="@string/shortcut_name_0">
+        <intent android:action="android.intent.action.MAIN" android:targetPackage="me.kyere.chat" android:targetClass="me.kyere.chat.LauncherActivity" android:data="https://chat.kyere.me/join"/>
+        <categories android:name="android.intent.category.LAUNCHER"/>
     </shortcut>
 </shortcuts>

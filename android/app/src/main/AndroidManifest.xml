@@ -153,7 +153,28 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https"
                     android:host="@string/hostName"
-                
+                />
+            </intent-filter>
+
+            <!-- Deep link intent filter for invite links -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https"
+                    android:host="@string/hostName"
+                    android:pathPrefix="/invite/"
+                />
+            </intent-filter>
+
+            <!-- Deep link intent filter for room links -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https"
+                    android:host="@string/hostName"
+                    android:pathPrefix="/room/"
                 />
             </intent-filter>
 
