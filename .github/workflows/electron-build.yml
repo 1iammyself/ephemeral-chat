@@ -11,6 +11,10 @@ on:
         required: false
         default: ''
 
+# Required permissions for creating releases and uploading artifacts
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
