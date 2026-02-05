@@ -450,11 +450,27 @@ app.post('/api/verbal-join', async (req, res) => {
 
 app.post('/api/rooms', async (req, res) => {
   try {
-    const { messageTTL, password, maxUsers, capToken, creatorId, persistenceMode } = req.body;
+    const { messageTTL, password, maxUsers, capToken, creatorId, persistenceMode, hp_email, hp_website, hp_timestamp } = req.body;
 
     logger.info('HTTP room creation request:', { messageTTL, password, maxUsers, hasCapToken: !!capToken, creatorId: !!creatorId, persistenceMode });
 
-    // Validate Cap token (proof-of-work verification)
+    // Honeypot validation - bots fill these hidden fields, humans don't
+    if (hp_email || hp_website) {
+      logger.warn('Honeypot triggered - bot detected', { hp_email: !!hp_email, hp_website: !!hp_website });
+      // Return success to not alert the bot, but don't create the room
+      return res.json({ success: true, roomCode: 'bot-trap-' + Math.random().toString(36).substring(7) });
+    }
+
+    // Timestamp validation - form should take at least 1 second to fill (bots are instant)
+    if (hp_timestamp) {
+      const formTime = Date.now() - parseInt(hp_timestamp, 10);
+      if (formTime < 1000) { // Less than 1 second
+        logger.warn('Form submitted too quickly - likely bot', { formTime });
+        return res.json({ success: true, roomCode: 'bot-trap-' + Math.random().toString(36).substring(7) });
+      }
+    }
+
+    // Legacy: Validate Cap token if provided (for backward compatibility)
     if (capToken) {
       const isValid = await cap.validateToken(capToken);
       if (!isValid) {
@@ -1047,7 +1063,23 @@ io.on('connection', (socket) => {
 
   socket.on('join-room', async (data, callback) => {
     try {
-      const { roomCode, nickname, password, inviteToken, capToken, sessionToken, userId } = data;
+      const { roomCode, nickname, password, inviteToken, capToken, sessionToken, userId, hp_email, hp_website, hp_timestamp } = data;
+
+      // Honeypot validation - bots fill these hidden fields, humans don't
+      if (hp_email || hp_website) {
+        logger.warn('Honeypot triggered on join - bot detected', { hp_email: !!hp_email, hp_website: !!hp_website });
+        // Return success to not alert the bot, but don't actually join
+        return callback({ success: false, error: 'Room not found' });
+      }
+
+      // Timestamp validation - form should take at least 1 second to fill
+      if (hp_timestamp) {
+        const formTime = Date.now() - parseInt(hp_timestamp, 10);
+        if (formTime < 1000) {
+          logger.warn('Form submitted too quickly on join - likely bot', { formTime });
+          return callback({ success: false, error: 'Room not found' });
+        }
+      }
 
       // 1. Session Resumption Path (Mobile-friendly: check grace period for disconnected sessions)
       if (sessionToken) {

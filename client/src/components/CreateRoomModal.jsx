@@ -1,10 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { X, Check, Copy, Users, Lock, Unlock, Timer, Zap, PartyPopper, Sun, Sunset, Settings, Clock, Shield, Share2 } from 'lucide-react';
 import { sanitizeInput, generateRoomKey } from '../utils/security';
 import { getCreatorId } from '../utils/creator';
 import { useTheme } from '../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
-import '@cap.js/widget';
+// Removed @cap.js/widget - using honeypot instead
 
 const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const API_BASE = import.meta.env.VITE_API_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '');
@@ -16,8 +16,12 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
     maxUsers: 1,
     persistenceMode: 'ephemeral' // NEW: Default to ephemeral mode
   });
-  const [capToken, setCapToken] = useState(null);
-  const [isCapVerified, setIsCapVerified] = useState(false);
+  // Honeypot fields - bots will fill these, humans won't see them
+  const [honeypot, setHoneypot] = useState({
+    hp_email: '',
+    hp_website: '',
+    hp_timestamp: Date.now().toString()
+  });
   const [isCreating, setIsCreating] = useState(false);
   const [createdRoom, setCreatedRoom] = useState(null);
   const [inviteLink, setInviteLink] = useState('');
@@ -32,26 +36,9 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const [roomKey, setRoomKey] = useState(null);
   const navigate = useNavigate();
 
-  // Use callback ref to ensure listener is attached when element mounts
-  const setCapWidgetRef = useCallback((node) => {
-    if (node) {
-      const handleSuccess = (event) => {
-        if (event.detail && event.detail.token) {
-          setCapToken(event.detail.token);
-          setIsCapVerified(true);
-        }
-      };
-      const handleError = (e) => console.error('Cap widget error:', e);
-
-      // Listen for various possible event names to be safe
-      node.addEventListener('cap:success', handleSuccess);
-      node.addEventListener('success', handleSuccess);
-      node.addEventListener('solve', handleSuccess);
-      node.addEventListener('token', handleSuccess);
-
-      node.addEventListener('cap:error', handleError);
-      node.addEventListener('error', handleError);
-    }
+  // Set timestamp when component mounts (for timing-based bot detection)
+  useEffect(() => {
+    setHoneypot(prev => ({ ...prev, hp_timestamp: Date.now().toString() }));
   }, []);
 
   const ttlOptions = [
@@ -95,11 +82,6 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const handleCreate = async (e) => {
     e.preventDefault();
 
-    if (!isCapVerified && !capToken) {
-      alert('Please complete the verification first.');
-      return;
-    }
-
     setIsCreating(true);
 
     try {
@@ -119,7 +101,10 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
           messageTTL: roomSettings.messageTTL !== 'none' ? roomSettings.messageTTL : undefined,
           password: roomSettings.password.trim() || undefined,
           maxUsers: roomSettings.maxUsers,
-          capToken: capToken,
+          // Honeypot fields for bot detection (invisible to users)
+          hp_email: honeypot.hp_email,
+          hp_website: honeypot.hp_website,
+          hp_timestamp: honeypot.hp_timestamp,
           creatorId: creatorId, // NEW: Include creator ID
           persistenceMode: roomSettings.persistenceMode // NEW: Include persistence mode
         }),
@@ -506,32 +491,29 @@ Verbal Code: ${verbalCode || 'N/A'}`;
                 </div>
               </div>
             </div>
-            <div>
-              <div className="flex items-center space-x-2 mb-2 sm:mb-3">
-                <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400" />
-                <label className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">
-                  Verification
-                </label>
-              </div>
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 sm:mb-3">
-                Complete this quick verification to prove you're human
-              </p>
-              <div className="flex justify-center [&_cap-widget]:!bg-transparent [&_cap-widget_*]:!bg-gray-100 dark:[&_cap-widget_*]:!bg-gray-700 [&_cap-widget]:rounded-lg">
-                <cap-widget
-                  ref={setCapWidgetRef}
-                  data-cap-api-endpoint={`${API_BASE}/api/cap/`}
-                  data-theme={theme}
-                  theme={theme}
-                  mode={theme}
-                  className="w-full"
-                />
-              </div>
-              {isCapVerified && (
-                <div className="mt-2 flex items-center justify-center text-green-600 dark:text-green-400 text-sm">
-                  <Check className="w-4 h-4 mr-1" />
-                  Verified
-                </div>
-              )}
+            
+            {/* Honeypot fields - invisible to humans, bots will fill them */}
+            <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', opacity: 0, height: 0, overflow: 'hidden' }}>
+              <label htmlFor="hp_email">Email (leave empty)</label>
+              <input
+                type="email"
+                id="hp_email"
+                name="hp_email"
+                tabIndex={-1}
+                autoComplete="off"
+                value={honeypot.hp_email}
+                onChange={(e) => setHoneypot(prev => ({ ...prev, hp_email: e.target.value }))}
+              />
+              <label htmlFor="hp_website">Website (leave empty)</label>
+              <input
+                type="url"
+                id="hp_website"
+                name="hp_website"
+                tabIndex={-1}
+                autoComplete="off"
+                value={honeypot.hp_website}
+                onChange={(e) => setHoneypot(prev => ({ ...prev, hp_website: e.target.value }))}
+              />
             </div>
 
             {/* Actions */}

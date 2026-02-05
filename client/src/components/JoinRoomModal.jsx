@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MessageCircle, Lock, Users, AlertCircle, Check, Loader2, Shield, Clock, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
-import '@cap.js/widget';
+// Removed @cap.js/widget - using honeypot instead
 
 const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite = false, isWaitingForHost = false }) => {
   const API_BASE = import.meta.env.VITE_API_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '');
@@ -19,29 +19,16 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
   const [isCheckingInvite, setIsCheckingInvite] = useState(false);
   const [inviteToken, setInviteToken] = useState(null);
   const [requiresPassword, setRequiresPassword] = useState(false);
-  const [capToken, setCapToken] = useState(null);
-  const [isCapVerified, setIsCapVerified] = useState(false);
+  // Honeypot fields - bots will fill these, humans won't see them
+  const [honeypot, setHoneypot] = useState({
+    hp_email: '',
+    hp_website: '',
+    hp_timestamp: Date.now().toString()
+  });
 
-  // Use callback ref to ensure listener is attached when element mounts
-  const setCapWidgetRef = useCallback((node) => {
-    if (node) {
-      const handleSuccess = (event) => {
-        if (event.detail && event.detail.token) {
-          setCapToken(event.detail.token);
-          setIsCapVerified(true);
-        }
-      };
-      const handleError = (e) => console.error('Cap widget error:', e);
-
-      // Listen for various possible event names to be safe
-      node.addEventListener('cap:success', handleSuccess);
-      node.addEventListener('success', handleSuccess);
-      node.addEventListener('solve', handleSuccess);
-      node.addEventListener('token', handleSuccess);
-
-      node.addEventListener('cap:error', handleError);
-      node.addEventListener('error', handleError);
-    }
+  // Set timestamp when component mounts (for timing-based bot detection)
+  useEffect(() => {
+    setHoneypot(prev => ({ ...prev, hp_timestamp: Date.now().toString() }));
   }, []);
 
   // Check for invite token in URL or location state
@@ -141,15 +128,6 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
-    if (!isCapVerified && !capToken) {
-      // If we have an invite token, maybe we skip captcha? 
-      // But for now let's enforce it unless logic says otherwise.
-      // Assuming invite token bypasses password but maybe not captcha?
-      // Let's enforce captcha for all joins to be safe.
-      return;
-    }
-
     setIsJoining(true);
 
     // Prepare join data - normalize nickname to lowercase for consistent watermark hashing
@@ -157,7 +135,10 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
     const joinData = {
       nickname: normalizedNickname,
       password: password.trim(),
-      capToken: capToken
+      // Honeypot fields for bot detection (invisible to users)
+      hp_email: honeypot.hp_email,
+      hp_website: honeypot.hp_website,
+      hp_timestamp: honeypot.hp_timestamp
     };
 
     if (fromInvite && inviteValid) {
@@ -301,38 +282,35 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
               </div>
             )}
 
-            {/* Cap Verification Widget */}
-            <div className="mb-6">
-              <div className="flex items-center space-x-2 mb-2">
-                <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Verification
-                </label>
-              </div>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                Complete this quick verification to prove you're human
-              </p>
-              <div className="flex justify-center [&_cap-widget]:!bg-transparent [&_cap-widget_*]:!bg-gray-100 dark:[&_cap-widget_*]:!bg-gray-700 [&_cap-widget]:rounded-lg">
-                <cap-widget
-                  ref={setCapWidgetRef}
-                  data-cap-api-endpoint={`${API_BASE}/api/cap/`}
-                  data-theme={theme}
-                  className="w-full"
-                />
-              </div>
-              {isCapVerified && (
-                <div className="mt-2 flex items-center justify-center text-green-600 dark:text-green-400 text-sm">
-                  <Check className="w-4 h-4 mr-1" />
-                  Verified
-                </div>
-              )}
+            {/* Honeypot fields - invisible to humans, bots will fill them */}
+            <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', opacity: 0, height: 0, overflow: 'hidden' }}>
+              <label htmlFor="hp_email_join">Email (leave empty)</label>
+              <input
+                type="email"
+                id="hp_email_join"
+                name="hp_email"
+                tabIndex={-1}
+                autoComplete="off"
+                value={honeypot.hp_email}
+                onChange={(e) => setHoneypot(prev => ({ ...prev, hp_email: e.target.value }))}
+              />
+              <label htmlFor="hp_website_join">Website (leave empty)</label>
+              <input
+                type="url"
+                id="hp_website_join"
+                name="hp_website"
+                tabIndex={-1}
+                autoComplete="off"
+                value={honeypot.hp_website}
+                onChange={(e) => setHoneypot(prev => ({ ...prev, hp_website: e.target.value }))}
+              />
             </div>
 
             <div className="flex flex-col space-y-3">
               <button
                 type="submit"
-                disabled={isJoining || isProcessingInvite || (!isCapVerified && !capToken)}
-                className={`w-full py-2 px-4 rounded-lg font-medium text-white ${isJoining || isProcessingInvite || (!isCapVerified && !capToken) ? 'bg-blue-400 dark:bg-blue-500' : 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700'
+                disabled={isJoining || isProcessingInvite}
+                className={`w-full py-2 px-4 rounded-lg font-medium text-white ${isJoining || isProcessingInvite ? 'bg-blue-400 dark:bg-blue-500' : 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700'
                   } transition-colors flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed`}
               >
                 {isJoining || isProcessingInvite ? (

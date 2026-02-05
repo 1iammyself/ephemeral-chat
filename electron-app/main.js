@@ -164,13 +164,15 @@ function setupSecurity(window) {
   }
 
   // Content Security Policy
+  // Note: We don't override CSP - let the server's CSP be used
+  // The cap.js widget needs blob: and worker-src which the server already provides
+  // Overriding CSP here was breaking cap.js proof-of-work verification
+  
+  // Only add security headers that don't conflict with the app
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': ["default-src 'self' https://chat.kyere.me wss://chat.kyere.me; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://chat.kyere.me; style-src 'self' 'unsafe-inline' https://chat.kyere.me https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://chat.kyere.me wss://chat.kyere.me;"]
-      }
-    });
+    // Don't modify CSP - let the server handle it
+    // Just pass through the response headers as-is
+    callback({ responseHeaders: details.responseHeaders });
   });
 
   // Screen capture protection (Windows)
@@ -271,6 +273,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      // Sandbox enabled for maximum security - honeypot verification works without Web Workers
       sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
