@@ -139,34 +139,43 @@ const ChatRoom = () => {
     };
   }, [isResizingSidebar, sidebarPosition]);
 
-  // Visual Viewport handler for mobile keyboard and browser chrome
+  // Visual Viewport handler for mobile keyboard and browser chrome - IMPROVED FOR ANDROID
+  // This entire useEffect should REPLACE the existing viewport handler (lines 142-205 in ChatRoom.jsx)
   useEffect(() => {
-    // Detect iOS (includes Chrome on iOS since all iOS browsers use WebKit)
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+    // Detect mobile OS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    
-    // Track if an input is currently focused (keyboard should be open)
+
+    const isAndroid = /Android/.test(navigator.userAgent);
+
+    // Track if an input is currently focused
     let inputFocused = false;
+
     // Store the initial viewport height (before keyboard)
     let initialHeight = window.innerHeight;
+    let initialVisualHeight = window.visualViewport?.height || window.innerHeight;
 
     const updateViewportHeight = () => {
       const vv = window.visualViewport;
-      
+
       if (vv) {
-        // Detect if keyboard is likely open by comparing heights
-        const heightDiff = initialHeight - vv.height;
-        const keyboardLikelyOpen = inputFocused && heightDiff > 150;
-        
+        // Calculate height difference from initial state
+        const heightDiff = initialVisualHeight - vv.height;
+
+        // Android-specific: keyboard detection is more reliable with a lower threshold
+        const keyboardThreshold = isAndroid ? 100 : 150;
+        const keyboardLikelyOpen = inputFocused && heightDiff > keyboardThreshold;
+
         let targetHeight;
         if (keyboardLikelyOpen) {
-          // Keyboard is open - use visual viewport height (smaller)
+          // Keyboard is open - use visual viewport height
           targetHeight = vv.height;
         } else {
-          // No keyboard - use inner height (full screen minus browser chrome)
+          // No keyboard - use inner height
           targetHeight = window.innerHeight;
         }
-        
+
+        // Update CSS custom properties
         document.documentElement.style.setProperty('--vh', `${targetHeight * 0.01}px`);
         document.documentElement.style.setProperty('--chat-height', `${targetHeight}px`);
         document.documentElement.style.setProperty('--keyboard-height', keyboardLikelyOpen ? `${heightDiff}px` : '0px');
@@ -180,83 +189,102 @@ const ChatRoom = () => {
     };
 
     const scrollToTop = () => {
-      window.scrollTo(0, 0);
-      document.body.scrollTop = 0;
-      document.documentElement.scrollTop = 0;
+      // Prevent page scroll on Android
+      if (isAndroid) {
+        window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+        document.documentElement.scrollTop = 0;
+      }
     };
 
+    // Input focus handlers to track keyboard state
     const handleFocusIn = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
         inputFocused = true;
-        // Wait for keyboard animation then update
-        setTimeout(() => {
-          if (isIOS) scrollToTop();
-          updateViewportHeight();
-        }, 100);
-        setTimeout(() => {
-          if (isIOS) scrollToTop();
-          updateViewportHeight();
-        }, 300);
-        setTimeout(() => {
-          if (isIOS) scrollToTop();
-          updateViewportHeight();
-        }, 500);
+
+        // Android-specific: Force viewport update after a short delay
+        if (isAndroid) {
+          setTimeout(() => {
+            updateViewportHeight();
+            scrollToTop();
+          }, 100);
+
+          // Additional update after keyboard animation completes
+          setTimeout(() => {
+            updateViewportHeight();
+          }, 400);
+        } else {
+          // iOS behavior
+          setTimeout(() => {
+            if (isIOS) scrollToTop();
+            updateViewportHeight();
+          }, 100);
+        }
       }
     };
 
-    const handleFocusOut = () => {
-      inputFocused = false;
-      // Wait for keyboard to hide then update
-      setTimeout(updateViewportHeight, 100);
-      setTimeout(updateViewportHeight, 300);
-    };
+    const handleFocusOut = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        inputFocused = false;
 
-    const handleVisualViewportChange = () => {
-      // Only scroll to top on iOS if input is focused
-      if (isIOS && inputFocused) {
-        scrollToTop();
+        // Android-specific: Force viewport update after keyboard closes
+        if (isAndroid) {
+          setTimeout(() => {
+            updateViewportHeight();
+            scrollToTop();
+          }, 100);
+        } else {
+          setTimeout(() => {
+            updateViewportHeight();
+          }, 100);
+        }
       }
-      updateViewportHeight();
     };
 
-    const handleResize = () => {
-      // Update initial height when resizing without keyboard
-      if (!inputFocused) {
-        initialHeight = window.innerHeight;
-      }
-      updateViewportHeight();
-    };
-
-    // Store initial height
-    initialHeight = window.innerHeight;
-    
-    // Initial call
+    // Initial setup
     updateViewportHeight();
+    scrollToTop();
 
     // Listen for viewport changes
     if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
-      window.visualViewport.addEventListener('scroll', handleVisualViewportChange);
+      window.visualViewport.addEventListener('resize', updateViewportHeight);
+      window.visualViewport.addEventListener('scroll', scrollToTop);
     }
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('orientationchange', () => {
-      setTimeout(() => {
-        initialHeight = window.innerHeight;
-        updateViewportHeight();
-      }, 100);
-    });
-    
-    // Focus listeners for keyboard tracking
+
+    // Listen for window resize (fallback)
+    window.addEventListener('resize', updateViewportHeight);
+
+    // Listen for input focus/blur to track keyboard state
     document.addEventListener('focusin', handleFocusIn);
     document.addEventListener('focusout', handleFocusOut);
 
+    // Android-specific: Prevent scroll when input is focused
+    if (isAndroid) {
+      const preventScroll = (e) => {
+        if (inputFocused) {
+          window.scrollTo(0, 0);
+        }
+      };
+      window.addEventListener('scroll', preventScroll, { passive: false });
+
+      return () => {
+        if (window.visualViewport) {
+          window.visualViewport.removeEventListener('resize', updateViewportHeight);
+          window.visualViewport.removeEventListener('scroll', scrollToTop);
+        }
+        window.removeEventListener('resize', updateViewportHeight);
+        window.removeEventListener('scroll', preventScroll);
+        document.removeEventListener('focusin', handleFocusIn);
+        document.removeEventListener('focusout', handleFocusOut);
+      };
+    }
+
     return () => {
       if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
-        window.visualViewport.removeEventListener('scroll', handleVisualViewportChange);
+        window.visualViewport.removeEventListener('resize', updateViewportHeight);
+        window.visualViewport.removeEventListener('scroll', scrollToTop);
       }
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', handleResize);
+      window.removeEventListener('resize', updateViewportHeight);
       document.removeEventListener('focusin', handleFocusIn);
       document.removeEventListener('focusout', handleFocusOut);
     };
@@ -1579,7 +1607,7 @@ const ChatRoom = () => {
           </div>
         </div>
       )}
-  <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 sm:py-3 sticky top-0 z-50 shrink-0">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 sm:py-3 sticky top-0 z-50 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 sm:space-x-4">
             <button onClick={() => navigate('/')} className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
@@ -2048,15 +2076,32 @@ const ChatRoom = () => {
                         onCut={(e) => e.preventDefault()}
                         onPaste={(e) => e.preventDefault()}
                         onFocus={() => {
-                          // Force a small scroll into view for some mobile browsers
-                          setTimeout(() => {
-                            messageInputRef.current?.scrollIntoView({ block: 'center' });
-                          }, 100);
+                          // Android-specific: Prevent scroll and ensure input stays visible
+                          const isAndroid = /Android/.test(navigator.userAgent);
+
+                          if (isAndroid) {
+                            // Prevent default scroll behavior
+                            setTimeout(() => {
+                              // Scroll the input container into view, not the input itself
+                              const inputContainer = messageInputRef.current?.closest('.chat-input-area');
+                              if (inputContainer) {
+                                inputContainer.scrollIntoView({ block: 'end', behavior: 'smooth' });
+                              }
+                              // Keep page at top to prevent keyboard from pushing content
+                              window.scrollTo(0, 0);
+                            }, 100);
+                          } else {
+                            // iOS behavior - original code
+                            setTimeout(() => {
+                              messageInputRef.current?.scrollIntoView({ block: 'center' });
+                            }, 100);
+                          }
                         }}
                         onBlur={() => {
-                          // Fix for iOS Safari "pushed up" layout bug
+                          // Reset scroll position
                           window.scrollTo(0, 0);
                         }}
+
                         placeholder="Type message..."
                         className="w-full input-field py-2.5 sm:py-3 px-3 sm:px-4 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 text-sm sm:text-base"
                         disabled={!isConnected || isSending}

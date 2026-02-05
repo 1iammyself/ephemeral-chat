@@ -31,6 +31,12 @@
     /* Safe area for iPhone notch/home indicator */
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    /* CRITICAL for Android: prevent body scroll when keyboard opens */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
   }
 
   /* Ensure the input area never gets hidden */
@@ -39,6 +45,8 @@
     position: relative;
     background: inherit;
     z-index: 50;
+    /* Android-specific: ensure input stays above keyboard */
+    min-height: 60px;
   }
 
   /* Message area should scroll */
@@ -48,6 +56,8 @@
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+    /* Android fix: prevent overscroll bounce that can hide input */
+    overscroll-behavior-y: none;
   }
 }
 
