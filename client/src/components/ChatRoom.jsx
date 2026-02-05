@@ -531,7 +531,13 @@ const ChatRoom = () => {
   const handleFileTransferInvite = useCallback(({ from, fromId, roomCode: targetRoomCode, recipients: targetedTo }) => {
     // Determine if we should show this
     const myId = socketManager.socket?.id;
-    if (fromId === myId) return; // Ignore self
+    
+    // CRITICAL: Ignore if this is from ourselves (sender should never see their own invite)
+    if (!myId || fromId === myId) {
+      console.log('[FileTransfer] Ignoring invite from self or no socket id', { fromId, myId });
+      return;
+    }
+    
     if (targetRoomCode !== roomCode) return; // Ignore other rooms
 
     // If targeted, check if we are a recipient

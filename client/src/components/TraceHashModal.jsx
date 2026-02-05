@@ -110,12 +110,15 @@ const TraceHashModal = ({ onClose }) => {
                                     <Users className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
                                     <textarea
                                         value={usernamesInput}
-                                        onChange={(e) => setUsernamesInput(e.target.value)}
+                                        onChange={(e) => setUsernamesInput(e.target.value.toLowerCase())}
                                         placeholder="Paste room participants here... (comma or line separated)"
-                                        className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all min-h-[120px] text-sm"
+                                        className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all min-h-[120px] text-sm lowercase"
                                         required
                                     />
                                 </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    Usernames are automatically converted to lowercase (hashes are case-sensitive)
+                                </p>
                             </div>
 
                             <button

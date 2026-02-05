@@ -1756,7 +1756,7 @@ io.on('connection', (socket) => {
     const from = socket.nickname || 'Unknown';
     const fromId = socket.id;
 
-    logger.info(`📁 [Intent] From: ${from} recipients: ${recipients?.length || 'all'}`);
+    logger.info(`📁 [File Transfer Intent] From: ${from} (${fromId}) recipients: ${recipients?.length || 'all'}`);
 
     const payload = {
       from,
@@ -1765,17 +1765,23 @@ io.on('connection', (socket) => {
       recipients: (recipients && recipients.length > 0) ? recipients : null
     };
 
-    if (payload.recipients) {
-      // Notify specific users, but EXCLUDE the sender even if they are in the list
+    if (recipients && recipients.length > 0) {
+      // Notify ONLY the specific targeted users, EXCLUDING the sender
       const targetIds = recipients.filter(id => id !== socket.id);
 
+      if (targetIds.length === 0) {
+        logger.info(`   -> No valid recipients after filtering sender`);
+        return;
+      }
+
       targetIds.forEach(recipientId => {
-        logger.info(`   -> Sending invite to: ${recipientId}`);
+        logger.info(`   -> Sending targeted invite to: ${recipientId}`);
         io.to(recipientId).emit('file-transfer-invite', payload);
       });
     } else {
-      // Broadcast to all (except sender) - socket.to() already handles this exclusion
-      logger.info(`   -> Broadcasting invite to room: ${roomCode}`);
+      // Broadcast to ALL users in room EXCEPT the sender
+      // socket.to() automatically excludes the sender socket
+      logger.info(`   -> Broadcasting invite to room: ${roomCode} (excluding sender: ${fromId})`);
       socket.to(roomCode).emit('file-transfer-invite', payload);
     }
   });
