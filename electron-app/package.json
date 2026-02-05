@@ -10,7 +10,7 @@
   "homepage": "https://chat.kyere.me",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cLLeB/ephemeral-chat"
+    "url": "https://github.com/1iammyself/ephemeral-chat"
   },
   "license": "MIT",
   "scripts": {
@@ -43,7 +43,7 @@
     ],
     "publish": {
       "provider": "github",
-      "owner": "cLLeB",
+      "owner": "1iammyself",
       "repo": "ephemeral-chat"
     },
     "win": {
