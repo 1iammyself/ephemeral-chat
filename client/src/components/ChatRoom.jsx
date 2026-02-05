@@ -213,12 +213,25 @@ const ChatRoom = () => {
           setTimeout(() => {
             updateViewportHeight();
           }, 400);
-        } else {
-          // iOS behavior
+        } else if (isIOS) {
+          // iOS-specific: More aggressive updates during keyboard animation
           setTimeout(() => {
-            if (isIOS) scrollToTop();
             updateViewportHeight();
-          }, 100);
+          }, 50);
+          setTimeout(() => {
+            updateViewportHeight();
+            scrollToTop();
+          }, 150);
+          setTimeout(() => {
+            updateViewportHeight();
+            scrollToTop();
+          }, 300);
+          setTimeout(() => {
+            updateViewportHeight();
+            scrollToTop();
+          }, 500);
+        } else {
+          updateViewportHeight();
         }
       }
     };
@@ -531,13 +544,13 @@ const ChatRoom = () => {
   const handleFileTransferInvite = useCallback(({ from, fromId, roomCode: targetRoomCode, recipients: targetedTo }) => {
     // Determine if we should show this
     const myId = socketManager.socket?.id;
-    
+
     // CRITICAL: Ignore if this is from ourselves (sender should never see their own invite)
     if (!myId || fromId === myId) {
       console.log('[FileTransfer] Ignoring invite from self or no socket id', { fromId, myId });
       return;
     }
-    
+
     if (targetRoomCode !== roomCode) return; // Ignore other rooms
 
     // If targeted, check if we are a recipient
@@ -2082,27 +2095,41 @@ const ChatRoom = () => {
                         onCut={(e) => e.preventDefault()}
                         onPaste={(e) => e.preventDefault()}
                         onFocus={() => {
-                          // Android-specific: Prevent scroll and ensure input stays visible
                           const isAndroid = /Android/.test(navigator.userAgent);
+                          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
                           if (isAndroid) {
-                            // Prevent default scroll behavior
+                            // Android behavior - prevent scroll and ensure input stays visible
                             setTimeout(() => {
-                              // Scroll the input container into view, not the input itself
                               const inputContainer = messageInputRef.current?.closest('.chat-input-area');
                               if (inputContainer) {
                                 inputContainer.scrollIntoView({ block: 'end', behavior: 'smooth' });
                               }
-                              // Keep page at top to prevent keyboard from pushing content
                               window.scrollTo(0, 0);
                             }, 100);
-                          } else {
-                            // iOS behavior - original code
+                          } else if (isIOS) {
+                            // iOS-specific: Scroll input into view with proper timing
+                            // First scroll brings input into view
                             setTimeout(() => {
-                              messageInputRef.current?.scrollIntoView({ block: 'center' });
-                            }, 100);
+                              messageInputRef.current?.scrollIntoView({
+                                block: 'nearest',
+                                behavior: 'smooth'
+                              });
+                            }, 300);
+                            // Second scroll after keyboard is fully visible ensures proper positioning
+                            setTimeout(() => {
+                              const inputContainer = messageInputRef.current?.closest('.chat-input-area');
+                              if (inputContainer) {
+                                inputContainer.scrollIntoView({
+                                  block: 'end',
+                                  behavior: 'smooth'
+                                });
+                              }
+                            }, 600);
                           }
                         }}
+
                         onBlur={() => {
                           // Reset scroll position
                           window.scrollTo(0, 0);

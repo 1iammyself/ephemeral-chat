@@ -428,3 +428,24 @@ cap-widget {
 .animate-slideUp {
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* iOS STANDALONE (PWA) FIXES */
+/* iOS Standalone - Proper safe area handling */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .chat-container {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* iOS Standalone - Additional top spacing for status bar to prevent content going behind notch */
+@media all and (display-mode: standalone) {
+  .chat-container {
+    padding-top: max(env(safe-area-inset-top), 20px);
+  }
+  
+  /* Ensure header doesn't go behind status bar */
+  .chat-container > :first-child {
+    margin-top: env(safe-area-inset-top, 0px);
+  }
+}
