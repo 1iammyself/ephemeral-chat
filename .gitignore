@@ -86,3 +86,20 @@ chrome-extension/*.pem
 *.deb
 *.rpm
 *.snap
+
+# Capacitor Android sensitive files
+client/android/gradle.properties
+client/android/local.properties
+client/android/app/build/
+client/android/build/
+client/android/*.keystore
+client/android/*.jks
+
+# Signing keys (never commit these)
+*.keystore
+*.jks
+*.p12
+*.pfx
+signing*.properties
+keystore.properties
+release.properties

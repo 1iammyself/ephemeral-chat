@@ -1,6 +1,6 @@
 {
   "name": "ephemeral-chat",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Secure, Temporary Chat Rooms - Desktop App",
   "main": "main.js",
   "author": {
@@ -75,7 +75,7 @@
     "appx": {
       "displayName": "Ephemeral Chat",
       "identityName": "CalebKwabenaKyereBoateng.Ephchat",
-      "publisher": "CN=6EF69D7C-8974-4D42-8DAD-1C77D5292526",
+      "publisher": "CN=6EE69D7C-8974-4D42-8DAD-1C77D5292526",
       "publisherDisplayName": "Caleb Kwabena Kyere Boateng",
       "applicationId": "EphemeralChat",
       "languages": ["en-US"],
