@@ -429,9 +429,15 @@ cap-widget {
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* iOS Standalone - Minimal Fix (targets only first element, not whole container) */
+
+
+/* iOS STANDALONE FIX - Moves chat container to start BELOW status bar */
 @media all and (display-mode: standalone) {
-  .chat-container > :first-child {
-    padding-top: env(safe-area-inset-top, 44px);
+  .chat-container {
+    /* Start below the status bar instead of at top: 0 */
+    top: env(safe-area-inset-top, 44px) !important;
+    
+    /* Adjust height so container doesn't overflow bottom */
+    height: calc(var(--chat-height, 100dvh) - env(safe-area-inset-top, 44px)) !important;
   }
 }
