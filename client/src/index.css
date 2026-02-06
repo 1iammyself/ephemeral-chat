@@ -484,3 +484,29 @@ cap-widget {
     max-height: var(--chat-height, 100dvh) !important;
   }
 }
+
+@supports (-webkit-touch-callout: none) {
+  /* iOS-specific using feature detection */
+
+  .chat-input-area {
+    /* Stick to bottom of visual viewport */
+    position: sticky;
+    bottom: 0;
+    z-index: 100;
+
+    /* Ensure background covers any gap */
+    background: inherit;
+
+    /* Prevent gap by ensuring full width */
+    width: 100%;
+    margin: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  /* Make sure messages area accounts for sticky input */
+  .chat-messages-area {
+    /* Reduce height to account for sticky input */
+    padding-bottom: 80px;
+    /* Approximate input height */
+  }
+}

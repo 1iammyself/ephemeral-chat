@@ -69,16 +69,25 @@
       ],
       "icon": "icons/icon.ico",
       "publisherName": "Caleb Kwabena Kyere Boateng",
-      "signingHashAlgorithms": ["sha256"],
+      "signingHashAlgorithms": [
+        "sha256"
+      ],
       "signDlls": true
     },
     "appx": {
+      "capabilities": [
+        "internetClient",
+        "microphone",
+        "webcam"
+      ],
       "displayName": "Ephemeral Chat",
       "identityName": "CalebKwabenaKyereBoateng.Ephchat",
       "publisher": "CN=6EE69D7C-8974-4D42-8DAD-1C77D5292526",
       "publisherDisplayName": "Caleb Kwabena Kyere Boateng",
       "applicationId": "EphemeralChat",
-      "languages": ["en-US"],
+      "languages": [
+        "en-US"
+      ],
       "showNameOnTiles": true,
       "backgroundColor": "#4F46E5",
       "artifactName": "${productName}-${version}-${os}-${arch}.msix"

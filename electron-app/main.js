@@ -3,14 +3,14 @@
  * Full-featured desktop app with security, notifications, auto-updates, and power user features
  */
 
-const { 
-  app, 
-  BrowserWindow, 
-  Menu, 
-  Tray, 
-  shell, 
-  ipcMain, 
-  nativeImage, 
+const {
+  app,
+  BrowserWindow,
+  Menu,
+  Tray,
+  shell,
+  ipcMain,
+  nativeImage,
   globalShortcut,
   Notification,
   dialog,
@@ -55,7 +55,7 @@ let lastActivity = Date.now();
 
 function setupAutoUpdater() {
   if (isDev) return;
-  
+
   autoUpdater.autoDownload = store.get('autoUpdate');
   autoUpdater.autoInstallOnAppQuit = true;
 
@@ -84,7 +84,7 @@ function setupAutoUpdater() {
     if (mainWindow) {
       mainWindow.setProgressBar(-1);
     }
-    
+
     const response = dialog.showMessageBoxSync(mainWindow, {
       type: 'info',
       title: 'Update Ready',
@@ -119,7 +119,7 @@ function setupAutoUpdater() {
 
 function showNotification(title, body, onClick) {
   if (!store.get('notificationsEnabled')) return;
-  
+
   const notification = new Notification({
     title,
     body,
@@ -135,6 +135,7 @@ function showNotification(title, body, onClick) {
 }
 
 // ==================== SECURITY ====================
+
 
 function setupSecurity(window) {
   const securityMode = store.get('securityMode');
@@ -167,7 +168,7 @@ function setupSecurity(window) {
   // Note: We don't override CSP - let the server's CSP be used
   // The cap.js widget needs blob: and worker-src which the server already provides
   // Overriding CSP here was breaking cap.js proof-of-work verification
-  
+
   // Only add security headers that don't conflict with the app
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     // Don't modify CSP - let the server handle it
@@ -180,18 +181,36 @@ function setupSecurity(window) {
     window.setContentProtection(true);
   }
 
-  // Block screen capture API
-  if (securityMode === 'high') {
-    window.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
-      // Only block screen capture and DRM, allow camera/mic
+  // Permission handling
+  // We explicitly handle permissions to ensure camera/mic works while blocking others if needed
+  window.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+    // Always allow camera and microphone
+    if (permission === 'media') {
+      callback(true);
+      return;
+    }
+
+    // High security mode blocks
+    if (securityMode === 'high') {
       const blockedPermissions = ['display-capture', 'mediaKeySystem'];
       if (blockedPermissions.includes(permission)) {
         callback(false);
-      } else {
-        callback(true);
+        return;
       }
-    });
-  }
+    }
+
+    // Allow others by default
+    callback(true);
+  });
+
+  // Also handle permission checks (e.g. navigator.permissions.query)
+  window.webContents.session.setPermissionCheckHandler((webContents, permission) => {
+    if (permission === 'media') {
+      return true;
+    }
+    // Return null to use default behavior for others
+    return null;
+  });
 }
 
 // Clipboard protection - clear sensitive data
@@ -202,8 +221,8 @@ function setupClipboardProtection() {
   mainWindow.on('blur', () => {
     const clipboardText = clipboard.readText();
     // Don't clear if it looks like a verbal code or invite link
-    if (clipboardText.includes('chat.kyere.me') || 
-        /^[a-z]+ [a-z]+ [a-z]+ [a-z]+$/i.test(clipboardText)) {
+    if (clipboardText.includes('chat.kyere.me') ||
+      /^[a-z]+ [a-z]+ [a-z]+ [a-z]+$/i.test(clipboardText)) {
       // Clear after 30 seconds
       setTimeout(() => {
         const currentText = clipboard.readText();
@@ -219,24 +238,24 @@ function setupClipboardProtection() {
 
 function setupIdleDetection() {
   const idleTimeout = store.get('idleTimeout') * 60 * 1000; // Convert to ms
-  
+
   if (idleTimeout <= 0) return;
 
   // Track activity
   const updateActivity = () => {
     lastActivity = Date.now();
     if (idleTimer) clearTimeout(idleTimer);
-    
+
     idleTimer = setTimeout(() => {
       if (!mainWindow) return;
-      
+
       // Show warning before auto-lock
       mainWindow.webContents.executeJavaScript(`
         if (typeof showIdleWarning === 'function') {
           showIdleWarning();
         }
-      `).catch(() => {});
-      
+      `).catch(() => { });
+
       showNotification('Idle Warning', 'You have been inactive. The app will lock soon for security.');
     }, idleTimeout);
   };
@@ -355,7 +374,7 @@ function createWindow() {
 
 function createTray() {
   const iconPath = path.join(__dirname, 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
-  
+
   let trayIcon;
   try {
     trayIcon = nativeImage.createFromPath(iconPath);
@@ -746,11 +765,11 @@ function registerShortcuts() {
 function handleDeepLink(url) {
   // Handle ephemeral:// and ephemeral-chat:// URLs
   // e.g., ephemeral://join/verbal-code or ephemeral://room/ROOMCODE
-  
+
   if (!url) return;
-  
+
   let path = url.replace(/^ephemeral(-chat)?:\/\//, '');
-  
+
   if (path.startsWith('join/')) {
     const code = path.replace('join/', '');
     mainWindow.loadURL(`${CHAT_URL}?join=${encodeURIComponent(code)}`);
