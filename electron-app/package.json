@@ -75,7 +75,7 @@
       "signDlls": true
     },
     "appx": {
-      "displayName": "Ephemeral Chat",
+      "displayName": "Ephchat",
       "identityName": "CalebKwabenaKyereBoateng.Ephchat",
       "publisher": "CN=6EE69D7C-8974-4D42-8DAD-1C77D5292526",
       "publisherDisplayName": "Caleb Kwabena Kyere Boateng",
@@ -85,6 +85,7 @@
       ],
       "showNameOnTiles": true,
       "backgroundColor": "#4F46E5",
+      "minVersion": "10.0.16299.0",
       "artifactName": "${productName}-${version}-${os}-${arch}.msix"
     },
     "nsis": {

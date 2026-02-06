@@ -776,6 +776,10 @@ function handleDeepLink(url) {
   } else if (path.startsWith('room/')) {
     const roomCode = path.replace('room/', '');
     mainWindow.loadURL(`${CHAT_URL}/room/${roomCode}`);
+  } else if (path.startsWith('invite/')) {
+    // For direct invite links (like in the image), we just append the path to the base URL
+    // This preserves the full ID and the #hash encryption key
+    mainWindow.loadURL(`${CHAT_URL}/${path}`);
   } else if (path.startsWith('create')) {
     mainWindow.loadURL(`${CHAT_URL}?action=create`);
   } else {
