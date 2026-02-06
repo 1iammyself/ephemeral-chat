@@ -159,26 +159,53 @@ const ChatRoom = () => {
       const vv = window.visualViewport;
 
       if (vv) {
-        // Calculate height difference from initial state
-        const heightDiff = initialVisualHeight - vv.height;
+        // On iOS Safari, visualViewport.height includes the keyboard
+        // But it may also include an offset from the top when page scrolls
+        const visualHeight = vv.height;
+        const visualOffsetTop = vv.offsetTop || 0;
 
-        // Android-specific: keyboard detection is more reliable with a lower threshold
+        // Calculate height difference from the initial visual viewport
+        const heightDiff = initialVisualHeight - visualHeight;
+
+        // Keyboard detection:
+        // - Android: use a lower threshold (100px)
+        // - iOS: use the height difference plus check if input is focused
         const keyboardThreshold = isAndroid ? 100 : 150;
         const keyboardLikelyOpen = inputFocused && heightDiff > keyboardThreshold;
 
         let targetHeight;
         if (keyboardLikelyOpen) {
           // Keyboard is open - use visual viewport height
-          targetHeight = vv.height;
+          // On iOS, this should be the height above the keyboard
+          targetHeight = visualHeight;
         } else {
-          // No keyboard - use inner height
+          // No keyboard - use window inner height
           targetHeight = window.innerHeight;
+        }
+
+        // For iOS with keyboard open, also account for any scroll offset
+        if (isIOS && keyboardLikelyOpen && visualOffsetTop > 0) {
+          // Page has scrolled, adjust for this
+          targetHeight = visualHeight - visualOffsetTop;
         }
 
         // Update CSS custom properties
         document.documentElement.style.setProperty('--vh', `${targetHeight * 0.01}px`);
         document.documentElement.style.setProperty('--chat-height', `${targetHeight}px`);
         document.documentElement.style.setProperty('--keyboard-height', keyboardLikelyOpen ? `${heightDiff}px` : '0px');
+
+        // Debug: log values for iOS troubleshooting
+        if (isIOS && inputFocused) {
+          console.log('[iOS Keyboard]', {
+            visualHeight,
+            innerHeight: window.innerHeight,
+            initialVisualHeight,
+            heightDiff,
+            targetHeight,
+            keyboardLikelyOpen,
+            visualOffsetTop
+          });
+        }
       } else {
         // Fallback for browsers without visualViewport
         const vh = window.innerHeight;
