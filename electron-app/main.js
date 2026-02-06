@@ -632,8 +632,8 @@ function createMenu() {
           click: () => showAboutDialog()
         },
         {
-          label: 'Visit Website',
-          click: () => shell.openExternal(CHAT_URL)
+          label: 'Visit GitHub',
+          click: () => shell.openExternal('https://github.com/cLLeB/ephemeral-chat')
         },
         {
           label: 'Report Issue',

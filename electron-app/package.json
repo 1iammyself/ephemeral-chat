@@ -85,7 +85,6 @@
       ],
       "showNameOnTiles": true,
       "backgroundColor": "#4F46E5",
-      "minVersion": "10.0.16299.0",
       "artifactName": "${productName}-${version}-${os}-${arch}.msix"
     },
     "nsis": {
