@@ -430,6 +430,26 @@ cap-widget {
 }
 
 
+/* iOS Safari Keyboard Fix - forces input to stay above keyboard */
+@supports (-webkit-touch-callout: none) {
+  /* iOS only */
+  .chat-input-area {
+    /* Add padding for Safari's toolbar */
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+  }
+  
+  /* Ensure input is never hidden when keyboard is open */
+  input:focus, textarea:focus {
+    scroll-margin-bottom: 100px;
+  }
+  
+  /* Prevent body scroll when input is focused */
+  body.keyboard-open {
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+  }
+}
 
 /* iOS STANDALONE FIX - Moves chat container to start BELOW status bar */
 @media all and (display-mode: standalone) {
@@ -439,6 +459,20 @@ cap-widget {
   
   .chat-container {
     top: 0 !important;
-    height: calc(100vh - env(safe-area-inset-top, 44px)) !important;
+    /* Use 100dvh for dynamic viewport height that accounts for dynamic toolbars */
+    height: 100dvh !important;
+    min-height: -webkit-fill-available;
+  }
+  
+  /* iOS PWA - input area needs to be sticky for keyboard to work */
+  @supports (-webkit-touch-callout: none) {
+    .chat-input-area {
+      position: sticky;
+      bottom: 0;
+      z-index: 100;
+      background: inherit;
+      /* Extra safe area for keyboard overlap */
+      padding-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+    }
   }
 }

@@ -2109,28 +2109,42 @@ const ChatRoom = () => {
                               window.scrollTo(0, 0);
                             }, 100);
                           } else if (isIOS) {
-                            // iOS-specific: Scroll input into view with proper timing
-                            // First scroll brings input into view
-                            setTimeout(() => {
-                              messageInputRef.current?.scrollIntoView({
-                                block: 'nearest',
-                                behavior: 'smooth'
-                              });
-                            }, 300);
-                            // Second scroll after keyboard is fully visible ensures proper positioning
+                            // iOS Safari - simpler approach that works with CSS sticky
+                            // Add keyboard-open class to body to apply CSS fixes
+                            document.body.classList.add('keyboard-open');
+
+                            // First scroll after keyboard starts appearing
                             setTimeout(() => {
                               const inputContainer = messageInputRef.current?.closest('.chat-input-area');
                               if (inputContainer) {
                                 inputContainer.scrollIntoView({
                                   block: 'end',
-                                  behavior: 'smooth'
+                                  inline: 'nearest',
+                                  behavior: 'instant'
                                 });
                               }
-                            }, 600);
+                            }, 100);
+
+                            // Second scroll after keyboard is fully visible
+                            setTimeout(() => {
+                              const inputContainer = messageInputRef.current?.closest('.chat-input-area');
+                              if (inputContainer) {
+                                inputContainer.scrollIntoView({
+                                  block: 'end',
+                                  inline: 'nearest',
+                                  behavior: 'instant'
+                                });
+                              }
+                              // Reset any page scroll
+                              window.scrollTo(0, 0);
+                              document.body.scrollTop = 0;
+                            }, 350);
                           }
                         }}
 
                         onBlur={() => {
+                          // Remove keyboard-open class from body (iOS)
+                          document.body.classList.remove('keyboard-open');
                           // Reset scroll position
                           window.scrollTo(0, 0);
                         }}
