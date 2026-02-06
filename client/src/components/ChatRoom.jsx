@@ -214,21 +214,21 @@ const ChatRoom = () => {
             updateViewportHeight();
           }, 400);
         } else if (isIOS) {
-          // iOS-specific: More aggressive updates during keyboard animation
+          // iOS-specific: Add class to trigger fixed positioning CSS
+          document.body.classList.add('ios-keyboard-open');
+
+          // Update viewport height multiple times during keyboard animation
           setTimeout(() => {
             updateViewportHeight();
           }, 50);
           setTimeout(() => {
             updateViewportHeight();
-            scrollToTop();
           }, 150);
           setTimeout(() => {
             updateViewportHeight();
-            scrollToTop();
           }, 300);
           setTimeout(() => {
             updateViewportHeight();
-            scrollToTop();
           }, 500);
         } else {
           updateViewportHeight();
@@ -245,6 +245,12 @@ const ChatRoom = () => {
           setTimeout(() => {
             updateViewportHeight();
             scrollToTop();
+          }, 100);
+        } else if (isIOS) {
+          // iOS-specific: Remove class and reset after keyboard closes
+          setTimeout(() => {
+            document.body.classList.remove('ios-keyboard-open');
+            updateViewportHeight();
           }, 100);
         } else {
           setTimeout(() => {
@@ -2096,8 +2102,6 @@ const ChatRoom = () => {
                         onPaste={(e) => e.preventDefault()}
                         onFocus={() => {
                           const isAndroid = /Android/.test(navigator.userAgent);
-                          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-                            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
                           if (isAndroid) {
                             // Android behavior - prevent scroll and ensure input stays visible
@@ -2108,45 +2112,14 @@ const ChatRoom = () => {
                               }
                               window.scrollTo(0, 0);
                             }, 100);
-                          } else if (isIOS) {
-                            // iOS Safari - simpler approach that works with CSS sticky
-                            // Add keyboard-open class to body to apply CSS fixes
-                            document.body.classList.add('keyboard-open');
-
-                            // First scroll after keyboard starts appearing
-                            setTimeout(() => {
-                              const inputContainer = messageInputRef.current?.closest('.chat-input-area');
-                              if (inputContainer) {
-                                inputContainer.scrollIntoView({
-                                  block: 'end',
-                                  inline: 'nearest',
-                                  behavior: 'instant'
-                                });
-                              }
-                            }, 100);
-
-                            // Second scroll after keyboard is fully visible
-                            setTimeout(() => {
-                              const inputContainer = messageInputRef.current?.closest('.chat-input-area');
-                              if (inputContainer) {
-                                inputContainer.scrollIntoView({
-                                  block: 'end',
-                                  inline: 'nearest',
-                                  behavior: 'instant'
-                                });
-                              }
-                              // Reset any page scroll
-                              window.scrollTo(0, 0);
-                              document.body.scrollTop = 0;
-                            }, 350);
                           }
+                          // iOS handling is done via the global focusin handler in useEffect
                         }}
 
                         onBlur={() => {
-                          // Remove keyboard-open class from body (iOS)
-                          document.body.classList.remove('keyboard-open');
-                          // Reset scroll position
+                          // Reset scroll position (primarily for Android)
                           window.scrollTo(0, 0);
+                          // iOS class removal is handled by the global focusout handler in useEffect
                         }}
 
                         placeholder="Type message..."

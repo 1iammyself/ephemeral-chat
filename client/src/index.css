@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 @layer base {
+
   /* CSS Custom Properties for dynamic viewport height */
   :root {
     --vh: 1vh;
@@ -378,21 +379,26 @@
 /* Cap.js widget dark mode styling */
 .dark cap-widget,
 .dark cap-widget * {
-  background-color: #374151 !important; /* gray-700 */
-  color: #f3f4f6 !important; /* gray-100 */
-  border-color: #4b5563 !important; /* gray-600 */
+  background-color: #374151 !important;
+  /* gray-700 */
+  color: #f3f4f6 !important;
+  /* gray-100 */
+  border-color: #4b5563 !important;
+  /* gray-600 */
 }
 
 .dark cap-widget input,
 .dark cap-widget button {
-  background-color: #4b5563 !important; /* gray-600 */
+  background-color: #4b5563 !important;
+  /* gray-600 */
   color: #f3f4f6 !important;
 }
 
 .dark cap-widget label,
 .dark cap-widget span,
 .dark cap-widget p {
-  color: #e5e7eb !important; /* gray-200 */
+  color: #e5e7eb !important;
+  /* gray-200 */
 }
 
 cap-widget {
@@ -405,6 +411,7 @@ cap-widget {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -415,6 +422,7 @@ cap-widget {
     opacity: 0;
     transform: translateY(-40%) scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: translateY(-50%) scale(1);
@@ -429,50 +437,74 @@ cap-widget {
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* ============================================
+   iOS Safari/PWA Keyboard Fix
+   
+   The key fix: Use position:fixed on the input bar
+   and set bottom to var(--keyboard-height) which is
+   calculated by the visualViewport JS handler.
+   ============================================ */
 
-/* iOS Safari Keyboard Fix - forces input to stay above keyboard */
+/* iOS-specific styles (Safari only) */
 @supports (-webkit-touch-callout: none) {
-  /* iOS only */
+
+  /* When keyboard is open on iOS, make input bar fixed and position it above keyboard */
+  body.ios-keyboard-open .chat-input-area {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: var(--keyboard-height, 0px) !important;
+    z-index: 9999 !important;
+    /* Ensure proper background */
+    background: var(--input-bg, #fff);
+  }
+
+  /* Dark mode background for fixed input */
+  .dark body.ios-keyboard-open .chat-input-area,
+  body.ios-keyboard-open .dark .chat-input-area {
+    background: #1f2937 !important;
+    /* gray-800 */
+  }
+
+  /* Add bottom padding to messages when input is fixed so content isn't hidden */
+  body.ios-keyboard-open .chat-messages-area {
+    padding-bottom: 80px !important;
+  }
+
+  /* Prevent body scroll when keyboard is open */
+  body.ios-keyboard-open {
+    overflow: hidden !important;
+  }
+
+  /* Normal state - input at bottom with safe area */
   .chat-input-area {
-    /* Add padding for Safari's toolbar */
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
-  }
-  
-  /* Ensure input is never hidden when keyboard is open */
-  input:focus, textarea:focus {
-    scroll-margin-bottom: 100px;
-  }
-  
-  /* Prevent body scroll when input is focused */
-  body.keyboard-open {
-    overflow: hidden;
-    position: fixed;
-    width: 100%;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 
-/* iOS STANDALONE FIX - Moves chat container to start BELOW status bar */
+/* iOS STANDALONE (PWA) specific fixes */
 @media all and (display-mode: standalone) {
+
+  /* Adjust for status bar in standalone mode */
   body {
-    padding-top: env(safe-area-inset-top, 44px);
+    padding-top: env(safe-area-inset-top, 0px);
   }
-  
+
   .chat-container {
-    top: 0 !important;
-    /* Use 100dvh for dynamic viewport height that accounts for dynamic toolbars */
+    /* Dynamic viewport height that adjusts with keyboard */
     height: 100dvh !important;
     min-height: -webkit-fill-available;
   }
-  
-  /* iOS PWA - input area needs to be sticky for keyboard to work */
+
+  /* iOS PWA keyboard fix */
   @supports (-webkit-touch-callout: none) {
-    .chat-input-area {
-      position: sticky;
-      bottom: 0;
-      z-index: 100;
-      background: inherit;
-      /* Extra safe area for keyboard overlap */
-      padding-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+    body.ios-keyboard-open .chat-input-area {
+      position: fixed !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: var(--keyboard-height, 0px) !important;
+      z-index: 9999 !important;
+      padding-bottom: env(safe-area-inset-bottom, 8px) !important;
     }
   }
 }
