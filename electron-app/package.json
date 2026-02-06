@@ -75,11 +75,6 @@
       "signDlls": true
     },
     "appx": {
-      "capabilities": [
-        "internetClient",
-        "microphone",
-        "webcam"
-      ],
       "displayName": "Ephemeral Chat",
       "identityName": "CalebKwabenaKyereBoateng.Ephchat",
       "publisher": "CN=6EE69D7C-8974-4D42-8DAD-1C77D5292526",
