@@ -449,3 +449,19 @@ cap-widget {
     margin-top: env(safe-area-inset-top, 0px);
   }
 }
+@media all and (display-mode: standalone) {
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-top, 0px);
+    background: #f8fafc;
+    z-index: 9999;
+  }
+  
+  .dark body::before {
+    background: #030712;
+  }
+}
