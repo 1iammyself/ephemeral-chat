@@ -429,39 +429,9 @@ cap-widget {
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* iOS STANDALONE (PWA) FIXES */
-/* iOS Standalone - Proper safe area handling */
-@supports (padding-top: env(safe-area-inset-top)) {
-  .chat-container {
-    padding-top: env(safe-area-inset-top, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
-}
-
-/* iOS Standalone - Additional top spacing for status bar to prevent content going behind notch */
+/* iOS Standalone - Minimal Fix (targets only first element, not whole container) */
 @media all and (display-mode: standalone) {
-  .chat-container {
-    padding-top: max(env(safe-area-inset-top), 20px);
-  }
-  
-  /* Ensure header doesn't go behind status bar */
   .chat-container > :first-child {
-    margin-top: env(safe-area-inset-top, 0px);
-  }
-}
-@media all and (display-mode: standalone) {
-  body::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: env(safe-area-inset-top, 0px);
-    background: #f8fafc;
-    z-index: 9999;
-  }
-  
-  .dark body::before {
-    background: #030712;
+    padding-top: env(safe-area-inset-top, 44px);
   }
 }
