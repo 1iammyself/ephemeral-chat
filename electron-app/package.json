@@ -20,7 +20,7 @@
     "build:win": "electron-builder --win --x64",
     "build:win:nsis": "electron-builder --win nsis",
     "build:win:appx": "electron-builder --win appx",
-    "build:win:store": "electron-builder --win appx",
+    "build:win:store": "electron-builder --win appx --x64 --arm64",
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
     "build:all": "electron-builder --win --mac --linux",
