@@ -15,6 +15,16 @@ const config: CapacitorConfig = {
     // Use Chrome WebView
     useLegacyBridge: false
   },
+  ios: {
+    // iOS-specific configuration
+    contentInset: 'automatic',
+    // Allow inline media playback
+    allowsLinkPreview: false,
+    // Scroll to input to prevent keyboard covering input fields
+    scrollEnabled: true,
+    // Disable long-press link previews for privacy
+    limitsNavigationsToAppBoundDomains: true
+  },
   plugins: {
     SplashScreen: {
       launchShowDuration: 2000,

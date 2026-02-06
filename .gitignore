@@ -103,3 +103,9 @@ client/android/*.jks
 signing*.properties
 keystore.properties
 release.properties
+
+# Capacitor iOS platform
+ios/
+
+# Do not commit local AASA file
+client/public/.well-known/apple-app-site-association
