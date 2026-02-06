@@ -183,7 +183,8 @@ function setupSecurity(window) {
   // Block screen capture API
   if (securityMode === 'high') {
     window.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
-      const blockedPermissions = ['media', 'display-capture', 'mediaKeySystem'];
+      // Only block screen capture and DRM, allow camera/mic
+      const blockedPermissions = ['display-capture', 'mediaKeySystem'];
       if (blockedPermissions.includes(permission)) {
         callback(false);
       } else {
