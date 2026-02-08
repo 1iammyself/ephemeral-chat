@@ -6,7 +6,7 @@ import JoinRoomModal from './components/JoinRoomModal';
 import InviteHandler from './components/InviteHandler.jsx';
 import PWAHandler from './components/PWAHandler';
 import MyRooms from './components/MyRooms'; // Import MyRooms component
-import AndroidAppBanner from './components/AndroidAppBanner';
+import AppRestrictionBanner from './components/AppRestrictionBanner';
 import DesktopSecurityGuard from './components/DesktopSecurityGuard';
 import DeepLinkHandler from './components/DeepLinkHandler';
 import { ToastContainer } from 'react-toastify';
@@ -39,7 +39,7 @@ function App() {
         <PWAHandler />
         <DesktopSecurityGuard />
         <DeepLinkHandler />
-        <AndroidAppBanner />
+        <AppRestrictionBanner />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/my-rooms" element={<MyRooms />} /> {/* Add MyRooms route */}
