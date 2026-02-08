@@ -129,7 +129,9 @@ function InviteHandler() {
           </div>
         </div>
 
-        <h2 className="text-2xl font-bold mb-2 text-white">Redirecting to App</h2>
+        <h2 className="text-2xl font-bold mb-2 text-white">
+          {isApp ? 'Joining Chat...' : 'Redirecting to App'}
+        </h2>
 
         {!isApp && (
           <p className="text-slate-400 mb-6">
@@ -141,7 +143,10 @@ function InviteHandler() {
           <div className="text-red-400 mb-4 bg-red-400/10 p-4 rounded-xl border border-red-400/20">
             <p>{error}</p>
             <button
-              onClick={() => navigate('/')}
+              onClick={() => {
+                setError(null);
+                navigate('/', { replace: true });
+              }}
               className="mt-4 px-6 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
             >
               Go Home

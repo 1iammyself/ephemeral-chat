@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { App as CapApp } from '@capacitor/app';
 
 const DeepLinkHandler = () => {
     const navigate = useNavigate();
+    const hasHandledInitialUrl = useRef(false);
 
     useEffect(() => {
         // 1. Handle runtime deep links (Warm/Hot start)
@@ -14,9 +15,12 @@ const DeepLinkHandler = () => {
 
         // 2. Handle initial deep link (Cold start)
         const checkInitialUrl = async () => {
+            if (hasHandledInitialUrl.current) return;
+
             const result = await CapApp.getLaunchUrl();
             if (result && result.url) {
                 console.log('App launched with URL (cold start):', result.url);
+                hasHandledInitialUrl.current = true;
                 handleUrl(result.url);
             }
         };
@@ -26,7 +30,8 @@ const DeepLinkHandler = () => {
                 const url = new URL(urlStr);
                 const path = url.pathname;
                 if (path && path !== '/') {
-                    navigate(path);
+                    // Use replace to avoid polluting history on initial launch
+                    navigate(path, { replace: true });
                 }
             } catch (e) {
                 console.error('Error parsing deep link URL:', e);
