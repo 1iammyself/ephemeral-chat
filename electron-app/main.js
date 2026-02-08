@@ -106,12 +106,12 @@ function setupAutoUpdater() {
 
   // Check for updates every 4 hours
   setInterval(() => {
-    autoUpdater.checkForUpdates();
+    autoUpdater.checkForUpdates().catch(() => { });
   }, 4 * 60 * 60 * 1000);
 
   // Initial check
   setTimeout(() => {
-    autoUpdater.checkForUpdates();
+    autoUpdater.checkForUpdates().catch(() => { });
   }, 10000);
 }
 
@@ -506,7 +506,9 @@ function updateTrayMenu() {
     {
       label: 'Check for Updates',
       click: () => {
-        autoUpdater.checkForUpdates();
+        autoUpdater.checkForUpdates().catch(err => {
+          console.error('Manual update check failed:', err);
+        });
         showNotification('Checking for Updates', 'Looking for new versions...');
       }
     },
@@ -623,7 +625,7 @@ function createMenu() {
         {
           label: 'Check for Updates',
           click: () => {
-            autoUpdater.checkForUpdates();
+            autoUpdater.checkForUpdates().catch(() => { });
           }
         },
         { type: 'separator' },
@@ -769,26 +771,32 @@ function handleDeepLink(url) {
   if (!url) return;
 
   let path = url.replace(/^ephemeral(-chat)?:\/\//, '');
+  let targetUrl = CHAT_URL;
+  const separator = targetUrl.includes('?') ? '&' : '?';
+  const desktopParam = `${separator}desktop=true`;
 
   if (path.startsWith('join/')) {
     const code = path.replace('join/', '');
-    mainWindow.loadURL(`${CHAT_URL}?join=${encodeURIComponent(code)}`);
+    targetUrl = `${CHAT_URL}${desktopParam}&join=${encodeURIComponent(code)}`;
   } else if (path.startsWith('room/')) {
     const roomCode = path.replace('room/', '');
-    mainWindow.loadURL(`${CHAT_URL}/room/${roomCode}`);
+    targetUrl = `${CHAT_URL}/room/${roomCode}${desktopParam}`;
   } else if (path.startsWith('invite/')) {
-    // Handle both ephemeral-chat://invite/token and standard paths
     const token = path.replace('invite/', '');
-    mainWindow.loadURL(`${CHAT_URL}/invite/${token}`);
+    targetUrl = `${CHAT_URL}/invite/${token}${desktopParam}`;
   } else if (path.startsWith('create')) {
-    mainWindow.loadURL(`${CHAT_URL}?action=create`);
+    targetUrl = `${CHAT_URL}${desktopParam}&action=create`;
   } else {
-    // If it's a full URL (HTTPS from App URI Handler), load it directly
     if (url.startsWith('https://')) {
-      mainWindow.loadURL(url);
+      targetUrl = url.includes('?') ? `${url}&desktop=true` : `${url}?desktop=true`;
     } else {
-      mainWindow.loadURL(CHAT_URL);
+      targetUrl = `${CHAT_URL}${desktopParam}`;
     }
+  }
+
+  // Only load if it's a different URL or if we are not on the home page
+  if (mainWindow.webContents.getURL() !== targetUrl) {
+    mainWindow.loadURL(targetUrl);
   }
 
   mainWindow.show();
@@ -909,7 +917,7 @@ ipcMain.handle('show-notification', (event, title, body) => {
 });
 
 ipcMain.handle('check-for-updates', () => {
-  autoUpdater.checkForUpdates();
+  autoUpdater.checkForUpdates().catch(() => { });
 });
 
 ipcMain.handle('get-system-idle-time', () => {
