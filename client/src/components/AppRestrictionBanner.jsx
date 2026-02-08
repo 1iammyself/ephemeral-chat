@@ -91,72 +91,69 @@ const AppRestrictionBanner = () => {
             {/* Backdrop */}
             <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-xl z-[9999] animate-fadeIn" />
 
-            {/* Container for Centering - Using dvh for robust mobile height */}
-            <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 min-h-[100dvh]">
-                {/* Modal Card - Compact version */}
-                <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden animate-slideUp border border-indigo-500/30">
-                    {/* Header - Reduced padding */}
-                    <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 px-6 py-6">
-                        <div className="flex flex-col items-center text-center gap-3">
-                            <div className="w-16 h-16 bg-white/15 rounded-2xl flex items-center justify-center shadow-inner backdrop-blur-sm border border-white/20">
-                                {isAndroid ? (
-                                    <Smartphone className="w-10 h-10 text-white" />
-                                ) : (
-                                    <Laptop className="w-10 h-10 text-white" />
-                                )}
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-black text-white tracking-tight">App Required</h3>
-                                <p className="text-indigo-100/90 text-[10px] font-bold uppercase tracking-[0.2em]">
-                                    {isAndroid ? 'Android Security' : 'Desktop Security'}
-                                </p>
-                            </div>
+            {/* Modal Card - Fixed Centering with Absolute Position */}
+            <div className="fixed left-4 right-4 top-1/2 -translate-y-1/2 z-[10000] max-w-sm mx-auto bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden animate-slideUp border border-indigo-500/30">
+                {/* Header - Compact */}
+                <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 px-6 py-6">
+                    <div className="flex flex-col items-center text-center gap-3">
+                        <div className="w-16 h-16 bg-white/15 rounded-2xl flex items-center justify-center shadow-inner backdrop-blur-sm border border-white/20">
+                            {isAndroid ? (
+                                <Smartphone className="w-10 h-10 text-white" />
+                            ) : (
+                                <Laptop className="w-10 h-10 text-white" />
+                            )}
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-black text-white tracking-tight text-center">App Required</h3>
+                            <p className="text-indigo-100/90 text-[10px] font-bold uppercase tracking-[0.2em] text-center">
+                                {isAndroid ? 'Android Security' : 'Desktop Security'}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Content - Compact */}
+                <div className="px-6 py-6">
+                    <div className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-800/50 rounded-xl p-4 mb-5">
+                        <div className="flex gap-3 text-left">
+                            <Shield className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+                            <p className="text-indigo-900 dark:text-indigo-200 text-xs leading-relaxed">
+                                To protect your privacy with <strong>screenshot restriction</strong>, rooms can only be accessed via the official {isAndroid ? 'Android' : 'Desktop'} app.
+                            </p>
                         </div>
                     </div>
 
-                    {/* Content - Reduced padding and shorter text */}
-                    <div className="px-6 py-6">
-                        <div className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-800/50 rounded-xl p-4 mb-5">
-                            <div className="flex gap-3 text-left">
-                                <Shield className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
-                                <p className="text-indigo-900 dark:text-indigo-200 text-xs leading-relaxed">
-                                    To protect your privacy with <strong>screenshot restriction</strong>, rooms can only be accessed via the official {isAndroid ? 'Android' : 'Desktop'} app.
-                                </p>
-                            </div>
+                    {/* Features */}
+                    <div className="flex flex-col gap-3 mb-6">
+                        <div className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-left">
+                            <Globe className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                            <span className="font-bold text-xs text-gray-900 dark:text-white">Hardened Privacy</span>
                         </div>
+                        <div className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-left">
+                            <Zap className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                            <span className="font-bold text-xs text-gray-900 dark:text-white">Seamless Entry</span>
+                        </div>
+                    </div>
 
-                        {/* Feature List - Simplified (No sub-text) */}
-                        <div className="flex flex-col gap-3 mb-6">
-                            <div className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-                                <Globe className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                                <span className="font-bold text-xs text-gray-900 dark:text-white">Hardened Privacy</span>
-                            </div>
-                            <div className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-                                <Zap className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                                <span className="font-bold text-xs text-gray-900 dark:text-white">Seamless Entry</span>
-                            </div>
-                        </div>
-
-                        {/* CTA Section - Compact buttons */}
-                        <div className="flex flex-col gap-3">
-                            <button
-                                onClick={() => window.location.href = 'ephemeral-chat://'}
-                                className="w-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-5 py-3.5 rounded-xl text-sm font-bold transition-all border-2 border-indigo-500/20 flex items-center justify-center gap-2 active:scale-[0.98]"
-                            >
-                                <ExternalLink size={18} className="text-indigo-500" />
-                                Open in App
-                            </button>
-                            <button
-                                onClick={handleDownload}
-                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3.5 rounded-xl text-sm font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 active:scale-[0.98]"
-                            >
-                                <Download size={18} />
-                                Download {isAndroid ? 'APK' : 'Desktop App'}
-                            </button>
-                            <p className="text-center text-[9px] text-gray-400 dark:text-gray-500 uppercase tracking-widest font-bold mt-1">
-                                Secure & Open Source
-                            </p>
-                        </div>
+                    {/* Buttons */}
+                    <div className="flex flex-col gap-3">
+                        <button
+                            onClick={() => window.location.href = 'ephemeral-chat://'}
+                            className="w-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-5 py-3.5 rounded-xl text-sm font-bold transition-all border-2 border-indigo-500/20 flex items-center justify-center gap-2 active:scale-[0.98]"
+                        >
+                            <ExternalLink size={18} className="text-indigo-500" />
+                            Open in App
+                        </button>
+                        <button
+                            onClick={handleDownload}
+                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3.5 rounded-xl text-sm font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 active:scale-[0.98]"
+                        >
+                            <Download size={18} />
+                            Download {isAndroid ? 'APK' : 'Desktop App'}
+                        </button>
+                        <p className="text-center text-[9px] text-gray-400 dark:text-gray-500 uppercase tracking-widest font-bold mt-1">
+                            Secure & Open Source
+                        </p>
                     </div>
                 </div>
             </div>
