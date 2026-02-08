@@ -37,8 +37,9 @@ function App() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 transition-colors duration-200">
         <PWAHandler />
         <DesktopSecurityGuard />
+        <AndroidAppBanner />
         <Routes>
-          <Route path="/" element={<><Home /><AndroidAppBanner /></>} />
+          <Route path="/" element={<Home />} />
           <Route path="/my-rooms" element={<MyRooms />} /> {/* Add MyRooms route */}
           <Route path="/room/:roomCode" element={<ChatRoom />} />
           <Route path="/join" element={

@@ -61,6 +61,16 @@
                     android:pathPrefix="/room" />
             </intent-filter>
 
+            <!-- Local Testing Deep Link (HTTP + Local IP) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http"
+                    android:host="169.254.184.174"
+                    android:port="5173" />
+            </intent-filter>
+
             <!-- Custom scheme deep linking -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

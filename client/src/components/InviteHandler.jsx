@@ -17,27 +17,38 @@ function InviteHandler() {
 
   useEffect(() => {
     const checkEnvironment = () => {
-      // Check for electronAPI (exposed by preload), the electron-ready event, or desktop param in URL
-      const isApp = window.electronAPI ||
+      // Check for mobile Android
+      const userAgent = navigator.userAgent.toLowerCase();
+      const isAndroid = /android/i.test(userAgent);
+
+      // Check if installed as TWA/Standalone/PWA or native capacitor app
+      const isAndroidApp = window.matchMedia('(display-mode: standalone)').matches ||
+        window.navigator.standalone === true ||
+        document.referrer.includes('android-app://') ||
+        window.Capacitor?.isNative;
+
+      // Check for desktop/electron environment
+      const isDesktopApp = window.electronAPI ||
         window.process?.versions?.electron ||
         document.body.classList.contains('electron-app') ||
         window.location.search.includes('desktop=true');
 
+      const isApp = isDesktopApp || isAndroidApp;
       setIsElectron(!!isApp);
 
       if (!isApp) {
-        // We are in a browser, attempt to launch the desktop app
-        setStatus('Launching Ephemeral Chat Desktop...');
+        if (isAndroid) {
+          // On Android browser, we let the global AndroidAppBanner handle the block/prompt
+          setStatus('Please open in the App');
+          return;
+        }
 
-        // Deep link URL
+        // For non-Android desktop browsers, attempt to launch the desktop app
+        setStatus('Launching Ephemeral Chat Desktop...');
         const protocolUrl = `ephemeral-chat://invite/${token}`;
 
-        // Attempt auto-launch only if we are strictly not in electron
-        // Double check against electronAPI to be safe specifically for this loop
         if (!window.electronAPI) {
           window.location.href = protocolUrl;
-
-          // Show download options after a short delay if app doesn't open
           setTimeout(() => setShowDownload(true), 3000);
         }
       }
