@@ -7,6 +7,9 @@ const DeepLinkHandler = () => {
     const hasHandledInitialUrl = useRef(false);
 
     useEffect(() => {
+        // Only run this logic in native Capacitor environments
+        if (!window.Capacitor?.isNative) return;
+
         // 1. Handle runtime deep links (Warm/Hot start)
         const urlListener = CapApp.addListener('appUrlOpen', (data) => {
             console.log('App opened with URL (runtime):', data.url);
