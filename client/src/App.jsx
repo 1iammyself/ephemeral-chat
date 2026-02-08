@@ -8,6 +8,7 @@ import PWAHandler from './components/PWAHandler';
 import MyRooms from './components/MyRooms'; // Import MyRooms component
 import AndroidAppBanner from './components/AndroidAppBanner';
 import DesktopSecurityGuard from './components/DesktopSecurityGuard';
+import DeepLinkHandler from './components/DeepLinkHandler';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -37,6 +38,7 @@ function App() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 transition-colors duration-200">
         <PWAHandler />
         <DesktopSecurityGuard />
+        <DeepLinkHandler />
         <AndroidAppBanner />
         <Routes>
           <Route path="/" element={<Home />} />
