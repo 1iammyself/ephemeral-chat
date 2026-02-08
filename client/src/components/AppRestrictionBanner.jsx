@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Download, Smartphone, Shield, Zap, Monitor, Laptop, Globe } from 'lucide-react';
+import { Download, Smartphone, Shield, Zap, Monitor, Laptop, Globe, ExternalLink } from 'lucide-react';
 
 const APK_DOWNLOAD_URL = 'https://github.com/cLLeB/ephemeral-chat/releases/download/chapter/app-release.apk';
 const REPO_BASE = 'https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.1';
@@ -145,6 +145,15 @@ const AppRestrictionBanner = () => {
 
                     {/* CTA Section */}
                     <div className="flex flex-col gap-4">
+                        {!isAndroid && (
+                            <button
+                                onClick={() => window.location.href = 'ephemeral-chat://'}
+                                className="w-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-6 py-4 rounded-2xl text-base font-bold transition-all border-2 border-indigo-500/20 flex items-center justify-center gap-3 active:scale-[0.98]"
+                            >
+                                <ExternalLink size={20} className="text-indigo-500" />
+                                Open Desktop App
+                            </button>
+                        )}
                         <button
                             onClick={handleDownload}
                             className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-4 rounded-2xl text-base font-black transition-all flex items-center justify-center gap-3 shadow-xl shadow-indigo-600/30 active:scale-[0.98]"
