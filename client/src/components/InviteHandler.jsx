@@ -17,7 +17,12 @@ function InviteHandler() {
 
   useEffect(() => {
     const checkEnvironment = () => {
-      const isApp = window.electron || window.process?.versions?.electron;
+      // Check for electronAPI (exposed by preload), the electron-ready event, or desktop param in URL
+      const isApp = window.electronAPI ||
+        window.process?.versions?.electron ||
+        document.body.classList.contains('electron-app') ||
+        window.location.search.includes('desktop=true');
+
       setIsElectron(!!isApp);
 
       if (!isApp) {
@@ -27,11 +32,14 @@ function InviteHandler() {
         // Deep link URL
         const protocolUrl = `ephemeral-chat://invite/${token}`;
 
-        // Attempt auto-launch
-        window.location.href = protocolUrl;
+        // Attempt auto-launch only if we are strictly not in electron
+        // Double check against electronAPI to be safe specifically for this loop
+        if (!window.electronAPI) {
+          window.location.href = protocolUrl;
 
-        // Show download options after a short delay if app doesn't open
-        setTimeout(() => setShowDownload(true), 3000);
+          // Show download options after a short delay if app doesn't open
+          setTimeout(() => setShowDownload(true), 3000);
+        }
       }
     };
 
@@ -74,9 +82,19 @@ function InviteHandler() {
 
   const getDownloadUrl = () => {
     const userAgent = navigator.userAgent.toLowerCase();
-    if (userAgent.indexOf('win') !== -1) return 'https://github.com/cLLeB/ephemeral-chat/releases/latest/download/Ephemeral.Chat-1.1.1-win-x64.exe';
-    if (userAgent.indexOf('mac') !== -1) return 'https://github.com/cLLeB/ephemeral-chat/releases/latest/download/Ephemeral.Chat-1.1.1.dmg';
-    return 'https://github.com/cLLeB/ephemeral-chat/releases/latest';
+    const repoBase = 'https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.1';
+
+    // Using hyphenated filenames seen in the GitHub release image
+    if (userAgent.indexOf('win') !== -1) {
+      return `${repoBase}/Ephemeral-Chat-1.1.1-win.exe`;
+    }
+    if (userAgent.indexOf('mac') !== -1) {
+      return `${repoBase}/Ephemeral-Chat-1.1.1-mac-arm64.dmg`;
+    }
+    if (userAgent.indexOf('linux') !== -1) {
+      return `${repoBase}/Ephemeral-Chat-1.1.1-linux-x86_64.AppImage`;
+    }
+    return 'https://github.com/1iammyself/ephemeral-chat/releases/tag/v1.1.1';
   };
 
   return (
