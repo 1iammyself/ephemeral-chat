@@ -777,13 +777,18 @@ function handleDeepLink(url) {
     const roomCode = path.replace('room/', '');
     mainWindow.loadURL(`${CHAT_URL}/room/${roomCode}`);
   } else if (path.startsWith('invite/')) {
-    // For direct invite links (like in the image), we just append the path to the base URL
-    // This preserves the full ID and the #hash encryption key
-    mainWindow.loadURL(`${CHAT_URL}/${path}`);
+    // Handle both ephemeral-chat://invite/token and standard paths
+    const token = path.replace('invite/', '');
+    mainWindow.loadURL(`${CHAT_URL}/invite/${token}`);
   } else if (path.startsWith('create')) {
     mainWindow.loadURL(`${CHAT_URL}?action=create`);
   } else {
-    mainWindow.loadURL(CHAT_URL);
+    // If it's a full URL (HTTPS from App URI Handler), load it directly
+    if (url.startsWith('https://')) {
+      mainWindow.loadURL(url);
+    } else {
+      mainWindow.loadURL(CHAT_URL);
+    }
   }
 
   mainWindow.show();
@@ -801,7 +806,10 @@ if (!gotTheLock) {
   // Handle second instance
   app.on('second-instance', (event, commandLine) => {
     // Check for deep link in command line
-    const deepLink = commandLine.find(arg => arg.startsWith('ephemeral'));
+    const deepLink = commandLine.find(arg =>
+      arg.startsWith('ephemeral') ||
+      arg.startsWith('https://chat.kyere.me')
+    );
     if (deepLink) {
       handleDeepLink(deepLink);
     }
@@ -835,7 +843,10 @@ if (!gotTheLock) {
     setupAutoUpdater();
 
     // Check command line for deep links
-    const deepLink = process.argv.find(arg => arg.startsWith('ephemeral'));
+    const deepLink = process.argv.find(arg =>
+      arg.startsWith('ephemeral') ||
+      arg.startsWith('https://chat.kyere.me')
+    );
     if (deepLink) {
       handleDeepLink(deepLink);
     }

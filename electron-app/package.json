@@ -46,6 +46,14 @@
       "owner": "1iammyself",
       "repo": "ephemeral-chat"
     },
+    "protocols": [
+      {
+        "name": "Ephemeral Chat",
+        "schemes": [
+          "ephemeral-chat"
+        ]
+      }
+    ],
     "win": {
       "target": [
         {
@@ -129,13 +137,6 @@
         "Type": "Application",
         "Categories": "Chat;Network;InstantMessaging"
       }
-    },
-    "protocols": {
-      "name": "Ephemeral Chat",
-      "schemes": [
-        "ephemeral",
-        "ephemeral-chat"
-      ]
     }
   },
   "devDependencies": {
