@@ -15,16 +15,52 @@ const AndroidAppBanner = () => {
     const isAndroidDevice = /android/i.test(userAgent);
     setIsAndroid(isAndroidDevice);
 
-    // Check if already installed as TWA (Trusted Web Activity) or PWA
-    // or if we are already inside the capacitor app environment
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-      window.navigator.standalone === true ||
-      document.referrer.includes('android-app://') ||
-      window.Capacitor?.isNative;
+    if (!isAndroidDevice) return;
 
-    // Show banner if: Android user AND strictly in a browser (not standalone/TWA)
-    if (isAndroidDevice && !isStandalone) {
-      setIsVisible(true);
+    // Function to check environment
+    const checkEnvironment = () => {
+      // 1. Check for standalone/PWA modes
+      const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches ||
+        window.navigator.standalone === true;
+
+      // 2. Check for TWA/App Referrer
+      const isTWA = document.referrer.includes('android-app://');
+
+      // 3. Check for Capacitor Bridge
+      const hasCapacitorBridge = !!window.Capacitor?.isNative || !!window.Capacitor?.Plugins;
+
+      // 4. Check for WebView-specific User Agent indicators
+      // Standard Android Chrome DOES NOT contain "Version/4.0", but Android WebViews DO.
+      const isWebView = userAgent.includes('version/4.0');
+
+      // 5. Check for custom protocol (if applicable)
+      const isCustomProtocol = window.location.protocol === 'capacitor:';
+
+      const isAppEnvironment = isStandaloneMode || isTWA || hasCapacitorBridge || isWebView || isCustomProtocol;
+
+      if (isAppEnvironment) {
+        setIsVisible(false);
+        return true; // Environment confirmed
+      }
+      return false;
+    };
+
+    // Initial check
+    const confirmed = checkEnvironment();
+
+    // If not confirmed, poll for a few seconds as the bridge might take time to initialize
+    if (!confirmed) {
+      setIsVisible(true); // Show by default on Android browser
+
+      let attempts = 0;
+      const interval = setInterval(() => {
+        attempts++;
+        if (checkEnvironment() || attempts > 20) { // Check for 2 seconds
+          clearInterval(interval);
+        }
+      }, 100);
+
+      return () => clearInterval(interval);
     }
   }, []);
 
