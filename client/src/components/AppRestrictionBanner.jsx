@@ -88,80 +88,85 @@ const AppRestrictionBanner = () => {
 
     return (
         <>
+            {/* Backdrop */}
             <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-xl z-[9999] animate-fadeIn" />
 
-            <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto bg-white dark:bg-gray-900 rounded-3xl shadow-2xl z-[10000] overflow-hidden animate-slideUp border border-indigo-500/30">
-                {/* Header with platform-specific icon */}
-                <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 px-6 py-8">
-                    <div className="flex flex-col items-center text-center gap-4">
-                        <div className="w-20 h-20 bg-white/15 rounded-3xl flex items-center justify-center shadow-inner backdrop-blur-sm border border-white/20">
-                            {isAndroid ? (
-                                <Smartphone className="w-12 h-12 text-white" />
-                            ) : (
-                                <Laptop className="w-12 h-12 text-white" />
-                            )}
-                        </div>
-                        <div>
-                            <h3 className="text-2xl font-black text-white tracking-tight">App Required</h3>
-                            <p className="text-indigo-100/90 text-sm font-medium mt-1 uppercase tracking-widest">
-                                {isAndroid ? 'Android Security' : 'Desktop Security'}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Content */}
-                <div className="px-6 py-8">
-                    <div className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-800/50 rounded-2xl p-5 mb-8">
-                        <div className="flex gap-3">
-                            <Shield className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
-                            <p className="text-indigo-900 dark:text-indigo-200 text-sm leading-relaxed">
-                                To protect your privacy with <strong>screenshot restriction</strong> and <strong>end-to-end security</strong>, chat rooms can only be accessed via the official Ephemeral Chat {isAndroid ? 'Android' : 'Desktop'} application.
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Feature List */}
-                    <div className="space-y-5 mb-10">
-                        <div className="flex items-center gap-4 group">
-                            <div className="w-10 h-10 shrink-0 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center transition-colors group-hover:bg-emerald-200 dark:group-hover:bg-emerald-900/50">
-                                <Globe className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            {/* Container for Centering - Using dvh for robust mobile height */}
+            <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 overflow-y-auto min-h-[100dvh]">
+                {/* Modal Card */}
+                <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden animate-slideUp border border-indigo-500/30 my-auto">
+                    {/* Header with platform-specific icon */}
+                    <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 px-6 py-8">
+                        <div className="flex flex-col items-center text-center gap-4">
+                            <div className="w-20 h-20 bg-white/15 rounded-3xl flex items-center justify-center shadow-inner backdrop-blur-sm border border-white/20">
+                                {isAndroid ? (
+                                    <Smartphone className="w-12 h-12 text-white" />
+                                ) : (
+                                    <Laptop className="w-12 h-12 text-white" />
+                                )}
                             </div>
                             <div>
-                                <span className="block font-bold text-sm text-gray-900 dark:text-white">Hardened Privacy</span>
-                                <span className="text-xs text-gray-500 dark:text-gray-400">Isolated environment for secure chats</span>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-4 group">
-                            <div className="w-10 h-10 shrink-0 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center transition-colors group-hover:bg-blue-200 dark:group-hover:bg-blue-900/50">
-                                <Zap className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                            </div>
-                            <div>
-                                <span className="block font-bold text-sm text-gray-900 dark:text-white">Seamless Entry</span>
-                                <span className="text-xs text-gray-500 dark:text-gray-400">Launch directly into rooms from links</span>
+                                <h3 className="text-2xl font-black text-white tracking-tight text-center">App Required</h3>
+                                <p className="text-indigo-100/90 text-sm font-medium mt-1 uppercase tracking-widest text-center">
+                                    {isAndroid ? 'Android Security' : 'Desktop Security'}
+                                </p>
                             </div>
                         </div>
                     </div>
 
-                    {/* CTA Section */}
-                    <div className="flex flex-col gap-4">
-                        <button
-                            onClick={() => window.location.href = 'ephemeral-chat://'}
-                            className="w-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-6 py-4 rounded-2xl text-base font-bold transition-all border-2 border-indigo-500/20 flex items-center justify-center gap-3 active:scale-[0.98]"
-                        >
-                            <ExternalLink size={20} className="text-indigo-500" />
-                            Open in App
-                        </button>
-                        <button
-                            onClick={handleDownload}
-                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-4 rounded-2xl text-base font-black transition-all flex items-center justify-center gap-3 shadow-xl shadow-indigo-600/30 active:scale-[0.98]"
-                        >
-                            <Download size={20} />
-                            Download {isAndroid ? 'APK' : 'Desktop App'}
-                        </button>
-                        <p className="text-center text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-widest font-bold">
-                            Secure & Open Source
-                        </p>
+                    {/* Content */}
+                    <div className="px-6 py-8">
+                        <div className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-800/50 rounded-2xl p-5 mb-8">
+                            <div className="flex gap-3 text-left">
+                                <Shield className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+                                <p className="text-indigo-900 dark:text-indigo-200 text-sm leading-relaxed">
+                                    To protect your privacy with <strong>screenshot restriction</strong> and <strong>end-to-end security</strong>, chat rooms can only be accessed via the official Ephemeral Chat {isAndroid ? 'Android' : 'Desktop'} application.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Feature List */}
+                        <div className="space-y-5 mb-10">
+                            <div className="flex items-center gap-4 group text-left">
+                                <div className="w-10 h-10 shrink-0 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center transition-colors group-hover:bg-emerald-200 dark:group-hover:bg-emerald-900/50">
+                                    <Globe className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                                </div>
+                                <div className="text-left">
+                                    <span className="block font-bold text-sm text-gray-900 dark:text-white">Hardened Privacy</span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">Isolated environment for secure chats</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4 group text-left">
+                                <div className="w-10 h-10 shrink-0 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center transition-colors group-hover:bg-blue-200 dark:group-hover:bg-blue-900/50">
+                                    <Zap className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <div className="text-left">
+                                    <span className="block font-bold text-sm text-gray-900 dark:text-white">Seamless Entry</span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">Launch directly into rooms from links</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* CTA Section */}
+                        <div className="flex flex-col gap-4">
+                            <button
+                                onClick={() => window.location.href = 'ephemeral-chat://'}
+                                className="w-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-6 py-4 rounded-2xl text-base font-bold transition-all border-2 border-indigo-500/20 flex items-center justify-center gap-3 active:scale-[0.98]"
+                            >
+                                <ExternalLink size={20} className="text-indigo-500" />
+                                Open in App
+                            </button>
+                            <button
+                                onClick={handleDownload}
+                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-4 rounded-2xl text-base font-black transition-all flex items-center justify-center gap-3 shadow-xl shadow-indigo-600/30 active:scale-[0.98]"
+                            >
+                                <Download size={20} />
+                                Download {isAndroid ? 'APK' : 'Desktop App'}
+                            </button>
+                            <p className="text-center text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-widest font-bold">
+                                Secure & Open Source
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
