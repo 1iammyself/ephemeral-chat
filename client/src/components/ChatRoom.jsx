@@ -1243,6 +1243,13 @@ const ChatRoom = () => {
       setError('Failed to send message');
     } finally {
       setIsSending(false);
+      // Maintain focus on mobile devices to prevent keyboard from dismissing
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      if (isMobile) {
+        setTimeout(() => {
+          messageInputRef.current?.focus();
+        }, 50);
+      }
     }
   };
 
