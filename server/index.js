@@ -173,6 +173,10 @@ app.get('/', (req, res) => {
   });
 });
 
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 // Rate limiting storage
 const rateLimits = new Map();
 
@@ -1084,14 +1088,14 @@ io.on('connection', (socket) => {
       // 1. Session Resumption Path (Mobile-friendly: check grace period for disconnected sessions)
       if (sessionToken) {
         const session = securityManager.validateSession(sessionToken);
-        
+
         // Check if this is a reconnection within grace period
         const gracePeriodSession = securityManager.checkGracePeriod(sessionToken);
-        
+
         if (session && session.roomCode === roomCode) {
           // Re-bind session to new socket
           securityManager.resumeSession(sessionToken, socket.id);
-          
+
           // Clear from disconnected sessions tracking (successful reconnect)
           securityManager.clearDisconnectedSession(sessionToken);
 
@@ -1113,7 +1117,7 @@ io.on('connection', (socket) => {
               });
               await roomManager.saveRoom(roomCode, room);
             }
-            
+
             const timeoutMs = await roomManager.getRoomTimeout(roomCode);
             securityManager.registerUserActivity(socket.id, userId || socket.id, roomCode, handleInactivityTimeout, timeoutMs);
 
@@ -1146,11 +1150,11 @@ io.on('connection', (socket) => {
         } else if (gracePeriodSession && gracePeriodSession.roomCode === roomCode) {
           // Session expired but within grace period - allow seamless reconnection
           logger.info(`📱 Grace period reconnection for user in room ${roomCode}`);
-          
+
           // Create a new session for this reconnection
           const newSessionToken = securityManager.createSession(socket.id, userId || socket.id, roomCode);
           securityManager.clearDisconnectedSession(sessionToken);
-          
+
           // Continue with standard join but skip knock/approval for returning users
           // (Fall through to standard join path but the user should be allowed back)
         }
