@@ -94,6 +94,7 @@ client/android/app/build/
 client/android/build/
 client/android/*.keystore
 client/android/*.jks
+client/android/app/release/
 
 # Signing keys (never commit these)
 *.keystore
