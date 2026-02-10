@@ -15,21 +15,21 @@ export const VIBES = {
         id: 'party',
         name: 'Party',
         emoji: '🎉',
-        bgClass: 'bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/30',
+        bgClass: 'bg-gradient-to-br from-blue-100 to-blue-400 dark:from-blue-800/80 dark:to-blue-900/60',
         description: 'Festive and fun'
     },
     chill: {
         id: 'chill',
         name: 'Chill',
         emoji: '🌊',
-        bgClass: 'bg-gradient-to-br from-cyan-50 to-blue-50 dark:from-cyan-950/30 dark:to-blue-950/30',
+        bgClass: 'bg-gradient-to-br from-cyan-100 to-blue-300 dark:from-cyan-900/70 dark:to-blue-900/60',
         description: 'Relaxed vibes'
     },
     focus: {
         id: 'focus',
         name: 'Focus',
         emoji: '🎯',
-        bgClass: 'bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30',
+        bgClass: 'bg-gradient-to-br from-amber-100 to-orange-300 dark:from-amber-900/70 dark:to-orange-900/60',
         description: 'Work mode'
     }
 };
