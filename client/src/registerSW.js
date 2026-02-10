@@ -11,9 +11,6 @@ if ('serviceWorker' in navigator) {
             updateSW(true);
           }
         },
-        onOfflineReady() {
-          console.log('App ready to work offline');
-        },
         onRegisterError(error) {
           console.error('Error during service worker registration:', error);
         },

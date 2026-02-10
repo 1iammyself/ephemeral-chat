@@ -84,13 +84,6 @@ const PWAHandler = () => {
                         }
                     );
                 },
-                onOfflineReady() {
-                    toast.success('App ready to work offline!', {
-                        position: "bottom-center",
-                        autoClose: 3000,
-                        className: "dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl"
-                    });
-                },
             });
 
             // Periodic check for updates (every hour)
