@@ -1,12 +1,13 @@
 import React from 'react';
 import { ArrowLeft, Shield, Lock, Eye, Trash2, Smartphone, Globe, Github } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import ThemeToggle from './ThemeToggle';
 
 const PrivacyPolicy = () => {
     const navigate = useNavigate();
 
     return (
-        <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+        <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-y-auto">
             {/* Header */}
             <header className="sticky top-0 z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
                 <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -15,13 +16,15 @@ const PrivacyPolicy = () => {
                         className="p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors flex items-center gap-2 group"
                     >
                         <ArrowLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
-                        <span className="font-medium">Back</span>
+                        <span className="hidden sm:inline font-medium">Back</span>
                     </button>
                     <div className="flex items-center gap-2">
                         <Shield className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
                         <h1 className="text-xl font-bold tracking-tight">Privacy Policy</h1>
                     </div>
-                    <div className="w-10"></div>
+                    <div className="flex items-center gap-2">
+                        <ThemeToggle />
+                    </div>
                 </div>
             </header>
 
