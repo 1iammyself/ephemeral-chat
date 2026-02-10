@@ -22,8 +22,8 @@ export const ROLE_INFO = {
   [ROLES.TIER1]: {
     label: 'Admin',
     badge: '⭐',
-    color: 'text-purple-500',
-    bgColor: 'bg-purple-100 dark:bg-purple-900/30'
+    color: 'text-blue-500',
+    bgColor: 'bg-blue-100 dark:bg-blue-900/30'
   },
   [ROLES.TIER2]: {
     label: 'Mod',

@@ -270,20 +270,20 @@ Verbal Code: ${verbalCode || 'N/A'}`;
               {/* Verbal Join Code */}
               {verbalCode && (
                 <div className="pt-3">
-                  <div className="p-3 bg-purple-50 dark:bg-purple-900/30 rounded-lg border border-purple-100 dark:border-purple-800">
-                    <label className="block text-sm font-medium text-purple-800 dark:text-purple-300 mb-2">Verbal Join Code</label>
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-100 dark:border-blue-800">
+                    <label className="block text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Verbal Join Code</label>
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-lg font-semibold text-purple-700 dark:text-purple-200 tracking-wide">
+                      <span className="font-mono text-lg font-semibold text-blue-700 dark:text-blue-200 tracking-wide">
                         {verbalCode}
                       </span>
                       <button
                         onClick={() => copyToClipboard(verbalCode, 'verbalCode')}
-                        className={`ml-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${isCopied.verbalCode ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-200 hover:bg-purple-200 dark:hover:bg-purple-700'}`}
+                        className={`ml-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${isCopied.verbalCode ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-700'}`}
                       >
                         {isCopied.verbalCode ? 'Copied!' : 'Copy'}
                       </button>
                     </div>
-                    <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
+                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
                       Share this code verbally — others can type it to join.
                     </p>
                   </div>
@@ -491,7 +491,7 @@ Verbal Code: ${verbalCode || 'N/A'}`;
                 </div>
               </div>
             </div>
-            
+
             {/* Honeypot fields - invisible to humans, bots will fill them */}
             <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', opacity: 0, height: 0, overflow: 'hidden' }}>
               <label htmlFor="hp_email">Email (leave empty)</label>

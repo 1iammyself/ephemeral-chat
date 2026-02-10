@@ -25,10 +25,10 @@ const Home = ({ children }) => {
   useEffect(() => {
     // Only process URL params once
     if (urlParamsProcessed) return;
-    
+
     const action = searchParams.get('action');
     const joinCode = searchParams.get('join');
-    
+
     if (action === 'create') {
       setUrlParamsProcessed(true);
       // Clear the URL params first by replacing history
@@ -41,13 +41,13 @@ const Home = ({ children }) => {
       const decodedCode = decodeURIComponent(joinCode).trim().toLowerCase();
       // Clear the URL params first
       window.history.replaceState({}, '', window.location.pathname);
-      
+
       // Validate and auto-join
       const words = decodedCode.split(/\s+/).filter(w => w.length > 0);
       if (words.length === 4) {
         setIsJoiningVerbal(true);
         setVerbalCode(decodedCode);
-        
+
         // Trigger the verbal join
         joinWithVerbalCode(decodedCode)
           .then(result => {
@@ -160,11 +160,11 @@ const Home = ({ children }) => {
   ];
 
   return (
-    <div style={{height: '100vh', overflowY: 'auto'}} className="dark:bg-gray-900 transition-colors duration-200">
+    <div style={{ height: '100vh', overflowY: 'auto' }} className="dark:bg-gray-900 transition-colors duration-200">
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-indigo-600 dark:text-indigo-400 flex items-center">
+          <h1 className="text-3xl font-bold text-blue-600 dark:text-blue-400 flex items-center">
             <MessageCircle className="h-8 w-8 mr-2" />
             Ephemeral Chat
           </h1>
@@ -222,14 +222,14 @@ const Home = ({ children }) => {
                         onChange={(e) => setVerbalCode(e.target.value)}
                         placeholder="clarity compass journey peace"
                         data-allow-copy="true"
-                        className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                        className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                         disabled={isJoiningVerbal}
                       />
                     </div>
                     <button
                       type="submit"
                       disabled={isJoiningVerbal || !verbalCode.trim()}
-                      className="px-4 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                      className="px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                     >
                       {isJoiningVerbal ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

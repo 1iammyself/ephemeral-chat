@@ -15,7 +15,7 @@ export const VIBES = {
         id: 'party',
         name: 'Party',
         emoji: '🎉',
-        bgClass: 'bg-gradient-to-br from-pink-50 to-purple-50 dark:from-pink-950/30 dark:to-purple-950/30',
+        bgClass: 'bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/30',
         description: 'Festive and fun'
     },
     chill: {

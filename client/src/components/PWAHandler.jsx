@@ -42,7 +42,7 @@ export const RefreshButton = ({ className = "" }) => {
             className={`p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all text-gray-500 dark:text-gray-400 flex items-center justify-center group ${className}`}
             title="Refresh App"
         >
-            <RefreshCw className={`w-5 h-5 transition-all duration-500 ${isRefreshing ? 'animate-spin text-indigo-500 scale-110' : 'group-hover:rotate-180 group-active:scale-90'}`} />
+            <RefreshCw className={`w-5 h-5 transition-all duration-500 ${isRefreshing ? 'animate-spin text-blue-500 scale-110' : 'group-hover:rotate-180 group-active:scale-90'}`} />
         </button>
     );
 };
@@ -58,7 +58,7 @@ const PWAHandler = () => {
                     toast.info(
                         <div className="flex flex-col space-y-2">
                             <div className="flex items-center space-x-2">
-                                <Info className="w-5 h-5 text-indigo-500" />
+                                <Info className="w-5 h-5 text-blue-500" />
                                 <p className="font-semibold text-gray-900 dark:text-white">New version available!</p>
                             </div>
                             <p className="text-xs text-gray-500 dark:text-gray-400">Update now to get the latest security features and improvements.</p>
@@ -67,7 +67,7 @@ const PWAHandler = () => {
                                     updateSW(true);
                                     toast.dismiss();
                                 }}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm font-bold flex items-center justify-center space-x-2 transition-all transform active:scale-95 shadow-lg shadow-indigo-500/20"
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-bold flex items-center justify-center space-x-2 transition-all transform active:scale-95 shadow-lg shadow-blue-500/20"
                             >
                                 <Download className="w-4 h-4" />
                                 <span>Update & Refresh</span>

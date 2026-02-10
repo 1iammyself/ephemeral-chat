@@ -34,9 +34,9 @@ const UserList = ({
       'bg-blue-500',
       'bg-green-500',
       'bg-yellow-500',
-      'bg-purple-500',
+      'bg-blue-400',
       'bg-pink-500',
-      'bg-indigo-500',
+      'bg-blue-600',
       'bg-teal-500'
     ];
 
@@ -150,7 +150,7 @@ const UserList = ({
                 <div key={user.socketId || user.id || index} className="relative">
                   <div
                     className={`flex items-center space-x-3 p-2 rounded-lg transition-colors duration-200 cursor-pointer ${isCurrentUser
-                      ? 'bg-indigo-50 dark:bg-indigo-900/20'
+                      ? 'bg-blue-50 dark:bg-blue-900/20'
                       : selectedRecipients.includes(user.socketId)
                         ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
                         : 'hover:bg-gray-50 dark:hover:bg-gray-800 border border-transparent'
@@ -174,7 +174,7 @@ const UserList = ({
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <p className={`text-sm font-medium truncate ${isCurrentUser ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-gray-200'
+                        <p className={`text-sm font-medium truncate ${isCurrentUser ? 'text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-gray-200'
                           }`}>
                           {user.nickname}
                           {isCurrentUser && ' (You)'}

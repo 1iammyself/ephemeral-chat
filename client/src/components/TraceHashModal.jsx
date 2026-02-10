@@ -67,7 +67,7 @@ const TraceHashModal = ({ onClose }) => {
 
             <div className="relative w-full max-w-lg bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-700 transition-all duration-300">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-indigo-600 to-blue-600 p-6">
+                <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6">
                     <div className="flex justify-between items-center text-white">
                         <div className="flex items-center space-x-3">
                             <Shield className="w-6 h-6" />
@@ -77,7 +77,7 @@ const TraceHashModal = ({ onClose }) => {
                             <X className="w-5 h-5" />
                         </button>
                     </div>
-                    <p className="text-indigo-100 text-sm mt-1 opacity-90">
+                    <p className="text-blue-100 text-sm mt-1 opacity-90">
                         Identify the user behind a forensic watermark hash.
                     </p>
                 </div>
@@ -96,7 +96,7 @@ const TraceHashModal = ({ onClose }) => {
                                         value={targetHash}
                                         onChange={(e) => setTargetHash(e.target.value)}
                                         placeholder="e.g. 3FC4CCFE7458"
-                                        className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-mono uppercase"
+                                        className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono uppercase"
                                         required
                                     />
                                 </div>
@@ -112,7 +112,7 @@ const TraceHashModal = ({ onClose }) => {
                                         value={usernamesInput}
                                         onChange={(e) => setUsernamesInput(e.target.value.toLowerCase())}
                                         placeholder="Paste room participants here... (comma or line separated)"
-                                        className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all min-h-[120px] text-sm lowercase"
+                                        className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[120px] text-sm lowercase"
                                         required
                                     />
                                 </div>
@@ -124,7 +124,7 @@ const TraceHashModal = ({ onClose }) => {
                             <button
                                 type="submit"
                                 disabled={isProcessing || !targetHash || !usernamesInput}
-                                className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/20 transition-all transform active:scale-[0.98] flex items-center justify-center space-x-2"
+                                className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 transition-all transform active:scale-[0.98] flex items-center justify-center space-x-2"
                             >
                                 {isProcessing ? (
                                     <>

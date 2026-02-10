@@ -608,8 +608,8 @@ const ChatRoom = () => {
     toast(({ closeToast }) => (
       <div className="flex flex-col gap-1.5 min-w-[240px] p-1">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl">
-            <FileText className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+          <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
+            <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           </div>
           <div className="flex-1">
             <h3 className="text-sm font-bold text-gray-900 dark:text-white leading-tight">
@@ -627,7 +627,7 @@ const ChatRoom = () => {
               closeToast();
               setShowFileModal(true);
             }}
-            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
           >
             Open Files
           </button>
@@ -1739,7 +1739,7 @@ const ChatRoom = () => {
         {/* Timer Pill */}
         {activeTimer && (
           <div
-            className="pointer-events-auto bg-indigo-600/90 backdrop-blur-md px-4 py-1.5 rounded-full shadow-lg flex items-center space-x-3 animate-in slide-in-from-top-2 text-white border border-indigo-500/50 cursor-move touch-none"
+            className="pointer-events-auto bg-blue-600/90 backdrop-blur-md px-4 py-1.5 rounded-full shadow-lg flex items-center space-x-3 animate-in slide-in-from-top-2 text-white border border-blue-500/50 cursor-move touch-none"
             style={{ transform: `translateX(${offsets.timer}px)` }}
             onMouseDown={(e) => handleStartPillDrag(e, 'timer')}
             onTouchStart={(e) => handleStartPillDrag(e, 'timer')}
@@ -1892,10 +1892,10 @@ const ChatRoom = () => {
                                 setActivityLogs(prev => [log, ...prev].slice(0, 50));
                               }}
                               disabled={!isConnected}
-                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-indigo-50/50 dark:bg-indigo-900/10 hover:bg-indigo-100 dark:hover:bg-indigo-900/20 transition-all border border-indigo-100/20 dark:border-indigo-800/20 group"
+                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all border border-blue-100/20 dark:border-blue-800/20 group"
                             >
-                              <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
-                                <FileText className="w-4 h-4 text-indigo-500" />
+                              <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+                                <FileText className="w-4 h-4 text-blue-500" />
                               </div>
                               <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">Files</span>
                             </button>
@@ -1944,10 +1944,10 @@ const ChatRoom = () => {
                               type="button"
                               onClick={() => { setShowPollModal(true); setShowFeatureMenu(false); }}
                               disabled={!isConnected}
-                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-purple-50/50 dark:bg-purple-900/10 hover:bg-purple-100 dark:hover:bg-purple-900/20 transition-all border border-purple-100/20 dark:border-purple-800/20 group"
+                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all border border-blue-100/20 dark:border-blue-800/20 group"
                             >
-                              <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
-                                <BarChart2 className="w-4 h-4 text-purple-500" />
+                              <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+                                <BarChart2 className="w-4 h-4 text-blue-500" />
                               </div>
                               <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">Poll</span>
                             </button>
@@ -2020,8 +2020,8 @@ const ChatRoom = () => {
                                     }}
                                     className={`flex items-center space-x-2 p-2 rounded-xl border transition-all ${activeTimer ? 'bg-red-50 border-red-100 dark:bg-red-900/10 dark:border-red-900/20' : 'bg-gray-50 border-gray-100 dark:bg-gray-900/50 dark:border-gray-800'}`}
                                   >
-                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${activeTimer ? 'bg-red-100 dark:bg-red-900/30' : 'bg-indigo-100 dark:bg-indigo-900/30'}`}>
-                                      {activeTimer ? <X className="w-3.5 h-3.5 text-red-500" /> : <Clock className="w-3.5 h-3.5 text-indigo-500" />}
+                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${activeTimer ? 'bg-red-100 dark:bg-red-900/30' : 'bg-blue-100 dark:bg-blue-900/30'}`}>
+                                      {activeTimer ? <X className="w-3.5 h-3.5 text-red-500" /> : <Clock className="w-3.5 h-3.5 text-blue-500" />}
                                     </div>
                                     <span className={`text-xs font-medium ${activeTimer ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
                                       {activeTimer ? 'Stop' : 'Timer'}
@@ -2091,7 +2091,7 @@ const ChatRoom = () => {
                                   </>
                                 ) : (
                                   <>
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold">
                                       {item.nickname[0].toUpperCase()}
                                     </div>
                                     <div className="font-bold text-sm">@{item.nickname}</div>
