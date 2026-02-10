@@ -174,9 +174,6 @@ const AppRestrictionBanner = () => {
                                 <span>iOS App Coming Soon</span>
                             </div>
                         )}
-                        <p className="text-center text-[9px] text-gray-400 dark:text-gray-500 uppercase tracking-widest font-bold mt-1">
-                            Secure & Open Source
-                        </p>
                     </div>
                 </div>
             </div>
