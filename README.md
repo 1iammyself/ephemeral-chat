@@ -24,7 +24,7 @@ Ephemeral Chat is a high-security, Private messaging platform built for users wh
 Watch how Ephemeral Chat redefines private communication:
 
 [![Watch the video](client/public/screenshot-chat.png)](https://youtu.be/gnvoWkvkkho)
-[![Watch the video](client/public/screenshot-chat.png)](https://youtu.be/gnvoWkvkkho)
+
 
 ### 📸 Sneak Peek
 
