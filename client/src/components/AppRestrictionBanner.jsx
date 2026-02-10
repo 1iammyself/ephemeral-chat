@@ -23,6 +23,12 @@ const AppRestrictionBanner = () => {
 
         // Detection logic
         const checkEnvironment = () => {
+            // WHITELIST: Allow privacy policy to be viewed in browser
+            if (window.location.pathname === '/privacy') {
+                setIsVisible(false);
+                return true;
+            }
+
             // 1. Desktop/Electron
             const isElectron = !!(window.electronAPI || window.process?.versions?.electron || document.body.classList.contains('electron-app'));
 
