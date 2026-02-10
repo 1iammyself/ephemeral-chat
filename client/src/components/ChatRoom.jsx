@@ -3,20 +3,14 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Send,
   Users,
-  Copy,
   ArrowLeft,
-  Wifi,
-  WifiOff,
   Clock,
-  Lock,
   X,
   Phone,
-  PhoneOff,
   Image as ImageIcon,
   Loader2,
   Trash2,
   Mic,
-  UserX,
   Smile,
   BarChart2,
   Plus,
@@ -25,11 +19,9 @@ import {
   Reply,
   FileText,
   Activity,
-  Info,
   Camera,
   PanelLeft,
   PanelRight,
-  GripVertical
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -1818,22 +1810,7 @@ const ChatRoom = () => {
                 {isRecording ? (
                   <div className="flex-1 flex flex-col space-y-2">
                     {/* Safari Audio Notice */}
-                    {isSafariBrowser() && !safariNoticeShown && (
-                      <div className="flex items-center space-x-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200/50 dark:border-amber-800/50 animate-in slide-in-from-top-2">
-                        <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                        <span className="text-xs text-amber-700 dark:text-amber-300">Recordings made and played on Safari may be truncated. Playback on other browsers is unaffected.</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSafariNoticeShown(true);
-                            localStorage.setItem('safariAudioNoticeShown', 'true');
-                          }}
-                          className="ml-auto text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 p-0.5"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
+
                     <div className="flex items-center justify-between bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-2">
                       <div className="flex items-center space-x-3"><div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" /><span className="text-red-600 dark:text-red-400 font-medium font-mono">{formatDuration(recordingDuration)} / 0:30</span></div>
                       <div className="flex items-center space-x-2">
