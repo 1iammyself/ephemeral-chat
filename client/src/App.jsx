@@ -9,6 +9,7 @@ import MyRooms from './components/MyRooms'; // Import MyRooms component
 import AppRestrictionBanner from './components/AppRestrictionBanner';
 import DesktopSecurityGuard from './components/DesktopSecurityGuard';
 import DeepLinkHandler from './components/DeepLinkHandler';
+import PrivacyPolicy from './components/PrivacyPolicy';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -50,6 +51,7 @@ function App() {
             </Home>
           } />
           <Route path="/invite/:token" element={<InviteHandler />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <ToastContainer />

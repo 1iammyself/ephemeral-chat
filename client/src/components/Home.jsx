@@ -295,9 +295,15 @@ const Home = ({ children }) => {
       {/* Footer */}
       < footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 py-6 transition-colors duration-200" >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-            Ephemeral Chat offers a fast, secure, and private experience
-          </p>
+          <div className="flex flex-col items-center space-y-2 text-sm text-gray-500 dark:text-gray-400">
+            <p>Ephemeral Chat offers a fast, secure, and private experience</p>
+            <button
+              onClick={() => navigate('/privacy')}
+              className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors font-medium underline underline-offset-4"
+            >
+              Privacy Policy
+            </button>
+          </div>
         </div>
       </footer >
     </div >
