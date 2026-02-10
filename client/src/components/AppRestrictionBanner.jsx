@@ -101,9 +101,9 @@ const AppRestrictionBanner = () => {
             <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-xl z-[9999] animate-fadeIn" />
 
             {/* Modal Card - Fixed Centering with Absolute Position */}
-            <div className="fixed left-4 right-4 top-1/2 -translate-y-1/2 z-[10000] max-w-sm mx-auto bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden animate-slideUp border border-indigo-500/30">
+            <div className="fixed left-4 right-4 top-1/2 -translate-y-1/2 z-[10000] max-w-sm mx-auto bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden animate-slideUp border border-blue-500/30">
                 {/* Header - Compact */}
-                <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 px-6 py-6">
+                <div className="bg-gradient-to-br from-blue-600 to-blue-700 px-6 py-6">
                     <div className="flex flex-col items-center text-center gap-3">
                         <div className="w-16 h-16 bg-white/15 rounded-2xl flex items-center justify-center shadow-inner backdrop-blur-sm border border-white/20">
                             {isMobile ? (
@@ -114,7 +114,7 @@ const AppRestrictionBanner = () => {
                         </div>
                         <div>
                             <h3 className="text-xl font-black text-white tracking-tight text-center">App Required</h3>
-                            <p className="text-indigo-100/90 text-[10px] font-bold uppercase tracking-[0.2em] text-center">
+                            <p className="text-blue-100/90 text-[10px] font-bold uppercase tracking-[0.2em] text-center">
                                 {isAndroid ? 'Android Security' : isIOS ? 'Coming Soon' : 'Desktop Security'}
                             </p>
                         </div>
@@ -123,10 +123,10 @@ const AppRestrictionBanner = () => {
 
                 {/* Content - Compact */}
                 <div className="px-6 py-6">
-                    <div className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-800/50 rounded-xl p-4 mb-5">
+                    <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-800/50 rounded-xl p-4 mb-5">
                         <div className="flex gap-3 text-left">
-                            <Shield className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
-                            <p className="text-indigo-900 dark:text-indigo-200 text-xs leading-relaxed">
+                            <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                            <p className="text-blue-900 dark:text-blue-200 text-xs leading-relaxed">
                                 {isIOS
                                     ? "The iOS application is currently in development. To ensure privacy and security, access is currently available via the Android and Desktop apps."
                                     : <>To protect your <strong>privacy</strong>, rooms can only be accessed via the official {isAndroid ? 'Android' : 'Desktop'} app.</>
@@ -152,9 +152,9 @@ const AppRestrictionBanner = () => {
                         {!isIOS && (
                             <button
                                 onClick={() => window.location.href = 'ephemeral-chat://'}
-                                className="w-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-5 py-3.5 rounded-xl text-sm font-bold transition-all border-2 border-indigo-500/20 flex items-center justify-center gap-2 active:scale-[0.98]"
+                                className="w-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-5 py-3.5 rounded-xl text-sm font-bold transition-all border-2 border-blue-500/20 flex items-center justify-center gap-2 active:scale-[0.98]"
                             >
-                                <ExternalLink size={18} className="text-indigo-500" />
+                                <ExternalLink size={18} className="text-blue-500" />
                                 Open in App
                             </button>
                         )}
@@ -162,7 +162,7 @@ const AppRestrictionBanner = () => {
                         {!isIOS && (
                             <button
                                 onClick={handleDownload}
-                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3.5 rounded-xl text-sm font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 active:scale-[0.98]"
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white px-5 py-3.5 rounded-xl text-sm font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-[0.98]"
                             >
                                 <Download size={18} />
                                 Download {isAndroid ? 'APK' : 'Desktop App'}
