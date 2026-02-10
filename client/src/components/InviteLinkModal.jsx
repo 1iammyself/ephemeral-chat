@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { generateInviteLink } from '../utils/api';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { toast } from 'react-toastify';
-import { X, Loader2, Check, AlertCircle, Clock } from 'lucide-react';
+import { X, Loader2, Check, AlertCircle, Clock, Share2 } from 'lucide-react';
 
 const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -76,6 +76,45 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
     setIsVerbalCopied(true);
     toast.success('Verbal code copied!');
     setTimeout(() => setIsVerbalCopied(false), 2000);
+  };
+
+  const handleShare = async () => {
+    if (!inviteLink) return;
+
+    const shareText = `Join my private, secure chat room!\n\nVerbal Code: ${verbalCode || 'N/A'}`;
+
+    const shareData = {
+      title: 'Ephemeral Chat',
+      text: shareText,
+      url: inviteLink
+    };
+
+    // Web Share API works on Capacitor Android WebView and mobile browsers
+    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          // Share failed — fallback to copy
+          const fullText = `${shareText}\n\nLink: ${inviteLink}`;
+          try {
+            await navigator.clipboard.writeText(fullText);
+            toast.success('Invite details copied to clipboard!');
+          } catch {
+            toast.error('Failed to share');
+          }
+        }
+      }
+    } else {
+      // Fallback for Electron / desktop browsers: copy to clipboard
+      const fullText = `${shareText}\n\nLink: ${inviteLink}`;
+      try {
+        await navigator.clipboard.writeText(fullText);
+        toast.success('Invite details copied! Paste it to share.');
+      } catch {
+        toast.error('Failed to copy to clipboard');
+      }
+    }
   };
 
 
@@ -200,7 +239,7 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
                     />
                     <CopyToClipboard text={inviteLink} onCopy={handleCopy}>
                       <button
-                        className={`inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 dark:border-gray-600 rounded-r-md bg-white dark:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${isCopied ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300' : ''
+                        className={`inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${isCopied ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300' : ''
                           }`}
                       >
                         {isCopied ? (
@@ -213,6 +252,13 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
                         )}
                       </button>
                     </CopyToClipboard>
+                    <button
+                      onClick={handleShare}
+                      className="inline-flex items-center px-3 py-2 border border-l-0 border-gray-300 dark:border-gray-600 rounded-r-md bg-blue-500 dark:bg-blue-600 text-sm font-medium text-white hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
+                      title="Share invite link and verbal code"
+                    >
+                      <Share2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
 
