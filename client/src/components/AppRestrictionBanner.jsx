@@ -35,14 +35,21 @@ const AppRestrictionBanner = () => {
                 userAgent.includes('version/4.0')
             );
 
+            // 3. iOS detection
+            const isIOS = /iphone|ipad|ipod/i.test(userAgent);
+
+            // CHANGED: We now block iOS PWA as well, so we only allow Electron or Android Native
             if (isElectron || isAndroidApp) {
                 setIsVisible(false);
                 return true;
             }
 
-            // If we are here, we are in a browser
+            // If we are here, we are in a browser or iOS PWA
             if (isAndroidDevice) {
                 setPlatform('android');
+                setIsVisible(true);
+            } else if (isIOS) {
+                setPlatform('ios');
                 setIsVisible(true);
             } else if (!isMobile) {
                 setPlatform('desktop');
@@ -85,6 +92,8 @@ const AppRestrictionBanner = () => {
     if (!isVisible) return null;
 
     const isAndroid = platform === 'android';
+    const isIOS = platform === 'ios';
+    const isMobile = isAndroid || isIOS;
 
     return (
         <>
@@ -97,7 +106,7 @@ const AppRestrictionBanner = () => {
                 <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 px-6 py-6">
                     <div className="flex flex-col items-center text-center gap-3">
                         <div className="w-16 h-16 bg-white/15 rounded-2xl flex items-center justify-center shadow-inner backdrop-blur-sm border border-white/20">
-                            {isAndroid ? (
+                            {isMobile ? (
                                 <Smartphone className="w-10 h-10 text-white" />
                             ) : (
                                 <Laptop className="w-10 h-10 text-white" />
@@ -106,7 +115,7 @@ const AppRestrictionBanner = () => {
                         <div>
                             <h3 className="text-xl font-black text-white tracking-tight text-center">App Required</h3>
                             <p className="text-indigo-100/90 text-[10px] font-bold uppercase tracking-[0.2em] text-center">
-                                {isAndroid ? 'Android Security' : 'Desktop Security'}
+                                {isAndroid ? 'Android Security' : isIOS ? 'Coming Soon' : 'Desktop Security'}
                             </p>
                         </div>
                     </div>
@@ -118,7 +127,10 @@ const AppRestrictionBanner = () => {
                         <div className="flex gap-3 text-left">
                             <Shield className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
                             <p className="text-indigo-900 dark:text-indigo-200 text-xs leading-relaxed">
-                                To protect your privacy with <strong>screenshot restriction</strong>, rooms can only be accessed via the official {isAndroid ? 'Android' : 'Desktop'} app.
+                                {isIOS
+                                    ? "The iOS application is currently in development. To ensure privacy and security, access is currently available via the Android and Desktop apps."
+                                    : <>To protect your <strong>privacy</strong>, rooms can only be accessed via the official {isAndroid ? 'Android' : 'Desktop'} app.</>
+                                }
                             </p>
                         </div>
                     </div>
@@ -137,20 +149,31 @@ const AppRestrictionBanner = () => {
 
                     {/* Buttons */}
                     <div className="flex flex-col gap-3">
-                        <button
-                            onClick={() => window.location.href = 'ephemeral-chat://'}
-                            className="w-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-5 py-3.5 rounded-xl text-sm font-bold transition-all border-2 border-indigo-500/20 flex items-center justify-center gap-2 active:scale-[0.98]"
-                        >
-                            <ExternalLink size={18} className="text-indigo-500" />
-                            Open in App
-                        </button>
-                        <button
-                            onClick={handleDownload}
-                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3.5 rounded-xl text-sm font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 active:scale-[0.98]"
-                        >
-                            <Download size={18} />
-                            Download {isAndroid ? 'APK' : 'Desktop App'}
-                        </button>
+                        {!isIOS && (
+                            <button
+                                onClick={() => window.location.href = 'ephemeral-chat://'}
+                                className="w-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-5 py-3.5 rounded-xl text-sm font-bold transition-all border-2 border-indigo-500/20 flex items-center justify-center gap-2 active:scale-[0.98]"
+                            >
+                                <ExternalLink size={18} className="text-indigo-500" />
+                                Open in App
+                            </button>
+                        )}
+
+                        {!isIOS && (
+                            <button
+                                onClick={handleDownload}
+                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3.5 rounded-xl text-sm font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 active:scale-[0.98]"
+                            >
+                                <Download size={18} />
+                                Download {isAndroid ? 'APK' : 'Desktop App'}
+                            </button>
+                        )}
+
+                        {isIOS && (
+                            <div className="w-full bg-gray-100 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 px-5 py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 cursor-default border border-gray-200 dark:border-gray-700">
+                                <span>iOS App Coming Soon</span>
+                            </div>
+                        )}
                         <p className="text-center text-[9px] text-gray-400 dark:text-gray-500 uppercase tracking-widest font-bold mt-1">
                             Secure & Open Source
                         </p>
