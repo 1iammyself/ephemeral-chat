@@ -4,5 +4,5 @@
     <color name="colorPrimaryDark">#3730A3</color>
     <color name="colorAccent">#6366F1</color>
     <color name="shortcut_background">#4F46E5</color>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <color name="ic_launcher_background">#4F46E5</color>
 </resources>

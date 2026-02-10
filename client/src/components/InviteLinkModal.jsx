@@ -89,31 +89,29 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
       url: inviteLink
     };
 
-    // Web Share API works on Capacitor Android WebView and mobile browsers
-    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+    // Use Web Share API (works on Android Capacitor WebView)
+    if (navigator.share) {
       try {
         await navigator.share(shareData);
       } catch (err) {
         if (err.name !== 'AbortError') {
-          // Share failed — fallback to copy
-          const fullText = `${shareText}\n\nLink: ${inviteLink}`;
-          try {
-            await navigator.clipboard.writeText(fullText);
-            toast.success('Invite details copied to clipboard!');
-          } catch {
-            toast.error('Failed to share');
-          }
+          // Fallback: Copy to clipboard
+          copyCombinedToClipboard(shareText, inviteLink);
         }
       }
     } else {
-      // Fallback for Electron / desktop browsers: copy to clipboard
-      const fullText = `${shareText}\n\nLink: ${inviteLink}`;
-      try {
-        await navigator.clipboard.writeText(fullText);
-        toast.success('Invite details copied! Paste it to share.');
-      } catch {
-        toast.error('Failed to copy to clipboard');
-      }
+      // Fallback for Desktop / No Share API available
+      copyCombinedToClipboard(shareText, inviteLink);
+    }
+  };
+
+  const copyCombinedToClipboard = async (shareText, link) => {
+    const fullText = `${shareText}\n\nLink: ${link}`;
+    try {
+      await navigator.clipboard.writeText(fullText);
+      toast.success('Invite details copied to clipboard!');
+    } catch {
+      toast.error('Failed to copy to clipboard');
     }
   };
 
