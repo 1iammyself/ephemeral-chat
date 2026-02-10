@@ -1,7 +1,7 @@
 /**
  * AudioCallModal Component
  * Displays the audio/video call UI with controls
- * Re-implemented based on reference implementation
+ * Re-implemented based on working branch implementation
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -36,7 +36,7 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
 
     const localAudioRef = useRef(null);
     const localVideoRef = useRef(null);
-    const remoteVideoRef = useRef(null); // Keep for single video (Mesh video is harder)
+    const remoteVideoRef = useRef(null);
     const callStartTimeRef = useRef(0);
 
     // Subscribe to call state changes
@@ -73,22 +73,17 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
 
     // Setup local audio/video streams
     useEffect(() => {
-        // Setup local audio stream
         const localStream = webRTCService.getLocalStream();
         if (localStream && localAudioRef.current) {
             localAudioRef.current.srcObject = localStream;
             localAudioRef.current.muted = true; // Always mute local audio
         }
 
-        // Setup local video stream (if video enabled)
         if (localStream && localVideoRef.current) {
             localVideoRef.current.srcObject = localStream;
             localVideoRef.current.muted = true;
         }
 
-        // Remote video (single stream support for now)
-        // If we have multiple streams, we might just show the first one or none for video
-        // For audio, we render AudioStream components below
         const remoteStreams = webRTCService.getRemoteStreams();
         if (remoteStreams && remoteStreams.size > 0 && remoteVideoRef.current) {
             const firstStream = remoteStreams.values().next().value;
@@ -127,10 +122,6 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
     };
 
     const toggleSpeaker = () => {
-        // This only affects the "main" remote audio if we were using a ref
-        // For multiple streams, we might need to mute all AudioStream components?
-        // Or just toggle state and pass it down?
-        // HTMLAudioElement.muted = !isSpeakerOn
         setIsSpeakerOn(!isSpeakerOn);
     };
 
@@ -199,21 +190,18 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                 {/* Video Preview (if video call) */}
                 {callState.isVideoEnabled && callState.isConnected && (
                     <div className="relative bg-gray-900 aspect-video">
-                        {/* Remote Video (Single) */}
                         <video
                             ref={remoteVideoRef}
                             autoPlay
                             playsInline
                             className="w-full h-full object-cover"
                         />
-                        {/* Local Video PIP */}
                         <video
                             ref={localVideoRef}
                             autoPlay
                             playsInline
                             muted
                             className="absolute bottom-4 right-4 w-24 h-32 object-cover rounded-lg border-2 border-white shadow-lg"
-                            style={{ transform: 'scaleX(-1)' }}
                         />
                     </div>
                 )}
@@ -221,7 +209,6 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                 {/* Call Controls */}
                 <div className="px-6 py-6">
                     {callState.isIncomingCall ? (
-                        // Incoming call controls
                         <div className="flex justify-center space-x-6">
                             <button
                                 onClick={handleRejectCall}
@@ -237,9 +224,7 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                             </button>
                         </div>
                     ) : (
-                        // Active call controls
                         <div className="flex justify-center space-x-4">
-                            {/* Mute Button */}
                             <button
                                 onClick={toggleMute}
                                 className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${isMuted
@@ -250,7 +235,6 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                                 {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
                             </button>
 
-                            {/* Speaker Button (Toggle output volume/mute) */}
                             <button
                                 onClick={toggleSpeaker}
                                 className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${!isSpeakerOn
@@ -261,7 +245,6 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                                 {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
                             </button>
 
-                            {/* End Call Button */}
                             <button
                                 onClick={handleEndCall}
                                 className="w-16 h-16 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
@@ -272,7 +255,6 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                     )}
                 </div>
 
-                {/* Security Notice */}
                 <div className="bg-green-50 dark:bg-green-900/20 border-t border-green-100 dark:border-green-800 px-4 py-3 text-center">
                     <p className="text-green-700 dark:text-green-400 text-sm flex items-center justify-center space-x-1">
                         <span>🔒</span>
@@ -280,10 +262,8 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                     </p>
                 </div>
 
-                {/* Hidden audio elements for local and remote streams */}
                 <audio ref={localAudioRef} autoPlay muted />
 
-                {/* Render audio for each remote stream */}
                 {callState.remoteStreams && Array.from(callState.remoteStreams.entries()).map(([id, stream]) => (
                     <AudioStream key={id} stream={stream} />
                 ))}

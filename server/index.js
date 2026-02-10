@@ -155,6 +155,7 @@ const io = socketIo(server, {
   pingInterval: 45000, // 45 seconds
   cookie: false,
   serveClient: false,
+  allowEIO3: true,
   perMessageDeflate: false // Disable to prevent Base64 corruption
 });
 

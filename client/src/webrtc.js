@@ -1,7 +1,7 @@
 /**
  * WebRTC Service for Ephemeral Chat
  * Handles peer-to-peer audio/video calls using WebRTC
- * Re-implemented based on reference implementation
+ * Re-implemented based on the working branch implementation
  */
 
 import socketManager from './socket';
@@ -29,7 +29,7 @@ class WebRTCService {
             isOutgoingCall: false,
             isCalling: false,
             isConnected: false,
-            remoteNickname: null, // Keep for backward compat (display name of caller/callee)
+            remoteNickname: null,
             callId: null,
             state: CallState.IDLE,
             remoteStreams: new Map() // socketId -> stream
@@ -88,7 +88,7 @@ class WebRTCService {
     updateCallState(updates) {
         this.currentCallState = { ...this.currentCallState, ...updates };
 
-        // Map boolean flags to state string for backward compatibility
+        // Map boolean flags to state string
         if (this.currentCallState.isIncomingCall) this.currentCallState.state = CallState.INCOMING;
         else if (this.currentCallState.isCalling) this.currentCallState.state = CallState.CALLING;
         else if (this.currentCallState.isConnected) this.currentCallState.state = CallState.CONNECTED;
@@ -104,8 +104,6 @@ class WebRTCService {
 
     /**
      * Start an outgoing call to multiple recipients
-     * @param {string} roomCode 
-     * @param {Array<{id: string, nickname: string}>} recipients 
      */
     async startCall(roomCode, recipients) {
         try {
@@ -113,7 +111,6 @@ class WebRTCService {
             this.currentRoomCode = roomCode;
             const callId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-            // Display name: if 1 person, use nickname. If multiple, use "Group Call" or similar.
             const remoteNickname = recipients.length === 1 ? recipients[0].nickname : `${recipients.length} people`;
 
             this.updateCallState({
@@ -136,18 +133,14 @@ class WebRTCService {
 
             // Initiate connection for each recipient
             for (const recipient of recipients) {
-                await this.createPeerConnection(recipient.id);
+                const pc = await this.createPeerConnection(recipient.id);
 
                 // Add local tracks
                 this.localStream.getTracks().forEach(track => {
-                    const peer = this.peers.get(recipient.id);
-                    if (peer && peer.connection) {
-                        peer.connection.addTrack(track, this.localStream);
-                    }
+                    pc.addTrack(track, this.localStream);
                 });
 
                 // Create and send offer
-                const pc = this.peers.get(recipient.id).connection;
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
 
@@ -169,7 +162,6 @@ class WebRTCService {
 
     /**
      * Accept an incoming call
-     * @param {string} callId 
      */
     async acceptCall(callId) {
         try {
@@ -179,7 +171,7 @@ class WebRTCService {
                 callId
             });
 
-            // Get local media stream if not already available
+            // Get local media stream
             if (!this.localStream) {
                 this.localStream = await navigator.mediaDevices.getUserMedia({
                     audio: {
@@ -241,7 +233,6 @@ class WebRTCService {
      * End the current call (all peers)
      */
     endCall() {
-        // Notify all peers
         if (this.currentCallState.callId && this.currentRoomCode) {
             this.peers.forEach((peer, socketId) => {
                 socketManager.emit('call-ended', {
@@ -252,13 +243,11 @@ class WebRTCService {
             });
         }
 
-        // Clean up local stream
         if (this.localStream) {
             this.localStream.getTracks().forEach(track => track.stop());
             this.localStream = null;
         }
 
-        // Close all peer connections
         this.peers.forEach(peer => {
             if (peer.connection) peer.connection.close();
         });
@@ -286,7 +275,6 @@ class WebRTCService {
             iceServers: this.iceServers
         });
 
-        // Handle ICE candidates
         pc.onicecandidate = (event) => {
             if (event.candidate && this.currentCallState.callId) {
                 socketManager.emit('call-ice-candidate', {
@@ -298,18 +286,19 @@ class WebRTCService {
             }
         };
 
-        // Handle remote stream
+        // Initialize candidate buffer
+        const pcData = this.peers.get(socketId);
+        if (pcData) pcData.pendingCandidates = [];
+
         pc.ontrack = (event) => {
-            console.log(`📞 Remote track received from ${socketId}`);
+            console.log(`\uD83D\uDCDE Remote track received from ${socketId}`);
             const stream = event.streams[0];
 
-            // Update peers map
             const peer = this.peers.get(socketId);
             if (peer) {
                 peer.stream = stream;
             }
 
-            // Update state
             const newStreams = new Map(this.currentCallState.remoteStreams);
             newStreams.set(socketId, stream);
 
@@ -319,35 +308,28 @@ class WebRTCService {
             });
         };
 
-        // Handle connection state changes
         pc.onconnectionstatechange = () => {
             const state = pc.connectionState;
             console.log(`Connection state for ${socketId}: ${state}`);
-            if (state === 'failed' || state === 'disconnected' || state === 'closed') {
-                // Remove this peer
+            if (state === 'failed' || state === 'closed') {
                 this.peers.delete(socketId);
 
                 const newStreams = new Map(this.currentCallState.remoteStreams);
                 newStreams.delete(socketId);
                 this.updateCallState({ remoteStreams: newStreams });
 
-                // If no peers left, end call?
                 if (this.peers.size === 0) {
                     this.endCall();
                 }
             }
         };
 
-        this.peers.set(socketId, { connection: pc, stream: null });
+        this.peers.set(socketId, { connection: pc, stream: null, pendingCandidates: [] });
         return pc;
     }
 
-    /**
-     * Handle incoming call offer
-     */
     async handleCallOffer(data) {
         try {
-            // If busy, reject
             if (this.currentCallState.isCallActive || this.currentCallState.isIncomingCall) {
                 socketManager.emit('call-rejected', {
                     roomCode: data.roomCode,
@@ -369,22 +351,35 @@ class WebRTCService {
             const pc = await this.createPeerConnection(data.fromSocketId);
             await pc.setRemoteDescription(data.offer);
 
+            // Process any buffered candidates
+            const peer = this.peers.get(data.fromSocketId);
+            if (peer && peer.pendingCandidates) {
+                while (peer.pendingCandidates.length > 0) {
+                    const candidate = peer.pendingCandidates.shift();
+                    await pc.addIceCandidate(candidate).catch(e => console.warn('Delayed ICE candidate failed:', e));
+                }
+            }
+
         } catch (error) {
             console.error('Failed to handle call offer:', error);
             this.rejectCall(data.callId);
         }
     }
 
-    /**
-     * Handle call answer
-     */
     async handleCallAnswer(data) {
         try {
             const peer = this.peers.get(data.fromSocketId);
             if (peer && peer.connection) {
                 await peer.connection.setRemoteDescription(data.answer);
 
-                // If this is the first answer, set active
+                // Process any buffered candidates
+                if (peer.pendingCandidates) {
+                    while (peer.pendingCandidates.length > 0) {
+                        const candidate = peer.pendingCandidates.shift();
+                        await peer.connection.addIceCandidate(candidate).catch(e => console.warn('Delayed ICE candidate failed:', e));
+                    }
+                }
+
                 if (!this.currentCallState.isCallActive) {
                     this.updateCallState({
                         isOutgoingCall: false,
@@ -398,44 +393,38 @@ class WebRTCService {
         }
     }
 
-    /**
-     * Handle ICE candidate
-     */
     async handleIceCandidate(data) {
         try {
             const peer = this.peers.get(data.fromSocketId);
             if (peer && peer.connection) {
-                await peer.connection.addIceCandidate(data.candidate);
+                if (peer.connection.remoteDescription) {
+                    await peer.connection.addIceCandidate(data.candidate);
+                } else {
+                    // Buffer candidate until remote description is set
+                    peer.pendingCandidates.push(data.candidate);
+                    console.log(`⏳ Buffered ICE candidate for ${data.fromSocketId}`);
+                }
             }
         } catch (error) {
             console.error('Failed to handle ICE candidate:', error);
         }
     }
 
-    /**
-     * Handle call rejected
-     */
     handleCallRejected(data) {
         console.log(`Call rejected by ${data.fromSocketId}. Reason: ${data.reason || 'unknown'}`);
 
-        // If specific peer rejected, remove them
         const peer = this.peers.get(data.fromSocketId);
         if (peer) {
             if (peer.connection) peer.connection.close();
             this.peers.delete(data.fromSocketId);
         }
 
-        // If no peers left (or if it was the only one we were calling), end call
         if (this.peers.size === 0) {
             this.endCall();
         }
     }
 
-    /**
-     * Handle call ended
-     */
     handleCallEnded(data) {
-        // Same as rejected, remove specific peer
         this.handleCallRejected(data);
     }
 
@@ -459,6 +448,5 @@ class WebRTCService {
     }
 }
 
-// Create singleton instance
 export const webRTCService = new WebRTCService();
 export default webRTCService;
