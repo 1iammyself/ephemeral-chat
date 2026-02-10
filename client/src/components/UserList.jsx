@@ -125,7 +125,7 @@ const UserList = ({
                 navigator.clipboard.writeText(verbalCode);
                 toast.success('Room code copied!');
               }}
-              className="flex items-center space-x-1 px-2 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors border border-indigo-100 dark:border-indigo-800"
+              className="lg:hidden flex items-center space-x-1 px-2 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors border border-indigo-100 dark:border-indigo-800"
               title="Click to copy join code"
             >
               <Zap className="w-3.5 h-3.5" />
