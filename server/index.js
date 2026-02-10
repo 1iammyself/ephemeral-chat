@@ -766,7 +766,7 @@ io.on('connection', (socket) => {
   });
 
   // Knock-to-Join Logic
-  socket.on('knock', ({ roomCode, nickname, password, inviteToken, capToken }) => {
+  socket.on('knock', async ({ roomCode, nickname, password, inviteToken, capToken }) => {
     // Reject clearly unsafe room codes that could lead to prototype pollution
     if (
       typeof roomCode !== 'string' ||
@@ -779,6 +779,20 @@ io.on('connection', (socket) => {
 
     // 1. Check if room exists in our metadata
     let room = roomData[roomCode];
+
+    // Clean stale users from roomManager (sockets that no longer exist)
+    try {
+      const managedRoom = await roomManager.getRoom(roomCode);
+      if (managedRoom && managedRoom.users) {
+        const activeUsers = managedRoom.users.filter(u => io.sockets.sockets.has(u.socketId));
+        if (activeUsers.length !== managedRoom.users.length) {
+          managedRoom.users = activeUsers;
+          await roomManager.saveRoom(roomCode, managedRoom);
+        }
+      }
+    } catch (e) {
+      // Non-critical, continue with knock logic
+    }
 
     // Check if room exists in socket adapter (active room)
     const socketRoom = io.sockets.adapter.rooms.get(roomCode);
@@ -823,12 +837,13 @@ io.on('connection', (socket) => {
     const hostSocket = io.sockets.sockets.get(hostId);
 
     if (!hostSocket) {
-      // Host might have disconnected without us knowing?
-      // Trigger handover logic or just let them in?
-      // Let's try to find a new host
+      // Host might have disconnected without us knowing
+      // Try to find a new host from remaining members
       const remainingMembers = Array.from(socketRoom || []);
       if (remainingMembers.length > 0) {
         room.hostId = remainingMembers[0];
+        if (!room.userRoles) room.userRoles = {};
+        room.userRoles[remainingMembers[0]] = 'host';
         io.to(room.hostId).emit('promoted-to-host');
         io.to(room.hostId).emit('user-knocking', {
           socketId: socket.id,
@@ -1187,6 +1202,18 @@ io.on('connection', (socket) => {
         }
 
         // logger.info(`Token validation successful for room ${roomCode}`);
+      }
+
+      // Clean stale user entries (sockets that no longer exist) before joining
+      // This prevents "username taken" errors when a user reconnects with the same name
+      const roomObj = await roomManager.getRoom(roomCode);
+      if (roomObj && roomObj.users) {
+        const staleUsers = roomObj.users.filter(u => !io.sockets.sockets.has(u.socketId));
+        if (staleUsers.length > 0) {
+          logger.info(`🧹 Cleaning ${staleUsers.length} stale user(s) from room ${roomCode}: ${staleUsers.map(u => u.nickname).join(', ')}`);
+          roomObj.users = roomObj.users.filter(u => io.sockets.sockets.has(u.socketId));
+          await roomManager.saveRoom(roomCode, roomObj);
+        }
       }
 
       // Join the room with the provided credentials
@@ -1799,19 +1826,31 @@ io.on('connection', (socket) => {
 
     // logger.info(`🚪 User ${nickname} (${socketId}) leaving room ${roomCode} (explicit: ${isExplicit})`);
 
+    // Leave the socket.io room FIRST so adapter state is immediately accurate
+    socket.leave(roomCode);
+    socket.roomCode = null;
+    socket.nickname = null;
+
     // Host Handover Logic
     const room = roomData[roomCode];
     if (room && room.hostId === socketId) {
       const socketRoom = io.sockets.adapter.rooms.get(roomCode);
-      const remainingMembers = Array.from(socketRoom || []).filter(id => id !== socketId);
+      const remainingMembers = Array.from(socketRoom || []);
 
       if (remainingMembers.length > 0) {
         const newHostId = remainingMembers[0];
         room.hostId = newHostId;
+        if (!room.userRoles) room.userRoles = {};
+        room.userRoles[newHostId] = 'host';
         io.to(newHostId).emit('promoted-to-host');
       } else {
         delete roomData[roomCode];
       }
+    }
+
+    // Clean up role data for departing user
+    if (roomData[roomCode]?.userRoles?.[socketId]) {
+      delete roomData[roomCode].userRoles[socketId];
     }
 
     if (isExplicit) {
@@ -1835,18 +1874,20 @@ io.on('connection', (socket) => {
     // Leave in RoomManager
     await roomManager.leaveRoom(roomCode, socketId);
 
-    // Notify others
-    const socketRoomSize = io.sockets.adapter.rooms.get(roomCode)?.size || 0;
-    socket.to(roomCode).emit('user-left', {
+    // Notify others with accurate user count (socket already left adapter)
+    const socketRoom = io.sockets.adapter.rooms.get(roomCode);
+    const socketRoomSize = socketRoom ? socketRoom.size : 0;
+    io.to(roomCode).emit('user-left', {
       nickname: nickname,
       socketId: socketId,
-      userCount: Math.max(0, socketRoomSize - 1)
+      userCount: socketRoomSize
     });
 
-    // Actually leave the socket.io room
-    socket.leave(roomCode);
-    socket.roomCode = null;
-    socket.nickname = null;
+    // Broadcast authoritative enriched user list so all clients stay in sync
+    if (roomData[roomCode]) {
+      const enrichedUsers = getEnrichedUsers(roomCode);
+      io.to(roomCode).emit('users-updated', { users: enrichedUsers });
+    }
   };
 
   socket.on('leave-room', async () => {

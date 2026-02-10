@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { generateInviteLink } from '../utils/api'; // Import API utility
 import {
   Send,
   Users,
@@ -376,6 +377,7 @@ const ChatRoom = () => {
   const [dragState, setDragState] = useState(null); // { type: 'topic' | 'timer', startX: number, startOffset: number }
   const [sessionToken, setSessionToken] = useState(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const [verbalCode, setVerbalCode] = useState(null); // State for verbal code display
 
   // Suggestions State
   const [suggestions, setSuggestions] = useState({ show: false, type: null, items: [], index: 0, query: '' });
@@ -1627,6 +1629,20 @@ const ChatRoom = () => {
     };
   }, []);
 
+  // Fetch verbal code if host
+  useEffect(() => {
+    if (isJoined && isHost && roomCode && !verbalCode) {
+      // Auto-generate invite to get the verbal code
+      generateInviteLink(roomCode).then(data => {
+        if (data && data.verbalCode) {
+          setVerbalCode(data.verbalCode);
+        }
+      }).catch(err => {
+        console.error('Failed to fetch verbal code:', err);
+      });
+    }
+  }, [isJoined, isHost, roomCode, verbalCode]);
+
   if (error && !isJoined) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -1733,6 +1749,20 @@ const ChatRoom = () => {
                 <Edit2 className="w-3 h-3" />
               </button>
             )}
+          </div>
+        )}
+
+        {/* Verbal Code Pill (Host Only) */}
+        {isHost && verbalCode && (
+          <div className="pointer-events-auto bg-indigo-100/90 dark:bg-indigo-900/40 backdrop-blur-sm border border-indigo-200 dark:border-indigo-800 px-4 py-1.5 rounded-full shadow-sm flex items-center space-x-2 animate-in slide-in-from-top-2 cursor-pointer transition-all hover:bg-indigo-200 dark:hover:bg-indigo-900/60"
+            onClick={() => {
+              navigator.clipboard.writeText(verbalCode);
+              toast.success('Verbal code copied!');
+            }}
+            title="verbal code"
+          >
+            <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider select-none">Code</span>
+            <span className="text-sm font-mono font-bold text-indigo-800 dark:text-indigo-200 select-none">{verbalCode}</span>
           </div>
         )}
 
