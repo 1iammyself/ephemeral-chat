@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { generateInviteLink } from '../utils/api';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { toast } from 'react-toastify';
+import { Share } from '@capacitor/share';
 import { X, Loader2, Check, AlertCircle, Clock, Share2 } from 'lucide-react';
 
 const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
@@ -81,37 +82,31 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
   const handleShare = async () => {
     if (!inviteLink) return;
 
-    const shareText = `Join my private, secure chat room!\n\nVerbal Code: ${verbalCode || 'N/A'}`;
+    const shareText = `Join my private, secure chat room!
+
+Verbal Code: ${verbalCode || 'N/A'}`;
 
     const shareData = {
       title: 'Ephemeral Chat',
       text: shareText,
-      url: inviteLink
+      url: inviteLink,
+      dialogTitle: 'Share Invite'
     };
 
-    // Use Web Share API (works on Android Capacitor WebView)
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          // Fallback: Copy to clipboard
-          copyCombinedToClipboard(shareText, inviteLink);
-        }
-      }
-    } else {
-      // Fallback for Desktop / No Share API available
-      copyCombinedToClipboard(shareText, inviteLink);
-    }
-  };
-
-  const copyCombinedToClipboard = async (shareText, link) => {
-    const fullText = `${shareText}\n\nLink: ${link}`;
     try {
-      await navigator.clipboard.writeText(fullText);
-      toast.success('Invite details copied to clipboard!');
-    } catch {
-      toast.error('Failed to copy to clipboard');
+      const canShareResult = await Share.canShare();
+      if (canShareResult.value) {
+        await Share.share(shareData);
+      } else {
+        throw new Error('Sharing not supported');
+      }
+    } catch (error) {
+      // User cancelled or share failed - fallback to copy
+      if (error.message !== 'Share canceled' && error.name !== 'AbortError') {
+        const fullText = `${shareText}\n\nLink: ${inviteLink}`;
+        navigator.clipboard.writeText(fullText);
+        toast.success('Invite details copied!');
+      }
     }
   };
 
