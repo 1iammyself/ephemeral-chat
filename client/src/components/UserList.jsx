@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Users, Crown, User, Check, X, ChevronDown, Shield, UserX, Info } from 'lucide-react';
+import { Users, Crown, User, Check, X, ChevronDown, Shield, UserX, Info, Zap } from 'lucide-react';
 import { ROLES, ROLE_INFO, canKick, canChangeRole, canManageGuests, getAssignableRoles } from '../utils/roles';
+import { toast } from 'react-toastify';
 
 const UserList = ({
   users,
@@ -15,7 +16,8 @@ const UserList = ({
   onKickUser,
   currentUserRole = ROLES.USER,
   onShowActivityLogs,
-  hasNewLogs = false
+  hasNewLogs = false,
+  verbalCode = null
 }) => {
   const [expandedUser, setExpandedUser] = useState(null);
 
@@ -116,16 +118,31 @@ const UserList = ({
             Participants ({users.length})
           </h3>
         </div>
-        {onShowActivityLogs && (
-          <button
-            onClick={onShowActivityLogs}
-            className={`p-1.5 rounded-lg transition-all relative ${hasNewLogs ? 'text-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-            title="Activity Log"
-          >
-            <Info className="w-5 h-5" />
-            {hasNewLogs && <span className="absolute top-1 right-1 w-2 h-2 bg-primary-500 rounded-full border-2 border-white dark:border-gray-800"></span>}
-          </button>
-        )}
+        <div className="flex items-center space-x-2">
+          {isHost && verbalCode && (
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(verbalCode);
+                toast.success('Room code copied!');
+              }}
+              className="flex items-center space-x-1 px-2 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors border border-indigo-100 dark:border-indigo-800"
+              title="Click to copy join code"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span className="font-bold text-[10px] uppercase tracking-wider">Code</span>
+            </button>
+          )}
+          {onShowActivityLogs && (
+            <button
+              onClick={onShowActivityLogs}
+              className={`p-1.5 rounded-lg transition-all relative ${hasNewLogs ? 'text-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              title="Activity Log"
+            >
+              <Info className="w-5 h-5" />
+              {hasNewLogs && <span className="absolute top-1 right-1 w-2 h-2 bg-primary-500 rounded-full border-2 border-white dark:border-gray-800"></span>}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* User List */}

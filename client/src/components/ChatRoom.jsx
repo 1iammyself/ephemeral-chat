@@ -1707,6 +1707,19 @@ const ChatRoom = () => {
                     <span><span className="hidden sm:inline">TTL: </span>{getTTLDisplay()}</span>
                   </div>
                 )}
+                {isHost && verbalCode && (
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(verbalCode);
+                      toast.success('Room code copied!');
+                    }}
+                    className="hidden sm:flex items-center space-x-1 px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors border border-indigo-100 dark:border-indigo-800"
+                    title="Click to copy join code"
+                  >
+                    <Zap className="w-3 h-3" />
+                    <span className="font-bold text-[10px] uppercase tracking-wider">Code</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1752,19 +1765,6 @@ const ChatRoom = () => {
           </div>
         )}
 
-        {/* Verbal Code Pill (Host Only) */}
-        {isHost && verbalCode && (
-          <div className="pointer-events-auto bg-indigo-100/90 dark:bg-indigo-900/40 backdrop-blur-sm border border-indigo-200 dark:border-indigo-800 px-4 py-1.5 rounded-full shadow-sm flex items-center space-x-2 animate-in slide-in-from-top-2 cursor-pointer transition-all hover:bg-indigo-200 dark:hover:bg-indigo-900/60"
-            onClick={() => {
-              navigator.clipboard.writeText(verbalCode);
-              toast.success('Verbal code copied!');
-            }}
-            title="verbal code"
-          >
-            <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider select-none">Code</span>
-            <span className="text-sm font-mono font-bold text-indigo-800 dark:text-indigo-200 select-none">{verbalCode}</span>
-          </div>
-        )}
 
         {/* Timer Pill */}
         {activeTimer && (
@@ -2205,6 +2205,7 @@ const ChatRoom = () => {
             currentUserRole={currentUserRole}
             onShowActivityLogs={() => { setShowActivityLogs(true); setHasNewLogs(false); }}
             hasNewLogs={hasNewLogs}
+            verbalCode={verbalCode}
           />
         </div>
       </div>
@@ -2230,6 +2231,7 @@ const ChatRoom = () => {
                   currentUserRole={currentUserRole}
                   onShowActivityLogs={() => { setShowActivityLogs(true); setHasNewLogs(false); }}
                   hasNewLogs={hasNewLogs}
+                  verbalCode={verbalCode}
                 />
               </div>
             </div>
