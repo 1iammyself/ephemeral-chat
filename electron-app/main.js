@@ -36,7 +36,10 @@ const store = new Store({
     soundEnabled: true,
     autoUpdate: true,
     idleTimeout: 5, // minutes
-    securityMode: 'high' // 'high', 'medium', 'low'
+    securityMode: 'high', // 'high', 'medium', 'low'
+    biometricLockEnabled: false,
+    lockDelay: 5, // minutes
+    hasShownTrayNotification: false
   }
 });
 
@@ -48,6 +51,8 @@ const isDev = !app.isPackaged || process.argv.includes('--dev');
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+let isLocked = false;
+let lastHideTime = 0;
 let idleTimer = null;
 let lastActivity = Date.now();
 
@@ -213,6 +218,103 @@ function setupSecurity(window) {
   });
 }
 
+// Biometric & Lock Management
+async function unlockApp() {
+  if (!isLocked) {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+    return true;
+  }
+
+  // Grace Period / Timer Check
+  const lockDelayMs = store.get('lockDelay') * 60 * 1000;
+  if (lockDelayMs > 0 && (Date.now() - lastHideTime < lockDelayMs)) {
+    isLocked = false;
+    mainWindow.show();
+    mainWindow.focus();
+    return true;
+  }
+
+  const useBiometrics = store.get('biometricLockEnabled');
+
+  if (useBiometrics) {
+    // macOS Touch ID Implementation
+    if (process.platform === 'darwin') {
+      try {
+        const { systemPreferences } = require('electron');
+        if (systemPreferences.canPromptTouchID()) {
+          await systemPreferences.promptTouchID('Unlock Ephemeral Chat');
+          isLocked = false;
+          mainWindow.show();
+          mainWindow.focus();
+          return true;
+        }
+      } catch (err) {
+        console.error('Touch ID Verification Failed:', err);
+        return false;
+      }
+    }
+
+    // Windows Hello Placeholder
+    // Note: For full Windows Hello (PIN/Face), @electron-webauthn/native is recommended.
+    // For now, we use a simple "Locked" state that requires user interaction.
+    if (process.platform === 'win32') {
+      const response = dialog.showMessageBoxSync(mainWindow, {
+        type: 'question',
+        title: 'Unlock Required',
+        message: 'Ephemeral Chat is locked for your security.',
+        detail: 'Click "Unlock" to reveal the app.',
+        buttons: ['Unlock', 'Cancel'],
+        defaultId: 0
+      });
+
+      if (response === 0) {
+        isLocked = false;
+        mainWindow.show();
+        mainWindow.focus();
+        return true;
+      }
+      return false;
+    }
+
+    // Linux & Generic Identity Verification
+    if (process.platform === 'linux' || !process.platform.match(/win32|darwin/)) {
+      const response = dialog.showMessageBoxSync(mainWindow, {
+        type: 'question',
+        title: 'Identity Verification',
+        message: 'Ephemeral Chat is secured.',
+        detail: 'Please confirm it is you to unlock the application.',
+        buttons: ['Verify & Unlock', 'Cancel'],
+        defaultId: 0
+      });
+
+      if (response === 0) {
+        isLocked = false;
+        mainWindow.show();
+        mainWindow.focus();
+        return true;
+      }
+      return false;
+    }
+  }
+
+  // If biometrics not enabled or not supported, just show
+  isLocked = false;
+  mainWindow.show();
+  mainWindow.focus();
+  return true;
+}
+
+function lockApp() {
+  isLocked = true;
+  lastHideTime = Date.now();
+  if (mainWindow) {
+    mainWindow.hide();
+  }
+}
+
 // Clipboard protection - clear sensitive data
 function setupClipboardProtection() {
   if (store.get('securityMode') !== 'high') return;
@@ -340,7 +442,12 @@ function createWindow() {
   // Handle minimize to tray
   mainWindow.on('minimize', () => {
     if (store.get('minimizeToTray')) {
-      mainWindow.hide();
+      if (store.get('biometricLockEnabled')) {
+        lockApp();
+      } else {
+        mainWindow.hide();
+      }
+      showTrayFirstTimeNotification();
     }
   });
 
@@ -348,7 +455,12 @@ function createWindow() {
   mainWindow.on('close', (event) => {
     if (store.get('minimizeToTray') && !isQuitting) {
       event.preventDefault();
-      mainWindow.hide();
+      if (store.get('biometricLockEnabled')) {
+        lockApp();
+      } else {
+        mainWindow.hide();
+      }
+      showTrayFirstTimeNotification();
     }
   });
 
@@ -368,6 +480,20 @@ function createWindow() {
   });
 
   return mainWindow;
+}
+
+function showTrayFirstTimeNotification() {
+  if (store.get('hasShownTrayNotification')) return;
+
+  showNotification(
+    'Running in Tray',
+    'Ephemeral Chat is still running in the background to keep you protected.',
+    () => {
+      unlockApp();
+    }
+  );
+
+  store.set('hasShownTrayNotification', true);
 }
 
 // ==================== SYSTEM TRAY ====================
@@ -392,8 +518,7 @@ function createTray() {
 
   // Double-click to show window
   tray.on('double-click', () => {
-    mainWindow.show();
-    mainWindow.focus();
+    unlockApp();
   });
 }
 
@@ -402,8 +527,14 @@ function updateTrayMenu() {
     {
       label: 'Open Ephemeral Chat',
       click: () => {
-        mainWindow.show();
-        mainWindow.focus();
+        unlockApp();
+      }
+    },
+    {
+      label: 'Lock App Now',
+      enabled: store.get('biometricLockEnabled'),
+      click: () => {
+        lockApp();
       }
     },
     {
@@ -499,6 +630,52 @@ function updateTrayMenu() {
               mainWindow.setContentProtection(false);
             }
           }
+        }
+      ]
+    },
+    { type: 'separator' },
+    {
+      label: 'Biometric Lock',
+      type: 'checkbox',
+      checked: store.get('biometricLockEnabled'),
+      click: (menuItem) => {
+        store.set('biometricLockEnabled', menuItem.checked);
+        updateTrayMenu();
+      }
+    },
+    {
+      label: 'Lock Delay',
+      enabled: store.get('biometricLockEnabled'),
+      submenu: [
+        {
+          label: 'Immediate',
+          type: 'radio',
+          checked: store.get('lockDelay') === 0,
+          click: () => { store.set('lockDelay', 0); updateTrayMenu(); }
+        },
+        {
+          label: '1 Minute',
+          type: 'radio',
+          checked: store.get('lockDelay') === 1,
+          click: () => { store.set('lockDelay', 1); updateTrayMenu(); }
+        },
+        {
+          label: '5 Minutes',
+          type: 'radio',
+          checked: store.get('lockDelay') === 5,
+          click: () => { store.set('lockDelay', 5); updateTrayMenu(); }
+        },
+        {
+          label: '10 Minutes',
+          type: 'radio',
+          checked: store.get('lockDelay') === 10,
+          click: () => { store.set('lockDelay', 10); updateTrayMenu(); }
+        },
+        {
+          label: '30 Minutes',
+          type: 'radio',
+          checked: store.get('lockDelay') === 30,
+          click: () => { store.set('lockDelay', 30); updateTrayMenu(); }
         }
       ]
     },
@@ -747,10 +924,13 @@ function registerShortcuts() {
   // Global shortcut to show/hide window
   globalShortcut.register('Alt+Shift+E', () => {
     if (mainWindow.isVisible() && mainWindow.isFocused()) {
-      mainWindow.hide();
+      if (store.get('biometricLockEnabled')) {
+        lockApp();
+      } else {
+        mainWindow.hide();
+      }
     } else {
-      mainWindow.show();
-      mainWindow.focus();
+      unlockApp();
     }
   });
 
