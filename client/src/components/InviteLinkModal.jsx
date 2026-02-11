@@ -86,7 +86,11 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
   const handleShare = async () => {
     if (!inviteLink) return;
 
-    if (Capacitor.isNativePlatform()) {
+    // Use a more explicit check for mobile platforms vs others
+    const platform = Capacitor.getPlatform();
+    const isMobile = platform === 'ios' || platform === 'android';
+
+    if (isMobile) {
       // Native (Android/iOS) - Use standard Share Sheet
       const shareText = `Join my private, secure chat room!
 

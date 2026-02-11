@@ -149,7 +149,11 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const handleShare = async () => {
     if (!inviteLink) return;
 
-    if (Capacitor.isNativePlatform()) {
+    // Use a more explicit check for mobile platforms vs others
+    const platform = Capacitor.getPlatform();
+    const isMobile = platform === 'ios' || platform === 'android';
+
+    if (isMobile) {
       // Native (Android/iOS) - Use standard Share Sheet
       const shareText = `Join my private, secure chat room!
 
@@ -173,7 +177,7 @@ Verbal Code: ${verbalCode || 'N/A'}`;
         if (error.message !== 'Share canceled' && error.name !== 'AbortError') {
           const fullText = `${shareText}\n\nLink: ${inviteLink}`;
           copyToClipboard(fullText, 'inviteLink');
-          alert('Invite details copied!');
+          toast.info('Invite details copied to clipboard');
         }
       }
     } else {
@@ -211,111 +215,125 @@ Verbal Code: ${verbalCode || 'N/A'}`;
   // If room was created, show success message with invite options
   if (createdRoom) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md relative">
-          <div className="p-6">
-            <h2 className="text-2xl font-bold mb-4 text-green-600 dark:text-green-400">
-              Room Created Successfully!
-            </h2>
+      <>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md relative">
+            <div className="p-6">
+              <h2 className="text-2xl font-bold mb-4 text-green-600 dark:text-green-400">
+                Room Created Successfully!
+              </h2>
 
-            <div className="space-y-4 mb-6">
-              {/* Room Code display removed to enforce link-only joining */}
+              <div className="space-y-4 mb-6">
+                {/* Room Code display removed to enforce link-only joining */}
 
-              {createdRoom.password && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Access Key</label>
+                {createdRoom.password && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Access Key</label>
+                    <div className="flex items-center">
+                      <input
+                        type="text" /* keep password managers from treating this as a password */
+                        readOnly
+                        inputMode="none"
+                        autoComplete="off"
+                        spellCheck={false}
+                        data-ms-formignored="true"
+                        data-ms-editor="false"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        data-form-type="other"
+                        onCopy={(e) => e.preventDefault()}
+                        onCut={(e) => e.preventDefault()}
+                        value={createdRoom.password}
+                        className="flex-1 p-2 border rounded-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white font-mono input-no-echo"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Invite Link (Expires in 25 min)</label>
                   <div className="flex items-center">
                     <input
-                      type="text" /* keep password managers from treating this as a password */
+                      type="text"
                       readOnly
-                      inputMode="none"
-                      autoComplete="off"
-                      spellCheck={false}
-                      data-ms-formignored="true"
-                      data-ms-editor="false"
-                      data-lpignore="true"
-                      data-1p-ignore="true"
-                      data-form-type="other"
-                      onCopy={(e) => e.preventDefault()}
-                      onCut={(e) => e.preventDefault()}
-                      value={createdRoom.password}
-                      className="flex-1 p-2 border rounded-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white font-mono input-no-echo"
+                      value={inviteLink || 'Generating...'}
+                      data-allow-copy="true"
+                      className="flex-1 p-2 border rounded-l-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm truncate"
                     />
+                    <button
+                      onClick={() => inviteLink && copyToClipboard(inviteLink, 'inviteLink')}
+                      disabled={!inviteLink}
+                      className={`p-2 transition-colors ${inviteLink ? 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700' : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'}`}
+                      title="Copy link"
+                    >
+                      {isCopied.inviteLink ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+                    </button>
+                    <button
+                      onClick={handleShare}
+                      disabled={!inviteLink}
+                      className={`p-2 rounded-r-md transition-colors ${inviteLink ? 'bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700' : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'}`}
+                      title="Share link"
+                    >
+                      <Share2 className="w-5 h-5" />
+                    </button>
                   </div>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Share this link with others to join easily</p>
                 </div>
-              )}
 
-              <div className="pt-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Invite Link (Expires in 25 min)</label>
-                <div className="flex items-center">
-                  <input
-                    type="text"
-                    readOnly
-                    value={inviteLink || 'Generating...'}
-                    data-allow-copy="true"
-                    className="flex-1 p-2 border rounded-l-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm truncate"
-                  />
-                  <button
-                    onClick={() => inviteLink && copyToClipboard(inviteLink, 'inviteLink')}
-                    disabled={!inviteLink}
-                    className={`p-2 transition-colors ${inviteLink ? 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700' : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'}`}
-                    title="Copy link"
-                  >
-                    {isCopied.inviteLink ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
-                  </button>
-                  <button
-                    onClick={handleShare}
-                    disabled={!inviteLink}
-                    className={`p-2 rounded-r-md transition-colors ${inviteLink ? 'bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700' : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'}`}
-                    title="Share link"
-                  >
-                    <Share2 className="w-5 h-5" />
-                  </button>
-                </div>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Share this link with others to join easily</p>
+                {/* Verbal Join Code */}
+                {verbalCode && (
+                  <div className="pt-3">
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-100 dark:border-blue-800">
+                      <label className="block text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Verbal Join Code</label>
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-lg font-semibold text-blue-700 dark:text-blue-200 tracking-wide">
+                          {verbalCode}
+                        </span>
+                        <button
+                          onClick={() => copyToClipboard(verbalCode, 'verbalCode')}
+                          className={`ml-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${isCopied.verbalCode ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-700'}`}
+                        >
+                          {isCopied.verbalCode ? 'Copied!' : 'Copy'}
+                        </button>
+                      </div>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                        Share this code verbally — others can type it to join.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Verbal Join Code */}
-              {verbalCode && (
-                <div className="pt-3">
-                  <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-100 dark:border-blue-800">
-                    <label className="block text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Verbal Join Code</label>
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-lg font-semibold text-blue-700 dark:text-blue-200 tracking-wide">
-                        {verbalCode}
-                      </span>
-                      <button
-                        onClick={() => copyToClipboard(verbalCode, 'verbalCode')}
-                        className={`ml-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${isCopied.verbalCode ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-700'}`}
-                      >
-                        {isCopied.verbalCode ? 'Copied!' : 'Copy'}
-                      </button>
-                    </div>
-                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-                      Share this code verbally — others can type it to join.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-between pt-2">
-              <button
-                onClick={handleNewRoom}
-                className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"
-              >
-                Create Another Room
-              </button>
-              <button
-                onClick={handleJoinRoom}
-                className="px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors"
-              >
-                Join Room Now
-              </button>
+              <div className="flex justify-between pt-2">
+                <button
+                  onClick={handleNewRoom}
+                  className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"
+                >
+                  Create Another Room
+                </button>
+                <button
+                  onClick={handleJoinRoom}
+                  className="px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors"
+                >
+                  Join Room Now
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+
+        {inviteLink && (
+          <ShareSheet
+            isOpen={showShareSheet}
+            onClose={() => setShowShareSheet(false)}
+            shareData={{
+              title: 'Ephemeral Chat',
+              text: `Join my private, secure chat room!\n\nVerbal Code: ${verbalCode || 'N/A'}`,
+              url: inviteLink
+            }}
+          />
+        )}
+      </>
     );
   }
 
