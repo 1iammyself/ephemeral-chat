@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { X, Check, Copy, Users, Lock, Unlock, Timer, Zap, PartyPopper, Sun, Sunset, Settings, Clock, Shield, Share2 } from 'lucide-react';
+import { Share } from '@capacitor/share';
 import { sanitizeInput, generateRoomKey } from '../utils/security';
 import { getCreatorId } from '../utils/creator';
 import { useTheme } from '../context/ThemeContext';
@@ -151,26 +152,24 @@ Verbal Code: ${verbalCode || 'N/A'}`;
     const shareData = {
       title: 'Ephemeral Chat',
       text: shareText,
-      url: inviteLink
+      url: inviteLink,
+      dialogTitle: 'Share Invite'
     };
 
-    // Check if Web Share API is available (mainly mobile browsers)
-    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
-      try {
-        await navigator.share(shareData);
-      } catch (err) {
-        // User cancelled or share failed - fallback to copy
-        if (err.name !== 'AbortError') {
-          const fullText = `${shareText}\n\nLink: ${inviteLink}`;
-          copyToClipboard(fullText, 'inviteLink');
-          alert('Invite details copied!');
-        }
+    try {
+      const canShareResult = await Share.canShare();
+      if (canShareResult.value) {
+        await Share.share(shareData);
+      } else {
+        throw new Error('Sharing not supported');
       }
-    } else {
-      // Fallback: copy to clipboard on desktop
-      const fullText = `${shareText}\n\nLink: ${inviteLink}`;
-      copyToClipboard(fullText, 'inviteLink');
-      alert('Invite details copied! Paste it to share.');
+    } catch (error) {
+      // User cancelled or share failed - fallback to copy
+      if (error.message !== 'Share canceled' && error.name !== 'AbortError') {
+        const fullText = `${shareText}\n\nLink: ${inviteLink}`;
+        copyToClipboard(fullText, 'inviteLink');
+        alert('Invite details copied!');
+      }
     }
   };
 
