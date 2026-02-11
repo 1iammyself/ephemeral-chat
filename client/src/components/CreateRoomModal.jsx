@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { X, Check, Copy, Users, Lock, Unlock, Timer, Zap, PartyPopper, Sun, Sunset, Settings, Clock, Shield, Share2 } from 'lucide-react';
 import { Share } from '@capacitor/share';
+import { Capacitor } from '@capacitor/core';
+import ShareSheet from './ShareSheet';
 import { sanitizeInput, generateRoomKey } from '../utils/security';
 import { getCreatorId } from '../utils/creator';
 import { useTheme } from '../context/ThemeContext';
@@ -34,6 +36,8 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
     verbalCode: false
   });
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
+  const [showShareSheet, setShowShareSheet] = useState(false);
+  const [formData, setFormData] = useState(null);
   const [roomKey, setRoomKey] = useState(null);
   const navigate = useNavigate();
 
@@ -145,31 +149,36 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const handleShare = async () => {
     if (!inviteLink) return;
 
-    const shareText = `Join my private, secure chat room!
+    if (Capacitor.isNativePlatform()) {
+      // Native (Android/iOS) - Use standard Share Sheet
+      const shareText = `Join my private, secure chat room!
 
 Verbal Code: ${verbalCode || 'N/A'}`;
 
-    const shareData = {
-      title: 'Ephemeral Chat',
-      text: shareText,
-      url: inviteLink,
-      dialogTitle: 'Share Invite'
-    };
+      const shareData = {
+        title: 'Ephemeral Chat',
+        text: shareText,
+        url: inviteLink,
+        dialogTitle: 'Share Invite'
+      };
 
-    try {
-      const canShareResult = await Share.canShare();
-      if (canShareResult.value) {
-        await Share.share(shareData);
-      } else {
-        throw new Error('Sharing not supported');
+      try {
+        const canShareResult = await Share.canShare();
+        if (canShareResult.value) {
+          await Share.share(shareData);
+        } else {
+          throw new Error('Sharing not supported');
+        }
+      } catch (error) {
+        if (error.message !== 'Share canceled' && error.name !== 'AbortError') {
+          const fullText = `${shareText}\n\nLink: ${inviteLink}`;
+          copyToClipboard(fullText, 'inviteLink');
+          alert('Invite details copied!');
+        }
       }
-    } catch (error) {
-      // User cancelled or share failed - fallback to copy
-      if (error.message !== 'Share canceled' && error.name !== 'AbortError') {
-        const fullText = `${shareText}\n\nLink: ${inviteLink}`;
-        copyToClipboard(fullText, 'inviteLink');
-        alert('Invite details copied!');
-      }
+    } else {
+      // Web/Electron - Show custom Share Sheet
+      setShowShareSheet(true);
     }
   };
 
@@ -195,8 +204,8 @@ Verbal Code: ${verbalCode || 'N/A'}`;
       password: '',
       maxUsers: 1
     });
-    setCapToken(null);
-    setIsCapVerified(false);
+    // setCapToken(null); // This variable is not defined in the provided code
+    // setIsCapVerified(false); // This variable is not defined in the provided code
   };
 
   // If room was created, show success message with invite options
@@ -543,8 +552,20 @@ Verbal Code: ${verbalCode || 'N/A'}`;
             </div>
           </form>
         </div>
-      </div>
-    </div>
+      </div >
+
+      {inviteLink && (
+        <ShareSheet
+          isOpen={showShareSheet}
+          onClose={() => setShowShareSheet(false)}
+          shareData={{
+            title: 'Ephemeral Chat',
+            text: `Join my private, secure chat room!\n\nVerbal Code: ${verbalCode || 'N/A'}`,
+            url: inviteLink
+          }}
+        />
+      )}
+    </div >
   );
 };
 
