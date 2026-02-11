@@ -97,27 +97,47 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
       // Get or generate creator ID
       const creatorId = getCreatorId();
 
-      const response = await fetch(`${API_BASE}/api/rooms`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messageTTL: roomSettings.messageTTL !== 'none' ? roomSettings.messageTTL : undefined,
-          password: roomSettings.password.trim() || undefined,
-          maxUsers: roomSettings.maxUsers,
-          // Honeypot fields for bot detection (invisible to users)
-          hp_email: honeypot.hp_email,
-          hp_website: honeypot.hp_website,
-          hp_timestamp: honeypot.hp_timestamp,
-          creatorId: creatorId, // NEW: Include creator ID
-          persistenceMode: roomSettings.persistenceMode // NEW: Include persistence mode
-        }),
-      });
+      // Retry logic for transient network failures
+      let response;
+      let lastError;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          response = await fetch(`${API_BASE}/api/rooms`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              messageTTL: roomSettings.messageTTL !== 'none' ? roomSettings.messageTTL : undefined,
+              password: roomSettings.password.trim() || undefined,
+              maxUsers: roomSettings.maxUsers,
+              // Honeypot fields for bot detection (invisible to users)
+              hp_email: honeypot.hp_email,
+              hp_website: honeypot.hp_website,
+              hp_timestamp: honeypot.hp_timestamp,
+              creatorId: creatorId, // NEW: Include creator ID
+              persistenceMode: roomSettings.persistenceMode // NEW: Include persistence mode
+            }),
+          });
+          if (response.ok) break; // Success, exit retry loop
+          lastError = `Server responded with ${response.status}`;
+        } catch (fetchError) {
+          lastError = fetchError.message;
+          if (attempt < 2) {
+            // Wait before retry
+            await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+          }
+        }
+      }
+
+      if (!response || !response.ok) {
+        const errorData = response ? await response.json().catch(() => ({})) : {};
+        throw new Error(errorData.error || lastError || 'Failed to create room');
+      }
 
       const data = await response.json();
 
-      if (response.ok && data.roomCode) {
+      if (data.roomCode) {
         setCreatedRoom({
           roomCode: data.roomCode,
           password: roomSettings.password.trim() || ''

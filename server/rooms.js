@@ -230,6 +230,17 @@ class RoomManager {
       // Ensure users array exists
       if (!room.users) room.users = [];
 
+      // Clean stale users whose sockets are no longer connected
+      // This prevents "username taken" errors from ghost users
+      if (this._io && room.users.length > 0) {
+        const beforeCount = room.users.length;
+        room.users = room.users.filter(u => this._io.sockets.sockets.has(u.socketId));
+        if (room.users.length !== beforeCount) {
+          logger.info(`🧹 joinRoom cleanup: removed ${beforeCount - room.users.length} stale user(s) from room ${roomCode}`);
+          await this.saveRoom(roomCode, room);
+        }
+      }
+
       // Check if room has expired
       if (new Date(room.expiresAt) < new Date()) {
         await this.deleteRoom(roomCode);

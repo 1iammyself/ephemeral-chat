@@ -205,6 +205,7 @@ async function initializeRedis() {
   }
 
   roomManager = new RoomManager(redisClient);
+  roomManager.setIo(io); // Pass io reference for stale user detection
   securityManager = new SecurityManager();
 
   // Periodic cleanup for security manager
@@ -220,6 +221,53 @@ async function initializeRedis() {
       logger.error('Error in room cleanup job:', error);
     }
   }, 5 * 60 * 1000); // Every 5 minutes
+
+  // Periodic stale-user cleanup: sweep all rooms for disconnected sockets
+  setInterval(async () => {
+    try {
+      const allRooms = roomManager.rooms; // In-memory Map
+      if (!allRooms || allRooms.size === 0) return;
+
+      for (const [roomCode, room] of allRooms.entries()) {
+        if (!room.users || room.users.length === 0) continue;
+
+        const before = room.users.length;
+        const activeUsers = room.users.filter(u => io.sockets.sockets.has(u.socketId));
+
+        if (activeUsers.length !== before) {
+          const removed = before - activeUsers.length;
+          room.users = activeUsers;
+          await roomManager.saveRoom(roomCode, room);
+          logger.info(`🧹 Periodic cleanup: removed ${removed} stale user(s) from room ${roomCode}`);
+
+          // Update roomData host if the host was stale
+          if (roomData[roomCode]) {
+            const socketRoom = io.sockets.adapter.rooms.get(roomCode);
+            const liveMembers = Array.from(socketRoom || []);
+
+            if (liveMembers.length > 0 && !liveMembers.includes(roomData[roomCode].hostId)) {
+              const newHostId = liveMembers[0];
+              roomData[roomCode].hostId = newHostId;
+              if (!roomData[roomCode].userRoles) roomData[roomCode].userRoles = {};
+              roomData[roomCode].userRoles[newHostId] = 'host';
+              io.to(newHostId).emit('promoted-to-host');
+              logger.info(`👑 Periodic cleanup: reassigned host to ${newHostId} in room ${roomCode}`);
+            } else if (liveMembers.length === 0) {
+              delete roomData[roomCode];
+            }
+
+            // Broadcast updated user list
+            if (roomData[roomCode] && liveMembers.length > 0) {
+              const enrichedUsers = getEnrichedUsers(roomCode);
+              io.to(roomCode).emit('users-updated', { users: enrichedUsers });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      logger.error('Error in stale user cleanup job:', error);
+    }
+  }, 30 * 1000); // Every 30 seconds
 }
 
 // Rate limiting function
@@ -778,15 +826,13 @@ io.on('connection', (socket) => {
       return socket.emit('knock-denied', { reason: 'Invalid room code' });
     }
 
-    // 1. Check if room exists in our metadata
-    let room = roomData[roomCode];
-
-    // Clean stale users from roomManager (sockets that no longer exist)
+    // 1. Clean stale users from roomManager (sockets that no longer exist)
     try {
       const managedRoom = await roomManager.getRoom(roomCode);
       if (managedRoom && managedRoom.users) {
         const activeUsers = managedRoom.users.filter(u => io.sockets.sockets.has(u.socketId));
         if (activeUsers.length !== managedRoom.users.length) {
+          logger.info(`🧹 Knock cleanup: removed ${managedRoom.users.length - activeUsers.length} stale user(s) from room ${roomCode}`);
           managedRoom.users = activeUsers;
           await roomManager.saveRoom(roomCode, managedRoom);
         }
@@ -795,70 +841,72 @@ io.on('connection', (socket) => {
       // Non-critical, continue with knock logic
     }
 
-    // Check if room exists in socket adapter (active room)
+    // 2. Check actual live user count from socket adapter (single source of truth)
     const socketRoom = io.sockets.adapter.rooms.get(roomCode);
-    const userCount = socketRoom ? socketRoom.size : 0;
+    const liveUserCount = socketRoom ? socketRoom.size : 0;
 
-    // If room is empty or doesn't exist, user becomes host automatically
-    if (userCount === 0) {
-      // Initialize roomData if missing
-      if (!room) {
-        roomData[roomCode] = {
-          hostId: socket.id,
-          lobbyLimit: 100, // Default
-          lobbyCount: 0
-        };
-      } else {
-        room.hostId = socket.id;
-      }
+    let room = roomData[roomCode];
 
-      // Auto-approve
+    // 3. If room is empty (no live sockets), user becomes host automatically
+    if (liveUserCount === 0) {
+      // Initialize or reset roomData
+      roomData[roomCode] = {
+        hostId: socket.id,
+        lobbyLimit: 100,
+        lobbyCount: 0,
+        userRoles: {}
+      };
+
+      logger.info(`👑 Room ${roomCode} is empty, ${nickname} auto-approved as host`);
       return socket.emit('knock-approved', { isHost: true });
     }
 
-    // If room exists but we don't have metadata (e.g. server restart or API creation)
+    // 4. If room has users but no metadata, create it
     if (!room) {
-      // Pick the first user as host
       const firstUser = Array.from(socketRoom)[0];
       room = {
         hostId: firstUser,
         lobbyLimit: 100,
-        lobbyCount: 0
+        lobbyCount: 0,
+        userRoles: {}
       };
       roomData[roomCode] = room;
     }
 
-    // 2. Check Lobby Limit
+    // 5. Check Lobby Limit
     if (room.lobbyCount >= room.lobbyLimit) {
       return socket.emit('knock-denied', { reason: 'Lobby is full' });
     }
 
-    // 3. Notify Host
-    const hostId = room.hostId;
-    const hostSocket = io.sockets.sockets.get(hostId);
+    // 6. Verify the host is still alive
+    const hostSocket = io.sockets.sockets.get(room.hostId);
+    const remainingMembers = Array.from(socketRoom);
 
-    if (!hostSocket) {
-      // Host might have disconnected without us knowing
-      // Try to find a new host from remaining members
-      const remainingMembers = Array.from(socketRoom || []);
+    if (!hostSocket || !remainingMembers.includes(room.hostId)) {
+      // Host is gone — try to find a new host from remaining members
       if (remainingMembers.length > 0) {
-        room.hostId = remainingMembers[0];
+        const newHostId = remainingMembers[0];
+        room.hostId = newHostId;
         if (!room.userRoles) room.userRoles = {};
-        room.userRoles[remainingMembers[0]] = 'host';
-        io.to(room.hostId).emit('promoted-to-host');
-        io.to(room.hostId).emit('user-knocking', {
+        room.userRoles[newHostId] = 'host';
+        logger.info(`👑 Host was stale during knock, reassigned to ${newHostId} in room ${roomCode}`);
+        io.to(newHostId).emit('promoted-to-host');
+
+        // Now notify the new host about this knock
+        io.to(newHostId).emit('user-knocking', {
           socketId: socket.id,
           nickname: nickname
         });
       } else {
-        // No one left, they become host
+        // No valid members (shouldn't happen since liveUserCount > 0, but safeguard)
         room.hostId = socket.id;
+        roomData[roomCode] = room;
         return socket.emit('knock-approved', { isHost: true });
       }
     } else {
+      // Host is alive — notify all managers (host and tier1)
       room.lobbyCount++;
 
-      // Notify all managers (host and tier1)
       const managers = Array.from(io.sockets.sockets.values()).filter(s => {
         if (s.roomCode !== roomCode) return false;
         const role = room.userRoles?.[s.id] || (room.hostId === s.id ? 'host' : 'user');
@@ -1825,33 +1873,54 @@ io.on('connection', (socket) => {
     const nickname = socket.nickname;
     const socketId = socket.id;
 
-    // logger.info(`🚪 User ${nickname} (${socketId}) leaving room ${roomCode} (explicit: ${isExplicit})`);
+    logger.info(`🚪 User ${nickname} (${socketId}) leaving room ${roomCode} (explicit: ${isExplicit})`);
 
     // Leave the socket.io room FIRST so adapter state is immediately accurate
     socket.leave(roomCode);
     socket.roomCode = null;
     socket.nickname = null;
 
+    // Clean up role data for departing user BEFORE host handover
+    if (roomData[roomCode]?.userRoles?.[socketId]) {
+      delete roomData[roomCode].userRoles[socketId];
+    }
+
     // Host Handover Logic
     const room = roomData[roomCode];
-    if (room && room.hostId === socketId) {
+    if (room) {
       const socketRoom = io.sockets.adapter.rooms.get(roomCode);
       const remainingMembers = Array.from(socketRoom || []);
 
-      if (remainingMembers.length > 0) {
-        const newHostId = remainingMembers[0];
-        room.hostId = newHostId;
-        if (!room.userRoles) room.userRoles = {};
-        room.userRoles[newHostId] = 'host';
-        io.to(newHostId).emit('promoted-to-host');
-      } else {
+      if (room.hostId === socketId) {
+        // Host is leaving - reassign immediately
+        if (remainingMembers.length > 0) {
+          const newHostId = remainingMembers[0];
+          room.hostId = newHostId;
+          if (!room.userRoles) room.userRoles = {};
+          room.userRoles[newHostId] = 'host';
+          logger.info(`👑 Host reassigned to ${newHostId} in room ${roomCode}`);
+          io.to(newHostId).emit('promoted-to-host');
+        } else {
+          // No one left - clean up room metadata
+          logger.info(`🗑️ Room ${roomCode} is now empty, cleaning up metadata`);
+          delete roomData[roomCode];
+        }
+      } else if (remainingMembers.length === 0) {
+        // Non-host left but room is now empty - clean up
         delete roomData[roomCode];
+      } else if (remainingMembers.length > 0) {
+        // Verify the host is still actually connected
+        const hostStillConnected = remainingMembers.includes(room.hostId);
+        if (!hostStillConnected) {
+          // Host socket is gone (stale), reassign
+          const newHostId = remainingMembers[0];
+          room.hostId = newHostId;
+          if (!room.userRoles) room.userRoles = {};
+          room.userRoles[newHostId] = 'host';
+          logger.info(`👑 Stale host detected, reassigned to ${newHostId} in room ${roomCode}`);
+          io.to(newHostId).emit('promoted-to-host');
+        }
       }
-    }
-
-    // Clean up role data for departing user
-    if (roomData[roomCode]?.userRoles?.[socketId]) {
-      delete roomData[roomCode].userRoles[socketId];
     }
 
     if (isExplicit) {
@@ -1861,30 +1930,43 @@ io.on('connection', (socket) => {
     } else {
       // Non-explicit disconnect (network issues, screen sleep, etc.)
       // Track the session for grace period reconnection (mobile-friendly)
-      // Find the session token for this socket
-      const stats = securityManager.getStats();
       for (const [token, session] of securityManager.sessionTokens.entries()) {
         if (session.socketId === socketId) {
           securityManager.trackDisconnectedSession(token, socketId, session.userId, roomCode);
-          // Don't invalidate session - allow reconnection within grace period
           break;
         }
       }
     }
 
-    // Leave in RoomManager
+    // Leave in RoomManager AND clean stale users at the same time
     await roomManager.leaveRoom(roomCode, socketId);
 
+    // Also clean any other stale users that may be lingering in roomManager
+    try {
+      const managedRoom = await roomManager.getRoom(roomCode);
+      if (managedRoom && managedRoom.users) {
+        const before = managedRoom.users.length;
+        managedRoom.users = managedRoom.users.filter(u => io.sockets.sockets.has(u.socketId));
+        if (managedRoom.users.length !== before) {
+          logger.info(`🧹 Cleaned ${before - managedRoom.users.length} stale user(s) from room ${roomCode} during departure`);
+          await roomManager.saveRoom(roomCode, managedRoom);
+        }
+      }
+    } catch (e) {
+      // Non-critical cleanup, log and continue
+      logger.error('Error cleaning stale users during departure:', e);
+    }
+
     // Notify others with accurate user count (socket already left adapter)
-    const socketRoom = io.sockets.adapter.rooms.get(roomCode);
-    const socketRoomSize = socketRoom ? socketRoom.size : 0;
+    const socketRoomAfter = io.sockets.adapter.rooms.get(roomCode);
+    const socketRoomSize = socketRoomAfter ? socketRoomAfter.size : 0;
     io.to(roomCode).emit('user-left', {
       nickname: nickname,
       socketId: socketId,
       userCount: socketRoomSize
     });
 
-    // Broadcast authoritative enriched user list so all clients stay in sync
+    // ALWAYS broadcast authoritative enriched user list so all clients stay in sync
     if (roomData[roomCode]) {
       const enrichedUsers = getEnrichedUsers(roomCode);
       io.to(roomCode).emit('users-updated', { users: enrichedUsers });

@@ -909,7 +909,7 @@ const ChatRoom = () => {
     socketManager.on('message-deleted', handleMessageDeleted);
     socketManager.on('message-updated', handleMessageUpdated);
     socketManager.on('user-joined', handleUserJoined);
-    socketManager.on('room-left', handleUserLeft);
+    socketManager.on('user-left', handleUserLeft);
     socketManager.on('room-error', handleError);
     socketManager.on('latency-pong', handlePong);
     socketManager.on('knock-approved', handleKnockApproved);
@@ -940,7 +940,7 @@ const ChatRoom = () => {
       socketManager.off('message-deleted', handleMessageDeleted);
       socketManager.off('message-updated', handleMessageUpdated);
       socketManager.off('user-joined', handleUserJoined);
-      socketManager.off('room-left', handleUserLeft);
+      socketManager.off('user-left', handleUserLeft);
       socketManager.off('room-error', handleError);
       socketManager.off('latency-pong', handlePong);
       socketManager.off('knock-approved', handleKnockApproved);
