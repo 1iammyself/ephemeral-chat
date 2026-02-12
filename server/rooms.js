@@ -97,7 +97,7 @@ class RoomManager {
 
       // Check if already taken
       if (await this.roomExists(roomCode)) {
-        throw new Error('This custom phrase is already in use. Please try another.');
+        throw new Error('Please try another.');
       }
     } else {
       // Auto-generate unique room code

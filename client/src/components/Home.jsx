@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { MessageCircle, UserX, Clock, Shield, Plus, Zap, Wifi, Edit, Lock, KeyRound, Loader2, Timer } from 'lucide-react';
+import { UserX, Clock, Shield, Plus, Zap, Wifi, Edit, Lock, KeyRound, Loader2, Timer } from 'lucide-react';
 import CreateRoomModal from './CreateRoomModal';
 import TraceHashModal from './TraceHashModal';
 import ThemeToggle from './ThemeToggle';
@@ -165,7 +165,7 @@ const Home = ({ children }) => {
       <header className="bg-white dark:bg-gray-800 shadow-sm transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
           <h1 className="text-3xl font-bold text-blue-600 dark:text-blue-400 flex items-center">
-            <MessageCircle className="h-8 w-8 mr-2" />
+            <img src="/logo.svg" alt="Logo" className="h-10 w-10 mr-3" />
             Ephemeral Chat
           </h1>
           <div className="flex items-center space-x-2">

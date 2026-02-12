@@ -1680,7 +1680,7 @@ const ChatRoom = () => {
           <div className="flex items-center space-x-2 sm:space-x-4">
             <button onClick={() => navigate('/')} className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
             <div className="min-w-0">
-              <h1 className="text-base sm:text-lg font-bold truncate text-gray-900 dark:text-white leading-tight">Secure Chat</h1>
+              <h1 className="text-base sm:text-lg font-bold truncate text-gray-900 dark:text-white leading-tight">{/^[A-Z0-9]{10}$/.test(roomCode) ? 'Secure Chat' : roomCode}</h1>
               <div className="flex items-center space-x-3 sm:space-x-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
                 {latency !== null && (
                   <div className="flex items-end space-x-0.5 h-4 pb-1" title={`Latency: ${latency}ms`}>

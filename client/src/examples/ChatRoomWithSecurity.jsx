@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useInactivityTimeout } from '../hooks/useInactivityTimeout';
 import InactivityWarning from '../components/InactivityWarning';
 import { clearAllSensitiveData } from '../utils/security';
@@ -12,7 +12,8 @@ import socketManager from '../socket';
 
 function ChatRoomWithSecurity() {
   const navigate = useNavigate();
-  
+  const { roomCode } = useParams();
+
   // State
   const [messages, setMessages] = useState([]);
   const [showWarning, setShowWarning] = useState(false);
@@ -22,28 +23,28 @@ function ChatRoomWithSecurity() {
   // Logout handler
   const handleLogout = useCallback(() => {
     console.log('🔒 Logging out user due to inactivity...');
-    
+
     // Clear all sensitive data
     clearAllSensitiveData();
-    
+
     // Disconnect socket
     socketManager.disconnect();
-    
+
     // Navigate to home with message
-    navigate('/', { 
-      state: { 
+    navigate('/', {
+      state: {
         message: 'You have been logged out due to inactivity',
         type: 'info'
-      } 
+      }
     });
   }, [navigate]);
 
   // Inactivity timeout hook
-  const { 
-    timeRemaining, 
-    isWarning, 
-    resetTimer, 
-    formatTimeRemaining 
+  const {
+    timeRemaining,
+    isWarning,
+    resetTimer,
+    formatTimeRemaining
   } = useInactivityTimeout({
     timeoutMs: inactivityTimeoutMs,
     socket: socketManager.socket,
@@ -59,7 +60,7 @@ function ChatRoomWithSecurity() {
   // Socket connection setup
   useEffect(() => {
     const socket = socketManager.connect();
-    
+
     socket.on('connect', () => {
       setIsConnected(true);
       console.log('✅ Connected to server');
@@ -103,13 +104,13 @@ function ChatRoomWithSecurity() {
         <div className="flex items-center justify-between max-w-6xl mx-auto">
           <div>
             <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-              Secure Chat Room
+              {roomCode && !/^[A-Z0-9]{10}$/.test(roomCode) ? roomCode : 'Chat Room'}
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
             </p>
           </div>
-          
+
           <button
             onClick={handleLogout}
             className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
@@ -128,8 +129,8 @@ function ChatRoomWithSecurity() {
             </div>
           ) : (
             messages.map((msg) => (
-              <div 
-                key={msg.id} 
+              <div
+                key={msg.id}
                 className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm"
               >
                 <div className="flex items-center justify-between mb-2">
@@ -182,7 +183,7 @@ function ChatRoomWithSecurity() {
       </div>
 
       {/* Inactivity Warning Modal */}
-      <InactivityWarning 
+      <InactivityWarning
         isOpen={showWarning}
         timeRemaining={timeRemaining}
         onContinue={handleContinue}
