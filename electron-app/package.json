@@ -1,11 +1,11 @@
 {
   "name": "ephemeral-chat",
-  "version": "1.1.1",
-  "description": "Secure, Temporary Chat Rooms - Desktop App",
+  "version": "1.1.2",
+  "description": "Private, temporary chat rooms with self-destructing messages",
   "main": "main.js",
   "author": {
     "name": "Ephemeral Chat",
-    "email": "contact@kyere.me"
+    "email": "ephchat@gmail.com"
   },
   "homepage": "https://chat.kyere.me",
   "repository": {
