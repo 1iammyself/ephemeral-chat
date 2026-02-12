@@ -1,10 +1,26 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Shield, Lock, Eye, Trash2, Smartphone, Globe, Github } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
 
 const PrivacyPolicy = () => {
     const navigate = useNavigate();
+
+    // Carousel state tracking
+    const [activeSection1, setActiveSection1] = useState(0);
+    const [activeSection2, setActiveSection2] = useState(0);
+    const [activeSection7, setActiveSection7] = useState(0);
+
+    const scrollRef1 = useRef(null);
+    const scrollRef2 = useRef(null);
+    const scrollRef7 = useRef(null);
+
+    const handleScroll = (ref, setter) => {
+        if (ref.current) {
+            const index = Math.round(ref.current.scrollLeft / ref.current.offsetWidth);
+            setter(index);
+        }
+    };
 
     return (
         <div className="h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-y-auto scrollbar-thin flex flex-col">
@@ -46,7 +62,41 @@ const PrivacyPolicy = () => {
                         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
                             <Eye className="w-6 h-6 text-indigo-600" /> 1. Information Collection
                         </h2>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                        {/* Mobile Carousel */}
+                        <div className="md:hidden relative group">
+                            <div
+                                ref={scrollRef1}
+                                onScroll={() => handleScroll(scrollRef1, setActiveSection1)}
+                                className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar gap-4 pb-4"
+                            >
+                                {[
+                                    { title: "No Personal Data", desc: "We do not require registration, names, email addresses, or phone numbers." },
+                                    { title: "No Message Logs", desc: "Messages are ephemeral. They are held in memory only as long as necessary for delivery and are never permanently stored on our servers." },
+                                    { title: "Anonymous Usage", desc: "We do not track individual users or create user profiles." }
+                                ].map((item, idx) => (
+                                    <div key={idx} className="min-w-full snap-center">
+                                        <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700 h-full">
+                                            <h3 className="font-bold text-lg mb-2">{item.title}</h3>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400">{item.desc}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Pagination Dots */}
+                            <div className="flex justify-center gap-1.5 mt-2">
+                                {[0, 1, 2].map((i) => (
+                                    <div
+                                        key={i}
+                                        className={`h-1.5 rounded-full transition-all duration-300 ${activeSection1 === i ? 'w-4 bg-indigo-600' : 'w-1.5 bg-gray-300 dark:bg-gray-700'}`}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Desktop Grid */}
+                        <div className="hidden md:grid grid-cols-3 gap-6">
                             <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700">
                                 <h3 className="font-bold text-lg mb-2">No Personal Data</h3>
                                 <p className="text-sm text-gray-600 dark:text-gray-400">We do not require registration, names, email addresses, or phone numbers.</p>
@@ -69,29 +119,47 @@ const PrivacyPolicy = () => {
                         </h2>
                         <p className="mb-4 text-gray-600 dark:text-gray-400">The App requires the following permissions to function:</p>
 
-                        {/* Mobile view for permissions */}
-                        <div className="md:hidden space-y-4">
-                            {[
-                                { name: "Internet Access", purpose: "Required to connect to chat rooms and transmit messages/calls.", handling: "Encrypted data transmitted to our relay servers." },
-                                { name: "Microphone", purpose: "Used only when you explicitly start a voice call or record a voice note.", handling: "Audio is transmitted peer-to-peer or processed for immediate delivery and is not recorded by the developer." },
-                                { name: "Camera", purpose: "Used only when you explicitly capture a photo to share in chat.", handling: "Photos are encrypted and transmitted directly to chat recipients. We do not store or access your photos." },
-                                { name: "File Access", purpose: "Used when you choose to send or receive files in chat.", handling: "Files are encrypted end-to-end and transmitted directly between users. We do not store or access your files." },
-                                { name: "Local Storage", purpose: "Used to optionally save chat history locally on your device (if you enable persistent mode).", handling: "Data is stored only on your device and is never uploaded to our servers." }
-                            ].map((perm, idx) => (
-                                <div key={idx} className="p-5 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700">
-                                    <h3 className="font-bold text-indigo-600 dark:text-indigo-400 mb-2">{perm.name}</h3>
-                                    <div className="space-y-3">
-                                        <div>
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Purpose</span>
-                                            <p className="text-sm font-medium mt-0.5">{perm.purpose}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Data Handling</span>
-                                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{perm.handling}</p>
+                        {/* Mobile view for permissions carousel */}
+                        <div className="md:hidden relative">
+                            <div
+                                ref={scrollRef2}
+                                onScroll={() => handleScroll(scrollRef2, setActiveSection2)}
+                                className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar gap-4 pb-4"
+                            >
+                                {[
+                                    { name: "Internet Access", purpose: "Required to connect to chat rooms and transmit messages/calls.", handling: "Encrypted data transmitted to our relay servers." },
+                                    { name: "Microphone", purpose: "Used only when you explicitly start a voice call or record a voice note.", handling: "Audio is transmitted peer-to-peer or processed for immediate delivery and is not recorded by the developer." },
+                                    { name: "Camera", purpose: "Used only when you explicitly capture a photo to share in chat.", handling: "Photos are encrypted and transmitted directly to chat recipients. We do not store or access your photos." },
+                                    { name: "File Access", purpose: "Used when you choose to send or receive files in chat.", handling: "Files are encrypted end-to-end and transmitted directly between users. We do not store or access your files." },
+                                    { name: "Local Storage", purpose: "Used to optionally save chat history locally on your device (if you enable persistent mode).", handling: "Data is stored only on your device and is never uploaded to our servers." }
+                                ].map((perm, idx) => (
+                                    <div key={idx} className="min-w-full snap-center">
+                                        <div className="p-5 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700 h-full">
+                                            <h3 className="font-bold text-indigo-600 dark:text-indigo-400 mb-3">{perm.name}</h3>
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Purpose</span>
+                                                    <p className="text-sm font-medium mt-1">{perm.purpose}</p>
+                                                </div>
+                                                <div>
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Data Handling</span>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{perm.handling}</p>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
+
+                            {/* Pagination Dots */}
+                            <div className="flex justify-center gap-1.5 mt-2">
+                                {[0, 1, 2, 3, 4].map((i) => (
+                                    <div
+                                        key={i}
+                                        className={`h-1.5 rounded-full transition-all duration-300 ${activeSection2 === i ? 'w-4 bg-indigo-600' : 'w-1.5 bg-gray-300 dark:bg-gray-700'}`}
+                                    />
+                                ))}
+                            </div>
                         </div>
 
                         {/* Desktop view for permissions */}
@@ -172,10 +240,10 @@ const PrivacyPolicy = () => {
                             </ul>
                         </section>
 
-                        {/* 6. Desktop App (Electron) */}
+                        {/* 6. Desktop App */}
                         <section>
                             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                                <Shield className="w-5 h-5 text-indigo-600" /> 6. Desktop App (Electron)
+                                <Shield className="w-5 h-5 text-indigo-600" /> 6. Desktop App
                             </h2>
                             <ul className="text-gray-600 dark:text-gray-400 space-y-2 list-disc pl-5">
                                 <li><strong>Screen Capture Protection:</strong> Prevents screenshots and screen recording on Windows.</li>
@@ -188,7 +256,42 @@ const PrivacyPolicy = () => {
                     {/* 7. Data Retention */}
                     <section className="p-6 md:p-8 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-3xl border border-indigo-100/50 dark:border-indigo-800/50">
                         <h2 className="text-2xl font-bold mb-6">7. Data Retention</h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                        {/* Mobile Carousel */}
+                        <div className="md:hidden relative">
+                            <div
+                                ref={scrollRef7}
+                                onScroll={() => handleScroll(scrollRef7, setActiveSection7)}
+                                className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar gap-4 pb-4"
+                            >
+                                {[
+                                    { label: "Messages", value: "Automatically deleted based on room settings (30 seconds to 1 hour)." },
+                                    { label: "Rooms", value: "Expire and are deleted after 24 hours of inactivity." },
+                                    { label: "Files", value: "Not stored on our servers; transmitted directly between users." },
+                                    { label: "Local Data", value: "Retained on your device until you delete it." }
+                                ].map((item, idx) => (
+                                    <div key={idx} className="min-w-full snap-center">
+                                        <div className="flex flex-col p-5 bg-white dark:bg-gray-800 rounded-2xl shadow-sm h-full border border-gray-100 dark:border-gray-700/50">
+                                            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-2">{item.label}</span>
+                                            <span className="text-sm font-medium leading-relaxed">{item.value}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Pagination Dots */}
+                            <div className="flex justify-center gap-1.5 mt-2">
+                                {[0, 1, 2, 3].map((i) => (
+                                    <div
+                                        key={i}
+                                        className={`h-1.5 rounded-full transition-all duration-300 ${activeSection7 === i ? 'w-4 bg-indigo-600' : 'w-1.5 bg-gray-300 dark:bg-gray-700'}`}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Desktop Grid */}
+                        <div className="hidden md:grid grid-cols-2 gap-4">
                             <div className="flex flex-col p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm">
                                 <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase mb-1">Messages</span>
                                 <span className="text-sm font-medium">Automatically deleted based on room settings (30 seconds to 1 hour).</span>
