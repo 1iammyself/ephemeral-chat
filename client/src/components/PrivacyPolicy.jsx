@@ -23,9 +23,9 @@ const PrivacyPolicy = () => {
     };
 
     return (
-        <div className="h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-y-auto scrollbar-thin flex flex-col">
+        <div className="h-screen w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-y-auto overflow-x-hidden scrollbar-thin flex flex-col">
             {/* Header */}
-            <header className="sticky top-0 z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
+            <header className="sticky top-0 z-10 w-full bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
                 <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
                     <button
                         onClick={() => navigate(-1)}
@@ -44,7 +44,7 @@ const PrivacyPolicy = () => {
                 </div>
             </header>
 
-            <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex-grow">
+            <main className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex-grow overflow-x-hidden">
                 <div className="space-y-8 sm:space-y-12">
                     {/* Hero Section */}
                     <header className="prose prose-indigo dark:prose-invert max-w-none border-b border-gray-100 dark:border-gray-800 pb-8">
@@ -64,18 +64,18 @@ const PrivacyPolicy = () => {
                         </h2>
 
                         {/* Mobile Carousel */}
-                        <div className="md:hidden relative group">
+                        <div className="md:hidden relative group w-full overflow-hidden">
                             <div
                                 ref={scrollRef1}
                                 onScroll={() => handleScroll(scrollRef1, setActiveSection1)}
-                                className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar gap-4 pb-4"
+                                className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar gap-4 pb-4 w-full"
                             >
                                 {[
                                     { title: "No Personal Data", desc: "We do not require registration, names, email addresses, or phone numbers." },
                                     { title: "No Message Logs", desc: "Messages are ephemeral. They are held in memory only as long as necessary for delivery and are never permanently stored on our servers." },
                                     { title: "Anonymous Usage", desc: "We do not track individual users or create user profiles." }
                                 ].map((item, idx) => (
-                                    <div key={idx} className="min-w-full snap-center">
+                                    <div key={idx} className="w-full flex-shrink-0 snap-center">
                                         <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700 h-full">
                                             <h3 className="font-bold text-lg mb-2">{item.title}</h3>
                                             <p className="text-sm text-gray-600 dark:text-gray-400">{item.desc}</p>
@@ -120,11 +120,11 @@ const PrivacyPolicy = () => {
                         <p className="mb-4 text-gray-600 dark:text-gray-400">The App requires the following permissions to function:</p>
 
                         {/* Mobile view for permissions carousel */}
-                        <div className="md:hidden relative">
+                        <div className="md:hidden relative w-full overflow-hidden">
                             <div
                                 ref={scrollRef2}
                                 onScroll={() => handleScroll(scrollRef2, setActiveSection2)}
-                                className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar gap-4 pb-4"
+                                className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar gap-4 pb-4 w-full"
                             >
                                 {[
                                     { name: "Internet Access", purpose: "Required to connect to chat rooms and transmit messages/calls.", handling: "Encrypted data transmitted to our relay servers." },
@@ -133,7 +133,7 @@ const PrivacyPolicy = () => {
                                     { name: "File Access", purpose: "Used when you choose to send or receive files in chat.", handling: "Files are encrypted end-to-end and transmitted directly between users. We do not store or access your files." },
                                     { name: "Local Storage", purpose: "Used to optionally save chat history locally on your device (if you enable persistent mode).", handling: "Data is stored only on your device and is never uploaded to our servers." }
                                 ].map((perm, idx) => (
-                                    <div key={idx} className="min-w-full snap-center">
+                                    <div key={idx} className="w-full flex-shrink-0 snap-center">
                                         <div className="p-5 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700 h-full">
                                             <h3 className="font-bold text-indigo-600 dark:text-indigo-400 mb-3">{perm.name}</h3>
                                             <div className="space-y-4">
@@ -258,11 +258,11 @@ const PrivacyPolicy = () => {
                         <h2 className="text-2xl font-bold mb-6">7. Data Retention</h2>
 
                         {/* Mobile Carousel */}
-                        <div className="md:hidden relative">
+                        <div className="md:hidden relative w-full overflow-hidden">
                             <div
                                 ref={scrollRef7}
                                 onScroll={() => handleScroll(scrollRef7, setActiveSection7)}
-                                className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar gap-4 pb-4"
+                                className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar gap-4 pb-4 w-full"
                             >
                                 {[
                                     { label: "Messages", value: "Automatically deleted based on room settings (30 seconds to 1 hour)." },
@@ -270,7 +270,7 @@ const PrivacyPolicy = () => {
                                     { label: "Files", value: "Not stored on our servers; transmitted directly between users." },
                                     { label: "Local Data", value: "Retained on your device until you delete it." }
                                 ].map((item, idx) => (
-                                    <div key={idx} className="min-w-full snap-center">
+                                    <div key={idx} className="w-full flex-shrink-0 snap-center">
                                         <div className="flex flex-col p-5 bg-white dark:bg-gray-800 rounded-2xl shadow-sm h-full border border-gray-100 dark:border-gray-700/50">
                                             <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-2">{item.label}</span>
                                             <span className="text-sm font-medium leading-relaxed">{item.value}</span>

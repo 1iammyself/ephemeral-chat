@@ -102,6 +102,16 @@
     -moz-user-select: none;
   }
 
+  /* Utility to hide scrollbars but keep functionality */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
   /* Hide password echo (no dots) while keeping placeholder visible */
   .input-no-echo {
     color: transparent;
