@@ -7,7 +7,7 @@ const PrivacyPolicy = () => {
     const navigate = useNavigate();
 
     return (
-        <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-y-auto scrollbar-thin flex flex-col">
+        <div className="h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-y-auto scrollbar-thin flex flex-col">
             {/* Header */}
             <header className="sticky top-0 z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
                 <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
