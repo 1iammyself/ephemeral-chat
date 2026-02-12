@@ -507,7 +507,7 @@ app.post('/api/verbal-join', async (req, res) => {
 
 app.post('/api/rooms', async (req, res) => {
   try {
-    const { messageTTL, password, maxUsers, capToken, creatorId, persistenceMode, hp_email, hp_website, hp_timestamp } = req.body;
+    const { messageTTL, password, maxUsers, capToken, creatorId, persistenceMode, customCode, hp_email, hp_website, hp_timestamp } = req.body;
 
     logger.info('HTTP room creation request:', { messageTTL, password, maxUsers, hasCapToken: !!capToken, creatorId: !!creatorId, persistenceMode });
 
@@ -553,6 +553,9 @@ app.post('/api/rooms', async (req, res) => {
     }
     if (persistenceMode && typeof persistenceMode === 'string') {
       settings.persistenceMode = sanitizeInput(persistenceMode);
+    }
+    if (customCode && typeof customCode === 'string') {
+      settings.customCode = sanitizeInput(customCode);
     }
 
     const roomCode = await roomManager.createRoom(settings);
@@ -784,7 +787,7 @@ io.on('connection', (socket) => {
 
   socket.on('create-room', async (data, callback) => {
     try {
-      const { messageTTL, password, maxUsers } = data || {};
+      const { messageTTL, password, maxUsers, customCode } = data || {};
 
       // logger.info('Creating room with data:', { messageTTL, password, maxUsers });
 
@@ -800,6 +803,9 @@ io.on('connection', (socket) => {
         logger.info('Setting maxUsers to:', maxUsers);
       } else {
         logger.info('Invalid or missing maxUsers, using default');
+      }
+      if (customCode && typeof customCode === 'string') {
+        settings.customCode = sanitizeInput(customCode);
       }
 
       const roomCode = await roomManager.createRoom(settings);

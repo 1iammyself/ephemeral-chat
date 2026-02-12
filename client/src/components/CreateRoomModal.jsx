@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { X, Check, Copy, Users, Lock, Unlock, Timer, Zap, PartyPopper, Sun, Sunset, Settings, Clock, Shield, Share2 } from 'lucide-react';
+import { X, Check, Copy, Users, Lock, Unlock, Timer, Zap, PartyPopper, Sun, Sunset, Settings, Clock, Shield, Share2, Hash } from 'lucide-react';
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
 import ShareSheet from './ShareSheet';
@@ -39,6 +39,9 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const [showShareSheet, setShowShareSheet] = useState(false);
   const [formData, setFormData] = useState(null);
   const [roomKey, setRoomKey] = useState(null);
+  const [useCustomCode, setUseCustomCode] = useState(false);
+  const [customCode, setCustomCode] = useState('');
+  const [customCodeError, setCustomCodeError] = useState('');
   const navigate = useNavigate();
 
   // Set timestamp when component mounts (for timing-based bot detection)
@@ -87,6 +90,15 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const handleCreate = async (e) => {
     e.preventDefault();
 
+    // Validate custom code if enabled
+    if (useCustomCode) {
+      const normalized = customCode.trim().toLowerCase().replace(/\s+/g, '-');
+      if (!normalized || normalized.length < 3 || normalized.length > 30 || !/^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$/.test(normalized)) {
+        setCustomCodeError('Please enter a valid custom phrase (3-30 chars, letters, numbers, hyphens)');
+        return;
+      }
+    }
+
     setIsCreating(true);
 
     try {
@@ -111,6 +123,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
               messageTTL: roomSettings.messageTTL !== 'none' ? roomSettings.messageTTL : undefined,
               password: roomSettings.password.trim() || undefined,
               maxUsers: roomSettings.maxUsers,
+              customCode: useCustomCode && customCode.trim() ? customCode.trim() : undefined,
               // Honeypot fields for bot detection (invisible to users)
               hp_email: honeypot.hp_email,
               hp_website: honeypot.hp_website,
@@ -228,6 +241,9 @@ Verbal Code: ${verbalCode || 'N/A'}`;
       password: '',
       maxUsers: 1
     });
+    setUseCustomCode(false);
+    setCustomCode('');
+    setCustomCodeError('');
     // setCapToken(null); // This variable is not defined in the provided code
     // setIsCapVerified(false); // This variable is not defined in the provided code
   };
@@ -375,6 +391,72 @@ Verbal Code: ${verbalCode || 'N/A'}`;
           </h2>
 
           <form onSubmit={handleCreate} autoComplete="off" className="space-y-4 sm:space-y-6">
+            {/* Custom Phrase Room Code */}
+            <div>
+              <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <div className="flex items-center space-x-2">
+                  <Hash className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
+                  <label className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">
+                    Custom Room Code
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUseCustomCode(!useCustomCode);
+                    setCustomCode('');
+                    setCustomCodeError('');
+                  }}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${useCustomCode ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${useCustomCode ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                  />
+                </button>
+              </div>
+              {useCustomCode && (
+                <>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    Use a memorable phrase instead of a random code (e.g. "friday-hangout")
+                  </p>
+                  <input
+                    type="text"
+                    autoComplete="off"
+                    placeholder="e.g. movie-night, study-group"
+                    value={customCode}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomCode(val);
+                      // Live validation
+                      const normalized = val.trim().toLowerCase().replace(/\s+/g, '-');
+                      if (normalized.length > 0 && normalized.length < 3) {
+                        setCustomCodeError('Must be at least 3 characters');
+                      } else if (normalized.length > 30) {
+                        setCustomCodeError('Must be 30 characters or less');
+                      } else if (normalized.length > 0 && !/^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$/.test(normalized)) {
+                        setCustomCodeError('Only letters, numbers, and hyphens allowed');
+                      } else {
+                        setCustomCodeError('');
+                      }
+                    }}
+                    className={`w-full input-field text-sm sm:text-base py-2 sm:py-3 px-3 sm:px-4 dark:bg-gray-700 dark:border-gray-600 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 ${customCodeError ? 'focus:ring-red-500 border-red-300 dark:border-red-500' : 'focus:ring-blue-500'
+                      }`}
+                    maxLength={30}
+                  />
+                  {customCode.trim() && !customCodeError && (
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                      Room code: <span className="font-mono font-semibold">{customCode.trim().toLowerCase().replace(/\s+/g, '-')}</span>
+                    </p>
+                  )}
+                  {customCodeError && (
+                    <p className="text-xs text-red-500 dark:text-red-400 mt-1">{customCodeError}</p>
+                  )}
+                </>
+              )}
+            </div>
+
             {/* Persistence Mode Selection */}
             <div>
               <div className="flex items-center space-x-2 mb-2 sm:mb-3">

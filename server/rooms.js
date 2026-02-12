@@ -81,17 +81,36 @@ class RoomManager {
     }
 
     let roomCode;
-    let attempts = 0;
-    const maxAttempts = 10;
 
-    // Generate unique room code
-    do {
-      roomCode = generateRoomCode();
-      attempts++;
-      if (attempts > maxAttempts) {
-        throw new Error('Failed to generate unique room code');
+    // Use custom phrase if provided, otherwise auto-generate
+    if (settings.customCode && typeof settings.customCode === 'string') {
+      // Normalize: lowercase, trim, replace spaces with hyphens
+      roomCode = settings.customCode.trim().toLowerCase().replace(/\s+/g, '-');
+
+      // Validate format: 3-30 chars, alphanumeric and hyphens only
+      if (roomCode.length < 3 || roomCode.length > 30) {
+        throw new Error('Custom phrase must be between 3 and 30 characters');
       }
-    } while (await this.roomExists(roomCode));
+      if (!/^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$/.test(roomCode)) {
+        throw new Error('Custom phrase can only contain letters, numbers, and hyphens');
+      }
+
+      // Check if already taken
+      if (await this.roomExists(roomCode)) {
+        throw new Error('This custom phrase is already in use. Please try another.');
+      }
+    } else {
+      // Auto-generate unique room code
+      let attempts = 0;
+      const maxAttempts = 10;
+      do {
+        roomCode = generateRoomCode();
+        attempts++;
+        if (attempts > maxAttempts) {
+          throw new Error('Failed to generate unique room code');
+        }
+      } while (await this.roomExists(roomCode));
+    }
 
     // Get lifetime from persistence mode configuration
     const modeConfig = getPersistenceMode(persistenceMode);

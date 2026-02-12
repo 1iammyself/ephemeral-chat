@@ -59,13 +59,16 @@ function sanitizeInput(input) {
 
 /**
  * Validate room code format
+ * Accepts auto-generated codes (10-char A-Z0-9) or custom phrases (3-30 chars, a-zA-Z0-9 and hyphens)
  * @param {string} code - Room code to validate
  * @returns {boolean} True if valid
  */
 function isValidRoomCode(code) {
-  return typeof code === 'string' &&
-    code.length === 10 &&
-    /^[A-Z0-9]+$/.test(code);
+  if (typeof code !== 'string' || code.length < 3 || code.length > 30) return false;
+  // Auto-generated: exactly 10 uppercase alphanumeric
+  if (/^[A-Z0-9]{10}$/.test(code)) return true;
+  // Custom phrase: alphanumeric and hyphens, no leading/trailing/consecutive hyphens
+  return /^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$/.test(code);
 }
 
 /**
