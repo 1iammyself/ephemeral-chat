@@ -151,8 +151,8 @@ const io = socketIo(server, {
   transports: ['websocket', 'polling'],
   allowUpgrades: true,
   maxHttpBufferSize: 1e7, // 10MB to accommodate large audio/image strings
-  pingTimeout: 120000, // 120 seconds (increased for mobile users)
-  pingInterval: 45000, // 45 seconds
+  pingTimeout: 300000, // 300 seconds (5 min – generous for mobile screen-off)
+  pingInterval: 60000, // 60 seconds
   cookie: false,
   serveClient: false,
   allowEIO3: true,
@@ -184,6 +184,10 @@ const rateLimits = new Map();
 // Room metadata for Lobby/Host logic
 // Roles: 'host', 'tier1', 'tier2', 'user'
 const roomData = {}; // { [roomId]: { hostId: string, lobbyLimit: number, lobbyCount: number, userRoles: { [socketId]: role } } }
+
+// Track deferred (grace-period) user removals so they can be cancelled on reconnect
+// Key: sessionToken, Value: { timeoutId, socketId, roomCode }
+const deferredRemovals = new Map();
 
 // Initialize Redis client (optional)
 let redisClient = null;
@@ -1160,6 +1164,14 @@ io.on('connection', (socket) => {
           // Re-bind session to new socket
           securityManager.resumeSession(sessionToken, socket.id);
 
+          // Cancel any pending deferred removal for this session
+          const deferred = deferredRemovals.get(sessionToken);
+          if (deferred) {
+            clearTimeout(deferred.timeoutId);
+            deferredRemovals.delete(sessionToken);
+            logger.info(`✅ Cancelled deferred removal for session ${sessionToken.substring(0, 8)}…`);
+          }
+
           // Clear from disconnected sessions tracking (successful reconnect)
           securityManager.clearDisconnectedSession(sessionToken);
 
@@ -1880,96 +1892,178 @@ io.on('connection', (socket) => {
     socket.roomCode = null;
     socket.nickname = null;
 
-    // Clean up role data for departing user BEFORE host handover
-    if (roomData[roomCode]?.userRoles?.[socketId]) {
-      delete roomData[roomCode].userRoles[socketId];
-    }
+    if (isExplicit) {
+      // ── Explicit leave (user clicked "Leave") ── immediate full cleanup
+      if (roomData[roomCode]?.userRoles?.[socketId]) {
+        delete roomData[roomCode].userRoles[socketId];
+      }
 
-    // Host Handover Logic
-    const room = roomData[roomCode];
-    if (room) {
-      const socketRoom = io.sockets.adapter.rooms.get(roomCode);
-      const remainingMembers = Array.from(socketRoom || []);
+      // Host Handover Logic (immediate)
+      const room = roomData[roomCode];
+      if (room) {
+        const socketRoom = io.sockets.adapter.rooms.get(roomCode);
+        const remainingMembers = Array.from(socketRoom || []);
 
-      if (room.hostId === socketId) {
-        // Host is leaving - reassign immediately
-        if (remainingMembers.length > 0) {
-          const newHostId = remainingMembers[0];
-          room.hostId = newHostId;
-          if (!room.userRoles) room.userRoles = {};
-          room.userRoles[newHostId] = 'host';
-          logger.info(`👑 Host reassigned to ${newHostId} in room ${roomCode}`);
-          io.to(newHostId).emit('promoted-to-host');
-        } else {
-          // No one left - clean up room metadata
-          logger.info(`🗑️ Room ${roomCode} is now empty, cleaning up metadata`);
+        if (room.hostId === socketId) {
+          if (remainingMembers.length > 0) {
+            const newHostId = remainingMembers[0];
+            room.hostId = newHostId;
+            if (!room.userRoles) room.userRoles = {};
+            room.userRoles[newHostId] = 'host';
+            logger.info(`👑 Host reassigned to ${newHostId} in room ${roomCode}`);
+            io.to(newHostId).emit('promoted-to-host');
+          } else {
+            logger.info(`🗑️ Room ${roomCode} is now empty, cleaning up metadata`);
+            delete roomData[roomCode];
+          }
+        } else if (remainingMembers.length === 0) {
           delete roomData[roomCode];
-        }
-      } else if (remainingMembers.length === 0) {
-        // Non-host left but room is now empty - clean up
-        delete roomData[roomCode];
-      } else if (remainingMembers.length > 0) {
-        // Verify the host is still actually connected
-        const hostStillConnected = remainingMembers.includes(room.hostId);
-        if (!hostStillConnected) {
-          // Host socket is gone (stale), reassign
-          const newHostId = remainingMembers[0];
-          room.hostId = newHostId;
-          if (!room.userRoles) room.userRoles = {};
-          room.userRoles[newHostId] = 'host';
-          logger.info(`👑 Stale host detected, reassigned to ${newHostId} in room ${roomCode}`);
-          io.to(newHostId).emit('promoted-to-host');
+        } else {
+          const hostStillConnected = remainingMembers.includes(room.hostId);
+          if (!hostStillConnected) {
+            const newHostId = remainingMembers[0];
+            room.hostId = newHostId;
+            if (!room.userRoles) room.userRoles = {};
+            room.userRoles[newHostId] = 'host';
+            logger.info(`👑 Stale host detected, reassigned to ${newHostId} in room ${roomCode}`);
+            io.to(newHostId).emit('promoted-to-host');
+          }
         }
       }
-    }
 
-    if (isExplicit) {
-      // Clear user activity tracking and session ONLY on explicit exit
       securityManager.clearUserActivity(socketId);
       securityManager.invalidateSocketSessions(socketId);
+
+      // Remove from room manager immediately
+      await roomManager.leaveRoom(roomCode, socketId);
+
+      // Also clean any other stale users
+      try {
+        const managedRoom = await roomManager.getRoom(roomCode);
+        if (managedRoom && managedRoom.users) {
+          const before = managedRoom.users.length;
+          managedRoom.users = managedRoom.users.filter(u => io.sockets.sockets.has(u.socketId));
+          if (managedRoom.users.length !== before) {
+            logger.info(`🧹 Cleaned ${before - managedRoom.users.length} stale user(s) from room ${roomCode} during departure`);
+            await roomManager.saveRoom(roomCode, managedRoom);
+          }
+        }
+      } catch (e) {
+        logger.error('Error cleaning stale users during departure:', e);
+      }
+
+      // Notify others immediately
+      const socketRoomAfter = io.sockets.adapter.rooms.get(roomCode);
+      const socketRoomSize = socketRoomAfter ? socketRoomAfter.size : 0;
+      io.to(roomCode).emit('user-left', {
+        nickname,
+        socketId,
+        userCount: socketRoomSize
+      });
+
+      if (roomData[roomCode]) {
+        const enrichedUsers = getEnrichedUsers(roomCode);
+        io.to(roomCode).emit('users-updated', { users: enrichedUsers });
+      }
     } else {
-      // Non-explicit disconnect (network issues, screen sleep, etc.)
-      // Track the session for grace period reconnection (mobile-friendly)
+      // ── Non-explicit disconnect (screen sleep, network switch, app backgrounded) ──
+      // Defer the actual removal for the grace period so the user can reconnect seamlessly.
+      // Other users will NOT see a "left" notification unless the grace period expires.
+
+      let matchedToken = null;
       for (const [token, session] of securityManager.sessionTokens.entries()) {
         if (session.socketId === socketId) {
           securityManager.trackDisconnectedSession(token, socketId, session.userId, roomCode);
+          matchedToken = token;
           break;
         }
       }
-    }
 
-    // Leave in RoomManager AND clean stale users at the same time
-    await roomManager.leaveRoom(roomCode, socketId);
+      const gracePeriodMs = securityManager.RECONNECT_GRACE_PERIOD_MS || 5 * 60 * 1000;
+      logger.info(`📱 Deferring removal of ${nickname} (${socketId}) from room ${roomCode} for ${gracePeriodMs / 1000}s grace period`);
 
-    // Also clean any other stale users that may be lingering in roomManager
-    try {
-      const managedRoom = await roomManager.getRoom(roomCode);
-      if (managedRoom && managedRoom.users) {
-        const before = managedRoom.users.length;
-        managedRoom.users = managedRoom.users.filter(u => io.sockets.sockets.has(u.socketId));
-        if (managedRoom.users.length !== before) {
-          logger.info(`🧹 Cleaned ${before - managedRoom.users.length} stale user(s) from room ${roomCode} during departure`);
-          await roomManager.saveRoom(roomCode, managedRoom);
+      const timeoutId = setTimeout(async () => {
+        // Grace period expired – perform the actual removal now
+        if (matchedToken) deferredRemovals.delete(matchedToken);
+
+        logger.info(`⏰ Grace period expired for ${nickname} (${socketId}) in room ${roomCode} – removing now`);
+
+        // Clean up role data
+        if (roomData[roomCode]?.userRoles?.[socketId]) {
+          delete roomData[roomCode].userRoles[socketId];
         }
+
+        // Host Handover Logic
+        const room = roomData[roomCode];
+        if (room) {
+          const socketRoom = io.sockets.adapter.rooms.get(roomCode);
+          const remainingMembers = Array.from(socketRoom || []);
+
+          if (room.hostId === socketId) {
+            if (remainingMembers.length > 0) {
+              const newHostId = remainingMembers[0];
+              room.hostId = newHostId;
+              if (!room.userRoles) room.userRoles = {};
+              room.userRoles[newHostId] = 'host';
+              logger.info(`👑 Host reassigned to ${newHostId} in room ${roomCode}`);
+              io.to(newHostId).emit('promoted-to-host');
+            } else {
+              logger.info(`🗑️ Room ${roomCode} is now empty, cleaning up metadata`);
+              delete roomData[roomCode];
+            }
+          } else if (remainingMembers.length === 0) {
+            delete roomData[roomCode];
+          } else {
+            const hostStillConnected = remainingMembers.includes(room.hostId);
+            if (!hostStillConnected) {
+              const newHostId = remainingMembers[0];
+              room.hostId = newHostId;
+              if (!room.userRoles) room.userRoles = {};
+              room.userRoles[newHostId] = 'host';
+              logger.info(`👑 Stale host detected, reassigned to ${newHostId} in room ${roomCode}`);
+              io.to(newHostId).emit('promoted-to-host');
+            }
+          }
+        }
+
+        securityManager.clearUserActivity(socketId);
+
+        await roomManager.leaveRoom(roomCode, socketId);
+
+        // Clean stale users
+        try {
+          const managedRoom = await roomManager.getRoom(roomCode);
+          if (managedRoom && managedRoom.users) {
+            const before = managedRoom.users.length;
+            managedRoom.users = managedRoom.users.filter(u => io.sockets.sockets.has(u.socketId));
+            if (managedRoom.users.length !== before) {
+              logger.info(`🧹 Cleaned ${before - managedRoom.users.length} stale user(s) from room ${roomCode} during deferred departure`);
+              await roomManager.saveRoom(roomCode, managedRoom);
+            }
+          }
+        } catch (e) {
+          logger.error('Error cleaning stale users during deferred departure:', e);
+        }
+
+        // Now notify others
+        const socketRoomAfter = io.sockets.adapter.rooms.get(roomCode);
+        const socketRoomSize = socketRoomAfter ? socketRoomAfter.size : 0;
+        io.to(roomCode).emit('user-left', {
+          nickname,
+          socketId,
+          userCount: socketRoomSize
+        });
+
+        if (roomData[roomCode]) {
+          const enrichedUsers = getEnrichedUsers(roomCode);
+          io.to(roomCode).emit('users-updated', { users: enrichedUsers });
+        }
+      }, gracePeriodMs);
+
+      // Store so it can be cancelled if user reconnects
+      if (matchedToken) {
+        deferredRemovals.set(matchedToken, { timeoutId, socketId, roomCode });
       }
-    } catch (e) {
-      // Non-critical cleanup, log and continue
-      logger.error('Error cleaning stale users during departure:', e);
-    }
-
-    // Notify others with accurate user count (socket already left adapter)
-    const socketRoomAfter = io.sockets.adapter.rooms.get(roomCode);
-    const socketRoomSize = socketRoomAfter ? socketRoomAfter.size : 0;
-    io.to(roomCode).emit('user-left', {
-      nickname: nickname,
-      socketId: socketId,
-      userCount: socketRoomSize
-    });
-
-    // ALWAYS broadcast authoritative enriched user list so all clients stay in sync
-    if (roomData[roomCode]) {
-      const enrichedUsers = getEnrichedUsers(roomCode);
-      io.to(roomCode).emit('users-updated', { users: enrichedUsers });
     }
   };
 

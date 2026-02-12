@@ -473,10 +473,11 @@ const ChatRoom = () => {
   }, []);
 
   const performJoin = useCallback((params) => {
-    const { nickname, password, capToken, inviteToken } = params;
+    const { nickname, password, capToken, inviteToken, sessionToken: resumeToken } = params;
     const userId = getCreatorId(); // Use persistent device ID for participation tracking
     const joinData = { roomCode, nickname, password, capToken, userId };
     if (inviteToken) joinData.inviteToken = inviteToken;
+    if (resumeToken) joinData.sessionToken = resumeToken;
 
     socketManager.emit('join-room', joinData, async (response) => {
       if (!response) {
@@ -693,7 +694,7 @@ const ChatRoom = () => {
         setError('You have been disconnected by the server');
       } else if (reason === 'transport close' || reason === 'ping timeout') {
         // Don't show full screen error for background disconnects if we can rejoin
-        if (isJoined) {
+        if (stateRef.current.isJoined) {
           setIsReconnecting(true);
         } else {
           setError('Connection lost. Trying to reconnect...');

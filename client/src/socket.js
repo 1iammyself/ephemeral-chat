@@ -61,7 +61,67 @@ class SocketManager {
       this.isConnected = false;
     });
 
+    // ── Mobile visibility-change handler ──
+    // When the user's screen turns on or they switch back to the app,
+    // mobile OSes often kill the WebSocket. We detect this and reconnect immediately.
+    this._setupVisibilityHandler();
+
     return this.socket;
+  }
+
+  /**
+   * Listen for page visibility changes (screen on/off, tab switch, app foreground/background).
+   * On resume: if the socket is disconnected or stale, force a reconnect immediately
+   * instead of waiting for the normal reconnection backoff.
+   */
+  _setupVisibilityHandler() {
+    if (this._visibilityHandlerSet) return;
+    this._visibilityHandlerSet = true;
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('📱 Page became visible – checking socket health…');
+
+        if (!this.socket) return;
+
+        if (this.socket.disconnected || !this.isConnected) {
+          // Socket is dead – force an immediate reconnect
+          console.log('🔄 Socket disconnected while backgrounded – reconnecting now');
+          this.socket.connect();
+        } else {
+          // Socket thinks it's connected, but the underlying transport may be stale.
+          // Send a no-op ping through the Engine.IO layer to validate the connection.
+          // If the transport is dead, this will trigger a disconnect → reconnect cycle.
+          try {
+            if (this.socket.io?.engine) {
+              this.socket.io.engine.ping();
+            }
+          } catch (e) {
+            console.warn('⚠️ Engine ping failed, forcing reconnect', e);
+            this.socket.disconnect().connect();
+          }
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Also handle the `resume` / `online` events which fire on some mobile browsers
+    window.addEventListener('online', () => {
+      console.log('🌐 Network came back online');
+      if (this.socket && (this.socket.disconnected || !this.isConnected)) {
+        console.log('🔄 Reconnecting after network restored');
+        this.socket.connect();
+      }
+    });
+
+    // iOS-specific: pageshow with persisted=true means restored from bfcache
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted && this.socket && (this.socket.disconnected || !this.isConnected)) {
+        console.log('🔄 Restored from bfcache – reconnecting');
+        this.socket.connect();
+      }
+    });
   }
 
   on(event, callback) {
