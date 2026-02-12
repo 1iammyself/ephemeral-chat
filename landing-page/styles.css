@@ -5,10 +5,11 @@
 }
 
 :root {
-    --primary: #6366f1;
-    --primary-dark: #4f46e5;
-    --secondary: #8b5cf6;
-    --accent: #ec4899;
+    --primary: #2563eb;
+    /* Vibrant Blue */
+    --primary-dark: #1d4ed8;
+    --secondary: #3b82f6;
+    --accent: #60a5fa;
     --dark: #0f172a;
     --gray: #64748b;
     --light-gray: #f1f5f9;
@@ -204,16 +205,149 @@ body {
 
 .features-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 2rem;
+}
+
+/* Carousel Styles */
+.carousel-container {
+    position: relative;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.carousel-track {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    gap: 1.5rem;
+    padding: 1rem 0.5rem 3rem;
+}
+
+.carousel-item {
+    scroll-snap-align: center;
+    flex: 0 0 100%;
+}
+
+@media (min-width: 769px) {
+    .carousel-item {
+        flex: 0 0 calc(33.333% - 1rem);
+        /* Show 3 cards on desktop */
+    }
+
+    .carousel-controls {
+        display: none !important;
+        /* Hide arrows completely on desktop */
+    }
+
+    .carousel-btn {
+        pointer-events: auto;
+        background: var(--bg-card);
+        color: var(--primary);
+        border: 2px solid var(--border-card);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .carousel-btn:hover {
+        background: var(--primary);
+        color: var(--white);
+        transform: scale(1.1) translateX(0);
+        border-color: var(--primary);
+    }
+}
+
+.carousel-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-top: -1rem;
+}
+
+.carousel-btn {
+    background: var(--bg-card);
+    border: 2px solid var(--border-card);
+    color: var(--primary);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    z-index: 10;
+}
+
+.carousel-btn:hover {
+    background: var(--primary);
+    color: var(--white);
+    transform: scale(1.1);
+}
+
+.carousel-dots {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.carousel-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--border-card);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.carousel-dot.active {
+    background: var(--primary);
+    width: 24px;
+    border-radius: 5px;
+}
+
+.hide-desktop {
+    display: none;
+}
+
+@media (max-width: 1024px) {
+    .features-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .features-grid {
+        display: flex;
+        /* Switch to flex for carousel */
+    }
+
+    .hide-desktop {
+        display: flex;
+    }
 }
 
 .feature-card {
     padding: 2.5rem;
     background: var(--bg-card);
-    border-radius: 20px;
+    border-radius: 24px;
     border: 2px solid var(--border-card);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-align: center;
+    /* Center text as requested */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
 }
 
 .feature-card:hover {
@@ -304,8 +438,21 @@ body {
 
 .download-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 2rem;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+    .download-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .download-grid {
+        display: flex;
+        /* Switch to flex for carousel */
+    }
 }
 
 .download-card {
@@ -315,6 +462,25 @@ body {
     border: 2px solid var(--border-card);
     text-align: center;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    /* Align button to bottom */
+    height: 100%;
+}
+
+.download-card h3 {
+    margin-top: 1rem;
+}
+
+.download-card p {
+    flex-grow: 1;
+    /* Push button down */
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    /* Center text vertically if needed */
 }
 
 .download-card:hover {
@@ -370,39 +536,172 @@ body {
     transition: background 0.3s ease;
 }
 
-.faq-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-    gap: 2rem;
+/* FAQ Accordion - Restored */
+.faq-accordion {
+    max-width: 800px;
+    margin: 0 auto;
 }
 
-.faq-item {
-    padding: 2rem;
+.faq-row {
     background: var(--bg-card);
-    border-radius: 16px;
-    border: 2px solid transparent;
-    transition: all 0.3s;
+    border: 2px solid var(--border-card);
+    border-radius: 20px;
+    margin-bottom: 1.25rem;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.faq-item:hover {
+.faq-row:hover {
     border-color: var(--primary);
+    transform: translateY(-2px);
 }
 
-.faq-item h3 {
-    font-size: 1.25rem;
-    font-weight: 700;
+.faq-row.active {
+    border-color: var(--primary);
+    background: rgba(37, 99, 235, 0.02);
+}
+
+.faq-header {
+    width: 100%;
+    padding: 1.75rem 2.5rem;
+    background: transparent;
+    border: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     color: var(--dark);
-    margin-bottom: 1rem;
+    font-size: 1.125rem;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: left;
+    gap: 1.5rem;
 }
 
-.faq-item p {
+.faq-icon {
+    font-size: 1.5rem;
+    color: var(--primary);
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    font-family: monospace;
+}
+
+.faq-row.active .faq-icon {
+    transform: rotate(45deg);
+}
+
+.faq-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.faq-row.active .faq-content {
+    max-height: 300px;
+}
+
+.faq-content p {
+    padding: 0 2.5rem 2.5rem;
     color: var(--gray);
     line-height: 1.8;
 }
 
+/* Steps Carousel Mobile Only */
+@media (max-width: 768px) {
+    .faq-header {
+        padding: 1.5rem;
+        font-size: 1rem;
+    }
+
+    .faq-content p {
+        padding: 0 1.5rem 1.5rem;
+    }
+
+    /* Force carousel for steps on mobile */
+    /* Force carousel for steps on mobile */
+    .steps-carousel .carousel-track {
+        display: flex !important;
+        flex-direction: row !important;
+        /* Force row */
+        flex-wrap: nowrap !important;
+        /* Prevent wrapping inherent from .steps */
+        overflow-x: auto !important;
+        scroll-snap-type: x mandatory;
+        padding-bottom: 2rem;
+        gap: 1rem;
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .steps-carousel .carousel-item {
+        flex: 0 0 100% !important;
+        /* Take full width on mobile for simplicity */
+        width: 100% !important;
+        scroll-snap-align: center;
+        margin-right: 0 !important;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .steps-carousel .carousel-controls {
+        display: flex;
+        justify-content: center;
+        margin-top: 1rem;
+    }
+
+    .steps-carousel .step-arrow {
+        display: none !important;
+    }
+
+    /* Hide arrows specifically for steps carousel on mobile if needed, 
+       but allow them for others like download carousel */
+    .steps-carousel .carousel-btn {
+        display: none;
+    }
+
+    /* Download carousel specific mobile styles */
+    .download-carousel .carousel-track {
+        display: flex;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        padding-bottom: 2rem;
+    }
+
+    .download-carousel .carousel-item {
+        flex: 0 0 85%;
+        scroll-snap-align: center;
+        margin-right: 1rem;
+    }
+
+    .download-carousel .carousel-controls {
+        display: flex;
+        /* Ensure controls are flex */
+        justify-content: center;
+        align-items: center;
+        gap: 1.5rem;
+        margin-top: 1rem;
+    }
+
+    .download-carousel .carousel-btn {
+        display: flex !important;
+        /* Force show arrows for download on mobile */
+        width: 40px;
+        height: 40px;
+        background: var(--bg-card);
+        border: 2px solid var(--border-card);
+        color: var(--primary);
+        border-radius: 50%;
+        justify-content: center;
+        align-items: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        pointer-events: auto;
+    }
+}
+
 /* Footer */
 .footer {
-    padding: 4rem 0 2rem;
+    padding: 2rem 0 2rem;
     background: var(--bg-footer);
     color: var(--dark);
     transition: background 0.3s ease;
@@ -494,17 +793,17 @@ body {
         padding: 4rem 0;
     }
 
-    .steps {
-        flex-direction: column;
-    }
-
-    .step-arrow {
-        transform: rotate(90deg);
-    }
-
+    /* Force row layout for footer links on mobile */
     .footer-links {
-        flex-direction: column;
-        gap: 2rem;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        text-align: left;
+    }
+
+    .footer-brand {
+        text-align: center;
+        margin-bottom: 2rem;
     }
 
     .cta-buttons {
@@ -514,6 +813,11 @@ body {
     .btn {
         width: 100%;
         justify-content: center;
+    }
+
+    /* Ensure How It Works step arrow is hidden in carousel */
+    .steps .step-arrow {
+        display: none;
     }
 }
 
@@ -535,6 +839,14 @@ body {
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    opacity: 1;
+    visibility: visible;
+}
+
+.theme-toggle.hidden {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-20px);
 }
 
 .theme-toggle:hover {

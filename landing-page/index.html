@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <title>Ephchat - Secure Ephemeral Messaging</title>
     <meta name="description"
         content="Private, ephemeral messaging with screenshot protection. Chat, call, and share files without leaving a trace.">
@@ -39,8 +40,7 @@
             <div class="hero-content">
                 <div class="badge">🔒 Privacy First</div>
                 <h1 class="hero-title">Chat Without a Trace</h1>
-                <p class="hero-subtitle">Ephemeral messaging with military-grade privacy. No history, no screenshots, no
-                    surveillance.</p>
+                <p class="hero-subtitle">Ephemeral messaging with privacy. No history</p>
                 <div class="cta-buttons">
                     <a href="https://github.com/cLLeB/ephemeral-chat/releases/download/chapter/app-release.apk"
                         class="btn btn-primary">
@@ -75,38 +75,44 @@
                 <h2>Privacy by Design</h2>
                 <p>Every feature is built to protect your conversations</p>
             </div>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">🔥</div>
-                    <h3>Truly Ephemeral</h3>
-                    <p>Messages disappear when you leave the room. No server-side storage, no message history, no data
-                        retention.</p>
+            <div class="carousel-container features-carousel">
+                <div class="features-grid carousel-track">
+                    <div class="feature-card carousel-item">
+                        <div class="feature-icon">🔥</div>
+                        <h3>Truly Ephemeral</h3>
+                        <p>Messages disappear when you leave the room. No message history, no data retention.</p>
+                    </div>
+                    <div class="feature-card carousel-item">
+                        <div class="feature-icon">📸</div>
+                        <h3>Screenshot Protection</h3>
+                        <p>Blocks screenshots and screen recording. Your conversations stay private.</p>
+                    </div>
+                    <div class="feature-card carousel-item">
+                        <div class="feature-icon">🎭</div>
+                        <h3>Anonymous by Default</h3>
+                        <p>No accounts, no emails, no phone numbers. Just pick a nickname and start chatting.</p>
+                    </div>
+                    <div class="feature-card carousel-item">
+                        <div class="feature-icon">🔐</div>
+                        <h3>End-to-End Encrypted</h3>
+                        <p>Communication is encrypted in transit.</p>
+                    </div>
+                    <div class="feature-card carousel-item">
+                        <div class="feature-icon">📞</div>
+                        <h3>Voice Calls</h3>
+                        <p>High-quality WebRTC peer-to-peer calls </p>
+                    </div>
+                    <div class="feature-card carousel-item">
+                        <div class="feature-icon">📁</div>
+                        <h3>E2ECP File Sharing</h3>
+                        <p>Send photos, videos, and documents with confidence. Files are never stored on our servers.
+                        </p>
+                    </div>
                 </div>
-                <div class="feature-card">
-                    <div class="feature-icon">📸</div>
-                    <h3>Screenshot Protection</h3>
-                    <p>Android & Desktop apps block screenshots and screen recording. Your conversations stay private.
-                    </p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🎭</div>
-                    <h3>Anonymous by Default</h3>
-                    <p>No accounts, no emails, no phone numbers. Just pick a nickname and start chatting.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🔐</div>
-                    <h3>End-to-End Encrypted</h3>
-                    <p>All communication is encrypted in transit using secure WebSocket connections and WebRTC.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">📞</div>
-                    <h3>Voice Calls</h3>
-                    <p>High-quality WebRTC calls with no third-party servers. Peer-to-peer when possible.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">📁</div>
-                    <h3>Secure File Sharing</h3>
-                    <p>Send photos, videos, and documents with confidence. Files are never stored on our servers.</p>
+                <div class="carousel-controls">
+                    <button class="carousel-btn prev" aria-label="Previous">❮</button>
+                    <div class="carousel-dots"></div>
+                    <button class="carousel-btn next" aria-label="Next">❯</button>
                 </div>
             </div>
         </div>
@@ -119,23 +125,30 @@
                 <h2>How It Works</h2>
                 <p>Get started in seconds</p>
             </div>
-            <div class="steps">
-                <div class="step">
-                    <div class="step-number">1</div>
-                    <h3>Create a Room</h3>
-                    <p>Generate a unique room code or use a custom phrase</p>
+            <div class="carousel-container steps-carousel">
+                <div class="steps carousel-track">
+                    <div class="step carousel-item">
+                        <div class="step-number">1</div>
+                        <h3>Create a Room</h3>
+                        <p>Generate a unique room code or use a custom phrase</p>
+                    </div>
+                    <div class="step-arrow">→</div>
+                    <div class="step carousel-item">
+                        <div class="step-number">2</div>
+                        <h3>Share the Code</h3>
+                        <p>Send the room code to your friends via any channel</p>
+                    </div>
+                    <div class="step-arrow">→</div>
+                    <div class="step carousel-item">
+                        <div class="step-number">3</div>
+                        <h3>Start Chatting</h3>
+                        <p>Messages totally disappear</p>
+                    </div>
                 </div>
-                <div class="step-arrow">→</div>
-                <div class="step">
-                    <div class="step-number">2</div>
-                    <h3>Share the Code</h3>
-                    <p>Send the room code to your friends via any channel</p>
-                </div>
-                <div class="step-arrow">→</div>
-                <div class="step">
-                    <div class="step-number">3</div>
-                    <h3>Start Chatting</h3>
-                    <p>Messages disappear when everyone leaves the room</p>
+                <div class="carousel-controls hide-desktop">
+                    <button class="carousel-btn prev" aria-label="Previous">❮</button>
+                    <div class="carousel-dots"></div>
+                    <button class="carousel-btn next" aria-label="Next">❯</button>
                 </div>
             </div>
         </div>
@@ -148,61 +161,68 @@
                 <h2>Download Ephchat</h2>
                 <p>Available on all your devices</p>
             </div>
-            <div class="download-grid">
-                <div class="download-card">
-                    <div class="download-icon">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-                            <line x1="12" y1="18" x2="12.01" y2="18"></line>
-                        </svg>
+            <div class="carousel-container download-carousel">
+                <div class="download-grid carousel-track">
+                    <div class="download-card carousel-item">
+                        <div class="download-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                                <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                            </svg>
+                        </div>
+                        <h3>Android</h3>
+                        <p>APK for Android 8.0+</p>
+                        <a href="https://github.com/cLLeB/ephemeral-chat/releases/download/chapter/app-release.apk"
+                            class="download-btn">Download APK</a>
                     </div>
-                    <h3>Android</h3>
-                    <p>APK for Android 8.0+</p>
-                    <a href="https://github.com/cLLeB/ephemeral-chat/releases/download/chapter/app-release.apk"
-                        class="download-btn">Download APK</a>
+                    <div class="download-card carousel-item">
+                        <div class="download-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                <line x1="8" y1="21" x2="16" y2="21"></line>
+                                <line x1="12" y1="17" x2="12" y2="21"></line>
+                            </svg>
+                        </div>
+                        <h3>Windows</h3>
+                        <p>Installer for Windows</p>
+                        <a href="https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.1/Ephemeral-Chat-1.1.1-win.exe"
+                            class="download-btn">Download .exe</a>
+                    </div>
+                    <div class="download-card carousel-item">
+                        <div class="download-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                <line x1="8" y1="21" x2="16" y2="21"></line>
+                                <line x1="12" y1="17" x2="12" y2="21"></line>
+                            </svg>
+                        </div>
+                        <h3>macOS</h3>
+                        <p>DMG for macOS</p>
+                        <a href="https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.1/Ephemeral-Chat-1.1.1-mac-arm64.dmg"
+                            class="download-btn">Download .dmg</a>
+                    </div>
+                    <div class="download-card carousel-item">
+                        <div class="download-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                <line x1="8" y1="21" x2="16" y2="21"></line>
+                                <line x1="12" y1="17" x2="12" y2="21"></line>
+                            </svg>
+                        </div>
+                        <h3>Linux</h3>
+                        <p>AppImage for Linux</p>
+                        <a href="https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.1/Ephemeral-Chat-1.1.1-linux-x86_64.AppImage"
+                            class="download-btn">Download AppImage</a>
+                    </div>
                 </div>
-                <div class="download-card">
-                    <div class="download-icon">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                            <line x1="8" y1="21" x2="16" y2="21"></line>
-                            <line x1="12" y1="17" x2="12" y2="21"></line>
-                        </svg>
-                    </div>
-                    <h3>Windows</h3>
-                    <p>Installer for Windows 10/11</p>
-                    <a href="https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.1/Ephemeral-Chat-1.1.1-win.exe"
-                        class="download-btn">Download .exe</a>
-                </div>
-                <div class="download-card">
-                    <div class="download-icon">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                            <line x1="8" y1="21" x2="16" y2="21"></line>
-                            <line x1="12" y1="17" x2="12" y2="21"></line>
-                        </svg>
-                    </div>
-                    <h3>macOS</h3>
-                    <p>DMG for macOS 11+</p>
-                    <a href="https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.1/Ephemeral-Chat-1.1.1-mac-arm64.dmg"
-                        class="download-btn">Download .dmg</a>
-                </div>
-                <div class="download-card">
-                    <div class="download-icon">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                            <line x1="8" y1="21" x2="16" y2="21"></line>
-                            <line x1="12" y1="17" x2="12" y2="21"></line>
-                        </svg>
-                    </div>
-                    <h3>Linux</h3>
-                    <p>AppImage for Linux</p>
-                    <a href="https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.1/Ephemeral-Chat-1.1.1-linux-x86_64.AppImage"
-                        class="download-btn">Download AppImage</a>
+                <div class="carousel-controls hide-desktop">
+                    <button class="carousel-btn prev" aria-label="Previous">❮</button>
+                    <div class="carousel-dots"></div>
+                    <button class="carousel-btn next" aria-label="Next">❯</button>
                 </div>
             </div>
         </div>
@@ -214,21 +234,36 @@
             <div class="section-header">
                 <h2>Frequently Asked Questions</h2>
             </div>
-            <div class="faq-grid">
-                <div class="faq-item">
-                    <h3>How does screenshot protection work?</h3>
-                    <p>The Android and Desktop apps use platform-specific APIs to block screenshot capture and screen
-                        recording while the app is active.</p>
+            <div class="faq-accordion">
+                <div class="faq-row">
+                    <button class="faq-header">
+                        How does screenshot protection work?
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-content">
+                        <p>The Android and Desktop apps use platform-specific APIs to block screenshot capture and
+                            screen recording while the app is active.</p>
+                    </div>
                 </div>
-                <div class="faq-item">
-                    <h3>Where are messages stored?</h3>
-                    <p>Messages are only stored in memory and are never written to disk. They disappear when all
-                        participants leave the room.</p>
+                <div class="faq-row">
+                    <button class="faq-header">
+                        Where are messages stored?
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-content">
+                        <p>Messages are never stored on our servers. They exist only on your device
+                            while the chat is open and disappear instantly.</p>
+                    </div>
                 </div>
-                <div class="faq-item">
-                    <h3>Is it end-to-end encrypted?</h3>
-                    <p>All communication uses secure WebSocket connections (WSS) and WebRTC for calls. We're working on
-                        adding E2EE for an extra layer of security.</p>
+                <div class="faq-row">
+                    <button class="faq-header">
+                        Is it end-to-end encrypted?
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-content">
+                        <p>Yes. All communication is end-to-end encrypted using industry-standard protocols. Your
+                            messages and calls are private and secure.</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -238,10 +273,7 @@
     <footer class="footer">
         <div class="container">
             <div class="footer-content">
-                <div class="footer-brand">
-                    <h3>Ephchat</h3>
-                    <p>Privacy-first messaging for everyone</p>
-                </div>
+
                 <div class="footer-links">
                     <div class="footer-column">
                         <h4>Product</h4>
