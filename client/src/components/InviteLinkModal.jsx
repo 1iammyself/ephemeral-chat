@@ -296,7 +296,7 @@ Verbal Code: ${verbalCode || 'N/A'}`;
                         </CopyToClipboard>
                       </div>
                       <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-                        Share this code verbally — others can type it to join.
+                        Share this code, others can type it to join.
                       </p>
                     </div>
                   )}
