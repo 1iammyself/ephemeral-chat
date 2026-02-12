@@ -1848,13 +1848,14 @@ io.on('connection', (socket) => {
   });
 
   // File Transfer Wake-Up Signal
-  socket.on('file-transfer-intent', ({ roomCode, recipients }) => {
+  socket.on('file-transfer-intent', ({ roomCode, recipients, senderId }) => {
     if (!socket.roomCode || socket.roomCode !== roomCode) return;
 
     const from = socket.nickname || 'Unknown';
-    const fromId = socket.id;
+    // Use the stable senderId if provided (to survive reconnects), otherwise socket.id
+    const fromId = senderId || socket.id;
 
-    logger.info(`📁 [File Transfer Intent] From: ${from} (${fromId}) recipients: ${recipients?.length || 'all'}`);
+    logger.info(`📁 [File Transfer Intent] From: ${from} (Socket: ${socket.id}, Stable: ${fromId}) recipients: ${recipients?.length || 'all'}`);
 
     const payload = {
       from,

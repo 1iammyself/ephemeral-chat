@@ -16,8 +16,9 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNick
     // State for the dynamic file server URL
     const [fileServerUrl, setFileServerUrl] = useState(null);
 
-    // Get current User ID (socket ID) to ensure consistent identity
-    const myId = socketManager.socket?.id || '';
+    // Get stable User ID (socket ID at mount) to ensure consistent identity across reconnects
+    // This prevents the iframe from reloading if the socket ID changes (e.g. mobile app switch)
+    const [myId] = useState(() => socketManager.socket?.id || `user_${Math.random().toString(36).substr(2, 9)}`);
 
     // Construct recipients string
     const recipientsStr = recipients.length > 0 ? recipients.join(',') : '';
@@ -35,8 +36,17 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNick
             // isLoading will be handled by iframe onLoad, but we can also set it here if we want to show loading until server is up
         };
 
+        const handleReconnect = () => {
+            // If socket reconnects, re-register our intent to transfer
+            // but keep the same myId for the iframe
+            if (socketManager.socket) {
+                socketManager.socket.emit('file-transfer-start');
+            }
+        };
+
         if (socketManager.socket) {
             socketManager.socket.on('file-server-ready', handleServerReady);
+            socketManager.socket.on('connect', handleReconnect); // Re-register on reconnect
 
             // 2. Request File Server Start
             socketManager.socket.emit('file-transfer-start');
@@ -44,7 +54,8 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNick
             // 3. Send "Wake Up" signal to chat room peers (notify intent)
             socketManager.socket.emit('file-transfer-intent', {
                 roomCode,
-                recipients: recipients
+                recipients: recipients,
+                senderId: myId // Send our stable ID
             });
         }
 
@@ -52,6 +63,7 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNick
             // Cleanup
             if (socketManager.socket) {
                 socketManager.socket.off('file-server-ready', handleServerReady);
+                socketManager.socket.off('connect', handleReconnect);
                 socketManager.socket.emit('file-transfer-end');
             }
         };

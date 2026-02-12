@@ -1,0 +1,27 @@
+﻿
+> ephemeral-chat@1.1.1 build:win:store
+> electron-builder --win appx --x64 --arm64
+
+  ΓÇó electron-builder  version=24.13.3 os=10.0.26200
+  ΓÇó loaded configuration  file=package.json ("build" field)
+  Γ¿» Invalid configuration object. electron-builder 24.13.3 has been initialized using a configuration object that does not match the API schema.
+ - configuration.appx has an unknown property 'minVersion'. These properties are valid:
+   object { addAutoLaunchExtension?, applicationId?, artifactName?, backgroundColor?, customExtensionsPath?, displayName?, electronUpdaterAware?, identityName?, languages?, makeappxArgs?, publish?, publisher?, publisherDisplayName?, setBuildNumber?, showNameOnTiles? }
+     How to fix:
+     1. Open https://www.electron.build/configuration/appx
+     2. Search the option name on the page (or type in into Search to find across the docs).
+       * Not found? The option was deprecated or not exists (check spelling).
+       * Found? Check that the option in the appropriate place. e.g. "title" only in the "dmg", not in the root.
+  failedTask=build stackTrace=ValidationError: Invalid configuration object. electron-builder 24.13.3 has been initialized using a configuration object that does not match the API schema.
+ - configuration.appx has an unknown property 'minVersion'. These properties are valid:
+   object { addAutoLaunchExtension?, applicationId?, artifactName?, backgroundColor?, customExtensionsPath?, displayName?, electronUpdaterAware?, identityName?, languages?, makeappxArgs?, publish?, publisher?, publisherDisplayName?, setBuildNumber?, showNameOnTiles? }
+     How to fix:
+     1. Open https://www.electron.build/configuration/appx
+     2. Search the option name on the page (or type in into Search to find across the docs).
+       * Not found? The option was deprecated or not exists (check spelling).
+       * Found? Check that the option in the appropriate place. e.g. "title" only in the "dmg", not in the root.
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      at validate (C:\Users\kyere\Documents\codes\ephemeral-chat\electron-app\node_modules\@develar\schema-utils\dist\validate.js:86:11)
+    at validateConfig (C:\Users\kyere\Documents\codes\ephemeral-chat\electron-app\node_modules\app-builder-lib\src\util\config.ts:240:3)
+    at Packager._build (C:\Users\kyere\Documents\codes\ephemeral-chat\electron-app\node_modules\app-builder-lib\src\packager.ts:345:5)
+    at Packager.build (C:\Users\kyere\Documents\codes\ephemeral-chat\electron-app\node_modules\app-builder-lib\src\packager.ts:340:12)
+    at executeFinally (C:\Users\kyere\Documents\codes\ephemeral-chat\electron-app\node_modules\builder-util\src\promise.ts:12:14)
