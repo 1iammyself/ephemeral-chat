@@ -105,19 +105,19 @@ function InviteHandler() {
 
   const getDownloadUrl = () => {
     const userAgent = navigator.userAgent.toLowerCase();
-    const repoBase = 'https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.1';
+    const repoBase = 'https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.2';
 
     // Using hyphenated filenames seen in the GitHub release image
     if (userAgent.indexOf('win') !== -1) {
-      return `${repoBase}/Ephemeral-Chat-1.1.1-win.exe`;
+      return `${repoBase}/Ephemeral-Chat-1.1.2-win.exe`;
     }
     if (userAgent.indexOf('mac') !== -1) {
-      return `${repoBase}/Ephemeral-Chat-1.1.1-mac-arm64.dmg`;
+      return `${repoBase}/Ephemeral-Chat-1.1.2-mac-arm64.dmg`;
     }
     if (userAgent.indexOf('linux') !== -1) {
-      return `${repoBase}/Ephemeral-Chat-1.1.1-linux-x86_64.AppImage`;
+      return `${repoBase}/Ephemeral-Chat-1.1.2-linux-x86_64.AppImage`;
     }
-    return 'https://github.com/1iammyself/ephemeral-chat/releases/tag/v1.1.1';
+    return 'https://github.com/1iammyself/ephemeral-chat/releases/tag/v1.1.2';
   };
 
   return (
