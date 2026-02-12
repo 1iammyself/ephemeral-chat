@@ -7,7 +7,7 @@ const PrivacyPolicy = () => {
     const navigate = useNavigate();
 
     return (
-        <div className="h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-y-auto scrollbar-thin">
+        <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-y-auto scrollbar-thin flex flex-col">
             {/* Header */}
             <header className="sticky top-0 z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
                 <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -20,7 +20,7 @@ const PrivacyPolicy = () => {
                     </button>
                     <div className="flex items-center gap-2">
                         <Shield className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-                        <h1 className="text-xl font-bold tracking-tight">Privacy Policy</h1>
+                        <h1 className="text-lg sm:text-xl font-bold tracking-tight">Privacy Policy</h1>
                     </div>
                     <div className="flex items-center gap-2">
                         <ThemeToggle />
@@ -28,15 +28,15 @@ const PrivacyPolicy = () => {
                 </div>
             </header>
 
-            <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                <div className="space-y-12">
+            <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex-grow">
+                <div className="space-y-8 sm:space-y-12">
                     {/* Hero Section */}
                     <header className="prose prose-indigo dark:prose-invert max-w-none border-b border-gray-100 dark:border-gray-800 pb-8">
-                        <h1 className="text-3xl font-extrabold mb-4">Privacy Policy for Ephemeral Chat</h1>
+                        <h1 className="text-2xl sm:text-3xl font-extrabold mb-4">Privacy Policy for Ephemeral Chat</h1>
                         <div className="inline-flex items-center px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-sm font-medium mb-6">
                             Last Updated: February 5, 2026
                         </div>
-                        <p className="text-xl leading-relaxed text-gray-600 dark:text-gray-400 font-medium italic">
+                        <p className="text-lg sm:text-xl leading-relaxed text-gray-600 dark:text-gray-400 font-medium italic">
                             Ephemeral Chat ("the App") is built with a "Privacy by Design" philosophy. Our goal is to provide a secure, anonymous communication platform where your data stays yours.
                         </p>
                     </header>
@@ -68,8 +68,35 @@ const PrivacyPolicy = () => {
                             <Smartphone className="w-6 h-6 text-indigo-600" /> 2. Device Permissions
                         </h2>
                         <p className="mb-4 text-gray-600 dark:text-gray-400">The App requires the following permissions to function:</p>
-                        <div className="overflow-hidden border border-gray-200 dark:border-gray-800 rounded-2xl overflow-x-auto">
-                            <table className="w-full text-left border-collapse min-w-[600px]">
+
+                        {/* Mobile view for permissions */}
+                        <div className="md:hidden space-y-4">
+                            {[
+                                { name: "Internet Access", purpose: "Required to connect to chat rooms and transmit messages/calls.", handling: "Encrypted data transmitted to our relay servers." },
+                                { name: "Microphone", purpose: "Used only when you explicitly start a voice call or record a voice note.", handling: "Audio is transmitted peer-to-peer or processed for immediate delivery and is not recorded by the developer." },
+                                { name: "Camera", purpose: "Used only when you explicitly capture a photo to share in chat.", handling: "Photos are encrypted and transmitted directly to chat recipients. We do not store or access your photos." },
+                                { name: "File Access", purpose: "Used when you choose to send or receive files in chat.", handling: "Files are encrypted end-to-end and transmitted directly between users. We do not store or access your files." },
+                                { name: "Local Storage", purpose: "Used to optionally save chat history locally on your device (if you enable persistent mode).", handling: "Data is stored only on your device and is never uploaded to our servers." }
+                            ].map((perm, idx) => (
+                                <div key={idx} className="p-5 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700">
+                                    <h3 className="font-bold text-indigo-600 dark:text-indigo-400 mb-2">{perm.name}</h3>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Purpose</span>
+                                            <p className="text-sm font-medium mt-0.5">{perm.purpose}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Data Handling</span>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{perm.handling}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Desktop view for permissions */}
+                        <div className="hidden md:block overflow-hidden border border-gray-200 dark:border-gray-800 rounded-2xl">
+                            <table className="w-full text-left border-collapse">
                                 <thead className="bg-gray-50 dark:bg-gray-800">
                                     <tr>
                                         <th className="p-4 font-bold border-b border-gray-200 dark:border-gray-700">Permission</th>
@@ -108,7 +135,7 @@ const PrivacyPolicy = () => {
                         </div>
                     </section>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
                         {/* 3. Data Encryption */}
                         <section>
                             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
@@ -159,7 +186,7 @@ const PrivacyPolicy = () => {
                     </div>
 
                     {/* 7. Data Retention */}
-                    <section className="p-8 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-3xl border border-indigo-100/50 dark:border-indigo-800/50">
+                    <section className="p-6 md:p-8 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-3xl border border-indigo-100/50 dark:border-indigo-800/50">
                         <h2 className="text-2xl font-bold mb-6">7. Data Retention</h2>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="flex flex-col p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm">
@@ -181,7 +208,7 @@ const PrivacyPolicy = () => {
                         </div>
                     </section>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 pt-8">
                         {/* 8. Children's Privacy */}
                         <section>
                             <h2 className="text-xl font-bold mb-4 underline decoration-indigo-500/30 underline-offset-8">8. Children's Privacy</h2>
