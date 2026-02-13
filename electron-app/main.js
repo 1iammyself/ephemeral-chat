@@ -811,6 +811,10 @@ function createMenu() {
           click: () => showAboutDialog()
         },
         {
+          label: 'Third-Party Licenses',
+          click: () => showLicensesDialog()
+        },
+        {
           label: 'Visit GitHub',
           click: () => shell.openExternal('https://github.com/cLLeB/ephemeral-chat')
         },
@@ -860,6 +864,27 @@ function showAboutDialog() {
     detail: `Version: ${app.getVersion()}\nElectron: ${process.versions.electron}\nChrome: ${process.versions.chrome}\nNode.js: ${process.versions.node}\n\nSecure, temporary chat rooms that vanish when you're done.\n\nNo accounts. No history. Just conversation.`,
     buttons: ['OK'],
     icon: path.join(__dirname, 'icons', 'icon.png')
+  });
+}
+
+function showLicensesDialog() {
+  const fs = require('fs');
+  const licensePath = path.join(__dirname, 'LICENSE-E2ECP.txt');
+  let licenseText = '';
+
+  try {
+    licenseText = fs.readFileSync(licensePath, 'utf8');
+  } catch (err) {
+    console.error('Failed to read license file:', err);
+    licenseText = 'License file reference: LICENSE-E2ECP.txt (included in application root)';
+  }
+
+  dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: 'Third-Party Licenses',
+    message: 'Third-Party Licenses',
+    detail: `This product includes software developed by schollz/e2ecp licensed under the MIT License.\n\n${licenseText}`,
+    buttons: ['OK']
   });
 }
 

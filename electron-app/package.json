@@ -39,7 +39,8 @@
       "main.js",
       "preload.js",
       "icons/**/*",
-      "sounds/**/*"
+      "sounds/**/*",
+      "LICENSE-E2ECP.txt"
     ],
     "publish": {
       "provider": "github",
