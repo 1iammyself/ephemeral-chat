@@ -111,15 +111,7 @@
     -moz-user-select: none;
   }
 
-  /* Utility to hide scrollbars but keep functionality */
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
 
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
 
   /* Hide password echo (no dots) while keeping placeholder visible */
   .input-no-echo {
@@ -528,4 +520,14 @@ cap-widget {
     padding-bottom: 80px;
     /* Approximate input height */
   }
+}
+
+/* Utility to hide scrollbars but keep functionality - High Priority */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
 }
