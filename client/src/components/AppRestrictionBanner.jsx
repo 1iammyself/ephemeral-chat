@@ -9,7 +9,7 @@ const DESKTOP_DOWNLOADS = {
     win: `${REPO_BASE}/Ephemeral-Chat-1.1.2-win.exe`,
     mac: `${REPO_BASE}/Ephemeral-Chat-1.1.2-mac-arm64.dmg`,
     linux: `${REPO_BASE}/Ephemeral-Chat-1.1.2-linux-x86_64.AppImage`,
-    fallback: 'https://github.com/1iammyself/ephemeral-chat/releases/tag/v1.1.2'
+    fallback: 'https://ephchat.kyere.me'
 };
 
 const AppRestrictionBanner = () => {

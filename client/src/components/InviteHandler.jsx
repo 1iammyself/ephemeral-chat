@@ -117,7 +117,7 @@ function InviteHandler() {
     if (userAgent.indexOf('linux') !== -1) {
       return `${repoBase}/Ephemeral-Chat-1.1.2-linux-x86_64.AppImage`;
     }
-    return 'https://github.com/1iammyself/ephemeral-chat/releases/tag/v1.1.2';
+    return 'https://ephchat.kyere.me';
   };
 
   return (

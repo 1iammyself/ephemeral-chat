@@ -65,8 +65,8 @@ We may update this Privacy Policy from time to time. Any changes will be posted 
 ## 10. Contact
 
 If you have any questions about this Privacy Policy, you can reach out via:
-- **GitHub:** https://github.com/1iammyself/ephemeral-chat
-- **Website:** https://chat.kyere.me
+- **GitHub:** https://github.com/cLLeB/ephemeral-chat
+- **Website:** https://ephchat.kyere.me
 
 ---
 
