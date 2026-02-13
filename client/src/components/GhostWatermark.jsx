@@ -74,7 +74,7 @@ const GhostWatermark = ({ nickname }) => {
 
     // Create 150 items to fill the oversized grid
     const items = Array.from({ length: 150 }).map((_, i) => (
-        <div key={i} className="watermark-item">
+        <div key={i} className="watermark-item font-forensic">
             {displayText}
         </div>
     ));

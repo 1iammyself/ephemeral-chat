@@ -96,7 +96,8 @@ const TraceHashModal = ({ onClose }) => {
                                         value={targetHash}
                                         onChange={(e) => setTargetHash(e.target.value)}
                                         placeholder="e.g. 3FC4CCFE7458"
-                                        className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono uppercase"
+                                        maxLength={12}
+                                        className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-forensic uppercase tracking-wider"
                                         required
                                     />
                                 </div>
@@ -153,7 +154,9 @@ const TraceHashModal = ({ onClose }) => {
                                             {results.found ? 'Match Found' : 'No Match Detected'}
                                         </h3>
                                         <p className={`text-sm mt-1 ${results.found ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                                            Target: <span className="font-mono font-bold uppercase">{results.targetHash}</span>
+                                            <p className={`text-sm mt-1 ${results.found ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
+                                                Target: <span className="font-forensic font-bold uppercase tracking-wide">{results.targetHash}</span>
+                                            </p>
                                         </p>
                                     </div>
                                 </div>
