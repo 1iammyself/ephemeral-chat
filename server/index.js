@@ -1172,10 +1172,50 @@ io.on('connection', (socket) => {
 
           // Cancel any pending deferred removal for this session
           const deferred = deferredRemovals.get(sessionToken);
+          const oldSocketId = deferred?.socketId;
           if (deferred) {
             clearTimeout(deferred.timeoutId);
             deferredRemovals.delete(sessionToken);
             logger.info(`✅ Cancelled deferred removal for session ${sessionToken.substring(0, 8)}…`);
+          }
+
+          // ── Evict old stale socket to prevent duplicate nicknames ──
+          // The old socket may still be in the adapter room if disconnect processing raced
+          // with this reconnect. Force-remove it and notify other clients.
+          if (oldSocketId && oldSocketId !== socket.id) {
+            const oldSocket = io.sockets.sockets.get(oldSocketId);
+            if (oldSocket) {
+              oldSocket.leave(roomCode);
+              oldSocket.roomCode = null;
+              oldSocket.nickname = null;
+            }
+            // Notify other clients so they remove the ghost entry from their user list
+            io.to(roomCode).emit('user-left', {
+              nickname: nickname || session.nickname,
+              socketId: oldSocketId
+            });
+            logger.info(`🧹 Evicted old socket ${oldSocketId} for reconnecting user`);
+          }
+
+          // Also scan for ANY other deferred removals that match the same userId
+          // (handles edge case of multiple rapid reconnects)
+          for (const [token, def] of deferredRemovals.entries()) {
+            if (token !== sessionToken && def.roomCode === roomCode && def.socketId !== socket.id) {
+              // Check if this deferred removal belongs to the same user
+              const defSession = securityManager.validateSession(token);
+              if (defSession && defSession.userId && defSession.userId === (userId || socket.id)) {
+                clearTimeout(def.timeoutId);
+                const staleId = def.socketId;
+                const staleSocket = io.sockets.sockets.get(staleId);
+                if (staleSocket) {
+                  staleSocket.leave(roomCode);
+                  staleSocket.roomCode = null;
+                }
+                io.to(roomCode).emit('user-left', { nickname: nickname || session.nickname, socketId: staleId });
+                deferredRemovals.delete(token);
+                logger.info(`🧹 Evicted additional stale socket ${staleId} for same user`);
+              }
+            }
           }
 
           // Clear from disconnected sessions tracking (successful reconnect)
@@ -1187,18 +1227,29 @@ io.on('connection', (socket) => {
 
           const room = await roomManager.getRoom(roomCode);
           if (room) {
-            // Re-add user to room if they were removed during disconnect
+            // ── Deduplicate: remove any stale entries for same user before re-adding ──
+            const reconnectNickname = socket.nickname;
+            const reconnectUserId = userId || socket.id;
+            const beforeCount = room.users.length;
+            room.users = room.users.filter(u =>
+              u.socketId === socket.id || // keep the current socket entry if it exists
+              (u.nickname !== reconnectNickname && u.id !== reconnectUserId) // keep unrelated users
+            );
+            if (room.users.length !== beforeCount) {
+              logger.info(`🧹 Removed ${beforeCount - room.users.length} stale user entry(ies) for ${reconnectNickname} during session resumption`);
+            }
+
+            // Re-add user to room if not already present
             const existingUser = room.users.find(u => u.socketId === socket.id);
             if (!existingUser) {
-              // User was removed, re-add them
               room.users.push({
-                id: userId || socket.id,
+                id: reconnectUserId,
                 socketId: socket.id,
-                nickname: socket.nickname,
+                nickname: reconnectNickname,
                 joinedAt: new Date().toISOString()
               });
-              await roomManager.saveRoom(roomCode, room);
             }
+            await roomManager.saveRoom(roomCode, room);
 
             const timeoutMs = await roomManager.getRoomTimeout(roomCode);
             securityManager.registerUserActivity(socket.id, userId || socket.id, roomCode, handleInactivityTimeout, timeoutMs);

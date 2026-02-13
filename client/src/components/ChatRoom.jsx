@@ -753,7 +753,11 @@ const ChatRoom = () => {
 
     const handleUserJoined = ({ user, roomUsers }) => {
       if (Array.isArray(roomUsers)) setUsers(roomUsers);
-      else if (user?.socketId) setUsers(prev => prev.some(u => u.socketId === user.socketId) ? prev : [...prev, user]);
+      else if (user?.socketId) setUsers(prev => {
+        // Remove any existing entry with the same nickname (stale socket from reconnect)
+        const filtered = prev.filter(u => u.socketId === user.socketId ? false : u.nickname !== user.nickname);
+        return [...filtered, user];
+      });
 
       const displayName = user?.nickname || 'Someone';
       const log = { id: `log_${Date.now()}`, type: 'join', content: `${displayName} joined the room`, timestamp: new Date().toISOString() };
