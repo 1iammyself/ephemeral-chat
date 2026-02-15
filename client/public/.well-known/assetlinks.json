@@ -1,13 +1,15 @@
 [
   {
     "relation": [
-      "delegate_permission/common.handle_all_urls"
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
     ],
     "target": {
       "namespace": "android_app",
       "package_name": "me.kyere.chat",
       "sha256_cert_fingerprints": [
-        "C7:C1:5D:3E:94:06:EB:EA:0E:5A:FF:5D:3F:A9:97:B7:C6:2C:9C:ED:17:8F:9B:C0:9F:8D:38:F9:3A:4D:A4:79"
+        "C7:C1:5D:3E:94:06:EB:EA:0E:5A:FF:5D:3F:A9:97:B7:C6:2C:9C:ED:17:8F:9B:C0:9F:8D:38:F9:3A:4D:A4:79",
+        "C7:C1:5D:3E:94:06:E8:EA:0E:5A:FF:5D:3F:A9:97:B7:C6:2C:9C:ED:17:BF:9B:C0:9F:0D:38:F9:3A:4D:A4:79"
       ]
     }
   }
