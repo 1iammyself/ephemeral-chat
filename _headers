@@ -1,0 +1,13 @@
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: same-origin
+  Permissions-Policy: geolocation=(), microphone=(self), camera=(self)
+
+/.well-known/assetlinks.json
+  Content-Type: application/json
+  Access-Control-Allow-Origin: *
+
+/.well-known/apple-app-site-association
+  Content-Type: application/json
+  Access-Control-Allow-Origin: *

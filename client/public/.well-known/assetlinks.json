@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.ephemeralchat.twa",
+      "sha256_cert_fingerprints": [
+        "E1:DE:29:60:38:2F:82:99:11:55:85:BB:2C:BB:6D:A8:C2:7B:BD:AC:E4:8E:00:2F:91:F6:94:FF:F0:D5:B9:12"
+      ]
+    }
+  }
+]
