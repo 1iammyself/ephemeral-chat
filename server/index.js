@@ -89,6 +89,14 @@ app.use((req, res, next) => {
   next();
 });
 
+// Serve static files from .well-known directory (for Digital Asset Links)
+app.use('/.well-known', express.static(path.join(__dirname, '../client/public/.well-known')));
+
+// Serve static files from the client dist directory in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../client/dist')));
+}
+
 // Middleware for Safari Audio compatibility
 app.use((req, res, next) => {
   if (req.path.endsWith('.mp4')) {
