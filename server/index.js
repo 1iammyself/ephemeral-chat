@@ -1239,6 +1239,38 @@ io.on('connection', (socket) => {
             const reconnectNickname = socket.nickname;
             const reconnectUserId = userId || socket.id;
             const beforeCount = room.users.length;
+
+            // Transfer roles from stale records to the new socket ID in roomData
+            const staleUsers = room.users.filter(u =>
+              u.socketId !== socket.id &&
+              (u.nickname === reconnectNickname || u.id === reconnectUserId)
+            );
+
+            if (staleUsers.length > 0 && roomData[roomCode]) {
+              staleUsers.forEach(stale => {
+                // Transfer host status
+                if (roomData[roomCode].hostId === stale.socketId) {
+                  roomData[roomCode].hostId = socket.id;
+                  logger.info(`👑 Transferred host status from ${stale.socketId} to ${socket.id} for ${reconnectNickname}`);
+                }
+                // Transfer other roles (admin, mod, tier1, tier2, etc.)
+                if (roomData[roomCode].userRoles && roomData[roomCode].userRoles[stale.socketId]) {
+                  roomData[roomCode].userRoles[socket.id] = roomData[roomCode].userRoles[stale.socketId];
+                  delete roomData[roomCode].userRoles[stale.socketId];
+                  logger.info(`🛡️ Transferred role ${roomData[roomCode].userRoles[socket.id]} to ${socket.id} for ${reconnectNickname}`);
+                }
+
+                // Cancel pending deferred removals to prevent delayed role stripping
+                for (const [token, def] of deferredRemovals.entries()) {
+                  if (def.socketId === stale.socketId) {
+                    clearTimeout(def.timeoutId);
+                    deferredRemovals.delete(token);
+                    logger.info(`✅ Cancelled deferred removal for stale socket ${stale.socketId} during Session Resumption`);
+                  }
+                }
+              });
+            }
+
             room.users = room.users.filter(u =>
               u.socketId === socket.id || // keep the current socket entry if it exists
               (u.nickname !== reconnectNickname && u.id !== reconnectUserId) // keep unrelated users
@@ -1334,8 +1366,38 @@ io.on('connection', (socket) => {
       // This prevents "username taken" errors when a user reconnects with the same name
       const roomObj = await roomManager.getRoom(roomCode);
       if (roomObj && roomObj.users) {
+        // Find stale sockets (disconnected)
         const staleUsers = roomObj.users.filter(u => !io.sockets.sockets.has(u.socketId));
+
         if (staleUsers.length > 0) {
+          // If any of the stale sockets map to the connecting user (same nickname or ID), transfer roles
+          const reconnectNickname = userNickname;
+          const reconnectUserId = userId || socket.id;
+
+          const myStaleUsers = staleUsers.filter(u => u.nickname === reconnectNickname || u.id === reconnectUserId);
+          if (myStaleUsers.length > 0 && roomData[roomCode]) {
+            myStaleUsers.forEach(stale => {
+              if (roomData[roomCode].hostId === stale.socketId) {
+                roomData[roomCode].hostId = socket.id;
+                logger.info(`👑 Transferred host status from ${stale.socketId} to ${socket.id} for ${reconnectNickname} (Standard Join)`);
+              }
+              if (roomData[roomCode].userRoles && roomData[roomCode].userRoles[stale.socketId]) {
+                roomData[roomCode].userRoles[socket.id] = roomData[roomCode].userRoles[stale.socketId];
+                delete roomData[roomCode].userRoles[stale.socketId];
+                logger.info(`🛡️ Transferred role ${roomData[roomCode].userRoles[socket.id]} to ${socket.id} for ${reconnectNickname} (Standard Join)`);
+              }
+
+              // Cancel pending deferred removals to prevent delayed role stripping
+              for (const [token, def] of deferredRemovals.entries()) {
+                if (def.socketId === stale.socketId) {
+                  clearTimeout(def.timeoutId);
+                  deferredRemovals.delete(token);
+                  logger.info(`✅ Cancelled deferred removal for stale socket ${stale.socketId} during Standard Join`);
+                }
+              }
+            });
+          }
+
           logger.info(`🧹 Cleaning ${staleUsers.length} stale user(s) from room ${roomCode}: ${staleUsers.map(u => u.nickname).join(', ')}`);
           roomObj.users = roomObj.users.filter(u => io.sockets.sockets.has(u.socketId));
           await roomManager.saveRoom(roomCode, roomObj);
