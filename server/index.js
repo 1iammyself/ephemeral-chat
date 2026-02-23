@@ -1480,7 +1480,7 @@ io.on('connection', (socket) => {
       }
 
       // Support for text, image, audio, and file messages
-      let { content, messageType = 'text', isViewOnce = false, imageData, pollData, recipients = [], replyTo, isEncrypted, iv, fileName, mimeType, fileSize } = data;
+      let { content, messageType = 'text', isViewOnce = false, imageData, pollData, recipients = [], replyTo, isEncrypted, iv, fileName, mimeType, fileSize, isAnonymous } = data;
 
       // Normalize content/imageData: If it's an image and content is provided but imageData isn't, use content for imageData
       if (messageType === 'image' && !imageData && content) {
@@ -1587,6 +1587,40 @@ io.on('connection', (socket) => {
           options: sanitizedOptions,
           allowMultiple: !!pollData.allowMultiple
         };
+      } else if (messageType === 'game') {
+        const { gameData } = data;
+        if (!gameData || !gameData.gameType) {
+          socket.emit('error', { message: 'Invalid game data' });
+          return;
+        }
+        if (gameData.gameType === 'would-you-rather') {
+          if (!gameData.optionA || !gameData.optionB) {
+            socket.emit('error', { message: 'WYR requires two options' });
+            return;
+          }
+          data.gameData = {
+            gameType: gameData.gameType,
+            optionA: sanitizeInput(gameData.optionA),
+            optionB: sanitizeInput(gameData.optionB),
+            answers: {}
+          };
+        } else if (gameData.gameType === 'trivia') {
+          if (!gameData.question || !Array.isArray(gameData.options) || gameData.answer === undefined) {
+            socket.emit('error', { message: 'Invalid trivia data' });
+            return;
+          }
+          data.gameData = {
+            gameType: gameData.gameType,
+            question: sanitizeInput(gameData.question),
+            options: gameData.options.map(o => sanitizeInput(o)),
+            answer: gameData.answer,
+            answers: {}
+          };
+        } else {
+          socket.emit('error', { message: 'Unknown game type' });
+          return;
+        }
+        messageContent = gameData.gameType === 'would-you-rather' ? 'Would You Rather' : 'Trivia';
       } else {
         messageContent = isEncrypted ? content : sanitizeInput(content.trim());
       }
@@ -1597,6 +1631,7 @@ io.on('connection', (socket) => {
         messageType,
         isViewOnce,
         pollData: messageType === 'poll' ? data.pollData : undefined,
+        gameData: messageType === 'game' ? data.gameData : undefined,
         fileName: messageType === 'file' ? fileName : undefined,
         mimeType: messageType === 'file' ? mimeType : undefined,
         fileSize: messageType === 'file' ? fileSize : undefined,
@@ -1606,7 +1641,12 @@ io.on('connection', (socket) => {
         replyTo: replyTo || null, // Store reply text/preview
         reactions: {}, // Initialize reactions
         hasBeenViewed: false,
-        sender: {
+        isAnonymous: !!isAnonymous, // Anonymous confession flag
+        sender: isAnonymous ? {
+          socketId: `anon_${Date.now()}`,
+          nickname: 'Anonymous \uD83D\uDC7B',
+          id: `anon_${Date.now()}`
+        } : {
           socketId: socket.id,
           nickname: socket.nickname,
           id: socket.id
@@ -1645,6 +1685,21 @@ io.on('connection', (socket) => {
       } else {
         // Broadcast to all users in room (default)
         io.to(socket.roomCode).emit('new-message', message);
+      }
+
+      // Update challenge progress (if active)
+      try {
+        const challengeRoom = await roomManager.getRoom(socket.roomCode);
+        if (challengeRoom?.activeChallenge && challengeRoom.activeChallenge.type === 'messages' && !challengeRoom.activeChallenge.completed) {
+          challengeRoom.activeChallenge.current += 1;
+          if (challengeRoom.activeChallenge.current >= challengeRoom.activeChallenge.target) {
+            challengeRoom.activeChallenge.completed = true;
+          }
+          await roomManager.saveRoom(socket.roomCode, challengeRoom);
+          io.to(socket.roomCode).emit('challenge-update', challengeRoom.activeChallenge);
+        }
+      } catch (challengeErr) {
+        // Non-critical, don't fail the message
       }
 
     } catch (error) {
@@ -1747,6 +1802,78 @@ io.on('connection', (socket) => {
       }
     } catch (error) {
       logger.error('Error voting on poll:', error);
+    }
+  });
+
+  // Handle game answer
+  socket.on('game-answer', async ({ messageId, answer }) => {
+    try {
+      if (!socket.roomCode || !messageId || answer === undefined) return;
+
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+
+      const messages = room.messages || [];
+      const message = messages.find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || !message.gameData) return;
+
+      // Prevent double-answering
+      if (!message.gameData.answers) message.gameData.answers = {};
+      if (message.gameData.answers[socket.id] !== undefined) return;
+
+      // Store the answer
+      message.gameData.answers[socket.id] = answer;
+      await roomManager.saveRoom(socket.roomCode, room);
+
+      // Broadcast the updated message
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (error) {
+      logger.error('Error handling game answer:', error);
+    }
+  });
+
+  // Handle room challenges
+  socket.on('start-challenge', async ({ type, target, label, emoji }) => {
+    try {
+      if (!socket.roomCode) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+
+      // Only host/admin/mod can start challenges
+      const userRole = room.users?.find(u => u.socketId === socket.id)?.role;
+      if (!['host', 'admin', 'moderator'].includes(userRole)) {
+        socket.emit('error', { message: 'Permission denied' });
+        return;
+      }
+
+      room.activeChallenge = {
+        type: type || 'messages',
+        target: parseInt(target) || 25,
+        label: label || `Send ${target} messages together`,
+        emoji: emoji || '💬',
+        current: 0,
+        completed: false,
+        startedAt: Date.now()
+      };
+
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('challenge-update', room.activeChallenge);
+    } catch (error) {
+      logger.error('Error starting challenge:', error);
+    }
+  });
+
+  socket.on('stop-challenge', async () => {
+    try {
+      if (!socket.roomCode) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+
+      room.activeChallenge = null;
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('challenge-update', null);
+    } catch (error) {
+      logger.error('Error stopping challenge:', error);
     }
   });
 

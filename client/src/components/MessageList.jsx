@@ -1,19 +1,23 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, FileText, Download, Check, CheckCheck, Pencil, X } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
 import ImageViewer from './ImageViewer';
 import AudioPlayer from './AudioPlayer';
 import PollMessage from './PollMessage';
+import GameMessage from './GameMessage';
+import ThreadView from './ThreadView';
+import { StreakBadge } from './ChallengeBar';
 import socketManager from '../socket';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🔥', '🙏'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onGameAnswer }) => {
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
   const { theme } = useTheme();
   const [messageTimers, setMessageTimers] = useState(new Map());
+  const [expandedThreads, setExpandedThreads] = useState(new Set());
   const [viewingImage, setViewingImage] = useState(null);
   const [currentImageUrl, setCurrentImageUrl] = useState(null);
   const [viewedMessages, setViewedMessages] = useState(new Set());
@@ -228,7 +232,12 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
             className={`message-item group flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'} ${isVanishing ? 'message-vanishing' : ''} relative ${activeReactionId === message.id ? 'z-[60]' : 'z-auto'}`}
           >
             <div className={`flex items-center space-x-2 mb-1 px-1 text-[10px] font-bold uppercase tracking-tighter text-gray-400 dark:text-gray-500`}>
-              {!isOwnMessage && <span className="text-primary-500 dark:text-primary-400">{message.sender.nickname}</span>}
+              {!isOwnMessage && (
+                <div className="flex items-center space-x-1">
+                  <span className={message.isAnonymous ? 'text-purple-500 dark:text-purple-400' : 'text-primary-500 dark:text-primary-400'}>{message.sender.nickname}</span>
+                  {!message.isAnonymous && <StreakBadge nickname={message.sender.nickname} roomCode={socketManager.socket?.roomCode} />}
+                </div>
+              )}
               {!isOwnMessage && <span>•</span>}
               <span>{formatTime(message.timestamp)}</span>
               {message.recipients && message.recipients.length > 0 && (
@@ -313,6 +322,8 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                       </div>
                     ) : message.messageType === 'poll' ? (
                       <PollMessage message={message} currentUser={currentUser} onVote={onVote} />
+                    ) : message.messageType === 'game' ? (
+                      <GameMessage message={message} currentUser={currentUser} onGameAnswer={onGameAnswer} />
                     ) : message.messageType === 'file' ? (
                       <div className="flex items-center space-x-3 min-w-[200px]">
                         <div className="p-2 bg-black/10 dark:bg-white/10 rounded-lg"><FileText className="w-6 h-6" /></div>
@@ -422,6 +433,40 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                 <span>{timeLeft}</span>
               </div>
             )}
+
+            {/* Thread: View Thread button + inline ThreadView */}
+            {(() => {
+              const replyCount = messages.filter(m => m.replyTo?.id === message.id).length;
+              if (replyCount === 0) return null;
+              const isExpanded = expandedThreads.has(message.id);
+              return (
+                <>
+                  <button
+                    onClick={() => setExpandedThreads(prev => {
+                      const next = new Set(prev);
+                      if (next.has(message.id)) next.delete(message.id);
+                      else next.add(message.id);
+                      return next;
+                    })}
+                    className="mt-1 px-2 py-0.5 text-[10px] font-bold text-purple-500 dark:text-purple-400 hover:text-purple-600 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-full transition-colors flex items-center space-x-1"
+                  >
+                    <span>{isExpanded ? '▾' : '▸'} {replyCount} {replyCount === 1 ? 'reply' : 'replies'}</span>
+                  </button>
+                  {isExpanded && (
+                    <ThreadView
+                      parentMessage={message}
+                      allMessages={messages}
+                      onReply={onReply}
+                      onClose={() => setExpandedThreads(prev => {
+                        const next = new Set(prev);
+                        next.delete(message.id);
+                        return next;
+                      })}
+                    />
+                  )}
+                </>
+              );
+            })()}
           </div>
         );
       })}

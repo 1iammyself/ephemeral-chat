@@ -23,6 +23,8 @@ import {
   Camera,
   PanelLeft,
   PanelRight,
+  Dices,
+  Trophy,
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -32,6 +34,8 @@ import MessageList from './MessageList';
 import UserList from './UserList';
 import AudioCallModal from './AudioCallModal';
 import PollModal from './PollModal';
+import GameModal from './GameModal';
+import ChallengeBar, { CHALLENGE_PRESETS } from './ChallengeBar';
 import webRTCService, { CallState } from '../webrtc';
 import { encryptMessage, decryptMessage } from '../utils/security';
 import { Mp3Recorder } from '../utils/mp3Recorder';
@@ -45,6 +49,7 @@ import DragDropOverlay from './DragDropOverlay';
 import ActivityLog from './ActivityLog';
 import CameraModal from './CameraModal';
 import { getVibeById, getAllVibes } from '../utils/vibes';
+import AmbientPlayer from './AmbientPlayer';
 import { canManageRoom } from '../utils/roles';
 import { getRandomIcebreaker } from '../utils/icebreakers';
 import { RefreshButton } from './PWAHandler';
@@ -55,6 +60,7 @@ import { toast } from 'react-toastify';
 const SLASH_COMMANDS = [
   { icon: Camera, label: 'Camera', value: '/camera', desc: 'Take a photo' },
   { icon: BarChart2, label: 'Poll', value: '/poll', desc: 'Create a new poll' },
+  { icon: Dices, label: 'Game', value: '/game', desc: 'Start a mini-game' },
   { icon: Phone, label: 'Voice Call', value: '/call', desc: 'Start a voice call' },
   { icon: ImageIcon, label: 'Photo', value: '/photo', desc: 'Upload an image' },
   { icon: Mic, label: 'Voice Note', value: '/voice', desc: 'Record a voice note' },
@@ -62,7 +68,8 @@ const SLASH_COMMANDS = [
   { icon: Zap, label: 'Pulse', value: '/pulse', desc: 'Shake the room' },
   { icon: Edit2, label: 'Topic', value: '/topic', desc: 'Set room topic', adminOnly: true },
   { icon: Clock, label: 'Timer', value: '/timer', desc: 'Start a countdown', adminOnly: true },
-  { icon: Activity, label: 'Vibe', value: '/vibe', desc: 'Change room vibe', adminOnly: true }
+  { icon: Activity, label: 'Vibe', value: '/vibe', desc: 'Change room vibe', adminOnly: true },
+  { icon: Trophy, label: 'Challenge', value: '/challenge', desc: 'Start a room challenge', adminOnly: true }
 ];
 
 // Safari detection (robust hybrid check)
@@ -357,6 +364,7 @@ const ChatRoom = () => {
   const [selectedRecipients, setSelectedRecipients] = useState([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
+  const [showGameModal, setShowGameModal] = useState(false);
   const [showFeatureMenu, setShowFeatureMenu] = useState(false);
   const [roomVibe, setRoomVibe] = useState('default');
   const [roomTopic, setRoomTopic] = useState('');
@@ -390,6 +398,8 @@ const ChatRoom = () => {
   const { theme } = useTheme();
 
   const [audioViewOnce, setAudioViewOnce] = useState(true);
+  const [isAnonymousMode, setIsAnonymousMode] = useState(false);
+  const [activeChallenge, setActiveChallenge] = useState(null);
 
 
 
@@ -853,6 +863,10 @@ const ChatRoom = () => {
       if (!showActivityLogs) setHasNewLogs(true);
     };
 
+    const handleChallengeUpdate = (challenge) => {
+      setActiveChallenge(challenge);
+    };
+
     const handleRoomTopicUpdated = ({ topic, updatedBy }) => {
       setRoomTopic(topic);
       const log = {
@@ -936,6 +950,7 @@ const ChatRoom = () => {
     socketManager.on('user-stop-typing', handleUserStopTyping);
     socketManager.on('room-reaction', handleRoomReaction);
     socketManager.on('file-transfer-invite', handleFileTransferInvite);
+    socketManager.on('challenge-update', handleChallengeUpdate);
 
     return () => {
       socketManager.off('connect', handleConnect);
@@ -967,6 +982,7 @@ const ChatRoom = () => {
       socketManager.off('user-stop-typing', handleUserStopTyping);
       socketManager.off('room-reaction', handleRoomReaction);
       socketManager.off('file-transfer-invite', handleFileTransferInvite);
+      socketManager.off('challenge-update', handleChallengeUpdate);
 
       // Explicitly leave the room before disconnecting
       socketManager.emit('leave-room');
@@ -1134,6 +1150,7 @@ const ChatRoom = () => {
       switch (cmd) {
         case '/camera': setShowCameraModal(true); break;
         case '/poll': setShowPollModal(true); break;
+        case '/game': setShowGameModal(true); break;
         case '/call':
           if (users.length > 7) {
             setError('Voice calls are disabled in rooms with more than 7 users for stability.');
@@ -1164,6 +1181,21 @@ const ChatRoom = () => {
           if (canManageRoom(currentUserRole)) {
             const vibe = getAllVibes().find(v => v.name.toLowerCase() === args.toLowerCase() || v.id === args.toLowerCase());
             if (vibe) handleUpdateVibe(vibe.id);
+          }
+          break;
+        case '/challenge':
+          if (canManageRoom(currentUserRole)) {
+            // Parse: /challenge 50 or /challenge (uses preset)
+            const targetNum = parseInt(args);
+            if (!isNaN(targetNum) && targetNum > 0) {
+              socketManager.emit('start-challenge', { type: 'messages', target: targetNum, label: `Send ${targetNum} messages together`, emoji: '💬' });
+            } else {
+              // Pick a random preset
+              const preset = CHALLENGE_PRESETS[Math.floor(Math.random() * CHALLENGE_PRESETS.length)];
+              socketManager.emit('start-challenge', preset);
+            }
+          } else {
+            setError('Admin permission required for /challenge');
           }
           break;
         default:
@@ -1233,7 +1265,8 @@ const ChatRoom = () => {
         isEncrypted,
         iv,
         recipients: finalRecipients,
-        replyTo: replyData
+        replyTo: replyData,
+        isAnonymous: isAnonymousMode
       });
       socketManager.emit('user-activity');
       setNewMessage('');
@@ -1255,6 +1288,16 @@ const ChatRoom = () => {
   const handleSendPoll = (pollData) => {
     if (!isConnected) return;
     socketManager.emit('send-message', { messageType: 'poll', pollData, recipients: selectedRecipients });
+  };
+
+  const handleSendGame = (gameData) => {
+    if (!isConnected) return;
+    socketManager.emit('send-message', { messageType: 'game', gameData, recipients: selectedRecipients });
+  };
+
+  const handleGameAnswer = (messageId, answer) => {
+    if (!isConnected) return;
+    socketManager.emit('game-answer', { messageId, answer });
   };
 
   const handleVote = (messageId, optionId) => {
@@ -1747,6 +1790,21 @@ const ChatRoom = () => {
       </div>
 
       <div className="absolute top-[84px] sm:top-[100px] left-0 right-0 z-40 flex flex-col items-center space-y-2 pointer-events-none transition-all duration-300">
+        {/* Ambient Player / Mood DJ */}
+        {getVibeById(roomVibe)?.moodSound && (
+          <div className="pointer-events-auto animate-in slide-in-from-top-2">
+            <AmbientPlayer moodSound={getVibeById(roomVibe).moodSound} isActive={true} />
+          </div>
+        )}
+        {/* Challenge Bar */}
+        {activeChallenge && (
+          <div className="pointer-events-auto w-[90%] sm:w-auto max-w-md animate-in slide-in-from-top-2 mt-2">
+            <ChallengeBar
+              challenge={activeChallenge}
+              onDismiss={canManageRoom(currentUserRole) ? () => socketManager.emit('stop-challenge') : undefined}
+            />
+          </div>
+        )}
         {/* Topic Pill */}
         {roomTopic && (
           <div
@@ -1809,6 +1867,7 @@ const ChatRoom = () => {
               onReply={handleReply}
               onReact={handleReaction}
               onEdit={handleEditMessage}
+              onGameAnswer={handleGameAnswer}
             />
             <div ref={messagesEndRef} />
           </div>
@@ -2168,12 +2227,20 @@ const ChatRoom = () => {
                           // iOS class removal is handled by the global focusout handler in useEffect
                         }}
 
-                        placeholder="Type message..."
-                        className="w-full input-field py-2.5 sm:py-3 px-3 sm:px-4 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 text-sm sm:text-base"
+                        placeholder={isAnonymousMode ? "Confess anonymously..." : "Type message..."}
+                        className={`w-full input-field py-2.5 sm:py-3 px-3 sm:px-4 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 text-sm sm:text-base ${isAnonymousMode ? 'border-purple-400 dark:border-purple-600' : ''}`}
                         disabled={!isConnected || isSending}
                         maxLength={500}
                       />
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsAnonymousMode(!isAnonymousMode)}
+                      className={`px-2.5 py-2.5 sm:py-3 rounded-xl transition-all text-lg ${isAnonymousMode ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 ring-2 ring-purple-400' : 'text-gray-400 hover:text-purple-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                      title={isAnonymousMode ? 'Anonymous mode ON' : 'Send anonymously'}
+                    >
+                      👻
+                    </button>
                     <button type="submit" disabled={!newMessage.trim() || !isConnected || isSending} className="btn-primary px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl"><Send className="w-5 h-5" /></button>
                   </>
                 )}
@@ -2268,6 +2335,7 @@ const ChatRoom = () => {
         initialContent={editingMessage?.content}
       />
       <PollModal isOpen={showPollModal} onClose={() => setShowPollModal(false)} onSend={handleSendPoll} />
+      <GameModal isOpen={showGameModal} onClose={() => setShowGameModal(false)} onSend={handleSendGame} />
       <DragDropOverlay isDragging={isDragging} />
       <PrivacyOverlay />
 
