@@ -452,6 +452,25 @@ const ChatRoom = () => {
     stateRef.current.sessionToken = sessionToken;
   }, [isJoined, sessionToken]);
 
+  // --- Auto-ping for user activity to prevent server inactivity disconnect ---
+  useEffect(() => {
+    if (!isJoined || !isConnected) return;
+
+    // Send an immediate heartbeat on join/reconnect
+    socketManager.emit('user-activity');
+
+    // Continuously ping the server every 60 seconds to prove the client is still alive
+    // This allows users to be completely idle (no typing, mouse movement) without getting kicked
+    const heartbeatInterval = setInterval(() => {
+      socketManager.emit('user-activity');
+    }, 60000); // 1 minute heartbeat
+
+    return () => {
+      clearInterval(heartbeatInterval);
+    };
+  }, [isJoined, isConnected]);
+  // --------------------------------------------------------------------------
+
   // Check for invite token and room key
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
