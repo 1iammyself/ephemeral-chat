@@ -88,18 +88,7 @@ class SocketManager {
           // Socket is dead – force an immediate reconnect
           console.log('🔄 Socket disconnected while backgrounded – reconnecting now');
           this.socket.connect();
-        } else {
-          // Socket thinks it's connected, but the underlying transport may be stale.
-          // Send a no-op ping through the Engine.IO layer to validate the connection.
-          // If the transport is dead, this will trigger a disconnect → reconnect cycle.
-          try {
-            if (this.socket.io?.engine) {
-              this.socket.io.engine.ping();
-            }
-          } catch (e) {
-            console.warn('⚠️ Engine ping failed, forcing reconnect', e);
-            this.socket.disconnect().connect();
-          }
+          // We rely on Socket.IO's built-in ping/pong interval to detect stale connections
         }
       }
     };

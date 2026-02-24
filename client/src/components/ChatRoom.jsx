@@ -382,6 +382,7 @@ const ChatRoom = () => {
   const [showActivityLogs, setShowActivityLogs] = useState(false);
   const [hasNewLogs, setHasNewLogs] = useState(false);
   const [offsets, setOffsets] = useState({ topic: 0, timer: 0 });
+  const [showDesktopSidebar, setShowDesktopSidebar] = useState(true);
   const [dragState, setDragState] = useState(null); // { type: 'topic' | 'timer', startX: number, startOffset: number }
   const [sessionToken, setSessionToken] = useState(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
@@ -1722,7 +1723,7 @@ const ChatRoom = () => {
           </div>
         </div>
       )}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 sm:py-3 sticky top-0 z-50 shrink-0">
+      <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50 px-4 py-2 sm:py-3 sticky top-0 z-50 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 sm:space-x-4">
             <button onClick={() => navigate('/')} className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
@@ -1772,6 +1773,13 @@ const ChatRoom = () => {
             </div>
           </div>
           <div className="flex items-center space-x-2 sm:space-x-3">
+            <button
+              onClick={() => setShowDesktopSidebar(prev => !prev)}
+              className="hidden lg:flex p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300"
+              title={showDesktopSidebar ? "Hide Sidebar" : "Show Sidebar"}
+            >
+              <Users className="w-5 h-5" />
+            </button>
             <button
               onClick={() => setSidebarPosition(prev => prev === 'right' ? 'left' : 'right')}
               className="hidden lg:flex p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300"
@@ -1871,14 +1879,14 @@ const ChatRoom = () => {
             />
             <div ref={messagesEndRef} />
           </div>
-          <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 sticky bottom-0 z-50 shrink-0 chat-input-area">
+          <div className="border-t border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md sticky bottom-0 z-50 shrink-0 chat-input-area">
             {typingUsers.size > 0 && (
-              <div className="px-4 py-1 text-xs text-gray-500 dark:text-gray-400 italic animate-pulse bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
+              <div className="px-4 py-1 text-xs text-gray-500 dark:text-gray-400 italic animate-pulse bg-black/5 dark:bg-white/5 border-b border-gray-200/50 dark:border-gray-700/50">
                 {Array.from(typingUsers.values()).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
               </div>
             )}
             {replyingTo && (
-              <div className="px-4 py-2 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-600 flex items-center justify-between animate-in slide-in-from-bottom-2">
+              <div className="px-4 py-2 bg-black/5 dark:bg-white/5 border-b border-gray-200/50 dark:border-gray-700/50 flex items-center justify-between animate-in slide-in-from-bottom-2">
                 <div className="flex items-center space-x-2 overflow-hidden">
                   <Reply className="w-4 h-4 text-blue-500" />
                   <div className="flex flex-col text-xs border-l-2 border-blue-500 pl-2">
@@ -1894,7 +1902,7 @@ const ChatRoom = () => {
               </div>
             )}
             {selectedRecipients.length > 0 && (
-              <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800 flex items-center justify-between">
+              <div className="px-4 py-2 bg-blue-50/50 dark:bg-blue-900/20 border-b border-blue-100/50 dark:border-blue-800/50 flex items-center justify-between">
                 <span className="text-xs text-blue-600 dark:text-blue-300 font-medium flex items-center"><Users className="w-3 h-3 mr-1.5" />Sending to {selectedRecipients.length} specific user{selectedRecipients.length !== 1 ? 's' : ''}</span>
                 <button onClick={() => setSelectedRecipients([])} className="text-xs text-blue-500 hover:text-blue-700 dark:hover:text-blue-200 underline">Clear selection</button>
               </div>
@@ -2250,36 +2258,38 @@ const ChatRoom = () => {
         </div>
 
         {/* Desktop Sidebar */}
-        <div
-          className={`hidden lg:flex flex-col relative bg-white dark:bg-gray-800 ${sidebarPosition === 'right' ? 'border-l' : 'border-r'} border-gray-200 dark:border-gray-700 transition-all duration-75`}
-          style={{ width: `${sidebarWidth}px` }}
-          ref={sidebarRef}
-        >
-          {/* Resize Handle */}
+        {showDesktopSidebar && (
           <div
-            className={`absolute top-0 bottom-0 w-1.5 cursor-col-resize z-50 hover:bg-blue-500/50 transition-colors flex items-center justify-center opacity-0 hover:opacity-100 ${sidebarPosition === 'right' ? '-left-0.5' : '-right-0.5'}`}
-            onMouseDown={() => setIsResizingSidebar(true)}
+            className={`hidden lg:flex flex-col relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-md ${sidebarPosition === 'right' ? 'border-l' : 'border-r'} border-gray-200/50 dark:border-gray-700/50 transition-all duration-75`}
+            style={{ width: `${sidebarWidth}px` }}
+            ref={sidebarRef}
           >
-            <div className="w-0.5 h-8 bg-gray-300 dark:bg-gray-600 rounded-full" />
-          </div>
+            {/* Resize Handle */}
+            <div
+              className={`absolute top-0 bottom-0 w-1.5 cursor-col-resize z-50 hover:bg-blue-500/50 transition-colors flex items-center justify-center opacity-0 hover:opacity-100 ${sidebarPosition === 'right' ? '-left-0.5' : '-right-0.5'}`}
+              onMouseDown={() => setIsResizingSidebar(true)}
+            >
+              <div className="w-0.5 h-8 bg-gray-300 dark:bg-gray-600 rounded-full" />
+            </div>
 
-          <UserList
-            users={users}
-            currentUser={currentUser}
-            pendingGuests={pendingGuests}
-            isHost={isHost}
-            onApprove={handleApproveGuest}
-            onDeny={handleDenyGuest}
-            selectedRecipients={selectedRecipients}
-            onToggleRecipient={toggleRecipient}
-            onSetUserRole={handleSetUserRole}
-            onKickUser={handleKickUser}
-            currentUserRole={currentUserRole}
-            onShowActivityLogs={() => { setShowActivityLogs(true); setHasNewLogs(false); }}
-            hasNewLogs={hasNewLogs}
-            verbalCode={verbalCode}
-          />
-        </div>
+            <UserList
+              users={users}
+              currentUser={currentUser}
+              pendingGuests={pendingGuests}
+              isHost={isHost}
+              onApprove={handleApproveGuest}
+              onDeny={handleDenyGuest}
+              selectedRecipients={selectedRecipients}
+              onToggleRecipient={toggleRecipient}
+              onSetUserRole={handleSetUserRole}
+              onKickUser={handleKickUser}
+              currentUserRole={currentUserRole}
+              onShowActivityLogs={() => { setShowActivityLogs(true); setHasNewLogs(false); }}
+              hasNewLogs={hasNewLogs}
+              verbalCode={verbalCode}
+            />
+          </div>
+        )}
       </div>
 
       {
