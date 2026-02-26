@@ -1765,10 +1765,20 @@ const ChatRoom = () => {
                     })}
                   </div>
                 )}
-                <div className="flex items-center space-x-1">
+                <button
+                  onClick={() => {
+                    if (window.innerWidth >= 1024) {
+                      setShowDesktopSidebar(prev => !prev);
+                    } else {
+                      setShowMobileMenu(true);
+                    }
+                  }}
+                  className="flex items-center space-x-1 hover:bg-black/5 dark:hover:bg-white/5 px-1.5 py-0.5 rounded cursor-pointer transition-colors"
+                  title="Toggle Participants"
+                >
                   <Users className="w-4 h-4" />
                   <span>{users.length}</span>
-                </div>
+                </button>
                 {getTTLDisplay() && (
                   <div className="flex items-center space-x-1">
                     <Clock className="w-4 h-4" />
@@ -1792,13 +1802,7 @@ const ChatRoom = () => {
             </div>
           </div>
           <div className="flex items-center space-x-2 sm:space-x-3">
-            <button
-              onClick={() => setShowDesktopSidebar(prev => !prev)}
-              className="hidden lg:flex p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300"
-              title={showDesktopSidebar ? "Hide Sidebar" : "Show Sidebar"}
-            >
-              <Users className="w-5 h-5" />
-            </button>
+
             <button
               onClick={() => setSidebarPosition(prev => prev === 'right' ? 'left' : 'right')}
               className="hidden lg:flex p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300"
@@ -1895,6 +1899,7 @@ const ChatRoom = () => {
               onReact={handleReaction}
               onEdit={handleEditMessage}
               onGameAnswer={handleGameAnswer}
+              roomVibe={roomVibe}
             />
             <div ref={messagesEndRef} />
           </div>
@@ -2279,7 +2284,7 @@ const ChatRoom = () => {
         {/* Desktop Sidebar */}
         {showDesktopSidebar && (
           <div
-            className={`hidden lg:flex flex-col relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-md ${sidebarPosition === 'right' ? 'border-l' : 'border-r'} border-gray-200/50 dark:border-gray-700/50 transition-all duration-75`}
+            className={`hidden lg:flex flex-col relative ${getVibeById(roomVibe).sidebarClass} backdrop-blur-md ${sidebarPosition === 'right' ? 'border-l' : 'border-r'} border-gray-200/50 dark:border-gray-700/50 transition-all duration-75`}
             style={{ width: `${sidebarWidth}px` }}
             ref={sidebarRef}
           >
@@ -2315,7 +2320,7 @@ const ChatRoom = () => {
         showMobileMenu && (
           <div className="fixed inset-0 z-50 lg:hidden">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileMenu(false)} />
-            <div className="absolute right-0 top-0 bottom-0 w-64 max-w-[70vw] bg-white dark:bg-gray-800 shadow-xl flex flex-col">
+            <div className={`absolute right-0 top-0 bottom-0 w-64 max-w-[70vw] ${getVibeById(roomVibe).sidebarClass} backdrop-blur-md shadow-xl flex flex-col`}>
               <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700"><h2 className="text-lg font-semibold text-gray-900 dark:text-white">Room Details</h2><button onClick={() => setShowMobileMenu(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400"><X className="w-5 h-5" /></button></div>
               <div className="flex-1 overflow-y-auto">
                 <UserList

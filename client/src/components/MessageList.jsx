@@ -9,13 +9,15 @@ import GameMessage from './GameMessage';
 import ThreadView from './ThreadView';
 import { StreakBadge } from './ChallengeBar';
 import socketManager from '../socket';
+import { getVibeById } from '../utils/vibes';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🔥', '🙏'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onGameAnswer }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onGameAnswer, roomVibe }) => {
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
   const { theme } = useTheme();
+  const currentVibe = getVibeById(roomVibe);
   const [messageTimers, setMessageTimers] = useState(new Map());
   const [expandedThreads, setExpandedThreads] = useState(new Set());
   const [viewingImage, setViewingImage] = useState(null);
@@ -256,7 +258,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                 <div
                   className={`relative z-10 rounded-2xl shadow-sm transition-all duration-300 ${message.messageType === 'poll' ? '' : 'px-3 py-2 sm:px-4 sm:py-3 box-border'
                     } ${isOwnMessage
-                      ? 'bg-primary-600 dark:bg-primary-700 text-white rounded-tr-none'
+                      ? currentVibe.messageClass
                       : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 dark:text-gray-100 rounded-tl-none'
                     }`}
                 >
