@@ -87,8 +87,8 @@ const VibeEffects = ({ effectType }) => {
 
   if (effectType === 'sparkles') {
     return (
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        {[...Array(20)].map((_, i) => (
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 bg-indigo-500/5 dark:bg-purple-900/10">
+        {[...Array(30)].map((_, i) => (
           <div
             key={i}
             className="absolute animate-bounce"
@@ -97,41 +97,61 @@ const VibeEffects = ({ effectType }) => {
               top: `${Math.random() * 100}%`,
               animationDelay: `${Math.random() * 5}s`,
               animationDuration: `${2 + Math.random() * 3}s`,
-              opacity: 0.3
+              opacity: 0.4
             }}
           >
-            <Zap className="w-4 h-4 text-yellow-300 fill-yellow-300" />
+            <div className={`w-1 h-1 rounded-full ${i % 3 === 0 ? 'bg-indigo-400' : i % 3 === 1 ? 'bg-purple-400' : 'bg-pink-400'} blur-[1px]`} />
           </div>
         ))}
       </div>
     );
   }
 
-  if (effectType === 'bubbles') {
+  if (effectType === 'rain') {
     return (
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        {[...Array(15)].map((_, i) => (
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 bg-teal-500/5 dark:bg-emerald-900/10">
+        {[...Array(40)].map((_, i) => (
           <div
             key={i}
-            className="absolute rounded-full border border-white/30 bg-white/10 animate-pulse"
+            className="absolute bg-gradient-to-b from-transparent to-teal-400/40 dark:to-teal-400/20"
             style={{
               left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              width: `${20 + Math.random() * 40}px`,
+              top: `-10%`,
+              width: '1px',
               height: `${20 + Math.random() * 40}px`,
-              animationDelay: `${Math.random() * 4}s`,
-              animationDuration: `${3 + Math.random() * 5}s`,
+              animation: `fall ${0.5 + Math.random() * 0.5}s linear infinite`,
+              animationDelay: `${Math.random() * 2}s`,
             }}
           />
         ))}
+        <style>{`
+          @keyframes fall {
+            to { transform: translateY(110vh) translateX(20px); }
+          }
+        `}</style>
       </div>
     );
   }
 
-  if (effectType === 'breath') {
+  if (effectType === 'stars') {
     return (
-      <div className="absolute inset-0 pointer-events-none z-0">
-        <div className="absolute inset-0 bg-orange-400/5 dark:bg-orange-900/10 animate-pulse active:scale-105" style={{ animationDuration: '8s' }} />
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 bg-orange-600/5 dark:bg-black/40">
+        {[...Array(50)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute bg-white rounded-full animate-pulse"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              width: `${Math.random() * 2}px`,
+              height: `${Math.random() * 2}px`,
+              opacity: Math.random() * 0.7,
+              animationDelay: `${Math.random() * 3}s`,
+              animationDuration: `${2 + Math.random() * 4}s`,
+            }}
+          />
+        ))}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-orange-500/5 to-transparent animate-pulse" style={{ animationDuration: '10s' }} />
       </div>
     );
   }
@@ -2042,7 +2062,7 @@ const ChatRoom = () => {
                           {/* Floating Reaction Pill */}
                           <div className="flex items-center gap-1 bg-gray-50/80 dark:bg-gray-900/80 rounded-2xl p-1 px-1.5 border border-gray-100/50 dark:border-gray-800/50 shadow-inner">
                             <div className="flex items-center flex-1 overflow-x-auto scrollbar-none gap-1 py-0.5 no-scrollbar">
-                              {['❤️', '🔥', '👏', '😂', '😮', '💯', '✨', '⚡', '🎉', '👍', '🙏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀'].map(emoji => (
+                              {['❤️', '🔥', '👏', '😂', '😮', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👍', '🙏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀'].map(emoji => (
                                 <button
                                   key={emoji}
                                   type="button"
@@ -2330,7 +2350,7 @@ const ChatRoom = () => {
                         }}
 
                         placeholder={isAnonymousMode ? "Confess anonymously..." : "Type message..."}
-                        className={`w-full input-field py-2.5 sm:py-3 px-3 sm:px-4 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 text-sm sm:text-base ${isAnonymousMode ? 'border-purple-400 dark:border-purple-600' : ''}`}
+                        className={`w-full input-field py-2.5 sm:py-3 px-3 sm:px-4 ${getVibeById(roomVibe).inputClass} dark:text-white border text-sm sm:text-base transition-all duration-300 rounded-xl focus:ring-2 focus:ring-primary-500/20 ${isAnonymousMode ? 'border-purple-400 dark:border-purple-600' : ''}`}
                         disabled={!isConnected || isSending}
                         maxLength={500}
                       />
@@ -2338,7 +2358,7 @@ const ChatRoom = () => {
                     <button
                       type="button"
                       onClick={() => setIsAnonymousMode(!isAnonymousMode)}
-                      className={`px-2.5 py-2.5 sm:py-3 rounded-xl transition-all text-lg ${isAnonymousMode ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 ring-2 ring-purple-400' : 'text-gray-400 hover:text-purple-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                      className={`px-2.5 py-2.5 sm:py-3 rounded-xl transition-all text-lg ${isAnonymousMode ? `${getVibeById(roomVibe).accentClass} ring-2 ring-white/20` : 'text-gray-400 hover:text-primary-500 hover:bg-black/5 dark:hover:bg-white/5'}`}
                       title={isAnonymousMode ? 'Anonymous mode ON' : 'Send anonymously'}
                     >
                       👻
