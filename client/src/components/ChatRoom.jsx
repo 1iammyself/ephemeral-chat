@@ -81,6 +81,64 @@ function isSafariBrowser() {
   return isWebKit && isNotChrome && isNotFirefox;
 }
 
+// --- Sub-component for Background Effects ---
+const VibeEffects = ({ effectType }) => {
+  if (!effectType) return null;
+
+  if (effectType === 'sparkles') {
+    return (
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+        {[...Array(20)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute animate-bounce"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 5}s`,
+              animationDuration: `${2 + Math.random() * 3}s`,
+              opacity: 0.3
+            }}
+          >
+            <Zap className="w-4 h-4 text-yellow-300 fill-yellow-300" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (effectType === 'bubbles') {
+    return (
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+        {[...Array(15)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute rounded-full border border-white/30 bg-white/10 animate-pulse"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              width: `${20 + Math.random() * 40}px`,
+              height: `${20 + Math.random() * 40}px`,
+              animationDelay: `${Math.random() * 4}s`,
+              animationDuration: `${3 + Math.random() * 5}s`,
+            }}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (effectType === 'breath') {
+    return (
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <div className="absolute inset-0 bg-orange-400/5 dark:bg-orange-900/10 animate-pulse active:scale-105" style={{ animationDuration: '8s' }} />
+      </div>
+    );
+  }
+
+  return null;
+};
+
 const ChatRoom = () => {
   const { roomCode } = useParams();
   const navigate = useNavigate();
@@ -1741,6 +1799,7 @@ const ChatRoom = () => {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
+      <VibeEffects effectType={getVibeById(roomVibe).effectType} />
       {isReconnecting && (
         <div className="absolute inset-0 z-[100] bg-black/20 backdrop-blur-[2px] flex items-center justify-center">
           <div className="bg-white dark:bg-gray-800 px-4 py-2 rounded-full shadow-lg flex items-center space-x-2">
@@ -1983,7 +2042,7 @@ const ChatRoom = () => {
                           {/* Floating Reaction Pill */}
                           <div className="flex items-center gap-1 bg-gray-50/80 dark:bg-gray-900/80 rounded-2xl p-1 px-1.5 border border-gray-100/50 dark:border-gray-800/50 shadow-inner">
                             <div className="flex items-center flex-1 overflow-x-auto scrollbar-none gap-1 py-0.5 no-scrollbar">
-                              {['❤️', '🔥', '👏', '😂', '😮', '💯', '✨', '⚡', '🎉', '👍', '🙏', '👀', '🤔', '😎', '🙌', '🎈'].map(emoji => (
+                              {['❤️', '🔥', '👏', '😂', '😮', '💯', '✨', '⚡', '🎉', '👍', '🙏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀'].map(emoji => (
                                 <button
                                   key={emoji}
                                   type="button"
@@ -1999,7 +2058,7 @@ const ChatRoom = () => {
                               type="button"
                               onClick={handleSendPulse}
                               disabled={!isConnected}
-                              className="w-8 h-8 flex items-center justify-center bg-yellow-400 hover:bg-yellow-500 text-white rounded-lg transition-all hover:scale-110 active:scale-95 shadow-sm shadow-yellow-400/20 group flex-shrink-0"
+                              className={`w-8 h-8 flex items-center justify-center ${getVibeById(roomVibe).accentClass} rounded-lg transition-all hover:scale-110 active:scale-95 shadow-sm group flex-shrink-0`}
                               title="Send Pulse Alert"
                             >
                               <Zap className="w-4 h-4 fill-current" />
@@ -2284,7 +2343,7 @@ const ChatRoom = () => {
                     >
                       👻
                     </button>
-                    <button type="submit" disabled={!newMessage.trim() || !isConnected || isSending} className="btn-primary px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl"><Send className="w-5 h-5" /></button>
+                    <button type="submit" disabled={!newMessage.trim() || !isConnected || isSending} className={`${getVibeById(roomVibe).accentClass} px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl transition-all shadow-sm active:scale-95`}><Send className="w-5 h-5" /></button>
                   </>
                 )}
               </form>
