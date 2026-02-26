@@ -363,6 +363,7 @@ const ChatRoom = () => {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [selectedRecipients, setSelectedRecipients] = useState([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [reactionTargetId, setReactionTargetId] = useState(null);
   const [showPollModal, setShowPollModal] = useState(false);
   const [showGameModal, setShowGameModal] = useState(false);
   const [showFeatureMenu, setShowFeatureMenu] = useState(false);
@@ -1108,6 +1109,12 @@ const ChatRoom = () => {
   };
 
   const onEmojiClick = (emojiData) => {
+    if (reactionTargetId) {
+      handleReaction(reactionTargetId, emojiData.emoji);
+      setReactionTargetId(null);
+      setShowEmojiPicker(false);
+      return;
+    }
     setNewMessage(prev => prev + emojiData.emoji);
   };
 
@@ -1742,7 +1749,7 @@ const ChatRoom = () => {
           </div>
         </div>
       )}
-      <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50 px-4 py-2 sm:py-3 sticky top-0 z-50 shrink-0">
+      <div className={`${getVibeById(roomVibe).panelClass} backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50 px-4 py-2 sm:py-3 sticky top-0 z-50 shrink-0`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 sm:space-x-4">
             <button onClick={() => navigate('/')} className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
@@ -1900,10 +1907,14 @@ const ChatRoom = () => {
               onEdit={handleEditMessage}
               onGameAnswer={handleGameAnswer}
               roomVibe={roomVibe}
+              onOpenEmojiPicker={(messageId) => {
+                setReactionTargetId(messageId);
+                setShowEmojiPicker(true);
+              }}
             />
             <div ref={messagesEndRef} />
           </div>
-          <div className="border-t border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md sticky bottom-0 z-50 shrink-0 chat-input-area">
+          <div className={`border-t border-gray-200/50 dark:border-gray-700/50 ${getVibeById(roomVibe).panelClass} backdrop-blur-md sticky bottom-0 z-50 shrink-0 chat-input-area`}>
             {typingUsers.size > 0 && (
               <div className="px-4 py-1 text-xs text-gray-500 dark:text-gray-400 italic animate-pulse bg-black/5 dark:bg-white/5 border-b border-gray-200/50 dark:border-gray-700/50">
                 {Array.from(typingUsers.values()).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
@@ -1971,19 +1982,19 @@ const ChatRoom = () => {
                         <div className="absolute bottom-full mb-3 left-0 z-50 bg-white/95 dark:bg-gray-800/95 rounded-3xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 p-2 sm:p-3 flex flex-col space-y-2 w-[280px] sm:w-80 animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/5">
                           {/* Floating Reaction Pill */}
                           <div className="flex items-center gap-1 bg-gray-50/80 dark:bg-gray-900/80 rounded-2xl p-1 px-1.5 border border-gray-100/50 dark:border-gray-800/50 shadow-inner">
-                            <div className="flex items-center flex-1 justify-around">
-                              {['❤️', '🔥', '👏', '😂', '😮', '💯'].map(emoji => (
+                            <div className="flex items-center flex-1 overflow-x-auto scrollbar-none gap-1 py-0.5 no-scrollbar">
+                              {['❤️', '🔥', '👏', '😂', '😮', '💯', '✨', '⚡', '🎉', '👍', '🙏', '👀', '🤔', '😎', '🙌', '🎈'].map(emoji => (
                                 <button
                                   key={emoji}
                                   type="button"
                                   onClick={() => sendRoomReaction(emoji)}
-                                  className="p-1 hover:bg-white dark:hover:bg-gray-700 rounded-lg transition-all hover:scale-125 active:scale-95"
+                                  className="p-1 hover:bg-white dark:hover:bg-gray-700 rounded-lg transition-all hover:scale-125 active:scale-95 flex-shrink-0"
                                 >
                                   <span className="text-xl leading-none">{emoji}</span>
                                 </button>
                               ))}
                             </div>
-                            <div className="w-px h-6 bg-gray-200 dark:bg-gray-700/50 mx-0.5" />
+                            <div className="w-px h-6 bg-gray-200 dark:bg-gray-700/50 mx-0.5 flex-shrink-0" />
                             <button
                               type="button"
                               onClick={handleSendPulse}

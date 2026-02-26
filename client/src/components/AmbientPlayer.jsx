@@ -125,7 +125,7 @@ const GENERATORS = {
 
 const AmbientPlayer = ({ moodSound, isActive = true }) => {
     const [volume, setVolume] = useState(0.3);
-    const [isMuted, setIsMuted] = useState(false);
+    const [isMuted, setIsMuted] = useState(true);
     const [isMinimized, setIsMinimized] = useState(false);
     const [dragX, setDragX] = useState(0);
 
@@ -158,6 +158,8 @@ const AmbientPlayer = ({ moodSound, isActive = true }) => {
         }
 
         if (currentSoundRef.current === moodSound) return;
+
+        setIsMuted(true);
 
         // Cleanup previous sound
         cleanup();

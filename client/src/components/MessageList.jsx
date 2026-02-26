@@ -11,9 +11,9 @@ import { StreakBadge } from './ChallengeBar';
 import socketManager from '../socket';
 import { getVibeById } from '../utils/vibes';
 
-const QUICK_REACTIONS = ['👍', '❤️', '😂', '🔥', '🙏'];
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onGameAnswer, roomVibe }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onGameAnswer, roomVibe, onOpenEmojiPicker }) => {
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
   const { theme } = useTheme();
@@ -375,7 +375,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                     {activeReactionId === message.id && (
                       <div className={`absolute ${index < 3 ? 'top-full mt-3' : 'bottom-full mb-3'} ${pickerPositionClass} z-50 flex flex-col items-center`}>
                         {!showFullPicker ? (
-                          <div className="bg-white/90 dark:bg-gray-800/95 backdrop-blur-md shadow-2xl rounded-full p-1.5 flex items-center space-x-1 border border-gray-100/50 dark:border-gray-700/50 whitespace-nowrap animate-in fade-in zoom-in slide-in-from-top-2 duration-300">
+                          <div className="bg-white/90 dark:bg-gray-800/95 backdrop-blur-md shadow-2xl rounded-full p-1.5 flex items-center space-x-1 border border-gray-100/50 dark:border-gray-700/50 whitespace-nowrap animate-in fade-in zoom-in slide-in-from-top-2 duration-300 max-w-[280px] sm:max-w-xs overflow-x-auto scrollbar-none no-scrollbar">
                             {QUICK_REACTIONS.map(emoji => (
                               <button
                                 key={emoji}
@@ -385,13 +385,14 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                                 {emoji}
                               </button>
                             ))}
-                            <div className="w-[1px] h-6 bg-gray-200 dark:bg-gray-700 mx-1" />
+                            <div className="w-[1px] h-6 bg-gray-200 dark:bg-gray-700 mx-1 flex-shrink-0" />
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setShowFullPicker(true);
+                                onOpenEmojiPicker(message.id);
+                                setActiveReactionId(null);
                               }}
-                              className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 hover:text-primary-500 transition-all duration-200"
+                              className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 hover:text-primary-500 transition-all duration-200 flex-shrink-0"
                             >
                               <Plus className="w-5 h-5" />
                             </button>
