@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Send, Dices, Sparkles, HelpCircle, ChevronLeft, Hash } from 'lucide-react';
 import { GAME_TYPES, getRandomWYR, getRandomTrivia, WYR_TOPIC_LIST, TRIVIA_TOPIC_LIST } from '../utils/games';
 
@@ -7,6 +7,15 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe }) => {
     const [selectedTopic, setSelectedTopic] = useState(null);
     const [wyrData, setWyrData] = useState(null);
     const [triviaData, setTriviaData] = useState(null);
+
+    useEffect(() => {
+        if (!isOpen) {
+            setGameType(null);
+            setSelectedTopic(null);
+            setWyrData(null);
+            setTriviaData(null);
+        }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
@@ -202,7 +211,16 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe }) => {
                                 </button>
                             </div>
                         </div>
-                    ) : null}
+                    ) : (
+                        <div className="flex flex-col items-center justify-center p-8 text-gray-400">
+                            <Dices className="w-8 h-8 mb-3 opacity-50" />
+                            <p className="text-sm font-bold">Game Data Missing</p>
+                            <p className="text-xs text-center mt-1">Please try selecting a topic again.</p>
+                            <button onClick={handleBack} className={`mt-4 px-4 py-2 rounded-lg bg-${vibeAccent}-500 text-white font-semibold text-xs hover:bg-${vibeAccent}-600 transition-colors`}>
+                                Go Back
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

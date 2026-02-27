@@ -15,7 +15,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, room
     const isTicTacToe = gameData.gameType === GAME_TYPES.TIC_TAC_TOE;
 
     const isPlayer = isTicTacToe && (gameData.players.X.id === currentUserId || gameData.players.O.id === currentUserId);
-    const [isExpanded, setIsExpanded] = useState(isPlayer || (isTicTacToe && !!gameData.winner));
+    const [isExpanded, setIsExpanded] = useState(false);
 
     // Trivia timer: 15 seconds from message timestamp
     useEffect(() => {

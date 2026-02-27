@@ -376,5 +376,5 @@ export const getRandomTrivia = (topic = null) => {
         const source = topic ? TRIVIA_TOPICS[topic] : TRIVIA_QUESTIONS;
         remainingTrivia[key] = shuffleArray(source);
     }
-    return remainingTrivia.pop();
+    return remainingTrivia[key].pop();
 };

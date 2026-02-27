@@ -54,6 +54,15 @@ const PWAHandler = () => {
     const [updateTrigger, setUpdateTrigger] = useState(null);
 
     useEffect(() => {
+        // Skip service worker logic in Electron or Capacitor environments
+        const isElectron = !!(window.electronAPI || window.process?.versions?.electron || document.body.classList.contains('electron-app'));
+        const isCapacitor = !!window.Capacitor?.isNative;
+
+        if (isElectron || isCapacitor) {
+            console.log('Skipping PWA logic in native environment');
+            return;
+        }
+
         if ('serviceWorker' in navigator && import.meta.env.PROD) {
             const updateSW = registerSW({
                 onNeedRefresh() {
