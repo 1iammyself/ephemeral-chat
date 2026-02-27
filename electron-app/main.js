@@ -22,6 +22,11 @@ const path = require('path');
 const Store = require('electron-store');
 const { autoUpdater } = require('electron-updater');
 
+// Fix Windows notification source name (removes "electron.app." prefix)
+if (process.platform === 'win32') {
+  app.setAppUserModelId('me.kyere.chat');
+}
+
 // Initialize store for settings
 const store = new Store({
   defaults: {
