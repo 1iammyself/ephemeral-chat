@@ -1657,7 +1657,7 @@ io.on('connection', (socket) => {
         }
         if (gameData.gameType === 'would-you-rather') {
           if (!gameData.optionA || !gameData.optionB) {
-            socket.emit('error', { message: 'WYR requires two options' });
+            socket.emit('error', { message: 'Game requires two options' });
             return;
           }
           data.gameData = {
@@ -1678,11 +1678,25 @@ io.on('connection', (socket) => {
             answer: gameData.answer,
             answers: {}
           };
+        } else if (gameData.gameType === 'tic-tac-toe') {
+          data.gameData = {
+            gameType: gameData.gameType,
+            board: Array(9).fill(null),
+            players: {
+              X: { id: socket.id, name: socket.nickname },
+              O: { id: null, name: null }
+            },
+            turn: 'X',
+            winner: null,
+            winningLine: null,
+            lastActivity: Date.now()
+          };
         } else {
           socket.emit('error', { message: 'Unknown game type' });
           return;
         }
-        messageContent = gameData.gameType === 'would-you-rather' ? 'Would You Rather' : 'Trivia';
+        messageContent = gameData.gameType === 'would-you-rather' ? 'Would You Rather' :
+          gameData.gameType === 'trivia' ? 'Trivia' : 'Tic-Tac-Toe';
       } else {
         messageContent = isEncrypted ? content : sanitizeInput(content.trim());
       }
@@ -1750,20 +1764,6 @@ io.on('connection', (socket) => {
         io.to(socket.roomCode).emit('new-message', message);
       }
 
-      // Update challenge progress (if active)
-      try {
-        const challengeRoom = await roomManager.getRoom(socket.roomCode);
-        if (challengeRoom?.activeChallenge && challengeRoom.activeChallenge.type === 'messages' && !challengeRoom.activeChallenge.completed) {
-          challengeRoom.activeChallenge.current += 1;
-          if (challengeRoom.activeChallenge.current >= challengeRoom.activeChallenge.target) {
-            challengeRoom.activeChallenge.completed = true;
-          }
-          await roomManager.saveRoom(socket.roomCode, challengeRoom);
-          io.to(socket.roomCode).emit('challenge-update', challengeRoom.activeChallenge);
-        }
-      } catch (challengeErr) {
-        // Non-critical, don't fail the message
-      }
 
     } catch (error) {
       logger.error('Error sending message:', error);
@@ -1781,6 +1781,7 @@ io.on('connection', (socket) => {
     if (updatedMessage) {
       // Broadcast update
       io.to(socket.roomCode).emit('message-updated', updatedMessage);
+
     }
   });
 
@@ -1798,7 +1799,7 @@ io.on('connection', (socket) => {
   });
 
   // Pulse
-  socket.on('send-pulse', ({ roomCode }) => {
+  socket.on('send-pulse', async ({ roomCode }) => {
     // Rate limit pulse
     if (!checkRateLimit(socket.id)) {
       return socket.emit('error', { message: 'Pulse rate limit exceeded' });
@@ -1806,6 +1807,7 @@ io.on('connection', (socket) => {
 
     if (roomCode && socket.roomCode === roomCode) {
       socket.to(roomCode).emit('pulse-received', { from: socket.nickname });
+
     }
   });
 
@@ -1873,6 +1875,7 @@ io.on('connection', (socket) => {
       const updatedMessage = await roomManager.votePoll(socket.roomCode, messageId, optionId, socket.id, socket.nickname);
       if (updatedMessage) {
         io.to(socket.roomCode).emit('message-updated', updatedMessage);
+
       }
     } catch (error) {
       logger.error('Error voting on poll:', error);
@@ -1906,64 +1909,74 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle room challenges
-  socket.on('start-challenge', async ({ type, target, label, emoji }) => {
+  // Handle Tic-Tac-Toe moves
+  socket.on('tic-tac-toe-move', async ({ messageId, action, position }) => {
     try {
-      if (!socket.roomCode) return;
+      if (!socket.roomCode || !messageId || !action) return;
+
       const room = await roomManager.getRoom(socket.roomCode);
       if (!room) return;
 
-      // Only host/admin/mod can start challenges
-      const roomMeta = roomData[socket.roomCode];
-      if (!roomMeta) return;
+      const messages = room.messages || [];
+      const message = messages.find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'tic-tac-toe') return;
 
-      const userRole = roomMeta.userRoles?.[socket.id] || (roomMeta.hostId === socket.id ? 'host' : 'user');
-      const canManage = userRole === 'host' || userRole === 'tier1' || userRole === 'tier2';
+      const { gameData } = message;
+      if (gameData.winner) return; // Game already over
 
-      if (!canManage) {
-        socket.emit('error', { message: 'Permission denied' });
+      if (action === 'join') {
+        if (!gameData.players.O.id && gameData.players.X.id !== socket.id) {
+          gameData.players.O = { id: socket.id, name: socket.nickname };
+          gameData.lastActivity = Date.now();
+          await roomManager.saveRoom(socket.roomCode, room);
+          io.to(socket.roomCode).emit('message-updated', message);
+        }
         return;
       }
 
-      room.activeChallenge = {
-        type: type || 'messages',
-        target: parseInt(target) || 25,
-        label: label || `Send ${target} messages together`,
-        emoji: emoji || '💬',
-        current: 0,
-        completed: false,
-        startedAt: Date.now()
-      };
+      if (action === 'move') {
+        if (position === undefined || position < 0 || position > 8) return;
+        if (gameData.board[position]) return; // Position already taken
+        if (gameData.players[gameData.turn].id !== socket.id) return; // Not your turn
 
-      await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('challenge-update', room.activeChallenge);
+        // Update board
+        gameData.board[position] = gameData.turn;
+        gameData.lastActivity = Date.now();
+
+        // Check for winner
+        const winLines = [
+          [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+          [0, 3, 6], [1, 4, 7], [2, 5, 8], // Cols
+          [0, 4, 8], [2, 4, 6]             // Diagonals
+        ];
+
+        let winnerFound = false;
+        for (const line of winLines) {
+          const [a, b, c] = line;
+          if (gameData.board[a] && gameData.board[a] === gameData.board[b] && gameData.board[a] === gameData.board[c]) {
+            gameData.winner = gameData.turn;
+            gameData.winningLine = line;
+            winnerFound = true;
+            break;
+          }
+        }
+
+        if (!winnerFound) {
+          if (gameData.board.every(cell => cell !== null)) {
+            gameData.winner = 'draw';
+          } else {
+            gameData.turn = gameData.turn === 'X' ? 'O' : 'X';
+          }
+        }
+
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+      }
     } catch (error) {
-      logger.error('Error starting challenge:', error);
+      logger.error('Error handling tic-tac-toe move:', error);
     }
   });
 
-  socket.on('stop-challenge', async () => {
-    try {
-      if (!socket.roomCode) return;
-
-      const roomMeta = roomData[socket.roomCode];
-      if (!roomMeta) return;
-
-      const userRole = roomMeta.userRoles?.[socket.id] || (roomMeta.hostId === socket.id ? 'host' : 'user');
-      const canManage = userRole === 'host' || userRole === 'tier1' || userRole === 'tier2';
-
-      if (!canManage) return;
-
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-
-      room.activeChallenge = null;
-      await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('challenge-update', null);
-    } catch (error) {
-      logger.error('Error stopping challenge:', error);
-    }
-  });
 
   // Handle ephemeral view token requests
   socket.on('request-view-token', async ({ messageId }, callback) => {

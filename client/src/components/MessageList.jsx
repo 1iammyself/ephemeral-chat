@@ -7,14 +7,13 @@ import AudioPlayer from './AudioPlayer';
 import PollMessage from './PollMessage';
 import GameMessage from './GameMessage';
 import ThreadView from './ThreadView';
-import { StreakBadge } from './ChallengeBar';
 import socketManager from '../socket';
 import { getVibeById } from '../utils/vibes';
 import LinkPreviewModal, { isDomainTrusted } from './LinkPreviewModal';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀', '🍕', '🍔', '🍦', '🍩', '🍺', '🎸', '🎮', '🚀', '🌈', '🍄'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onGameAnswer, roomVibe, onOpenEmojiPicker }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onGameAnswer, onTicTacToeMove, roomVibe, onOpenEmojiPicker }) => {
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
   const { theme } = useTheme();
@@ -263,7 +262,6 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
               {!isOwnMessage && (
                 <div className="flex items-center space-x-1">
                   <span className={message.isAnonymous ? 'text-purple-500 dark:text-purple-400' : `text-${uiAccentColor}-500 dark:text-${uiAccentColor}-400`}>{message.sender.nickname}</span>
-                  {!message.isAnonymous && <StreakBadge nickname={message.sender.nickname} roomCode={socketManager.socket?.roomCode} />}
                 </div>
               )}
               {!isOwnMessage && <span>•</span>}
@@ -351,7 +349,13 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                     ) : message.messageType === 'poll' ? (
                       <PollMessage message={message} currentUser={currentUser} onVote={onVote} roomVibe={roomVibe} />
                     ) : message.messageType === 'game' ? (
-                      <GameMessage message={message} currentUser={currentUser} onGameAnswer={onGameAnswer} roomVibe={roomVibe} />
+                      <GameMessage
+                        message={message}
+                        currentUser={currentUser}
+                        onGameAnswer={onGameAnswer}
+                        onTicTacToeMove={onTicTacToeMove}
+                        roomVibe={roomVibe}
+                      />
                     ) : message.messageType === 'file' ? (
                       <div className="flex items-center space-x-3 min-w-[200px]">
                         <div className="p-2 bg-black/10 dark:bg-white/10 rounded-lg"><FileText className="w-6 h-6" /></div>

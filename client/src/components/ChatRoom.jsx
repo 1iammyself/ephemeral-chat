@@ -24,7 +24,6 @@ import {
   PanelLeft,
   PanelRight,
   Dices,
-  Trophy,
   Ghost,
   EyeOff,
 } from 'lucide-react';
@@ -37,7 +36,6 @@ import UserList from './UserList';
 import AudioCallModal from './AudioCallModal';
 import PollModal from './PollModal';
 import GameModal from './GameModal';
-import ChallengeBar, { CHALLENGE_PRESETS } from './ChallengeBar';
 import webRTCService, { CallState } from '../webrtc';
 import { encryptMessage, decryptMessage } from '../utils/security';
 import { Mp3Recorder } from '../utils/mp3Recorder';
@@ -72,7 +70,6 @@ const SLASH_COMMANDS = [
   { icon: Edit2, label: 'Topic', value: '/topic', desc: 'Set room topic', adminOnly: true },
   { icon: Clock, label: 'Timer', value: '/timer', desc: 'Start a countdown', adminOnly: true },
   { icon: Activity, label: 'Vibe', value: '/vibe', desc: 'Change room vibe', adminOnly: true },
-  { icon: Trophy, label: 'Challenge', value: '/challenge', desc: 'Start a room challenge', adminOnly: true }
 ];
 
 // Safari detection (robust hybrid check)
@@ -486,7 +483,6 @@ const ChatRoom = () => {
 
   const [audioViewOnce, setAudioViewOnce] = useState(true);
   const [isAnonymousMode, setIsAnonymousMode] = useState(false);
-  const [activeChallenge, setActiveChallenge] = useState(null);
 
 
 
@@ -925,9 +921,6 @@ const ChatRoom = () => {
       if (!showActivityLogs) setHasNewLogs(true);
     };
 
-    const handleChallengeUpdate = (challenge) => {
-      setActiveChallenge(challenge);
-    };
 
     const handleRoomTopicUpdated = ({ topic, updatedBy }) => {
       setRoomTopic(topic);
@@ -1012,7 +1005,6 @@ const ChatRoom = () => {
     socketManager.on('user-stop-typing', handleUserStopTyping);
     socketManager.on('room-reaction', handleRoomReaction);
     socketManager.on('file-transfer-invite', handleFileTransferInvite);
-    socketManager.on('challenge-update', handleChallengeUpdate);
     socketManager.on('messages-cleared', () => {
       setMessages([]);
       setActivityLogs(prev => [{
@@ -1053,7 +1045,6 @@ const ChatRoom = () => {
       socketManager.off('user-stop-typing', handleUserStopTyping);
       socketManager.off('room-reaction', handleRoomReaction);
       socketManager.off('file-transfer-invite', handleFileTransferInvite);
-      socketManager.off('challenge-update', handleChallengeUpdate);
       socketManager.off('messages-cleared');
 
       // Explicitly leave the room before disconnecting
@@ -1302,21 +1293,6 @@ const ChatRoom = () => {
             if (vibe) handleUpdateVibe(vibe.id);
           }
           break;
-        case '/challenge':
-          if (canManageRoom(currentUserRole)) {
-            // Parse: /challenge 50 or /challenge (uses preset)
-            const targetNum = parseInt(args);
-            if (!isNaN(targetNum) && targetNum > 0) {
-              socketManager.emit('start-challenge', { type: 'messages', target: targetNum, label: `Send ${targetNum} messages together`, emoji: '💬' });
-            } else {
-              // Pick a random preset
-              const preset = CHALLENGE_PRESETS[Math.floor(Math.random() * CHALLENGE_PRESETS.length)];
-              socketManager.emit('start-challenge', preset);
-            }
-          } else {
-            setError('Admin permission required for /challenge');
-          }
-          break;
         default:
           // Just send as regular message if not a valid command
           break;
@@ -1324,7 +1300,7 @@ const ChatRoom = () => {
       if (cmd.startsWith('/')) {
         const isValid = SLASH_COMMANDS.some(c => c.value === cmd);
         if (isValid) {
-          setNewMessage('');
+          if (cmd !== '/ice') setNewMessage('');
           return;
         }
       }
@@ -1425,6 +1401,11 @@ const ChatRoom = () => {
     socketManager.emit('game-answer', { messageId, answer });
   };
 
+  const handleTicTacToeMove = (messageId, action, position) => {
+    if (!isConnected) return;
+    socketManager.emit('tic-tac-toe-move', { messageId, action, position });
+  };
+
   const handleVote = (messageId, optionId) => {
     if (!isConnected) return;
     socketManager.emit('vote-poll', { messageId, optionId });
@@ -1520,13 +1501,12 @@ const ChatRoom = () => {
 
   const handleSendIcebreaker = () => {
     const question = getRandomIcebreaker();
-    socketManager.emit('send-message', {
-      content: `🧊 ${question}`,
-      isEncrypted: false,
-      recipients: selectedRecipients
-    });
-    socketManager.emit('user-activity');
+    setNewMessage(`🧊 ${question}`);
     setShowFeatureMenu(false);
+    // Focus the input field so user can edit or send
+    setTimeout(() => {
+      messageInputRef.current?.focus();
+    }, 100);
   };
 
   const handleStartPillDrag = (e, type) => {
@@ -1945,15 +1925,6 @@ const ChatRoom = () => {
             <AmbientPlayer moodSound={getVibeById(roomVibe).moodSound} isActive={true} />
           </div>
         )}
-        {/* Challenge Bar */}
-        {activeChallenge && (
-          <div className="pointer-events-auto w-[90%] sm:w-auto max-w-md animate-in slide-in-from-top-2 mt-2">
-            <ChallengeBar
-              challenge={activeChallenge}
-              onDismiss={canManageRoom(currentUserRole) ? () => socketManager.emit('stop-challenge') : undefined}
-            />
-          </div>
-        )}
         {/* Topic Pill */}
         {roomTopic && (
           <div
@@ -2017,6 +1988,7 @@ const ChatRoom = () => {
               onReact={handleReaction}
               onEdit={handleEditMessage}
               onGameAnswer={handleGameAnswer}
+              onTicTacToeMove={handleTicTacToeMove}
               roomVibe={roomVibe}
               onOpenEmojiPicker={(messageId) => {
                 setReactionTargetId(messageId);

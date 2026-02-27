@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Sparkles, HelpCircle, Users, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Sparkles, HelpCircle, Users, CheckCircle2, XCircle, Clock, Hash, Circle, X } from 'lucide-react';
 import { GAME_TYPES } from '../utils/games';
 import { getVibeById } from '../utils/vibes';
 
-const GameMessage = ({ message, currentUser, onGameAnswer, roomVibe }) => {
+const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, roomVibe }) => {
     const { gameData } = message;
     const currentUserId = currentUser?.id || currentUser?.socketId;
     const vibe = getVibeById(roomVibe);
@@ -12,6 +12,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, roomVibe }) => {
 
     const isWYR = gameData.gameType === GAME_TYPES.WYR;
     const isTrivia = gameData.gameType === GAME_TYPES.TRIVIA;
+    const isTicTacToe = gameData.gameType === GAME_TYPES.TIC_TAC_TOE;
 
     // Trivia timer: 15 seconds from message timestamp
     useEffect(() => {
@@ -48,9 +49,11 @@ const GameMessage = ({ message, currentUser, onGameAnswer, roomVibe }) => {
         }
         if (isTrivia) {
             const groups = {};
-            gameData.options.forEach((_, i) => {
-                groups[i] = Object.values(answers).filter(v => v === i).length;
-            });
+            if (gameData.options) {
+                gameData.options.forEach((_, i) => {
+                    groups[i] = Object.values(answers).filter(v => v === i).length;
+                });
+            }
             const total = Object.values(answers).length;
             return { groups, total };
         }
@@ -61,6 +64,18 @@ const GameMessage = ({ message, currentUser, onGameAnswer, roomVibe }) => {
         if (hasAnswered) return;
         if (isTrivia && triviaRevealed) return; // Too late
         onGameAnswer(message.id, answer);
+    };
+
+    const handleTTTMove = (index) => {
+        if (!isTicTacToe || gameData.winner) return;
+        if (gameData.board[index]) return;
+        if (gameData.players[gameData.turn].id !== currentUserId) return;
+        onTicTacToeMove(message.id, 'move', index);
+    };
+
+    const handleTTTJoin = () => {
+        if (!isTicTacToe || gameData.players.O.id) return;
+        onTicTacToeMove(message.id, 'join');
     };
 
     // Dynamic classes based on vibe
@@ -77,6 +92,86 @@ const GameMessage = ({ message, currentUser, onGameAnswer, roomVibe }) => {
     const progressFillClass = `bg-${accentColor}-500/10`;
     const optionDotClass = `bg-${accentColor}-500 text-white`;
 
+    // ── Tic-Tac-Toe ──
+    if (isTicTacToe) {
+        const isMyTurn = gameData.players[gameData.turn]?.id === currentUserId;
+        const isPlayerX = gameData.players.X.id === currentUserId;
+        const isPlayerO = gameData.players.O.id === currentUserId;
+        const amPlaying = isPlayerX || isPlayerO;
+
+        const getStatusMessage = () => {
+            if (gameData.winner) {
+                if (gameData.winner === 'draw') return "It's a draw!";
+                const winnerName = gameData.players[gameData.winner].name;
+                return gameData.winner === (isPlayerX ? 'X' : isPlayerO ? 'O' : null) ? "You Won! 🎉" : `${winnerName} Won!`;
+            }
+            if (!gameData.players.O.id) return "Waiting for Player O...";
+            if (isMyTurn) return "Your move!";
+            return `${gameData.players[gameData.turn].name}'s turn`;
+        };
+
+        return (
+            <div className={`w-full max-w-[280px] overflow-hidden rounded-2xl shadow-lg border-2 ${cardBorderClass} animate-in fade-in zoom-in duration-300`}>
+                <div className={`p-3 ${headerClass} flex items-center justify-between`}>
+                    <div className="flex items-center gap-2">
+                        <Hash className="w-5 h-5 text-white" />
+                        <h3 className="text-white font-bold text-sm">Tic-Tac-Toe</h3>
+                    </div>
+                    {gameData.players.O.id && !gameData.winner && (
+                        <div className="flex items-center gap-1.5 bg-white/20 rounded-full px-2 py-0.5">
+                            <div className={`w-2 h-2 rounded-full bg-white ${isMyTurn ? 'animate-pulse' : 'opacity-50'}`} />
+                            <span className="text-[10px] font-black text-white uppercase tracking-tighter">Live</span>
+                        </div>
+                    )}
+                </div>
+
+                <div className="p-4 bg-white dark:bg-gray-900 flex flex-col items-center">
+                    <div className="w-full flex justify-between items-center mb-4 px-2">
+                        <div className={`flex flex-col items-center p-2 rounded-xl border-2 transition-all ${gameData.turn === 'X' && !gameData.winner ? `border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20` : 'border-transparent opacity-60'}`}>
+                            <X className={`w-5 h-5 ${gameData.turn === 'X' && !gameData.winner ? 'text-indigo-500' : 'text-gray-400'}`} />
+                            <span className="text-[10px] font-bold mt-1 max-w-[60px] truncate">{gameData.players.X.name}</span>
+                        </div>
+                        <div className="text-gray-300 dark:text-gray-700 font-black text-xl italic">VS</div>
+                        <div className={`flex flex-col items-center p-2 rounded-xl border-2 transition-all ${gameData.turn === 'O' && !gameData.winner ? `border-rose-500 bg-rose-50 dark:bg-rose-900/20` : 'border-transparent opacity-60'}`}>
+                            <Circle className={`w-5 h-5 ${gameData.turn === 'O' && !gameData.winner ? 'text-rose-500' : 'text-gray-400'}`} />
+                            <span className="text-[10px] font-bold mt-1 max-w-[60px] truncate">{gameData.players.O.name || '???'}</span>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 w-full aspect-square bg-gray-100 dark:bg-gray-800 p-2 rounded-xl border border-gray-200 dark:border-gray-700 shadow-inner">
+                        {gameData.board.map((cell, i) => {
+                            const isWinningCell = gameData.winningLine?.includes(i);
+                            return (
+                                <button
+                                    key={i}
+                                    onClick={() => handleTTTMove(i)}
+                                    disabled={!!cell || !isMyTurn || !!gameData.winner}
+                                    className={`relative flex items-center justify-center bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 transition-all active:scale-90 ${!cell && isMyTurn ? `hover:bg-${accentColor}-50 dark:hover:bg-${accentColor}-900/10 cursor-pointer` : 'cursor-default'} ${isWinningCell ? `ring-4 ring-${gameData.winner === 'X' ? 'indigo' : 'rose'}-500/50 ttt-win-pulse` : ''}`}
+                                >
+                                    {cell === 'X' && <X className={`w-8 h-8 text-indigo-500 ttt-piece-pop ${isWinningCell ? 'ttt-win-pulse' : ''}`} />}
+                                    {cell === 'O' && <Circle className={`w-8 h-8 text-rose-500 ttt-piece-pop ${isWinningCell ? 'ttt-win-pulse' : ''}`} />}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <div className={`mt-4 w-full p-2.5 rounded-xl text-center font-bold text-sm transition-all animate-bounce-subtle ${gameData.winner ? (gameData.winner === 'draw' ? 'bg-gray-100 dark:bg-gray-800 text-gray-600' : `bg-${gameData.winner === 'X' ? 'indigo' : 'rose'}-500 text-white shadow-lg shadow-${gameData.winner === 'X' ? 'indigo' : 'rose'}-500/30`) : `text-gray-600 dark:text-gray-400`}`}>
+                        {getStatusMessage()}
+                    </div>
+
+                    {!gameData.players.O.id && currentUserId !== gameData.players.X.id && (
+                        <button
+                            onClick={handleTTTJoin}
+                            className={`mt-3 w-full py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-indigo-500 text-white font-black text-xs uppercase tracking-widest shadow-lg hover:scale-[1.02] active:scale-95 transition-all`}
+                        >
+                            Tap to Join Game
+                        </button>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     // ── Would You Rather ──
     if (isWYR) {
         return (
@@ -88,7 +183,6 @@ const GameMessage = ({ message, currentUser, onGameAnswer, roomVibe }) => {
                     </div>
                 </div>
                 <div className="p-3 space-y-2 bg-white dark:bg-gray-800">
-                    {/* Option A */}
                     <button
                         onClick={() => handleAnswer('A')}
                         disabled={hasAnswered}
@@ -112,7 +206,6 @@ const GameMessage = ({ message, currentUser, onGameAnswer, roomVibe }) => {
                             )}
                         </div>
                     </button>
-                    {/* Option B */}
                     <button
                         onClick={() => handleAnswer('B')}
                         disabled={hasAnswered}
@@ -167,7 +260,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, roomVibe }) => {
                 <div className="p-3 bg-white dark:bg-gray-800">
                     <p className="text-sm font-bold text-gray-900 dark:text-white mb-3">{gameData.question}</p>
                     <div className="space-y-2">
-                        {gameData.options.map((opt, i) => {
+                        {gameData.options && gameData.options.map((opt, i) => {
                             const isCorrect = i === gameData.answer;
                             const isMyPick = myAnswer === i;
                             const showResult = triviaRevealed || hasAnswered;

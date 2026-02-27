@@ -1,27 +1,37 @@
 import React, { useState } from 'react';
-import { X, Send, Dices, Sparkles, HelpCircle } from 'lucide-react';
-import { GAME_TYPES, getRandomWYR, getRandomTrivia } from '../utils/games';
+import { X, Send, Dices, Sparkles, HelpCircle, ChevronLeft, Hash } from 'lucide-react';
+import { GAME_TYPES, getRandomWYR, getRandomTrivia, WYR_TOPIC_LIST, TRIVIA_TOPIC_LIST } from '../utils/games';
 
 const GameModal = ({ isOpen, onClose, onSend, roomVibe }) => {
-    const [gameType, setGameType] = useState(null); // null = selection screen
+    const [gameType, setGameType] = useState(null); // null = select game, then select topic
+    const [selectedTopic, setSelectedTopic] = useState(null);
     const [wyrData, setWyrData] = useState(null);
     const [triviaData, setTriviaData] = useState(null);
 
     if (!isOpen) return null;
 
-    const handlePickWYR = () => {
-        setGameType(GAME_TYPES.WYR);
-        setWyrData(getRandomWYR());
+    const handlePickGame = (type) => {
+        if (type === GAME_TYPES.TIC_TAC_TOE) {
+            onSend({ gameType: GAME_TYPES.TIC_TAC_TOE });
+            handleClose();
+        } else {
+            setGameType(type);
+        }
     };
 
-    const handlePickTrivia = () => {
-        setGameType(GAME_TYPES.TRIVIA);
-        setTriviaData(getRandomTrivia());
+    const handlePickTopic = (topic) => {
+        const topicVal = topic === 'Any' ? null : topic;
+        setSelectedTopic(topicVal);
+        if (gameType === GAME_TYPES.WYR) {
+            setWyrData(getRandomWYR(topicVal));
+        } else {
+            setTriviaData(getRandomTrivia(topicVal));
+        }
     };
 
     const handleShuffle = () => {
-        if (gameType === GAME_TYPES.WYR) setWyrData(getRandomWYR());
-        else if (gameType === GAME_TYPES.TRIVIA) setTriviaData(getRandomTrivia());
+        if (gameType === GAME_TYPES.WYR) setWyrData(getRandomWYR(selectedTopic));
+        else if (gameType === GAME_TYPES.TRIVIA) setTriviaData(getRandomTrivia(selectedTopic));
     };
 
     const handleSend = () => {
@@ -44,23 +54,43 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe }) => {
 
     const handleClose = () => {
         setGameType(null);
+        setSelectedTopic(null);
         setWyrData(null);
         setTriviaData(null);
         onClose();
+    };
+
+    const handleBack = () => {
+        if (wyrData || triviaData) {
+            setWyrData(null);
+            setTriviaData(null);
+            setSelectedTopic(null);
+        } else {
+            setGameType(null);
+        }
     };
 
     const vibeAccent = roomVibe === 'party' ? 'indigo' :
         roomVibe === 'chill' ? 'teal' :
             roomVibe === 'focus' ? 'orange' : 'primary';
 
+    const currentTopicList = gameType === GAME_TYPES.WYR ? WYR_TOPIC_LIST : TRIVIA_TOPIC_LIST;
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 border border-${vibeAccent}-500/20`}>
                 <div className={`flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-${vibeAccent}-50/30 dark:bg-${vibeAccent}-900/10`}>
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center">
-                        <Dices className={`w-6 h-6 mr-2 text-${vibeAccent}-500`} />
-                        {!gameType ? 'Pick a Game' : gameType === GAME_TYPES.WYR ? 'Would You Rather' : 'Trivia'}
-                    </h2>
+                    <div className="flex items-center">
+                        {gameType && (
+                            <button onClick={handleBack} className="mr-2 p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded-full text-gray-500">
+                                <ChevronLeft className="w-5 h-5" />
+                            </button>
+                        )}
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center">
+                            <Dices className={`w-6 h-6 mr-2 text-${vibeAccent}-500`} />
+                            {!gameType ? 'Pick a Game' : !selectedTopic && !(wyrData || triviaData) ? 'Pick a Topic' : gameType === GAME_TYPES.WYR ? 'Would You Rather' : 'Trivia'}
+                        </h2>
+                    </div>
                     <button onClick={handleClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400">
                         <X className="w-5 h-5" />
                     </button>
@@ -68,28 +98,63 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe }) => {
 
                 <div className="p-4">
                     {!gameType ? (
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <button
-                                onClick={handlePickWYR}
-                                className={`flex flex-col items-center justify-center p-6 rounded-xl border-2 border-dashed border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:border-${vibeAccent}-500 hover:bg-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group`}
+                                onClick={() => handlePickGame(GAME_TYPES.WYR)}
+                                className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:border-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group`}
                             >
-                                <Sparkles className={`w-8 h-8 text-${vibeAccent}-500 mb-2 group-hover:scale-110 transition-transform`} />
-                                <span className="font-bold text-gray-900 dark:text-white text-sm">Would You Rather</span>
-                                <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">Pick between two options</span>
+                                <Sparkles className={`w-6 h-6 text-${vibeAccent}-500 mb-2 group-hover:scale-110 transition-transform`} />
+                                <span className="font-bold text-gray-900 dark:text-white text-xs">Would You Rather</span>
+                                <span className="text-[9px] text-gray-500 dark:text-gray-400 mt-1">Impossible choices</span>
                             </button>
                             <button
-                                onClick={handlePickTrivia}
-                                className={`flex flex-col items-center justify-center p-6 rounded-xl border-2 border-dashed border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:border-${vibeAccent}-500 hover:bg-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group`}
+                                onClick={() => handlePickGame(GAME_TYPES.TRIVIA)}
+                                className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:border-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group`}
                             >
-                                <HelpCircle className={`w-8 h-8 text-${vibeAccent}-500 mb-2 group-hover:scale-110 transition-transform`} />
-                                <span className="font-bold text-gray-900 dark:text-white text-sm">Trivia</span>
-                                <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">Test everyone's knowledge</span>
+                                <HelpCircle className={`w-6 h-6 text-${vibeAccent}-500 mb-2 group-hover:scale-110 transition-transform`} />
+                                <span className="font-bold text-gray-900 dark:text-white text-xs">Trivia</span>
+                                <span className="text-[9px] text-gray-500 dark:text-gray-400 mt-1">Test your knowledge</span>
+                            </button>
+                            <button
+                                onClick={() => handlePickGame(GAME_TYPES.TIC_TAC_TOE)}
+                                className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:border-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group sm:col-span-2`}
+                            >
+                                <Hash className={`w-6 h-6 text-${vibeAccent}-500 mb-2 group-hover:scale-110 transition-transform`} />
+                                <span className="font-bold text-gray-900 dark:text-white text-xs">Tic-Tac-Toe</span>
+                                <span className="text-[9px] text-gray-500 dark:text-gray-400 mt-1">Classic 3x3 game</span>
                             </button>
                         </div>
-                    ) : gameType === GAME_TYPES.WYR && wyrData ? (
+                    ) : !selectedTopic && !(wyrData || triviaData) ? (
+                        <div className="max-h-[300px] overflow-y-auto pr-1 scrollbar-thin">
+                            <div className="grid grid-cols-1 gap-2">
+                                <button
+                                    onClick={() => handlePickTopic('Any')}
+                                    className={`flex items-center p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 text-left font-semibold text-sm text-gray-700 dark:text-gray-200`}
+                                >
+                                    ✨ Any Topic (Shuffle All)
+                                </button>
+                                {currentTopicList.map(topic => (
+                                    <button
+                                        key={topic}
+                                        onClick={() => handlePickTopic(topic)}
+                                        className={`flex items-center p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 text-left text-sm text-gray-700 dark:text-gray-200`}
+                                    >
+                                        {topic}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (gameType === GAME_TYPES.WYR && wyrData) ? (
                         <div className="space-y-4">
                             <div className={`bg-gradient-to-br from-${vibeAccent}-50 to-pink-50 dark:from-${vibeAccent}-900/20 dark:to-pink-900/20 rounded-xl p-4 border border-${vibeAccent}-100 dark:border-${vibeAccent}-800`}>
-                                <p className={`text-xs font-bold uppercase tracking-wider text-${vibeAccent}-500 mb-3`}>Would You Rather...</p>
+                                <div className="flex justify-between items-center mb-3">
+                                    <p className={`text-xs font-bold uppercase tracking-wider text-${vibeAccent}-500`}>
+                                        Would You Rather...
+                                    </p>
+                                    {selectedTopic && (
+                                        <span className="text-[9px] bg-white/50 dark:bg-black/20 px-1.5 py-0.5 rounded-full text-gray-500 uppercase font-bold">{selectedTopic}</span>
+                                    )}
+                                </div>
                                 <div className="space-y-2">
                                     <div className={`p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-${vibeAccent}-100 dark:border-${vibeAccent}-800`}>
                                         <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">🅰️ {wyrData.optionA}</span>
@@ -112,7 +177,12 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe }) => {
                     ) : gameType === GAME_TYPES.TRIVIA && triviaData ? (
                         <div className="space-y-4">
                             <div className={`bg-gradient-to-br from-${vibeAccent}-50 to-cyan-50 dark:from-${vibeAccent}-900/20 dark:to-cyan-900/20 rounded-xl p-4 border border-${vibeAccent}-100 dark:border-${vibeAccent}-800`}>
-                                <p className={`text-xs font-bold uppercase tracking-wider text-${vibeAccent}-500 mb-3`}>Trivia Question</p>
+                                <div className="flex justify-between items-center mb-3">
+                                    <p className={`text-xs font-bold uppercase tracking-wider text-${vibeAccent}-500`}>Trivia Question</p>
+                                    {selectedTopic && (
+                                        <span className="text-[9px] bg-white/50 dark:bg-black/20 px-1.5 py-0.5 rounded-full text-gray-500 uppercase font-bold">{selectedTopic}</span>
+                                    )}
+                                </div>
                                 <p className="text-sm font-bold text-gray-900 dark:text-white mb-3">{triviaData.question}</p>
                                 <div className="space-y-2">
                                     {triviaData.options.map((opt, i) => (
