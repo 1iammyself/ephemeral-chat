@@ -429,6 +429,10 @@ const ChatRoom = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
 
+  // Stealth Actions State
+  const [isStealthMode, setIsStealthMode] = useState(false);
+  const [overrideTtl, setOverrideTtl] = useState(false);
+
   // Floating Reactions State
   const reactionLayerRef = useRef(null);
   const lastReactionTime = useRef(0);
@@ -1101,53 +1105,28 @@ const ChatRoom = () => {
     return () => clearInterval(interval);
   }, [isConnected]);
 
-  // High-Assurance Quick Actions (Electron only)
+  // High-Assurance Quick Actions (Electron only, Option C)
   useEffect(() => {
-    if (window.electronAPI?.onPanicBurn) {
-      window.electronAPI.onPanicBurn(() => {
-        // Only trigger if not actively typing
-        const isInputFocused = document.activeElement &&
-          (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
-
-        if (!isInputFocused && currentUser) {
-          // Find all messages sent by this user that are currently in state
-          const myMsgs = messages.filter(m => m.sender.socketId === currentUser.socketId || m.sender.id === currentUser.id);
-
-          if (myMsgs.length > 0) {
-            hapticError(); // Distinctive haptic for panic action
-            myMsgs.forEach(msg => {
-              socketManager.emit('delete-message', { messageId: msg.id });
-            });
-            toast.success(`Panic Burn: Destroyed ${myMsgs.length} messages`, {
-              autoClose: 2000,
-              theme: theme === 'dark' ? 'dark' : 'light',
-              icon: '🔥'
-            });
-          }
-        }
+    if (window.electronAPI?.onToggleStealth) {
+      window.electronAPI.onToggleStealth(() => {
+        setIsStealthMode(prev => {
+          const next = !prev;
+          if (next) hapticLight();
+          return next;
+        });
       });
     }
 
-    if (window.electronAPI?.onToggleAnonymous) {
-      window.electronAPI.onToggleAnonymous(() => {
-        const isInputFocused = document.activeElement &&
-          (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
-
-        if (!isInputFocused) {
-          setIsAnonymousMode(prev => {
-            const newState = !prev;
-            toast.info(`Anonymous Sender: ${newState ? 'ON' : 'OFF'}`, {
-              autoClose: 1500,
-              theme: theme === 'dark' ? 'dark' : 'light',
-              icon: newState ? '👻' : '👤'
-            });
-            hapticLight();
-            return newState;
-          });
-        }
+    if (window.electronAPI?.onToggleOverrideTtl) {
+      window.electronAPI.onToggleOverrideTtl(() => {
+        setOverrideTtl(prev => {
+          const next = !prev;
+          if (next) hapticLight();
+          return next;
+        });
       });
     }
-  }, [messages, currentUser, theme]);
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1419,9 +1398,14 @@ const ChatRoom = () => {
         iv,
         recipients: finalRecipients,
         replyTo: replyData,
-        isAnonymous: isAnonymousMode
+        isAnonymous: isAnonymousMode,
+        overrideTtl: overrideTtl ? 10 : null // 10-second self-destruct override
       });
-      socketManager.emit('user-activity');
+
+      // Clear override after one use
+      if (overrideTtl) setOverrideTtl(false);
+
+      if (!isStealthMode) socketManager.emit('user-activity');
       hapticLight(); // Haptic feedback on message send
       setNewMessage('');
       setReplyingTo(null);
@@ -1529,6 +1513,7 @@ const ChatRoom = () => {
   };
 
   const handleTyping = () => {
+    if (isStealthMode) return; // Block typing indicator if in stealth mode
     socketManager.emit('typing', { roomCode });
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
@@ -2044,7 +2029,23 @@ const ChatRoom = () => {
             <div ref={messagesEndRef} />
           </div>
           <div className={`border-t border-gray-200/50 dark:border-gray-700/50 ${getVibeById(roomVibe).panelClass} backdrop-blur-md sticky bottom-0 z-50 shrink-0 chat-input-area`}>
-            {typingUsers.size > 0 && (
+            {/* Active Security Indicators */}
+            {(isStealthMode || overrideTtl) && (
+              <div className="px-4 py-1.5 flex items-center gap-3 border-b border-gray-200/50 dark:border-yellow-900/50 bg-yellow-50/50 dark:bg-yellow-900/10">
+                {isStealthMode && (
+                  <span className="flex items-center text-xs font-mono text-yellow-700 dark:text-yellow-400">
+                    <EyeOff className="w-3.5 h-3.5 mr-1.5" /> STEALTH MODE
+                  </span>
+                )}
+                {overrideTtl && (
+                  <span className="flex items-center text-xs font-mono text-orange-700 dark:text-orange-400">
+                    <Clock className="w-3.5 h-3.5 mr-1.5" /> OVERRIDE 10s TTL
+                  </span>
+                )}
+              </div>
+            )}
+
+            {typingUsers.size > 0 && !isStealthMode && (
               <div className="px-4 py-1 text-xs text-gray-500 dark:text-gray-400 italic animate-pulse bg-black/5 dark:bg-white/5 border-b border-gray-200/50 dark:border-gray-700/50">
                 {Array.from(typingUsers.values()).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
               </div>

@@ -769,8 +769,8 @@ function createMenu() {
     {
       label: 'Security Actions',
       submenu: [
-        { label: 'Panic Burn', accelerator: 'CmdOrCtrl+Z', click: () => { if (mainWindow) mainWindow.webContents.send('panic-burn'); } },
-        { label: 'Toggle Internal Anonymous', accelerator: 'CmdOrCtrl+Y', click: () => { if (mainWindow) mainWindow.webContents.send('toggle-anonymous'); } },
+        { label: 'Toggle Stealth Mode', accelerator: 'CmdOrCtrl+Shift+H', click: () => { if (mainWindow) mainWindow.webContents.send('toggle-stealth'); } },
+        { label: 'Toggle Self-Destruct Override', accelerator: 'CmdOrCtrl+Shift+D', click: () => { if (mainWindow) mainWindow.webContents.send('toggle-override-ttl'); } },
         { type: 'separator' },
         { role: 'cut' },
         { role: 'copy' },
