@@ -23,12 +23,22 @@ class WebRTCService {
         this.callStateHandlers = new Map();
         this.currentRoomCode = null;
 
+        // Voice scrambler state
+        this._scramblerEnabled = false;
+        this._scramblerCtx = null;       // AudioContext
+        this._scramblerSource = null;     // MediaStreamSource
+        this._scramblerDest = null;       // MediaStreamDestination
+        this._scramblerOsc = null;        // OscillatorNode for ring modulation
+        this._scramblerGain = null;       // GainNode
+        this._originalAudioTrack = null;  // Original track to restore later
+
         this.currentCallState = {
             isCallActive: false,
             isIncomingCall: false,
             isOutgoingCall: false,
             isCalling: false,
             isConnected: false,
+            isVoiceScramblerOn: false,
             remoteNickname: null,
             callId: null,
             state: CallState.IDLE,
@@ -243,6 +253,9 @@ class WebRTCService {
             });
         }
 
+        // Clean up voice scrambler
+        this.disableVoiceScrambler();
+
         if (this.localStream) {
             this.localStream.getTracks().forEach(track => track.stop());
             this.localStream = null;
@@ -260,6 +273,7 @@ class WebRTCService {
             isOutgoingCall: false,
             isCalling: false,
             isConnected: false,
+            isVoiceScramblerOn: false,
             remoteNickname: null,
             callId: null,
             incomingCallerId: null,
@@ -435,6 +449,143 @@ class WebRTCService {
     getRemoteStreams() {
         return this.currentCallState.remoteStreams;
     }
+
+    // ==================== VOICE SCRAMBLER ====================
+
+    /**
+     * Enable voice scrambler — processes local audio through a ring modulation
+     * + bandpass filter pipeline and replaces the audio track on all peer connections.
+     */
+    enableVoiceScrambler() {
+        if (this._scramblerEnabled || !this.localStream) return;
+
+        try {
+            const audioTrack = this.localStream.getAudioTracks()[0];
+            if (!audioTrack) return;
+
+            this._originalAudioTrack = audioTrack;
+
+            // Create AudioContext and nodes
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const source = ctx.createMediaStreamSource(new MediaStream([audioTrack]));
+            const dest = ctx.createMediaStreamDestination();
+
+            // Ring modulation: multiply signal with a sine wave to shift pitch
+            const oscillator = ctx.createOscillator();
+            oscillator.type = 'sine';
+            oscillator.frequency.value = 400; // Hz shift — gives a "robotic" effect
+
+            const modGain = ctx.createGain();
+            modGain.gain.value = 0.8;
+
+            // Bandpass filter to shape the scrambled output
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = 1800;
+            filter.Q.value = 0.7;
+
+            // Additional pitch-warping filter
+            const distortion = ctx.createBiquadFilter();
+            distortion.type = 'highshelf';
+            distortion.frequency.value = 3000;
+            distortion.gain.value = 8;
+
+            // Connect: source -> modGain <- oscillator, modGain -> filter -> distortion -> dest
+            oscillator.connect(modGain.gain); // Modulate the gain with the oscillator
+            source.connect(modGain);
+            modGain.connect(filter);
+            filter.connect(distortion);
+            distortion.connect(dest);
+            oscillator.start();
+
+            // Store references for cleanup
+            this._scramblerCtx = ctx;
+            this._scramblerSource = source;
+            this._scramblerDest = dest;
+            this._scramblerOsc = oscillator;
+            this._scramblerGain = modGain;
+
+            // Replace the audio track on all active peer connections
+            const scrambledTrack = dest.stream.getAudioTracks()[0];
+            this.peers.forEach((peer) => {
+                const senders = peer.connection.getSenders();
+                const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
+                if (audioSender) {
+                    audioSender.replaceTrack(scrambledTrack).catch(e =>
+                        console.warn('Failed to replace track for scrambler:', e)
+                    );
+                }
+            });
+
+            this._scramblerEnabled = true;
+            this.updateCallState({ isVoiceScramblerOn: true });
+            console.log('🔊 Voice scrambler enabled');
+        } catch (error) {
+            console.error('Failed to enable voice scrambler:', error);
+        }
+    }
+
+    /**
+     * Disable voice scrambler — restores the original audio track.
+     */
+    disableVoiceScrambler() {
+        if (!this._scramblerEnabled) return;
+
+        try {
+            // Restore original track on all peer connections
+            if (this._originalAudioTrack) {
+                this.peers.forEach((peer) => {
+                    const senders = peer.connection.getSenders();
+                    const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
+                    if (audioSender) {
+                        audioSender.replaceTrack(this._originalAudioTrack).catch(e =>
+                            console.warn('Failed to restore original track:', e)
+                        );
+                    }
+                });
+            }
+
+            // Clean up audio nodes
+            if (this._scramblerOsc) {
+                this._scramblerOsc.stop();
+                this._scramblerOsc.disconnect();
+            }
+            if (this._scramblerSource) this._scramblerSource.disconnect();
+            if (this._scramblerGain) this._scramblerGain.disconnect();
+            if (this._scramblerCtx) this._scramblerCtx.close().catch(() => { });
+
+            this._scramblerCtx = null;
+            this._scramblerSource = null;
+            this._scramblerDest = null;
+            this._scramblerOsc = null;
+            this._scramblerGain = null;
+            this._originalAudioTrack = null;
+            this._scramblerEnabled = false;
+
+            this.updateCallState({ isVoiceScramblerOn: false });
+            console.log('🔇 Voice scrambler disabled');
+        } catch (error) {
+            console.error('Failed to disable voice scrambler:', error);
+        }
+    }
+
+    /**
+     * Toggle voice scrambler on/off
+     */
+    toggleVoiceScrambler() {
+        if (this._scramblerEnabled) {
+            this.disableVoiceScrambler();
+        } else {
+            this.enableVoiceScrambler();
+        }
+        return this._scramblerEnabled;
+    }
+
+    isVoiceScramblerEnabled() {
+        return this._scramblerEnabled;
+    }
+
+    // ==================== MUTE ====================
 
     toggleMute() {
         if (this.localStream) {

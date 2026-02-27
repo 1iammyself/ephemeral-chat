@@ -13,6 +13,7 @@ import {
     Video,
     Volume2,
     VolumeX,
+    AudioLines,
     X
 } from 'lucide-react';
 import webRTCService from '../webrtc';
@@ -32,6 +33,7 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
     const [callState, setCallState] = useState(webRTCService.getCurrentCallState());
     const [isMuted, setIsMuted] = useState(false);
     const [isSpeakerOn, setIsSpeakerOn] = useState(true);
+    const [isScrambled, setIsScrambled] = useState(false);
     const [callDuration, setCallDuration] = useState(0);
 
     const localAudioRef = useRef(null);
@@ -123,6 +125,11 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
 
     const toggleSpeaker = () => {
         setIsSpeakerOn(!isSpeakerOn);
+    };
+
+    const toggleScrambler = () => {
+        const nowScrambled = webRTCService.toggleVoiceScrambler();
+        setIsScrambled(nowScrambled);
     };
 
     const formatDuration = (seconds) => {
@@ -243,6 +250,17 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                                     }`}
                             >
                                 {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
+                            </button>
+
+                            <button
+                                onClick={toggleScrambler}
+                                title={isScrambled ? 'Disable voice scrambler' : 'Enable voice scrambler'}
+                                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${isScrambled
+                                    ? 'bg-purple-500 text-white ring-2 ring-purple-400/50 animate-pulse shadow-lg shadow-purple-500/30'
+                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                                    }`}
+                            >
+                                <AudioLines className="w-6 h-6" />
                             </button>
 
                             <button
