@@ -13,7 +13,7 @@ import {
     Video,
     Volume2,
     VolumeX,
-    AudioLines,
+    Activity,
     X
 } from 'lucide-react';
 import webRTCService from '../webrtc';
@@ -260,7 +260,7 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                                     : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                                     }`}
                             >
-                                <AudioLines className="w-6 h-6" />
+                                <Activity className="w-6 h-6" />
                             </button>
 
                             <button
