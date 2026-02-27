@@ -1914,8 +1914,13 @@ io.on('connection', (socket) => {
       if (!room) return;
 
       // Only host/admin/mod can start challenges
-      const userRole = room.users?.find(u => u.socketId === socket.id)?.role;
-      if (!['host', 'admin', 'moderator'].includes(userRole)) {
+      const roomMeta = roomData[socket.roomCode];
+      if (!roomMeta) return;
+
+      const userRole = roomMeta.userRoles?.[socket.id] || (roomMeta.hostId === socket.id ? 'host' : 'user');
+      const canManage = userRole === 'host' || userRole === 'tier1' || userRole === 'tier2';
+
+      if (!canManage) {
         socket.emit('error', { message: 'Permission denied' });
         return;
       }
@@ -1940,6 +1945,15 @@ io.on('connection', (socket) => {
   socket.on('stop-challenge', async () => {
     try {
       if (!socket.roomCode) return;
+
+      const roomMeta = roomData[socket.roomCode];
+      if (!roomMeta) return;
+
+      const userRole = roomMeta.userRoles?.[socket.id] || (roomMeta.hostId === socket.id ? 'host' : 'user');
+      const canManage = userRole === 'host' || userRole === 'tier1' || userRole === 'tier2';
+
+      if (!canManage) return;
+
       const room = await roomManager.getRoom(socket.roomCode);
       if (!room) return;
 
