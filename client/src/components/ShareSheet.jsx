@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Mail, Link as LinkIcon, Check, Copy } from 'lucide-react';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
-import { toast } from 'react-toastify';
+import { hapticSuccess } from '../utils/platform';
 
 // Simple icons for social platforms (Lucide doesn't have brand icons like WhatsApp/Telegram natively)
 // We'll use SVGs or text for them.
@@ -27,7 +27,7 @@ const ShareSheet = ({ isOpen, onClose, shareData }) => {
 
     const handleCopy = () => {
         setIsCopied(true);
-        toast.success('Link copied to clipboard!');
+        hapticSuccess();
         setTimeout(() => {
             setIsCopied(false);
             onClose(); // Optional: close after copy? Maybe keep open.

@@ -767,15 +767,41 @@ function createMenu() {
       ]
     },
     {
-      label: 'Security Actions',
+      label: 'Edit',
       submenu: [
-        { label: 'Toggle Stealth Mode', accelerator: 'CmdOrCtrl+Shift+H', click: () => { if (mainWindow) mainWindow.webContents.send('toggle-stealth'); } },
-        { label: 'Toggle Self-Destruct Override', accelerator: 'CmdOrCtrl+Shift+D', click: () => { if (mainWindow) mainWindow.webContents.send('toggle-override-ttl'); } },
+        { role: 'undo', accelerator: 'CmdOrCtrl+Alt+Z' },
+        { role: 'redo', accelerator: 'CmdOrCtrl+Shift+Z' },
         { type: 'separator' },
         { role: 'cut' },
         { role: 'copy' },
         { role: 'paste' },
         { role: 'selectAll' }
+      ]
+    },
+    {
+      label: 'Security',
+      submenu: [
+        {
+          label: 'Panic Burn (Delete Room Content)',
+          accelerator: 'CmdOrCtrl+Z',
+          click: () => { if (mainWindow) mainWindow.webContents.send('panic-burn'); }
+        },
+        {
+          label: 'Toggle Anonymous Mode',
+          accelerator: 'CmdOrCtrl+Y',
+          click: () => { if (mainWindow) mainWindow.webContents.send('toggle-anonymous'); }
+        },
+        { type: 'separator' },
+        {
+          label: 'Toggle Stealth Mode',
+          accelerator: 'CmdOrCtrl+Shift+H',
+          click: () => { if (mainWindow) mainWindow.webContents.send('toggle-stealth'); }
+        },
+        {
+          label: 'Toggle 10s Self-Destruct Override',
+          accelerator: 'CmdOrCtrl+Shift+D',
+          click: () => { if (mainWindow) mainWindow.webContents.send('toggle-override-ttl'); }
+        }
       ]
     },
     {
@@ -930,6 +956,20 @@ Window:
   F11             Toggle fullscreen
   Ctrl+/          Show this dialog
   Ctrl+Q / Alt+F4 Quit
+
+Security:
+  Ctrl+Z          Panic Burn (Delete room content)
+  Ctrl+Y          Toggle Anonymous Mode
+  Ctrl+Shift+H    Toggle Stealth Mode
+  Ctrl+Shift+D    Toggle 10s Self-Destruct Override
+
+Standard Editing:
+  Ctrl+Alt+Z      Undo
+  Ctrl+Shift+Z    Redo
+  Ctrl+X          Cut
+  Ctrl+C          Copy
+  Ctrl+V          Paste
+  Ctrl+A          Select All
   `;
 
   dialog.showMessageBox(mainWindow, {

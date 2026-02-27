@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { hapticSuccess } from '../utils/platform';
 import { X, Check, Copy, Users, Lock, Unlock, Timer, Zap, PartyPopper, Sun, Sunset, Settings, Clock, Shield, Share2, Hash } from 'lucide-react';
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
@@ -173,6 +174,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
 
   const copyToClipboard = (text, type) => {
     navigator.clipboard.writeText(text);
+    hapticSuccess();
     setIsCopied(prev => ({ ...prev, [type]: true }));
     setTimeout(() => {
       setIsCopied(prev => ({ ...prev, [type]: false }));
@@ -210,7 +212,6 @@ Verbal Code: ${verbalCode || 'N/A'}`;
         if (error.message !== 'Share canceled' && error.name !== 'AbortError') {
           const fullText = `${shareText}\n\nLink: ${inviteLink}`;
           copyToClipboard(fullText, 'inviteLink');
-          toast.info('Invite details copied to clipboard');
         }
       }
     } else {

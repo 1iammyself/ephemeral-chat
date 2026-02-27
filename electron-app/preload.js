@@ -44,6 +44,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   onToggleOverrideTtl: (callback) => {
     ipcRenderer.on('toggle-override-ttl', () => callback());
+  },
+  onPanicBurn: (callback) => {
+    ipcRenderer.on('panic-burn', () => callback());
+  },
+  onToggleAnonymous: (callback) => {
+    ipcRenderer.on('toggle-anonymous', () => callback());
   }
 });
 

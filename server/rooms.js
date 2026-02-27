@@ -432,6 +432,12 @@ class RoomManager {
     }
     message.timestamp = new Date().toISOString();
 
+    // Handle per-message override TTL (e.g., 10s override)
+    if (message.overrideTtl && message.overrideTtl > 0) {
+      const expiresAt = new Date(Date.now() + message.overrideTtl * 1000);
+      message.expiresAt = expiresAt.toISOString();
+    }
+
     // Initialize viewedBy array for view-once messages
     if (message.isViewOnce) {
       message.viewedBy = [];
@@ -440,7 +446,9 @@ class RoomManager {
     // Handle message TTL with Redis
     if (this.redis && room.settings.messageTTL > 0) {
       const messageKey = `message:${roomCode}:${message.id}`;
-      await this.redis.setex(messageKey, room.settings.messageTTL, JSON.stringify(message));
+      // Use the smaller of override or room default for Redis expiry
+      const ttl = message.overrideTtl || room.settings.messageTTL;
+      await this.redis.setex(messageKey, ttl, JSON.stringify(message));
     } else {
       room.messages.push(message);
 
@@ -453,6 +461,25 @@ class RoomManager {
     }
 
     this.refreshRoomExpiry(roomCode);
+  }
+
+  /**
+   * Clear all messages from a room
+   * @param {string} roomCode - Room code
+   */
+  async clearMessages(roomCode) {
+    const room = await this.getRoom(roomCode);
+    if (!room) return;
+
+    if (this.redis) {
+      const messageKeys = await this.redis.keys(`message:${roomCode}:*`);
+      if (messageKeys.length > 0) {
+        await this.redis.del(...messageKeys);
+      }
+    } else {
+      room.messages = [];
+      await this.saveRoom(roomCode, room);
+    }
   }
 
   /**
@@ -498,26 +525,32 @@ class RoomManager {
       messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     } else {
       // In-memory: Filter out expired messages on read
-      if (room.settings.messageTTL > 0) {
-        const now = new Date();
-        const ttlMs = room.settings.messageTTL * 1000;
+      const now = new Date();
+      const defaultTtlMs = room.settings.messageTTL * 1000;
 
-        // Filter messages that haven't expired
-        const validMessages = room.messages.filter(msg => {
-          const msgTime = new Date(msg.timestamp);
-          return (now - msgTime) < ttlMs;
-        });
-
-        // If we filtered anything out, update the room storage immediately
-        if (validMessages.length !== room.messages.length) {
-          room.messages = validMessages;
-          await this.saveRoom(roomCode, room);
+      // Filter messages that haven't expired
+      const validMessages = room.messages.filter(msg => {
+        // 1. Check if message has its own expiry override
+        if (msg.expiresAt) {
+          return new Date(msg.expiresAt) > now;
         }
 
-        messages = validMessages;
-      } else {
-        messages = room.messages || [];
+        // 2. Fallback to room default TTL if set
+        if (defaultTtlMs > 0) {
+          const msgTime = new Date(msg.timestamp);
+          return (now - msgTime) < defaultTtlMs;
+        }
+
+        return true;
+      });
+
+      // If we filtered anything out, update the room storage immediately
+      if (validMessages.length !== room.messages.length) {
+        room.messages = validMessages;
+        await this.saveRoom(roomCode, room);
       }
+
+      messages = validMessages;
     }
 
     // Filter private messages if userId is provided
@@ -545,18 +578,27 @@ class RoomManager {
     const now = new Date();
 
     for (const [roomCode, room] of this.rooms.entries()) {
-      if (room.settings.messageTTL > 0) {
-        const ttlMs = room.settings.messageTTL * 1000;
-        const originalCount = room.messages.length;
+      const now = new Date();
+      const defaultTtlMs = room.settings.messageTTL * 1000;
+      const originalCount = room.messages.length;
 
-        room.messages = room.messages.filter(msg => {
-          const msgTime = new Date(msg.timestamp);
-          return (now - msgTime) < ttlMs;
-        });
-
-        if (room.messages.length !== originalCount) {
-          // console.log(`Pruned ${originalCount - room.messages.length} expired messages from room ${roomCode}`);
+      room.messages = room.messages.filter(msg => {
+        // 1. Check if message has its own expiry override
+        if (msg.expiresAt) {
+          return new Date(msg.expiresAt) > now;
         }
+
+        // 2. Fallback to room default TTL
+        if (defaultTtlMs > 0) {
+          const msgTime = new Date(msg.timestamp);
+          return (now - msgTime) < defaultTtlMs;
+        }
+
+        return true;
+      });
+
+      if (room.messages.length !== originalCount) {
+        // console.log(`Pruned ${originalCount - room.messages.length} expired messages from room ${roomCode}`);
       }
     }
   }

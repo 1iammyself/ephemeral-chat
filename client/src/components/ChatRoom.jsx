@@ -25,6 +25,8 @@ import {
   PanelRight,
   Dices,
   Trophy,
+  Ghost,
+  EyeOff,
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -718,50 +720,6 @@ const ChatRoom = () => {
 
     // Trigger Pulse to alert the user visually
     triggerPulse();
-
-    // Prevent duplicate toasts using fixed toastId
-    if (toast.isActive('file-transfer-invite')) return;
-
-    toast(({ closeToast }) => (
-      <div className="flex flex-col gap-1.5 min-w-[240px] p-1">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
-            <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-sm font-bold text-gray-900 dark:text-white leading-tight">
-              {from}
-            </h3>
-            <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">
-              Secure file transfer request
-            </p>
-          </div>
-        </div>
-
-        <div className="flex gap-2 mt-3 pt-2 border-t border-gray-100 dark:border-gray-800">
-          <button
-            onClick={() => {
-              closeToast();
-              setShowFileModal(true);
-            }}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
-          >
-            Open Files
-          </button>
-          <button
-            onClick={closeToast}
-            className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg text-xs font-semibold hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors active:scale-95"
-          >
-            Ignore
-          </button>
-        </div>
-      </div>
-    ), {
-      toastId: 'file-transfer-invite',
-      autoClose: false,
-      position: "top-right",
-      className: 'dark:bg-gray-900/90 dark:backdrop-blur-md border border-gray-100 dark:border-gray-800 rounded-2xl shadow-2xl p-2'
-    });
   }, [roomCode, triggerPulse]);
 
   const sendRoomReaction = useCallback((emoji) => {
@@ -1055,6 +1013,15 @@ const ChatRoom = () => {
     socketManager.on('room-reaction', handleRoomReaction);
     socketManager.on('file-transfer-invite', handleFileTransferInvite);
     socketManager.on('challenge-update', handleChallengeUpdate);
+    socketManager.on('messages-cleared', () => {
+      setMessages([]);
+      setActivityLogs(prev => [{
+        id: `log_${Date.now()}`,
+        type: 'system',
+        content: 'Room content has been cleared (Panic Burn)',
+        timestamp: new Date().toISOString()
+      }, ...prev].slice(0, 50));
+    });
 
     return () => {
       socketManager.off('connect', handleConnect);
@@ -1087,6 +1054,7 @@ const ChatRoom = () => {
       socketManager.off('room-reaction', handleRoomReaction);
       socketManager.off('file-transfer-invite', handleFileTransferInvite);
       socketManager.off('challenge-update', handleChallengeUpdate);
+      socketManager.off('messages-cleared');
 
       // Explicitly leave the room before disconnecting
       socketManager.emit('leave-room');
@@ -1120,6 +1088,25 @@ const ChatRoom = () => {
     if (window.electronAPI?.onToggleOverrideTtl) {
       window.electronAPI.onToggleOverrideTtl(() => {
         setOverrideTtl(prev => {
+          const next = !prev;
+          if (next) hapticLight();
+          return next;
+        });
+      });
+    }
+
+    if (window.electronAPI?.onPanicBurn) {
+      window.electronAPI.onPanicBurn(() => {
+        if (socketManager.socket?.connected) {
+          socketManager.emit('panic-burn');
+          hapticHeavy();
+        }
+      });
+    }
+
+    if (window.electronAPI?.onToggleAnonymous) {
+      window.electronAPI.onToggleAnonymous(() => {
+        setIsAnonymousMode(prev => {
           const next = !prev;
           if (next) hapticLight();
           return next;
@@ -1920,7 +1907,7 @@ const ChatRoom = () => {
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(verbalCode);
-                      toast.success('Room code copied!');
+                      hapticSuccess();
                     }}
                     className="hidden sm:flex items-center space-x-1 px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors border border-indigo-100 dark:border-indigo-800"
                     title="Click to copy join code"
@@ -2040,17 +2027,25 @@ const ChatRoom = () => {
           </div>
           <div className={`border-t border-gray-200/50 dark:border-gray-700/50 ${getVibeById(roomVibe).panelClass} backdrop-blur-md sticky bottom-0 z-50 shrink-0 chat-input-area`}>
             {/* Active Security Indicators */}
-            {(isStealthMode || overrideTtl) && (
-              <div className="px-4 py-1.5 flex items-center gap-3 border-b border-gray-200/50 dark:border-yellow-900/50 bg-yellow-50/50 dark:bg-yellow-900/10">
+            {(isStealthMode || overrideTtl || isAnonymousMode) && (
+              <div className="px-4 py-1.5 flex items-center gap-3 border-b border-gray-200/50 dark:border-gray-700/50 bg-white/50 dark:bg-black/20 overflow-x-auto scrollbar-none">
                 {isStealthMode && (
-                  <span className="flex items-center text-xs font-mono text-yellow-700 dark:text-yellow-400">
-                    <EyeOff className="w-3.5 h-3.5 mr-1.5" /> STEALTH MODE
-                  </span>
+                  <div className="flex items-center gap-1.5 text-[10px] font-black tracking-tighter text-gray-500 dark:text-gray-400 bg-gray-100/80 dark:bg-gray-800/80 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-gray-200/50 dark:border-white/10 shadow-sm shrink-0">
+                    <EyeOff className="w-3 h-3" />
+                    GHOST MODE
+                  </div>
                 )}
                 {overrideTtl && (
-                  <span className="flex items-center text-xs font-mono text-orange-700 dark:text-orange-400">
-                    <Clock className="w-3.5 h-3.5 mr-1.5" /> OVERRIDE 10s TTL
-                  </span>
+                  <div className="flex items-center gap-1.5 text-[10px] font-black tracking-tighter text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-950/40 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-red-100/50 dark:border-red-500/20 shadow-sm animate-pulse shrink-0">
+                    <Clock className="w-3 h-3" />
+                    VANISH-10S
+                  </div>
+                )}
+                {isAnonymousMode && (
+                  <div className="flex items-center gap-1.5 text-[10px] font-black tracking-tighter text-purple-600 dark:text-purple-400 bg-purple-50/80 dark:bg-purple-950/40 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-purple-100/50 dark:border-purple-500/20 shadow-sm shrink-0">
+                    <Ghost className="w-3 h-3" />
+                    ANONYMOUS
+                  </div>
                 )}
               </div>
             )}

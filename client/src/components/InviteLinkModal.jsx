@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { generateInviteLink } from '../utils/api';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
-import { toast } from 'react-toastify';
+import { hapticSuccess } from '../utils/platform';
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
 import { X, Loader2, Check, AlertCircle, Clock, Share2 } from 'lucide-react';
@@ -58,14 +58,13 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
         }
         setInviteLink(url);
         setVerbalCode(result.verbalCode || '');
-        toast.success('Invite link generated!');
+        hapticSuccess();
       } else {
         throw new Error(result.error || 'Failed to generate invite link');
       }
     } catch (error) {
       console.error('Error generating invite link:', error);
       setError(error.message || 'Failed to generate invite link. Please try again.');
-      toast.error(error.message || 'Failed to generate invite link');
     } finally {
       setIsGenerating(false);
     }
@@ -73,13 +72,13 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
 
   const handleCopy = () => {
     setIsCopied(true);
-    toast.success('Link copied to clipboard!');
+    hapticSuccess();
     setTimeout(() => setIsCopied(false), 2000);
   };
 
   const handleVerbalCopy = () => {
     setIsVerbalCopied(true);
-    toast.success('Verbal code copied!');
+    hapticSuccess();
     setTimeout(() => setIsVerbalCopied(false), 2000);
   };
 
@@ -114,7 +113,7 @@ Verbal Code: ${verbalCode || 'N/A'}`;
         if (error.message !== 'Share canceled' && error.name !== 'AbortError') {
           const fullText = `${shareText}\n\nLink: ${inviteLink}`;
           navigator.clipboard.writeText(fullText);
-          toast.success('Invite details copied!');
+          hapticSuccess();
         }
       }
     } else {

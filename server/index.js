@@ -1542,7 +1542,7 @@ io.on('connection', (socket) => {
       }
 
       // Support for text, image, audio, and file messages
-      let { content, messageType = 'text', isViewOnce = false, imageData, pollData, recipients = [], replyTo, isEncrypted, iv, fileName, mimeType, fileSize, isAnonymous } = data;
+      let { content, messageType = 'text', isViewOnce = false, imageData, pollData, recipients = [], replyTo, isEncrypted, iv, fileName, mimeType, fileSize, isAnonymous, overrideTtl } = data;
 
       // Normalize content/imageData: If it's an image and content is provided but imageData isn't, use content for imageData
       if (messageType === 'image' && !imageData && content) {
@@ -1704,6 +1704,7 @@ io.on('connection', (socket) => {
         reactions: {}, // Initialize reactions
         hasBeenViewed: false,
         isAnonymous: !!isAnonymous, // Anonymous confession flag
+        overrideTtl: overrideTtl || null, // Per-message TTL override
         sender: isAnonymous ? {
           socketId: `anon_${Date.now()}`,
           nickname: 'Anonymous \uD83D\uDC7B',
@@ -1805,6 +1806,17 @@ io.on('connection', (socket) => {
 
     if (roomCode && socket.roomCode === roomCode) {
       socket.to(roomCode).emit('pulse-received', { from: socket.nickname });
+    }
+  });
+
+  // Panic Burn (Delete all messages in room)
+  socket.on('panic-burn', async () => {
+    if (!socket.roomCode) return;
+    try {
+      await roomManager.clearMessages(socket.roomCode);
+      io.to(socket.roomCode).emit('messages-cleared');
+    } catch (err) {
+      logger.error('Error in panic-burn:', err);
     }
   });
 

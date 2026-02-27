@@ -5,7 +5,7 @@ import CreateRoomModal from './CreateRoomModal';
 import TraceHashModal from './TraceHashModal';
 import ThemeToggle from './ThemeToggle';
 import { joinWithVerbalCode, checkRoom } from '../utils/api';
-import { toast } from 'react-toastify';
+import { hapticError } from '../utils/platform';
 
 import { RefreshButton } from './PWAHandler';
 
@@ -17,6 +17,7 @@ const Home = ({ children }) => {
   const [isJoining, setIsJoining] = useState(false);
   const [isJoiningVerbal, setIsJoiningVerbal] = useState(false);
   const [urlParamsProcessed, setUrlParamsProcessed] = useState(false);
+  const [verbalError, setVerbalError] = useState('');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -56,13 +57,15 @@ const Home = ({ children }) => {
             }
           })
           .catch(error => {
-            toast.error(typeof error === 'string' ? error : 'Invalid or expired code');
+            setVerbalError(typeof error === 'string' ? error : 'Invalid or expired code');
+            hapticError();
           })
           .finally(() => {
             setIsJoiningVerbal(false);
           });
       } else {
-        toast.error('Invalid verbal code format. Please enter 4 words.');
+        setVerbalError('Invalid verbal code format. Please enter 4 words.');
+        hapticError();
       }
     }
   }, [searchParams, urlParamsProcessed, navigate]);
@@ -97,16 +100,20 @@ const Home = ({ children }) => {
     const trimmedCode = verbalCode.trim().toLowerCase();
 
     if (!trimmedCode) {
-      toast.error('Please enter a verbal code');
+      setVerbalError('Please enter a verbal code');
+      hapticError();
       return;
     }
 
     // Validate format: 4 words separated by spaces
     const words = trimmedCode.split(' ').filter(w => w.length > 0);
     if (words.length !== 4) {
-      toast.error('Please enter 4 words separated by spaces');
+      setVerbalError('Please enter 4 words separated by spaces');
+      hapticError();
       return;
     }
+
+    setVerbalError('');
 
     setIsJoiningVerbal(true);
     try {
@@ -115,7 +122,8 @@ const Home = ({ children }) => {
         navigate(`/invite/${result.token}`);
       }
     } catch (error) {
-      toast.error(typeof error === 'string' ? error : 'Invalid or expired code');
+      setVerbalError(typeof error === 'string' ? error : 'Invalid or expired code');
+      hapticError();
     } finally {
       setIsJoiningVerbal(false);
     }
@@ -238,6 +246,11 @@ const Home = ({ children }) => {
                       )}
                     </button>
                   </form>
+                  {verbalError && (
+                    <p className="mt-2 text-xs text-red-500 dark:text-red-400 animate-in fade-in slide-in-from-top-1">
+                      {verbalError}
+                    </p>
+                  )}
                 </div>
 
                 <p className="mt-4 text-center text-xs text-gray-400 dark:text-gray-500">

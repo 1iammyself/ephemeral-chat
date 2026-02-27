@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { registerSW } from 'virtual:pwa-register';
 import { RefreshCw, Download, Info } from 'lucide-react';
-import { toast } from 'react-toastify';
 
 /**
  * Detects if the app is running as a standalone PWA on iOS
@@ -51,38 +50,15 @@ export const RefreshButton = ({ className = "" }) => {
  * Main PWA Handler component to be placed at the root of the app
  */
 const PWAHandler = () => {
+    const [updateAvailable, setUpdateAvailable] = useState(false);
+    const [updateTrigger, setUpdateTrigger] = useState(null);
+
     useEffect(() => {
         if ('serviceWorker' in navigator && import.meta.env.PROD) {
             const updateSW = registerSW({
                 onNeedRefresh() {
-                    toast.info(
-                        <div className="flex flex-col space-y-2">
-                            <div className="flex items-center space-x-2">
-                                <Info className="w-5 h-5 text-blue-500" />
-                                <p className="font-semibold text-gray-900 dark:text-white">New version available!</p>
-                            </div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Update now to get the latest security features and improvements.</p>
-                            <button
-                                onClick={() => {
-                                    updateSW(true);
-                                    toast.dismiss();
-                                }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-bold flex items-center justify-center space-x-2 transition-all transform active:scale-95 shadow-lg shadow-blue-500/20"
-                            >
-                                <Download className="w-4 h-4" />
-                                <span>Update & Refresh</span>
-                            </button>
-                        </div>,
-                        {
-                            position: "top-center",
-                            autoClose: false,
-                            closeOnClick: false,
-                            closeButton: true,
-                            draggable: false,
-                            className: "dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl",
-                            toastId: 'pwa-update-toast'
-                        }
-                    );
+                    setUpdateAvailable(true);
+                    setUpdateTrigger(() => (reloadPage) => updateSW(reloadPage));
                 },
             });
 
@@ -120,7 +96,23 @@ const PWAHandler = () => {
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, []);
 
-    return null;
+    return (
+        updateAvailable && (
+            <div className="fixed top-0 left-0 right-0 z-[100] bg-blue-600 text-white px-4 py-2 flex items-center justify-between shadow-lg animate-in slide-in-from-top duration-300">
+                <div className="flex items-center space-x-3">
+                    <Info className="w-5 h-5 hidden sm:block" />
+                    <p className="text-sm font-semibold truncate pr-2">A new version of Ephemeral Chat is available!</p>
+                </div>
+                <button
+                    onClick={() => updateTrigger?.(true)}
+                    className="flex items-center space-x-2 bg-white text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-all transform active:scale-95 whitespace-nowrap"
+                >
+                    <Download className="w-4 h-4" />
+                    <span>Update Now</span>
+                </button>
+            </div>
+        )
+    );
 };
 
 export default PWAHandler;
