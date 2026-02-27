@@ -767,10 +767,10 @@ function createMenu() {
       ]
     },
     {
-      label: 'Edit',
+      label: 'Security Actions',
       submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
+        { label: 'Panic Burn', accelerator: 'CmdOrCtrl+Z', click: () => { if (mainWindow) mainWindow.webContents.send('panic-burn'); } },
+        { label: 'Toggle Internal Anonymous', accelerator: 'CmdOrCtrl+Y', click: () => { if (mainWindow) mainWindow.webContents.send('toggle-anonymous'); } },
         { type: 'separator' },
         { role: 'cut' },
         { role: 'copy' },

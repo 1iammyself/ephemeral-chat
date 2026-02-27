@@ -1101,6 +1101,53 @@ const ChatRoom = () => {
     return () => clearInterval(interval);
   }, [isConnected]);
 
+  // High-Assurance Quick Actions (Electron only)
+  useEffect(() => {
+    if (window.electronAPI?.onPanicBurn) {
+      window.electronAPI.onPanicBurn(() => {
+        // Only trigger if not actively typing
+        const isInputFocused = document.activeElement &&
+          (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+
+        if (!isInputFocused && currentUser) {
+          // Find all messages sent by this user that are currently in state
+          const myMsgs = messages.filter(m => m.sender.socketId === currentUser.socketId || m.sender.id === currentUser.id);
+
+          if (myMsgs.length > 0) {
+            hapticError(); // Distinctive haptic for panic action
+            myMsgs.forEach(msg => {
+              socketManager.emit('delete-message', { messageId: msg.id });
+            });
+            toast.success(`Panic Burn: Destroyed ${myMsgs.length} messages`, {
+              autoClose: 2000,
+              theme: theme === 'dark' ? 'dark' : 'light',
+              icon: '🔥'
+            });
+          }
+        }
+      });
+    }
+
+    if (window.electronAPI?.onToggleAnonymous) {
+      window.electronAPI.onToggleAnonymous(() => {
+        const isInputFocused = document.activeElement &&
+          (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+
+        if (!isInputFocused) {
+          setIsAnonymousMode(prev => {
+            const newState = !prev;
+            toast.info(`Anonymous Sender: ${newState ? 'ON' : 'OFF'}`, {
+              autoClose: 1500,
+              theme: theme === 'dark' ? 'dark' : 'light',
+              icon: newState ? '👻' : '👤'
+            });
+            hapticLight();
+            return newState;
+          });
+        }
+      });
+    }
+  }, [messages, currentUser, theme]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

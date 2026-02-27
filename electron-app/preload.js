@@ -38,6 +38,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   onUpdateDownloaded: (callback) => {
     ipcRenderer.on('update-downloaded', (event, info) => callback(info));
+  },
+  onPanicBurn: (callback) => {
+    ipcRenderer.on('panic-burn', () => callback());
+  },
+  onToggleAnonymous: (callback) => {
+    ipcRenderer.on('toggle-anonymous', () => callback());
   }
 });
 
