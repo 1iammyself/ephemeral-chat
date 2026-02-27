@@ -57,8 +57,8 @@ const PWAHandler = () => {
         if ('serviceWorker' in navigator && import.meta.env.PROD) {
             const updateSW = registerSW({
                 onNeedRefresh() {
-                    setUpdateAvailable(true);
-                    setUpdateTrigger(() => (reloadPage) => updateSW(reloadPage));
+                    console.log('New version available, updating automatically...');
+                    updateSW(true);
                 },
             });
 
@@ -96,23 +96,7 @@ const PWAHandler = () => {
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, []);
 
-    return (
-        updateAvailable && (
-            <div className="fixed top-0 left-0 right-0 z-[100] bg-blue-600 text-white px-4 py-2 flex items-center justify-between shadow-lg animate-in slide-in-from-top duration-300">
-                <div className="flex items-center space-x-3">
-                    <Info className="w-5 h-5 hidden sm:block" />
-                    <p className="text-sm font-semibold truncate pr-2">A new version of Ephemeral Chat is available!</p>
-                </div>
-                <button
-                    onClick={() => updateTrigger?.(true)}
-                    className="flex items-center space-x-2 bg-white text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-all transform active:scale-95 whitespace-nowrap"
-                >
-                    <Download className="w-4 h-4" />
-                    <span>Update Now</span>
-                </button>
-            </div>
-        )
-    );
+    return null;
 };
 
 export default PWAHandler;
