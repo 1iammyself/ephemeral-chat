@@ -1142,10 +1142,10 @@ const ChatRoom = () => {
 
     if (text.startsWith('/')) {
       const query = text.substring(1).toLowerCase();
-      const filtered = SLASH_COMMANDS.filter(cmd =>
-        (cmd.value.toLowerCase().includes(query) || cmd.label.toLowerCase().includes(query)) &&
-        (!cmd.adminOnly || canManageRoom(currentUserRole))
-      );
+      const filtered = SLASH_COMMANDS.filter(cmd => {
+        const cmdValue = cmd.value.substring(1).toLowerCase();
+        return cmdValue.startsWith(query) && (!cmd.adminOnly || canManageRoom(currentUserRole));
+      });
       setSuggestions({
         show: filtered.length > 0,
         type: 'command',
@@ -1157,7 +1157,7 @@ const ChatRoom = () => {
       const query = lastWord.substring(1).toLowerCase();
       const filtered = users
         .filter(u => u.socketId !== socketManager.socket?.id)
-        .filter(u => u.nickname.toLowerCase().includes(query));
+        .filter(u => u.nickname.toLowerCase().startsWith(query));
 
       setSuggestions({
         show: filtered.length > 0,
