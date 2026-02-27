@@ -247,6 +247,11 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
           );
         }
 
+        // Dynamic accent color for UI elements
+        const uiAccentColor = roomVibe === 'party' ? 'purple' :
+          roomVibe === 'chill' ? 'teal' :
+            roomVibe === 'focus' ? 'orange' : 'primary';
+
         return (
           <div
             id={message.id}
@@ -257,7 +262,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
             <div className={`flex items-center space-x-2 mb-1 px-1 text-[10px] font-bold uppercase tracking-tighter text-gray-400 dark:text-gray-500`}>
               {!isOwnMessage && (
                 <div className="flex items-center space-x-1">
-                  <span className={message.isAnonymous ? 'text-purple-500 dark:text-purple-400' : 'text-primary-500 dark:text-primary-400'}>{message.sender.nickname}</span>
+                  <span className={message.isAnonymous ? 'text-purple-500 dark:text-purple-400' : `text-${uiAccentColor}-500 dark:text-${uiAccentColor}-400`}>{message.sender.nickname}</span>
                   {!message.isAnonymous && <StreakBadge nickname={message.sender.nickname} roomCode={socketManager.socket?.roomCode} />}
                 </div>
               )}
@@ -311,7 +316,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                       >
                         {isOwnMessage ? (
                           <div className="flex flex-col items-center justify-center p-4 bg-black/5 dark:bg-white/5 rounded-xl border border-dashed border-black/10 dark:border-white/10 opacity-70">
-                            <ImageIcon className="w-8 h-8 mb-2 text-primary-300" />
+                            <ImageIcon className="w-8 h-8 mb-2 text-white/50" />
                             <span className="text-[10px] font-bold uppercase tracking-wider">You sent a photo</span>
                             {isViewOnce && <span className="text-[9px] opacity-60 mt-1">(View Once)</span>}
                           </div>
@@ -328,13 +333,13 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                       <div className="min-w-[200px]">
                         {isOwnMessage ? (
                           <div className="flex items-center space-x-3 p-2 bg-black/5 dark:bg-white/5 rounded-xl border border-dashed border-black/10 dark:border-white/10 opacity-70">
-                            <div className="w-10 h-10 bg-primary-500/10 rounded-full flex items-center justify-center text-primary-300"><Mic className="w-5 h-5" /></div>
+                            <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white/50"><Mic className="w-5 h-5" /></div>
                             <div className="flex flex-col">
                               <span className="text-sm font-bold">Voice Note Sent</span>
                               {isViewOnce && <span className="text-[10px] opacity-60">View Once</span>}
                             </div>
                           </div>
-                        ) : isViewOnce && !hasBeenViewed && playingAudioId !== message.id ? (
+                        ) : isViewOnce && !hasBeenViewed && playingAudioId === message.id ? (
                           <div onClick={() => handleAudioPlay(message)} className="flex items-center space-x-3 cursor-pointer p-1">
                             <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-500"><Mic className="w-5 h-5" /></div>
                             <div className="flex flex-col"><span className="text-sm font-bold">Voice Note</span><span className="text-[10px] opacity-70">View Once</span></div>
@@ -344,9 +349,9 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         )}
                       </div>
                     ) : message.messageType === 'poll' ? (
-                      <PollMessage message={message} currentUser={currentUser} onVote={onVote} />
+                      <PollMessage message={message} currentUser={currentUser} onVote={onVote} roomVibe={roomVibe} />
                     ) : message.messageType === 'game' ? (
-                      <GameMessage message={message} currentUser={currentUser} onGameAnswer={onGameAnswer} />
+                      <GameMessage message={message} currentUser={currentUser} onGameAnswer={onGameAnswer} roomVibe={roomVibe} />
                     ) : message.messageType === 'file' ? (
                       <div className="flex items-center space-x-3 min-w-[200px]">
                         <div className="p-2 bg-black/10 dark:bg-white/10 rounded-lg"><FileText className="w-6 h-6" /></div>
@@ -472,7 +477,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                       else next.add(message.id);
                       return next;
                     })}
-                    className="mt-1 px-2 py-0.5 text-[10px] font-bold text-purple-500 dark:text-purple-400 hover:text-purple-600 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-full transition-colors flex items-center space-x-1"
+                    className={`mt-1 px-2 py-0.5 text-[10px] font-bold text-${uiAccentColor}-500 dark:text-${uiAccentColor}-400 hover:text-${uiAccentColor}-600 dark:hover:text-${uiAccentColor}-300 hover:bg-${uiAccentColor}-50 dark:hover:bg-${uiAccentColor}-900/20 rounded-full transition-colors flex items-center space-x-1`}
                   >
                     <span>{isExpanded ? '▾' : '▸'} {replyCount} {replyCount === 1 ? 'reply' : 'replies'}</span>
                   </button>

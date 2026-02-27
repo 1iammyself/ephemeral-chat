@@ -17,9 +17,14 @@ const UserList = ({
   currentUserRole = ROLES.USER,
   onShowActivityLogs,
   hasNewLogs = false,
-  verbalCode = null
+  verbalCode = null,
+  roomVibe
 }) => {
   const [expandedUser, setExpandedUser] = useState(null);
+
+  const vibeAccent = roomVibe === 'party' ? 'indigo' :
+    roomVibe === 'chill' ? 'teal' :
+      roomVibe === 'focus' ? 'orange' : 'primary';
 
   const getInitials = (nickname) => {
     return nickname
@@ -167,9 +172,9 @@ const UserList = ({
                 <div key={user.socketId || user.id || index} className="relative">
                   <div
                     className={`flex items-center space-x-3 p-2 rounded-lg transition-colors duration-200 cursor-pointer ${isCurrentUser
-                      ? 'bg-blue-50 dark:bg-blue-900/20'
+                      ? `bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20`
                       : selectedRecipients.includes(user.socketId)
-                        ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
+                        ? `bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20 border border-${vibeAccent}-200 dark:border-${vibeAccent}-800`
                         : 'hover:bg-gray-50 dark:hover:bg-gray-800 border border-transparent'
                       }`}
                     onClick={() => {
@@ -183,7 +188,7 @@ const UserList = ({
                         {getInitials(user.nickname)}
                       </div>
                       {!isCurrentUser && onToggleRecipient && (
-                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center ${selectedRecipients.includes(user.socketId) ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-600'
+                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center ${selectedRecipients.includes(user.socketId) ? `bg-${vibeAccent}-500` : 'bg-gray-200 dark:bg-gray-600'
                           }`}>
                           {selectedRecipients.includes(user.socketId) && <Check className="w-2.5 h-2.5 text-white" />}
                         </div>
@@ -191,7 +196,7 @@ const UserList = ({
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <p className={`text-sm font-medium truncate ${isCurrentUser ? 'text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-gray-200'
+                        <p className={`text-sm font-medium truncate ${isCurrentUser ? `text-${vibeAccent}-700 dark:text-${vibeAccent}-300` : 'text-gray-900 dark:text-gray-200'
                           }`}>
                           {user.nickname}
                           {isCurrentUser && ' (You)'}

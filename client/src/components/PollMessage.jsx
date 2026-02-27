@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { CheckCircle2, Circle, Users } from 'lucide-react';
 import PollDetailsModal from './PollDetailsModal';
+import { getVibeById } from '../utils/vibes';
 
-const PollMessage = ({ message, currentUser, onVote }) => {
-    const { pollData, sender } = message;
+const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
+    const { pollData } = message;
     const { question, options, allowMultiple } = pollData;
     const currentUserId = currentUser?.id || currentUser?.socketId;
+    const vibe = getVibeById(roomVibe);
 
     const [showDetails, setShowDetails] = useState(false);
 
@@ -17,12 +19,24 @@ const PollMessage = ({ message, currentUser, onVote }) => {
 
     const hasUserVoted = (votes) => votes?.some(v => v.userId === currentUserId);
 
+    // Dynamic classes based on vibe
+    const accentColor = vibe.id === 'party' ? 'indigo' :
+        vibe.id === 'chill' ? 'teal' :
+            vibe.id === 'focus' ? 'orange' : 'primary';
+
+    const headerClass = vibe.accentClass;
+    const selectedOptionClass = `border-${accentColor}-500 bg-${accentColor}-50 dark:bg-${accentColor}-900/20`;
+    const checkIconClass = `text-${accentColor}-500`;
+    const selectedTextClass = `text-${accentColor}-700 dark:text-${accentColor}-300`;
+    const progressBarClass = `bg-${accentColor}-500/10 dark:bg-${accentColor}-400/10`;
+    const footerLinkClass = `text-${accentColor}-600 dark:text-${accentColor}-400`;
+
     return (
         <>
-            <div className="w-full max-w-sm bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border border-gray-200 dark:border-gray-700">
-                <div className="p-4 bg-primary-600">
+            <div className={`w-full max-w-sm bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border border-${accentColor}-100 dark:border-${accentColor}-800/50`}>
+                <div className={`p-4 ${headerClass}`}>
                     <h3 className="text-white font-bold leading-tight">{question}</h3>
-                    <p className="text-primary-100 text-xs mt-1 flex items-center">
+                    <p className="text-white/80 text-xs mt-1 flex items-center">
                         <CheckCircle2 className="w-3 h-3 mr-1" />
                         {allowMultiple ? 'Select one or more' : 'Select one'}
                     </p>
@@ -40,17 +54,17 @@ const PollMessage = ({ message, currentUser, onVote }) => {
                                 <button
                                     onClick={() => onVote(message.id, option.id)}
                                     className={`w-full text-left p-3 rounded-lg border transition-all duration-200 flex items-center justify-between relative z-10 ${isVoted
-                                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                                        : 'border-gray-100 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-700 bg-gray-50 dark:bg-gray-700/50'
+                                        ? selectedOptionClass
+                                        : `border-gray-100 dark:border-gray-700 hover:border-${accentColor}-300 dark:hover:border-${accentColor}-700 bg-gray-50 dark:bg-gray-700/50`
                                         }`}
                                 >
                                     <div className="flex items-center space-x-3 mr-10">
                                         {isVoted ? (
-                                            <CheckCircle2 className="w-5 h-5 text-primary-500 shrink-0" />
+                                            <CheckCircle2 className={`w-5 h-5 ${checkIconClass} shrink-0`} />
                                         ) : (
                                             <Circle className="w-5 h-5 text-gray-400 dark:text-gray-500 shrink-0" />
                                         )}
-                                        <span className={`text-sm ${isVoted ? 'font-semibold text-primary-700 dark:text-primary-300' : 'text-gray-700 dark:text-gray-300'}`}>
+                                        <span className={`text-sm ${isVoted ? `font-semibold ${selectedTextClass}` : 'text-gray-700 dark:text-gray-300'}`}>
                                             {option.text}
                                         </span>
                                     </div>
@@ -61,7 +75,7 @@ const PollMessage = ({ message, currentUser, onVote }) => {
 
                                 {/* Progress bar background */}
                                 {totalVotes > 0 && (
-                                    <div className="absolute left-0 top-0 h-full bg-primary-500/10 dark:bg-primary-400/10 rounded-lg pointer-events-none transition-all duration-500" style={{ width: `${percentage}%` }} />
+                                    <div className={`absolute left-0 top-0 h-full ${progressBarClass} rounded-lg pointer-events-none transition-all duration-500`} style={{ width: `${percentage}%` }} />
                                 )}
                             </div>
                         );
@@ -74,7 +88,7 @@ const PollMessage = ({ message, currentUser, onVote }) => {
                         <span>{totalVotes} vote{totalVotes !== 1 ? 's' : ''}</span>
                     </div>
                     <button
-                        className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline"
+                        className={`text-xs font-medium ${footerLinkClass} hover:underline`}
                         onClick={() => setShowDetails(true)}
                     >
                         View results
@@ -87,6 +101,7 @@ const PollMessage = ({ message, currentUser, onVote }) => {
                 onClose={() => setShowDetails(false)}
                 pollData={pollData}
                 currentUser={currentUser}
+                roomVibe={roomVibe}
             />
         </>
     );

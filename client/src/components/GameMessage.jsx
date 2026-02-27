@@ -1,10 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Sparkles, HelpCircle, Users, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { GAME_TYPES } from '../utils/games';
+import { getVibeById } from '../utils/vibes';
 
-const GameMessage = ({ message, currentUser, onGameAnswer }) => {
+const GameMessage = ({ message, currentUser, onGameAnswer, roomVibe }) => {
     const { gameData } = message;
     const currentUserId = currentUser?.id || currentUser?.socketId;
+    const vibe = getVibeById(roomVibe);
     const [triviaRevealed, setTriviaRevealed] = useState(false);
     const [triviaTimeLeft, setTriviaTimeLeft] = useState(null);
 
@@ -61,11 +63,25 @@ const GameMessage = ({ message, currentUser, onGameAnswer }) => {
         onGameAnswer(message.id, answer);
     };
 
+    // Dynamic classes based on vibe
+    const accentColor = vibe.id === 'party' ? 'indigo' :
+        vibe.id === 'chill' ? 'teal' :
+            vibe.id === 'focus' ? 'orange' : 'primary';
+
+    const headerClass = vibe.accentClass;
+    const cardBorderClass = `border-${accentColor}-200 dark:border-${accentColor}-800`;
+    const footerBorderClass = `border-${accentColor}-100 dark:border-${accentColor}-800/50`;
+    const selectedOutlineClass = `border-${accentColor}-500 bg-${accentColor}-50 dark:bg-${accentColor}-900/20`;
+    const hoverBorderClass = `hover:border-${accentColor}-400 dark:hover:border-${accentColor}-600`;
+    const statTextClass = `text-${accentColor}-600 dark:text-${accentColor}-400`;
+    const progressFillClass = `bg-${accentColor}-500/10`;
+    const optionDotClass = `bg-${accentColor}-500 text-white`;
+
     // ── Would You Rather ──
     if (isWYR) {
         return (
-            <div className="w-full max-w-sm overflow-hidden rounded-xl shadow-sm border border-purple-200 dark:border-purple-800">
-                <div className="p-3 bg-gradient-to-r from-purple-600 to-pink-600">
+            <div className={`w-full max-w-sm overflow-hidden rounded-xl shadow-sm border ${cardBorderClass}`}>
+                <div className={`p-3 ${headerClass}`}>
                     <div className="flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-white" />
                         <h3 className="text-white font-bold text-sm">Would You Rather</h3>
@@ -77,19 +93,22 @@ const GameMessage = ({ message, currentUser, onGameAnswer }) => {
                         onClick={() => handleAnswer('A')}
                         disabled={hasAnswered}
                         className={`w-full text-left p-3 rounded-lg border-2 transition-all duration-200 relative overflow-hidden ${hasAnswered
-                                ? myAnswer === 'A'
-                                    ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-                                    : 'border-gray-100 dark:border-gray-700 opacity-60'
-                                : 'border-gray-100 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-600 cursor-pointer active:scale-[0.98]'
+                            ? myAnswer === 'A'
+                                ? selectedOutlineClass
+                                : 'border-gray-100 dark:border-gray-700 opacity-60'
+                            : `border-gray-100 dark:border-gray-700 ${hoverBorderClass} cursor-pointer active:scale-[0.98]`
                             }`}
                     >
                         {hasAnswered && (
-                            <div className="absolute left-0 top-0 h-full bg-purple-500/10 transition-all duration-700" style={{ width: `${stats.aPct}%` }} />
+                            <div className={`absolute left-0 top-0 h-full ${progressFillClass} transition-all duration-700`} style={{ width: `${stats.aPct}%` }} />
                         )}
                         <div className="relative flex items-center justify-between">
-                            <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">🅰️ {gameData.optionA}</span>
+                            <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md ${optionDotClass} text-[10px] font-bold mr-2`}>A</span>
+                                {gameData.optionA}
+                            </span>
                             {hasAnswered && (
-                                <span className="text-xs font-bold text-purple-600 dark:text-purple-400 ml-2 shrink-0">{stats.aPct}%</span>
+                                <span className={`text-xs font-bold ${statTextClass} ml-2 shrink-0`}>{stats.aPct}%</span>
                             )}
                         </div>
                     </button>
@@ -98,24 +117,27 @@ const GameMessage = ({ message, currentUser, onGameAnswer }) => {
                         onClick={() => handleAnswer('B')}
                         disabled={hasAnswered}
                         className={`w-full text-left p-3 rounded-lg border-2 transition-all duration-200 relative overflow-hidden ${hasAnswered
-                                ? myAnswer === 'B'
-                                    ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-                                    : 'border-gray-100 dark:border-gray-700 opacity-60'
-                                : 'border-gray-100 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-600 cursor-pointer active:scale-[0.98]'
+                            ? myAnswer === 'B'
+                                ? selectedOutlineClass
+                                : 'border-gray-100 dark:border-gray-700 opacity-60'
+                            : `border-gray-100 dark:border-gray-700 ${hoverBorderClass} cursor-pointer active:scale-[0.98]`
                             }`}
                     >
                         {hasAnswered && (
-                            <div className="absolute left-0 top-0 h-full bg-purple-500/10 transition-all duration-700" style={{ width: `${stats.bPct}%` }} />
+                            <div className={`absolute left-0 top-0 h-full ${progressFillClass} transition-all duration-700`} style={{ width: `${stats.bPct}%` }} />
                         )}
                         <div className="relative flex items-center justify-between">
-                            <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">🅱️ {gameData.optionB}</span>
+                            <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md ${optionDotClass} text-[10px] font-bold mr-2`}>B</span>
+                                {gameData.optionB}
+                            </span>
                             {hasAnswered && (
-                                <span className="text-xs font-bold text-purple-600 dark:text-purple-400 ml-2 shrink-0">{stats.bPct}%</span>
+                                <span className={`text-xs font-bold ${statTextClass} ml-2 shrink-0`}>{stats.bPct}%</span>
                             )}
                         </div>
                     </button>
                 </div>
-                <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700/50 border-t border-purple-100 dark:border-purple-800 flex items-center">
+                <div className={`px-3 py-2 bg-gray-50 dark:bg-gray-700/50 border-t ${footerBorderClass} flex items-center`}>
                     <Users className="w-3.5 h-3.5 mr-1 text-gray-500 dark:text-gray-400" />
                     <span className="text-xs text-gray-500 dark:text-gray-400">{stats.total} response{stats.total !== 1 ? 's' : ''}</span>
                 </div>
@@ -126,8 +148,8 @@ const GameMessage = ({ message, currentUser, onGameAnswer }) => {
     // ── Trivia ──
     if (isTrivia) {
         return (
-            <div className="w-full max-w-sm overflow-hidden rounded-xl shadow-sm border border-blue-200 dark:border-blue-800">
-                <div className="p-3 bg-gradient-to-r from-blue-600 to-cyan-600 flex items-center justify-between">
+            <div className={`w-full max-w-sm overflow-hidden rounded-xl shadow-sm border ${cardBorderClass}`}>
+                <div className={`p-3 ${headerClass} flex items-center justify-between`}>
                     <div className="flex items-center gap-2">
                         <HelpCircle className="w-4 h-4 text-white" />
                         <h3 className="text-white font-bold text-sm">Trivia</h3>
@@ -158,12 +180,12 @@ const GameMessage = ({ message, currentUser, onGameAnswer }) => {
                                     onClick={() => handleAnswer(i)}
                                     disabled={hasAnswered || triviaRevealed}
                                     className={`w-full text-left p-2.5 rounded-lg border-2 transition-all duration-200 relative overflow-hidden ${showResult
-                                            ? isCorrect
-                                                ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                                                : isMyPick && !isCorrect
-                                                    ? 'border-red-400 bg-red-50 dark:bg-red-900/20'
-                                                    : 'border-gray-100 dark:border-gray-700 opacity-50'
-                                            : 'border-gray-100 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-600 cursor-pointer active:scale-[0.98]'
+                                        ? isCorrect
+                                            ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                                            : isMyPick && !isCorrect
+                                                ? 'border-red-400 bg-red-50 dark:bg-red-900/20'
+                                                : 'border-gray-100 dark:border-gray-700 opacity-50'
+                                        : `border-gray-100 dark:border-gray-700 ${hoverBorderClass} cursor-pointer active:scale-[0.98]`
                                         }`}
                                 >
                                     {showResult && (
@@ -186,7 +208,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer }) => {
                         })}
                     </div>
                 </div>
-                <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700/50 border-t border-blue-100 dark:border-blue-800 flex items-center">
+                <div className={`px-3 py-2 bg-gray-50 dark:bg-gray-700/50 border-t ${footerBorderClass} flex items-center`}>
                     <Users className="w-3.5 h-3.5 mr-1 text-gray-500 dark:text-gray-400" />
                     <span className="text-xs text-gray-500 dark:text-gray-400">{stats.total} answer{stats.total !== 1 ? 's' : ''}</span>
                 </div>

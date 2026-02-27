@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Plus, Trash2, Send, HelpCircle } from 'lucide-react';
 
-const PollModal = ({ isOpen, onClose, onSend }) => {
+const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
     const [question, setQuestion] = useState('');
     const [options, setOptions] = useState(['', '']);
     const [allowMultiple, setAllowMultiple] = useState(false);
@@ -43,12 +43,16 @@ const PollModal = ({ isOpen, onClose, onSend }) => {
         }
     };
 
+    const vibeAccent = roomVibe === 'party' ? 'indigo' :
+        roomVibe === 'chill' ? 'teal' :
+            roomVibe === 'focus' ? 'orange' : 'primary';
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+            <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 border border-${vibeAccent}-500/20`}>
+                <div className={`flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-${vibeAccent}-50/30 dark:bg-${vibeAccent}-900/10`}>
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center">
-                        <HelpCircle className="w-6 h-6 mr-2 text-primary-500" />
+                        <HelpCircle className={`w-6 h-6 mr-2 text-${vibeAccent}-500`} />
                         Create Poll
                     </h2>
                     <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400">
@@ -66,7 +70,7 @@ const PollModal = ({ isOpen, onClose, onSend }) => {
                             value={question}
                             onChange={(e) => setQuestion(e.target.value)}
                             placeholder="Ask a question..."
-                            className="input-field bg-gray-50 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                            className={`input-field bg-gray-50 dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-${vibeAccent}-500/20 focus:border-${vibeAccent}-500`}
                             maxLength={200}
                             required
                         />
@@ -83,7 +87,7 @@ const PollModal = ({ isOpen, onClose, onSend }) => {
                                     value={option}
                                     onChange={(e) => handleOptionChange(index, e.target.value)}
                                     placeholder={`Option ${index + 1}`}
-                                    className="input-field bg-gray-50 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                                    className={`input-field bg-gray-50 dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-${vibeAccent}-500/20 focus:border-${vibeAccent}-500`}
                                     maxLength={100}
                                     required={index < 2}
                                 />
@@ -102,7 +106,7 @@ const PollModal = ({ isOpen, onClose, onSend }) => {
                             <button
                                 type="button"
                                 onClick={handleAddOption}
-                                className="flex items-center text-primary-600 dark:text-primary-400 text-sm font-medium hover:underline p-1"
+                                className={`flex items-center text-${vibeAccent}-600 dark:text-${vibeAccent}-400 text-sm font-medium hover:underline p-1`}
                             >
                                 <Plus className="w-4 h-4 mr-1" />
                                 Add Option
@@ -117,7 +121,7 @@ const PollModal = ({ isOpen, onClose, onSend }) => {
                         <button
                             type="button"
                             onClick={() => setAllowMultiple(!allowMultiple)}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${allowMultiple ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-${vibeAccent}-500 focus:ring-offset-2 ${allowMultiple ? `bg-${vibeAccent}-600` : 'bg-gray-200 dark:bg-gray-700'
                                 }`}
                         >
                             <span
@@ -130,7 +134,7 @@ const PollModal = ({ isOpen, onClose, onSend }) => {
                     <button
                         type="submit"
                         disabled={!question.trim() || options.filter(opt => opt.trim()).length < 2}
-                        className="w-full btn-primary py-3 flex items-center justify-center space-x-2"
+                        className={`w-full btn-${vibeAccent} py-3 flex items-center justify-center space-x-2`}
                     >
                         <Send className="w-5 h-5" />
                         <span>Send Poll</span>

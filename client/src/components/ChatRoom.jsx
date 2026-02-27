@@ -1796,6 +1796,16 @@ const ChatRoom = () => {
     return unsubscribe;
   }, [showCallModal]);
 
+  const currentVibe = getVibeById(roomVibe);
+  const vibeAccent = roomVibe === 'party' ? 'indigo' :
+    roomVibe === 'chill' ? 'teal' :
+      roomVibe === 'focus' ? 'orange' : 'primary';
+
+  const vibeHex = roomVibe === 'party' ? '#6366f1' : // indigo-500
+    roomVibe === 'chill' ? '#14b8a6' : // teal-500
+      roomVibe === 'focus' ? '#f97316' : // orange-500
+        '#3b82f6'; // blue-500 (primary)
+
   const getTTLDisplay = () => {
     if (!room?.settings?.messageTTL) return null;
     const ttl = room.settings.messageTTL;
@@ -1858,7 +1868,7 @@ const ChatRoom = () => {
       {isReconnecting && (
         <div className="absolute inset-0 z-[100] bg-black/20 backdrop-blur-[2px] flex items-center justify-center">
           <div className="bg-white dark:bg-gray-800 px-4 py-2 rounded-full shadow-lg flex items-center space-x-2">
-            <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+            <Loader2 className={`w-4 h-4 text-${vibeAccent}-500 animate-spin`} />
             <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Reconnecting...</span>
           </div>
         </div>
@@ -1965,12 +1975,12 @@ const ChatRoom = () => {
             onMouseDown={(e) => handleStartPillDrag(e, 'topic')}
             onTouchStart={(e) => handleStartPillDrag(e, 'topic')}
           >
-            <span className="text-xs font-semibold text-primary-600 dark:text-primary-400 uppercase tracking-wider select-none">Topic</span>
+            <span className={`text-xs font-semibold text-${vibeAccent}-600 dark:text-${vibeAccent}-400 uppercase tracking-wider select-none`}>Topic</span>
             <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate select-none">{roomTopic}</span>
             {canManageRoom(currentUserRole) && (
               <button
                 onClick={(e) => { e.stopPropagation(); setShowTopicEditor(true); }}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 hover:text-primary-500 transition-colors"
+                className={`p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 hover:text-${vibeAccent}-500 transition-colors`}
                 onMouseDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
               >
@@ -1984,7 +1994,7 @@ const ChatRoom = () => {
         {/* Timer Pill */}
         {activeTimer && (
           <div
-            className="pointer-events-auto bg-blue-600/90 backdrop-blur-md px-4 py-1.5 rounded-full shadow-lg flex items-center space-x-3 animate-in slide-in-from-top-2 text-white border border-blue-500/50 cursor-move touch-none"
+            className={`pointer-events-auto bg-${vibeAccent}-600/90 backdrop-blur-md px-4 py-1.5 rounded-full shadow-lg flex items-center space-x-3 animate-in slide-in-from-top-2 text-white border border-${vibeAccent}-500/50 cursor-move touch-none`}
             style={{ transform: `translateX(${offsets.timer}px)` }}
             onMouseDown={(e) => handleStartPillDrag(e, 'timer')}
             onTouchStart={(e) => handleStartPillDrag(e, 'timer')}
@@ -2053,9 +2063,9 @@ const ChatRoom = () => {
             {replyingTo && (
               <div className="px-4 py-2 bg-black/5 dark:bg-white/5 border-b border-gray-200/50 dark:border-gray-700/50 flex items-center justify-between animate-in slide-in-from-bottom-2">
                 <div className="flex items-center space-x-2 overflow-hidden">
-                  <Reply className="w-4 h-4 text-blue-500" />
-                  <div className="flex flex-col text-xs border-l-2 border-blue-500 pl-2">
-                    <span className="font-semibold text-blue-500">Replying to {replyingTo.sender.nickname}</span>
+                  <Reply className={`w-4 h-4 text-${vibeAccent}-500`} />
+                  <div className={`flex flex-col text-xs border-l-2 border-${vibeAccent}-500 pl-2`}>
+                    <span className={`font-semibold text-${vibeAccent}-500`}>Replying to {replyingTo.sender.nickname}</span>
                     <span className="text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
                       {replyingTo.messageType === 'image' ? 'Image' : replyingTo.messageType === 'audio' ? 'Voice Note' : replyingTo.content}
                     </span>
@@ -2067,9 +2077,9 @@ const ChatRoom = () => {
               </div>
             )}
             {selectedRecipients.length > 0 && (
-              <div className="px-4 py-2 bg-blue-50/50 dark:bg-blue-900/20 border-b border-blue-100/50 dark:border-blue-800/50 flex items-center justify-between">
-                <span className="text-xs text-blue-600 dark:text-blue-300 font-medium flex items-center"><Users className="w-3 h-3 mr-1.5" />Sending to {selectedRecipients.length} specific user{selectedRecipients.length !== 1 ? 's' : ''}</span>
-                <button onClick={() => setSelectedRecipients([])} className="text-xs text-blue-500 hover:text-blue-700 dark:hover:text-blue-200 underline">Clear selection</button>
+              <div className={`px-4 py-2 bg-${vibeAccent}-50/50 dark:bg-${vibeAccent}-900/20 border-b border-${vibeAccent}-100/50 dark:border-${vibeAccent}-800/50 flex items-center justify-between`}>
+                <span className={`text-xs text-${vibeAccent}-600 dark:text-${vibeAccent}-300 font-medium flex items-center`}><Users className="w-3 h-3 mr-1.5" />Sending to {selectedRecipients.length} specific user{selectedRecipients.length !== 1 ? 's' : ''}</span>
+                <button onClick={() => setSelectedRecipients([])} className={`text-xs text-${vibeAccent}-500 hover:text-${vibeAccent}-700 dark:hover:text-${vibeAccent}-200 underline`}>Clear selection</button>
               </div>
             )}
             <div className="px-2 pt-2 sm:px-4 sm:pt-4 pb-0 sm:pb-4">
@@ -2078,19 +2088,19 @@ const ChatRoom = () => {
                   <div className="flex-1 flex flex-col space-y-2">
                     {/* Safari Audio Notice */}
 
-                    <div className="flex items-center justify-between bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-2">
-                      <div className="flex items-center space-x-3"><div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" /><span className="text-red-600 dark:text-red-400 font-medium font-mono">{formatDuration(recordingDuration)} / 0:30</span></div>
+                    <div className={`flex items-center justify-between bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20 rounded-lg px-4 py-2 border border-${vibeAccent}-100 dark:border-${vibeAccent}-800/30`}>
+                      <div className="flex items-center space-x-3"><div className={`w-3 h-3 bg-${vibeAccent}-500 rounded-full animate-pulse`} /><span className={`text-${vibeAccent}-600 dark:text-${vibeAccent}-400 font-medium font-mono`}>{formatDuration(recordingDuration)} / 0:30</span></div>
                       <div className="flex items-center space-x-2">
                         <button
                           type="button"
                           onClick={() => setAudioViewOnce(!audioViewOnce)}
-                          className={`p-2 rounded-full font-bold text-[10px] w-8 h-8 flex items-center justify-center transition-colors ${audioViewOnce ? 'bg-red-500 text-white' : 'bg-transparent text-red-500 border border-red-500'}`}
+                          className={`p-2 rounded-full font-bold text-[10px] w-8 h-8 flex items-center justify-center transition-colors ${audioViewOnce ? `bg-${vibeAccent}-500 text-white` : `bg-transparent text-${vibeAccent}-500 border border-${vibeAccent}-500`}`}
                           title={audioViewOnce ? "View Once Active" : "View Once Inactive"}
                         >
                           1x
                         </button>
-                        <button type="button" onClick={handleCancelRecording} className="p-2 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-full text-red-500"><Trash2 className="w-5 h-5" /></button>
-                        <button type="button" onClick={handleStopRecording} className="p-2 bg-red-500 hover:bg-red-600 rounded-full text-white shadow-sm"><Send className="w-5 h-5" /></button>
+                        <button type="button" onClick={handleCancelRecording} className={`p-2 hover:bg-${vibeAccent}-100 dark:hover:bg-${vibeAccent}-900/40 rounded-full text-${vibeAccent}-500`}><Trash2 className="w-5 h-5" /></button>
+                        <button type="button" onClick={handleStopRecording} className={`p-2 bg-${vibeAccent}-500 hover:bg-${vibeAccent}-600 rounded-full text-white shadow-sm`}><Send className="w-5 h-5" /></button>
                       </div>
                     </div>
                   </div>
@@ -2159,10 +2169,10 @@ const ChatRoom = () => {
                                 setActivityLogs(prev => [log, ...prev].slice(0, 50));
                               }}
                               disabled={!isConnected}
-                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all border border-blue-100/20 dark:border-blue-800/20 group"
+                              className={`flex flex-col items-center justify-center p-2 rounded-xl bg-${vibeAccent}-50/50 dark:bg-${vibeAccent}-900/10 hover:bg-${vibeAccent}-100 dark:hover:bg-${vibeAccent}-900/20 transition-all border border-${vibeAccent}-100/20 dark:border-${vibeAccent}-800/20 group`}
                             >
-                              <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
-                                <FileText className="w-4 h-4 text-blue-500" />
+                              <div className={`w-8 h-8 rounded-lg bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/30 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform`}>
+                                <FileText className={`w-4 h-4 text-${vibeAccent}-500`} />
                               </div>
                               <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">Files</span>
                             </button>
@@ -2171,10 +2181,10 @@ const ChatRoom = () => {
                               type="button"
                               onClick={() => { setShowCameraModal(true); setShowFeatureMenu(false); }}
                               disabled={!isConnected}
-                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all border border-blue-100/20 dark:border-blue-800/20 group"
+                              className={`flex flex-col items-center justify-center p-2 rounded-xl bg-${vibeAccent}-50/50 dark:bg-${vibeAccent}-900/10 hover:bg-${vibeAccent}-100 dark:hover:bg-${vibeAccent}-900/20 transition-all border border-${vibeAccent}-100/20 dark:border-${vibeAccent}-800/20 group`}
                             >
-                              <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
-                                <Camera className="w-4 h-4 text-blue-500" />
+                              <div className={`w-8 h-8 rounded-lg bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/30 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform`}>
+                                <Camera className={`w-4 h-4 text-${vibeAccent}-500`} />
                               </div>
                               <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">Camera</span>
                             </button>
@@ -2211,10 +2221,10 @@ const ChatRoom = () => {
                               type="button"
                               onClick={() => { setShowPollModal(true); setShowFeatureMenu(false); }}
                               disabled={!isConnected}
-                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-all border border-blue-100/20 dark:border-blue-800/20 group"
+                              className={`flex flex-col items-center justify-center p-2 rounded-xl bg-${vibeAccent}-50/50 dark:bg-${vibeAccent}-900/10 hover:bg-${vibeAccent}-100 dark:hover:bg-${vibeAccent}-900/20 transition-all border border-${vibeAccent}-100/20 dark:border-${vibeAccent}-800/20 group`}
                             >
-                              <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
-                                <BarChart2 className="w-4 h-4 text-blue-500" />
+                              <div className={`w-8 h-8 rounded-lg bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/30 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform`}>
+                                <BarChart2 className={`w-4 h-4 text-${vibeAccent}-500`} />
                               </div>
                               <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">Poll</span>
                             </button>
@@ -2285,10 +2295,10 @@ const ChatRoom = () => {
                                       else setShowTimerModal(true);
                                       setShowFeatureMenu(false);
                                     }}
-                                    className={`flex items-center space-x-2 p-2 rounded-xl border transition-all ${activeTimer ? 'bg-red-50 border-red-100 dark:bg-red-900/10 dark:border-red-900/20' : 'bg-gray-50 border-gray-100 dark:bg-gray-900/50 dark:border-gray-800'}`}
+                                    className={`flex items-center space-x-2 p-2 rounded-xl border transition-all ${activeTimer ? 'bg-red-50 border-red-100 dark:bg-red-900/10 dark:border-red-900/20' : `bg-gray-50 border-gray-100 dark:bg-gray-900/50 dark:border-gray-800`}`}
                                   >
-                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${activeTimer ? 'bg-red-100 dark:bg-red-900/30' : 'bg-blue-100 dark:bg-blue-900/30'}`}>
-                                      {activeTimer ? <X className="w-3.5 h-3.5 text-red-500" /> : <Clock className="w-3.5 h-3.5 text-blue-500" />}
+                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${activeTimer ? 'bg-red-100 dark:bg-red-900/30' : `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/30`}`}>
+                                      {activeTimer ? <X className="w-3.5 h-3.5 text-red-500" /> : <Clock className={`w-3.5 h-3.5 text-${vibeAccent}-500`} />}
                                     </div>
                                     <span className={`text-xs font-medium ${activeTimer ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
                                       {activeTimer ? 'Stop' : 'Timer'}
@@ -2312,12 +2322,19 @@ const ChatRoom = () => {
                           setShowEmojiPicker(!showEmojiPicker);
                         }}
                         disabled={!isConnected}
-                        className={`p-2.5 sm:p-3 rounded-xl transition-colors ${showEmojiPicker ? 'bg-gray-100 dark:bg-gray-700 text-blue-500' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
+                        className={`p-2.5 sm:p-3 rounded-xl transition-colors ${showEmojiPicker ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 text-${vibeAccent}-500` : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
                       >
                         <Smile className="w-5 h-5" />
                       </button>
                       {showEmojiPicker && (
-                        <div className="absolute bottom-full mb-2 left-0 z-50 animate-in fade-in zoom-in slide-in-from-bottom-2 duration-200">
+                        <div
+                          className="absolute bottom-full mb-2 left-0 z-50 animate-in fade-in zoom-in slide-in-from-bottom-2 duration-200 themed-emoji-picker"
+                          style={{
+                            '--epr-highlight-color': vibeHex,
+                            '--epr-focus-bg-color': `${vibeHex}20`,
+                            '--epr-hover-bg-color': `${vibeHex}10`,
+                          }}
+                        >
                           <EmojiPicker
                             onEmojiClick={onEmojiClick}
                             theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
@@ -2344,11 +2361,11 @@ const ChatRoom = () => {
                                 key={idx}
                                 onClick={() => applySuggestion(item)}
                                 onMouseEnter={() => setSuggestions(prev => ({ ...prev, index: idx }))}
-                                className={`w-full flex items-center space-x-3 px-4 py-2.5 transition-colors text-left ${idx === suggestions.index ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300'}`}
+                                className={`w-full flex items-center space-x-3 px-4 py-2.5 transition-colors text-left ${idx === suggestions.index ? `bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20 text-${vibeAccent}-600 dark:text-${vibeAccent}-400` : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300'}`}
                               >
                                 {suggestions.type === 'command' ? (
                                   <>
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${idx === suggestions.index ? 'bg-blue-100 dark:bg-blue-900/40' : 'bg-gray-100 dark:bg-gray-700'}`}>
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${idx === suggestions.index ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40` : 'bg-gray-100 dark:bg-gray-700'}`}>
                                       <item.icon className="w-4 h-4" />
                                     </div>
                                     <div className="flex-1 min-w-0">
@@ -2358,7 +2375,7 @@ const ChatRoom = () => {
                                   </>
                                 ) : (
                                   <>
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold">
+                                    <div className={`w-8 h-8 rounded-full bg-gradient-to-br from-${vibeAccent}-500 to-${vibeAccent}-600 flex items-center justify-center text-white text-xs font-bold`}>
                                       {item.nickname[0].toUpperCase()}
                                     </div>
                                     <div className="font-bold text-sm">@{item.nickname}</div>
@@ -2452,6 +2469,7 @@ const ChatRoom = () => {
               onShowActivityLogs={() => { setShowActivityLogs(true); setHasNewLogs(false); }}
               hasNewLogs={hasNewLogs}
               verbalCode={verbalCode}
+              roomVibe={roomVibe}
             />
           </div>
         )}
@@ -2479,6 +2497,7 @@ const ChatRoom = () => {
                   onShowActivityLogs={() => { setShowActivityLogs(true); setHasNewLogs(false); }}
                   hasNewLogs={hasNewLogs}
                   verbalCode={verbalCode}
+                  roomVibe={roomVibe}
                 />
               </div>
             </div>
@@ -2509,8 +2528,8 @@ const ChatRoom = () => {
         onSave={handleSaveEdit}
         initialContent={editingMessage?.content}
       />
-      <PollModal isOpen={showPollModal} onClose={() => setShowPollModal(false)} onSend={handleSendPoll} />
-      <GameModal isOpen={showGameModal} onClose={() => setShowGameModal(false)} onSend={handleSendGame} />
+      <PollModal isOpen={showPollModal} onClose={() => setShowPollModal(false)} onSend={handleSendPoll} roomVibe={roomVibe} />
+      <GameModal isOpen={showGameModal} onClose={() => setShowGameModal(false)} onSend={handleSendGame} roomVibe={roomVibe} />
       <DragDropOverlay isDragging={isDragging} />
       <PrivacyOverlay />
 

@@ -1,11 +1,13 @@
 import React from 'react';
-import { X, User, Clock } from 'lucide-react';
+import { X, Clock } from 'lucide-react';
+import { getVibeById } from '../utils/vibes';
 
-const PollDetailsModal = ({ isOpen, onClose, pollData, currentUser }) => {
+const PollDetailsModal = ({ isOpen, onClose, pollData, currentUser, roomVibe }) => {
     if (!isOpen || !pollData) return null;
 
     const { question, options } = pollData;
     const currentUserId = currentUser?.id || currentUser?.socketId;
+    const vibe = getVibeById(roomVibe);
 
     const formatTime = (isoString) => {
         const date = new Date(isoString);
@@ -17,6 +19,15 @@ const PollDetailsModal = ({ isOpen, onClose, pollData, currentUser }) => {
         }
         return date.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     };
+
+    // Dynamic classes based on vibe
+    const accentColor = vibe.id === 'party' ? 'indigo' :
+        vibe.id === 'chill' ? 'teal' :
+            vibe.id === 'focus' ? 'orange' : 'primary';
+
+    const avatarClass = `bg-${accentColor}-600 text-white`;
+    const youBadgeClass = `bg-${accentColor}-100 dark:bg-${accentColor}-900/40 text-${accentColor}-600 dark:text-${accentColor}-400 border-${accentColor}-200 dark:border-${accentColor}-800`;
+    const nicknameClass = `text-${accentColor}-600 dark:text-${accentColor}-400`;
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
@@ -50,8 +61,8 @@ const PollDetailsModal = ({ isOpen, onClose, pollData, currentUser }) => {
                                         {option.text}
                                     </h4>
                                     <div className={`px-3 py-1 rounded-full text-xs font-bold flex items-center space-x-1 ${(option.votes?.length || 0) > 0
-                                            ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800'
-                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700'
+                                        ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800'
+                                        : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700'
                                         }`}>
                                         <span>{option.votes?.length || 0} vote{(option.votes?.length || 0) !== 1 ? 's' : ''}</span>
                                         {(option.votes?.length || 0) > 0 && <span className="text-[10px]">★</span>}
@@ -65,19 +76,19 @@ const PollDetailsModal = ({ isOpen, onClose, pollData, currentUser }) => {
                                             return (
                                                 <div key={idx} className="flex items-center space-x-4 animate-in slide-in-from-left-2 duration-300" style={{ animationDelay: `${idx * 50}ms` }}>
                                                     <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold shadow-sm ${isMe
-                                                            ? 'bg-primary-600 text-white'
-                                                            : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                                                        ? avatarClass
+                                                        : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                                                         }`}>
                                                         {vote.nickname?.charAt(0).toUpperCase() || '?'}
                                                     </div>
                                                     <div className="flex flex-col">
                                                         <div className="flex items-center space-x-2">
-                                                            <span className={`font-bold transition-colors ${isMe ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'
+                                                            <span className={`font-bold transition-colors ${isMe ? nicknameClass : 'text-gray-900 dark:text-white'
                                                                 }`}>
                                                                 {isMe ? 'You' : vote.nickname}
                                                             </span>
                                                             {isMe && (
-                                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400 font-bold border border-primary-200 dark:border-primary-800">
+                                                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${youBadgeClass} font-bold border`}>
                                                                     You
                                                                 </span>
                                                             )}

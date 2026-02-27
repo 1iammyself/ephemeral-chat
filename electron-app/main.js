@@ -907,7 +907,7 @@ function showLicensesDialog() {
     type: 'info',
     title: 'Third-Party Licenses',
     message: 'Third-Party Licenses',
-    detail: `This product includes software developed by schollz/e2ecp licensed under the MIT License.\n\n${licenseText}`,
+    detail: `This product includes software developed by schollz/e2ecp licensed under the MIT License.`,
     buttons: ['OK']
   });
 }
