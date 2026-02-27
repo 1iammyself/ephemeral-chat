@@ -5,6 +5,7 @@
  */
 
 import socketManager from './socket';
+import { requestWakeLock, releaseWakeLock } from './utils/platform';
 
 // Call states
 export const CallState = {
@@ -141,6 +142,10 @@ class WebRTCService {
                 video: false
             });
 
+            // Keep screen awake during calls
+            window.__wakeLockActive = true;
+            requestWakeLock();
+
             // Initiate connection for each recipient
             for (const recipient of recipients) {
                 const pc = await this.createPeerConnection(recipient.id);
@@ -255,6 +260,10 @@ class WebRTCService {
 
         // Clean up voice scrambler
         this.disableVoiceScrambler();
+
+        // Release screen wake lock
+        window.__wakeLockActive = false;
+        releaseWakeLock();
 
         if (this.localStream) {
             this.localStream.getTracks().forEach(track => track.stop());

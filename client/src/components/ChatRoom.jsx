@@ -54,6 +54,7 @@ import { canManageRoom } from '../utils/roles';
 import { getRandomIcebreaker } from '../utils/icebreakers';
 import { RefreshButton } from './PWAHandler';
 import { getCreatorId } from '../utils/creator';
+import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess } from '../utils/platform';
 import FileTransferModal from './FileTransferModal';
 import { toast } from 'react-toastify';
 
@@ -1374,6 +1375,7 @@ const ChatRoom = () => {
         isAnonymous: isAnonymousMode
       });
       socketManager.emit('user-activity');
+      hapticLight(); // Haptic feedback on message send
       setNewMessage('');
       setReplyingTo(null);
     } catch (error) {
@@ -1489,6 +1491,7 @@ const ChatRoom = () => {
 
   const handleSendPulse = () => {
     socketManager.emit('send-pulse', { roomCode });
+    hapticHeavy(); // Strong haptic feedback for pulse
     triggerPulse(); // Immediate local feedback
 
     // Add local log for sender

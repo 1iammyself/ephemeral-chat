@@ -404,7 +404,8 @@ function createWindow() {
       sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
-      experimentalFeatures: false
+      experimentalFeatures: false,
+      spellcheck: true // Enable native spell check for all text inputs
     }
   };
 
@@ -424,6 +425,24 @@ function createWindow() {
 
   // Load the app
   mainWindow.loadURL(CHAT_URL);
+
+  // Track download progress in taskbar
+  mainWindow.webContents.session.on('will-download', (event, item) => {
+    item.on('updated', (event, state) => {
+      if (state === 'progressing' && !item.isPaused()) {
+        const progress = item.getReceivedBytes() / item.getTotalBytes();
+        if (mainWindow && !isNaN(progress)) {
+          mainWindow.setProgressBar(progress);
+        }
+      }
+    });
+    item.once('done', (event, state) => {
+      if (mainWindow) mainWindow.setProgressBar(-1); // Clear progress bar
+      if (state === 'completed') {
+        showNotification('Download Complete', `${item.getFilename()} has been downloaded.`);
+      }
+    });
+  });
 
   // Show window when ready
   mainWindow.once('ready-to-show', () => {
@@ -969,6 +988,33 @@ function registerShortcuts() {
     mainWindow.show();
     mainWindow.focus();
     mainWindow.loadURL(`${CHAT_URL}?action=create`);
+  });
+
+  // Picture-in-Picture mini mode (compact always-on-top window)
+  globalShortcut.register('Alt+Shift+P', () => {
+    if (!mainWindow) return;
+    const bounds = mainWindow.getBounds();
+    const isPiP = bounds.width <= 380 && bounds.height <= 500;
+
+    if (isPiP) {
+      // Restore to normal size
+      const savedBounds = store.get('windowBounds');
+      const savedPos = store.get('windowPosition');
+      mainWindow.setAlwaysOnTop(store.get('alwaysOnTop'));
+      mainWindow.setBounds({
+        width: savedBounds.width,
+        height: savedBounds.height,
+        ...(savedPos ? { x: savedPos.x, y: savedPos.y } : {})
+      });
+      mainWindow.setMinimumSize(400, 600);
+    } else {
+      // Enter PiP: small always-on-top window
+      mainWindow.setMinimumSize(320, 400);
+      mainWindow.setAlwaysOnTop(true);
+      mainWindow.setBounds({ width: 380, height: 500 });
+    }
+    mainWindow.show();
+    mainWindow.focus();
   });
 }
 
