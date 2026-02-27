@@ -1145,6 +1145,43 @@ ipcMain.handle('set-badge', (event, count) => {
   }
 });
 
+// Link handling IPC
+ipcMain.handle('open-url-external', (event, url) => {
+  // Validate the URL is http/https before opening
+  if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+    shell.openExternal(url);
+  }
+});
+
+ipcMain.handle('open-url-in-app', (event, url) => {
+  // Open URL in a sandboxed in-app browser window
+  if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) return;
+
+  const inAppWindow = new BrowserWindow({
+    width: 900,
+    height: 700,
+    parent: mainWindow,
+    modal: false,
+    title: 'In-App Browser',
+    icon: path.join(__dirname, 'icons', 'icon.png'),
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false
+    }
+  });
+
+  inAppWindow.loadURL(url);
+
+  // Prevent the in-app browser from opening new windows
+  inAppWindow.webContents.setWindowOpenHandler(({ url: newUrl }) => {
+    shell.openExternal(newUrl);
+    return { action: 'deny' };
+  });
+});
+
 // Create a badge icon for Windows taskbar
 function createBadgeIcon(count) {
   // Simple implementation - in production you'd want to render this properly

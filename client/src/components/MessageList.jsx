@@ -10,6 +10,7 @@ import ThreadView from './ThreadView';
 import { StreakBadge } from './ChallengeBar';
 import socketManager from '../socket';
 import { getVibeById } from '../utils/vibes';
+import LinkPreviewModal, { isDomainTrusted } from './LinkPreviewModal';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀', '🍕', '🍔', '🍦', '🍩', '🍺', '🎸', '🎮', '🚀', '🌈', '🍄'];
 
@@ -25,6 +26,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   const [viewedMessages, setViewedMessages] = useState(new Set());
   const [playingAudioId, setPlayingAudioId] = useState(null);
   const [newMessages, setNewMessages] = useState(new Set());
+  const [linkPreviewUrl, setLinkPreviewUrl] = useState(null);
 
   // Click away listener for reaction bar
   useEffect(() => {
@@ -164,6 +166,25 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
     setViewingImage(null);
     setCurrentImageUrl(null);
   }, [viewingImage]);
+
+  // Handle link click — check if domain is trusted, otherwise show modal
+  const handleLinkClick = useCallback((url, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      const hostname = new URL(url).hostname;
+      if (isDomainTrusted(hostname)) {
+        // Trusted domain — open directly
+        if (window.electronAPI?.openUrlExternal) {
+          window.electronAPI.openUrlExternal(url);
+        } else {
+          window.open(url, '_blank', 'noopener,noreferrer');
+        }
+        return;
+      }
+    } catch { /* invalid URL, show modal */ }
+    setLinkPreviewUrl(url);
+  }, []);
 
   if (messages.length === 0) {
     return (
@@ -334,7 +355,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                       </div>
                     ) : (
                       <div className="text-[15px] leading-relaxed select-text">
-                        {renderMessageContent(message.content, currentUser)}
+                        {renderMessageContent(message.content, currentUser, handleLinkClick)}
                         {message.isEdited && <span className="text-[10px] opacity-50 italic ml-1">(edited)</span>}
                       </div>
                     )}
@@ -486,6 +507,14 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
           return messageTTL;
         })()}
       />
+
+      {/* Link Preview Modal */}
+      {linkPreviewUrl && (
+        <LinkPreviewModal
+          url={linkPreviewUrl}
+          onClose={() => setLinkPreviewUrl(null)}
+        />
+      )}
     </div>
   );
 };
@@ -513,12 +542,12 @@ function formatFileSize(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-function renderMessageContent(content, currentUser) {
+function renderMessageContent(content, currentUser, onLinkClick) {
   if (!content) return null;
   const parts = content.split(/((?:https?:\/\/[^\s]+)|(?:@[\w\-\.]+))/g);
   return parts.map((part, i) => {
     if (part.match(/^https?:\/\//)) {
-      return <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline break-all hover:text-blue-600" onClick={(e) => e.stopPropagation()}>{part}</a>;
+      return <a key={i} href={part} rel="noopener noreferrer" className="text-blue-500 underline break-all hover:text-blue-600" onClick={(e) => { if (onLinkClick) onLinkClick(part, e); else e.stopPropagation(); }}>{part}</a>;
     }
     if (part.startsWith('@') && part.length > 1) {
       const isMe = currentUser && (part.slice(1).toLowerCase() === currentUser.nickname?.toLowerCase());

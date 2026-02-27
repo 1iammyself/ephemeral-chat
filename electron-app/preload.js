@@ -10,24 +10,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Settings
   getSettings: () => ipcRenderer.invoke('get-settings'),
   setSetting: (key, value) => ipcRenderer.invoke('set-setting', key, value),
-  
+
   // App info
   getVersion: () => ipcRenderer.invoke('get-app-version'),
-  
+
   // Notifications
   showNotification: (title, body) => ipcRenderer.invoke('show-notification', title, body),
-  
+
   // Updates
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
-  
+
   // System
   getSystemIdleTime: () => ipcRenderer.invoke('get-system-idle-time'),
   setBadge: (count) => ipcRenderer.invoke('set-badge', count),
-  
+
+  // Link handling
+  openUrlExternal: (url) => ipcRenderer.invoke('open-url-external', url),
+  openUrlInApp: (url) => ipcRenderer.invoke('open-url-in-app', url),
+
   // Platform detection
   platform: process.platform,
   isElectron: true,
-  
+
   // Event listeners
   onUpdateAvailable: (callback) => {
     ipcRenderer.on('update-available', (event, info) => callback(info));
@@ -40,14 +44,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
 // Security: Block dangerous keyboard shortcuts
 document.addEventListener('keydown', (e) => {
   // Block DevTools shortcuts
-  if (e.key === 'F12' || 
-      (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i')) ||
-      (e.ctrlKey && e.shiftKey && (e.key === 'J' || e.key === 'j')) ||
-      (e.ctrlKey && (e.key === 'U' || e.key === 'u'))) {
+  if (e.key === 'F12' ||
+    (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i')) ||
+    (e.ctrlKey && e.shiftKey && (e.key === 'J' || e.key === 'j')) ||
+    (e.ctrlKey && (e.key === 'U' || e.key === 'u'))) {
     e.preventDefault();
     return false;
   }
-  
+
   // Block print
   if (e.ctrlKey && (e.key === 'P' || e.key === 'p')) {
     e.preventDefault();
@@ -73,7 +77,7 @@ document.addEventListener('contextmenu', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
   // Add electron class to body for CSS targeting
   document.body.classList.add('electron-app');
-  
+
   // Dispatch custom event that the web app can listen to
   window.dispatchEvent(new CustomEvent('electron-ready', {
     detail: {
