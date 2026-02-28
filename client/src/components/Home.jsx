@@ -171,9 +171,9 @@ const Home = ({ children }) => {
     <div style={{ height: '100vh', overflowY: 'auto' }} className="dark:bg-gray-900 transition-colors duration-200 no-scrollbar">
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm transition-colors duration-200">
-        <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-blue-600 dark:text-blue-400 flex items-center">
-            <img src="/logo.svg" alt="Logo" className="h-10 w-10 mr-3" />
+        <div className="max-w-7xl mx-auto px-4 py-4 sm:py-6 sm:px-6 lg:px-8 flex justify-between items-center">
+          <h1 className="text-xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400 flex items-center">
+            <img src="/logo.svg" alt="Logo" className="h-8 w-8 sm:h-10 sm:w-10 mr-2 sm:mr-3" />
             Ephemeral Chat
           </h1>
           <div className="flex items-center space-x-2">
@@ -186,13 +186,13 @@ const Home = ({ children }) => {
       {/* Main Content */}
       <main className="flex-grow">
         {children || (
-          <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto px-4 py-8 sm:py-12 sm:px-6 lg:px-8">
             {/* Hero Section */}
-            <div className="text-center mb-10 sm:mb-16">
-              <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white sm:text-5xl sm:tracking-tight lg:text-6xl">
+            <div className="text-center mb-8 sm:mb-16">
+              <h2 className="text-2xl sm:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight lg:text-6xl">
                 Secure, Temporary Chat Rooms
               </h2>
-              <p className="mt-4 max-w-2xl mx-auto text-base sm:text-xl text-gray-500 dark:text-gray-400">
+              <p className="mt-3 sm:mt-4 max-w-2xl mx-auto text-sm sm:text-xl text-gray-500 dark:text-gray-400">
                 Create or join a room to start chatting.
               </p>
             </div>

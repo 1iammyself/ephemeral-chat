@@ -346,16 +346,16 @@ Verbal Code: ${verbalCode || 'N/A'}`;
                 )}
               </div>
 
-              <div className="flex justify-between pt-2">
+              <div className="flex flex-col sm:flex-row gap-2 pt-4">
                 <button
                   onClick={handleNewRoom}
-                  className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"
+                  className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors order-2 sm:order-1"
                 >
-                  Create Another Room
+                  Create Another
                 </button>
                 <button
                   onClick={handleJoinRoom}
-                  className="px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors"
+                  className="w-full sm:w-auto px-4 py-2 text-sm font-bold bg-blue-500 dark:bg-blue-600 text-white rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors order-1 sm:order-2"
                 >
                   Join Room Now
                 </button>
