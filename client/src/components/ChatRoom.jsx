@@ -2019,7 +2019,7 @@ const ChatRoom = () => {
         {/* Topic Pill */}
         {roomTopic && (
           <div
-            className="pointer-events-auto bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 px-4 py-1.5 rounded-full shadow-sm flex items-center space-x-2 animate-in slide-in-from-top-2 max-w-[80%] cursor-move touch-none"
+            className={`pointer-events-auto bg-${vibeAccent}-50/90 dark:bg-${vibeAccent}-950/40 backdrop-blur-md border border-${vibeAccent}-200/50 dark:border-${vibeAccent}-500/20 px-4 py-1.5 rounded-full shadow-sm flex items-center space-x-2 animate-in slide-in-from-top-2 max-w-[80%] cursor-move touch-none`}
             style={{ transform: `translateX(${offsets.topic}px)` }}
             onMouseDown={(e) => handleStartPillDrag(e, 'topic')}
             onTouchStart={(e) => handleStartPillDrag(e, 'topic')}
@@ -2192,7 +2192,7 @@ const ChatRoom = () => {
                       </button>
 
                       {showFeatureMenu && (
-                        <div className="absolute bottom-full mb-3 left-0 z-50 bg-white/70 dark:bg-black/70 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] border border-white/20 p-2 sm:p-3 flex flex-col space-y-2 w-[85vw] max-w-[280px] sm:max-w-[320px] animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-2xl ring-1 ring-white/10 dark:ring-white/5">
+                        <div className="absolute bottom-full mb-3 left-0 z-50 bg-white/60 dark:bg-black/40 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] border border-white/20 p-2 sm:p-3 flex flex-col space-y-2 w-[85vw] max-w-[280px] sm:max-w-[320px] animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-2xl ring-1 ring-white/10 dark:ring-white/5">
                           {/* Floating Reaction Pill */}
                           <div className="flex items-center gap-1 bg-white/40 dark:bg-white/5 rounded-2xl p-1 px-1.5 border border-white/20 shadow-inner">
                             <div className="flex items-center flex-1 overflow-x-auto scrollbar-none gap-1 py-0.5 no-scrollbar">
@@ -2412,7 +2412,7 @@ const ChatRoom = () => {
                             '--epr-picker-border-radius': '1.5rem',
                           }}
                         >
-                          <div className="absolute inset-0 bg-white/70 dark:bg-black/70 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/20 -z-10" />
+                          <div className="absolute inset-0 bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/10 -z-10" />
                           <EmojiPicker
                             onEmojiClick={onEmojiClick}
                             theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
@@ -2431,7 +2431,7 @@ const ChatRoom = () => {
                       {suggestions.show && (
                         <div
                           ref={suggestionRef}
-                          className="absolute bottom-full left-0 -ml-12 sm:ml-0 mb-3 w-[85vw] sm:w-full max-w-[280px] sm:max-w-none bg-white/70 dark:bg-black/70 backdrop-blur-2xl border border-white/20 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] overflow-hidden z-[60] animate-in slide-in-from-bottom-2 duration-300 ring-1 ring-white/10"
+                          className="absolute bottom-full left-0 -ml-12 sm:ml-0 mb-3 w-[85vw] sm:w-full max-w-[280px] sm:max-w-none bg-white/60 dark:bg-black/40 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] overflow-hidden z-[60] animate-in slide-in-from-bottom-2 duration-300 ring-1 ring-white/10"
                         >
                           <div className="max-h-48 overflow-y-auto p-1.5 sm:p-2 space-y-0.5">
                             {suggestions.items.map((item, idx) => (
