@@ -183,6 +183,14 @@ class RoomManager {
   }
 
   /**
+   * Get users in a room
+   */
+  async getRoomUsers(roomCode) {
+    const room = await this.getRoom(roomCode);
+    return room ? room.users : [];
+  }
+
+  /**
    * Get inactivity timeout for a room based on its persistence mode
    * @param {string} roomCode - Room code
    * @returns {Promise<number>} Timeout in milliseconds
@@ -509,7 +517,7 @@ class RoomManager {
   /**
    * Get messages for a room
    * @param {string} roomCode - Room code
-   * @param {string} [userId] - Optional user ID to filter private messages
+   * @param {string} [userId] - Optional user ID to filter private messages and mask game data
    * @returns {Promise<Array>} Array of messages
    */
   async getMessages(roomCode, userId = null) {
@@ -560,21 +568,63 @@ class RoomManager {
       messages = validMessages;
     }
 
-    // Filter private messages if userId is provided
+    // Filter private messages and mask game data if userId is provided
     if (userId) {
-      messages = messages.filter(msg => {
-        // If no recipients defined, it's a broadcast message (everyone sees it)
-        if (!msg.recipients || msg.recipients.length === 0) return true;
+      messages = messages
+        .filter(msg => {
+          // If no recipients defined, it's a broadcast message (everyone sees it)
+          if (!msg.recipients || msg.recipients.length === 0) return true;
 
-        // If I am the sender, I can see it
-        if (msg.sender.socketId === userId || msg.sender.id === userId) return true;
+          // If I am the sender, I can see it
+          if (msg.sender.socketId === userId || msg.sender.id === userId) return true;
 
-        // If I am in the recipients list, I can see it
-        return msg.recipients.includes(userId);
-      });
+          // If I am in the recipients list, I can see it
+          return msg.recipients.includes(userId);
+        })
+        .map(msg => this.maskMessageForUser(msg, userId));
     }
 
     return messages;
+  }
+
+  /**
+   * Mask sensitive game data for non-senders
+   */
+  maskMessageForUser(message, userId) {
+    if (message.messageType !== 'game' || !message.gameData || !message.gameData.answers) {
+      return message;
+    }
+
+    // Senders see everything
+    if (message.sender.socketId === userId || message.sender.id === userId) {
+      return message;
+    }
+
+    const { gameType, answers } = message.gameData;
+    if (gameType === 'would-you-rather' || gameType === 'trivia') {
+      const stats = {};
+      Object.values(answers).forEach(val => {
+        stats[val] = (stats[val] || 0) + 1;
+      });
+
+      // Include only their own answer
+      const maskedAnswers = {};
+      if (answers[userId]) {
+        maskedAnswers[userId] = answers[userId];
+      }
+
+      return {
+        ...message,
+        gameData: {
+          ...message.gameData,
+          answers: maskedAnswers,
+          stats: stats,
+          isMasked: true
+        }
+      };
+    }
+
+    return message;
   }
 
   /**

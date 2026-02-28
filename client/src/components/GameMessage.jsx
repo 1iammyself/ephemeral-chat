@@ -15,8 +15,12 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
     const isTicTacToe = gameData.gameType === GAME_TYPES.TIC_TAC_TOE;
     const isRPS = gameData.gameType === GAME_TYPES.ROCK_PAPER_SCISSORS;
 
-    const isPlayer = isTicTacToe && (gameData.players.X.id === currentUserId || gameData.players.O.id === currentUserId);
+    const isSender = message.sender.socketId === currentUserId || message.sender.id === currentUserId;
+    const isPlayer = (isTicTacToe && (gameData.players.X.id === currentUserId || gameData.players.O.id === currentUserId)) ||
+        (isRPS && (gameData.players.P1.id === currentUserId || gameData.players.P2.id === currentUserId));
+    const isSpectator = !isPlayer && (isTicTacToe || isRPS);
     const [isExpanded, setIsExpanded] = useState(false);
+    const [showVoteDetails, setShowVoteDetails] = useState(false);
 
     // Trivia timer: Dynamic based on gameData.timer (defaults to 15 if missing)
     useEffect(() => {
@@ -132,12 +136,19 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                         <Hash className="w-5 h-5 text-white" />
                         <h3 className="text-white font-bold text-sm">Tic-Tac-Toe</h3>
                     </div>
-                    {gameData.players.O.id && !gameData.winner && (
-                        <div className="flex items-center gap-1.5 bg-white/20 rounded-full px-2 py-0.5">
-                            <div className={`w-2 h-2 rounded-full bg-white ${isMyTurn ? 'animate-pulse' : 'opacity-50'}`} />
-                            <span className="text-[10px] font-black text-white uppercase tracking-tighter">Live</span>
-                        </div>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                        {isSpectator && (
+                            <div className="bg-white/10 rounded-full px-2 py-0.5 border border-white/20">
+                                <span className="text-[9px] font-black text-white/80 uppercase tracking-tighter">Spectating</span>
+                            </div>
+                        )}
+                        {gameData.players.O.id && !gameData.winner && (
+                            <div className="flex items-center gap-1.5 bg-white/20 rounded-full px-2 py-0.5">
+                                <div className={`w-2 h-2 rounded-full bg-white ${isMyTurn ? 'animate-pulse' : 'opacity-50'}`} />
+                                <span className="text-[10px] font-black text-white uppercase tracking-tighter">Live</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {!isExpanded ? (
@@ -299,9 +310,19 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                             )}
                         </div>
                         <div className={`px-3 py-2 bg-gray-50 dark:bg-gray-700/50 border-t ${footerBorderClass} flex items-center justify-between`}>
-                            <div className="flex items-center">
-                                <Users className="w-3.5 h-3.5 mr-1 text-gray-500 dark:text-gray-400" />
-                                <span className="text-xs text-gray-500 dark:text-gray-400">{stats.total} response{stats.total !== 1 ? 's' : ''}</span>
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center">
+                                    <Users className="w-3.5 h-3.5 mr-1 text-gray-500 dark:text-gray-400" />
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">{stats.total} response{stats.total !== 1 ? 's' : ''}</span>
+                                </div>
+                                {isSender && stats.total > 0 && (
+                                    <button
+                                        onClick={() => setShowVoteDetails(!showVoteDetails)}
+                                        className="text-[10px] font-black text-primary-500 dark:text-primary-400 uppercase tracking-widest hover:underline"
+                                    >
+                                        {showVoteDetails ? 'Hide Details' : 'View Details'}
+                                    </button>
+                                )}
                             </div>
                             <button
                                 onClick={() => setIsExpanded(false)}
@@ -310,6 +331,23 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                                 Collapse
                             </button>
                         </div>
+                        {showVoteDetails && isSender && (
+                            <div className="px-4 py-3 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 animate-in slide-in-from-top-2 duration-200">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Vote Details</p>
+                                <div className="space-y-1.5">
+                                    {Object.entries(answers).map(([uid, choice]) => (
+                                        <div key={uid} className="flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 px-2.5 py-1.5 rounded-lg border border-gray-100 dark:border-gray-800">
+                                            <span className="text-xs font-bold text-gray-600 dark:text-gray-400 truncate max-w-[120px]">
+                                                {uid === currentUserId ? 'You' : (message.sender.nickname === 'You' ? 'Anonymous' : 'Member')}
+                                            </span>
+                                            <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${choice === 'A' ? 'bg-indigo-500' : 'bg-teal-500'} text-white`}>
+                                                Option {choice}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </>
                 )}
             </div>
@@ -403,9 +441,19 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                             )}
                         </div>
                         <div className={`px-3 py-2 bg-gray-50 dark:bg-gray-700/50 border-t ${footerBorderClass} flex items-center justify-between`}>
-                            <div className="flex items-center">
-                                <Users className="w-3.5 h-3.5 mr-1 text-gray-500 dark:text-gray-400" />
-                                <span className="text-xs text-gray-500 dark:text-gray-400">{stats.total} answer{stats.total !== 1 ? 's' : ''}</span>
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center">
+                                    <Users className="w-3.5 h-3.5 mr-1 text-gray-500 dark:text-gray-400" />
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">{stats.total} answer{stats.total !== 1 ? 's' : ''}</span>
+                                </div>
+                                {isSender && stats.total > 0 && (
+                                    <button
+                                        onClick={() => setShowVoteDetails(!showVoteDetails)}
+                                        className="text-[10px] font-black text-primary-500 dark:text-primary-400 uppercase tracking-widest hover:underline"
+                                    >
+                                        {showVoteDetails ? 'Hide Details' : 'View Details'}
+                                    </button>
+                                )}
                             </div>
                             <button
                                 onClick={() => setIsExpanded(false)}
@@ -414,6 +462,23 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                                 Collapse
                             </button>
                         </div>
+                        {showVoteDetails && isSender && (
+                            <div className="px-4 py-3 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 animate-in slide-in-from-top-2 duration-200">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Detailed Results</p>
+                                <div className="space-y-1.5">
+                                    {Object.entries(answers).map(([uid, choiceIdx]) => (
+                                        <div key={uid} className="flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 px-2.5 py-1.5 rounded-lg border border-gray-100 dark:border-gray-800">
+                                            <span className="text-xs font-bold text-gray-600 dark:text-gray-400 truncate max-w-[120px]">
+                                                {uid === currentUserId ? 'You' : (message.sender.nickname === 'You' ? 'Anonymous' : 'Member')}
+                                            </span>
+                                            <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${choiceIdx === gameData.answer ? 'bg-green-500' : 'bg-red-500'} text-white`}>
+                                                {String.fromCharCode(65 + choiceIdx)}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </>
                 )}
             </div>
@@ -433,14 +498,16 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
             if (gameData.winner) {
                 if (gameData.winner === 'draw') return "It's a draw! 🤝";
                 const winnerName = gameData.players[gameData.winner].name;
-                return gameData.winner === (isP1 ? 'P1' : 'P2') ? "You Won! 🏆" : `${winnerName} Won!`;
+                return gameData.winner === (isP1 ? 'P1' : 'P2') ? "You Won the Match! 🏆" : `${winnerName} Won the Match!`;
             }
             if (!gameData.players.P2.id) return "Waiting for opponent...";
+
+            const roundNum = (gameData.rounds?.length || 0) + 1;
             if (amPlaying) {
-                if (!myMove) return "Make your move!";
-                return "Waiting for opponent's move...";
+                if (!myMove) return `Round ${roundNum}: Make your move!`;
+                return `Round ${roundNum}: Waiting for opponent...`;
             }
-            return "Game in progress...";
+            return `Round ${roundNum} in progress...`;
         };
 
         const getMoveIcon = (move) => {
@@ -457,7 +524,21 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                 <div className={`p-3 ${headerClass} flex items-center justify-between`}>
                     <div className="flex items-center gap-2">
                         <Sparkles className="w-5 h-5 text-white" />
-                        <h3 className="text-white font-bold text-sm">Rock Paper Scissors</h3>
+                        <h3 className="text-white font-bold text-sm">Best of Three RPS</h3>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        {isSpectator && (
+                            <div className="bg-white/10 rounded-full px-2 py-0.5 border border-white/20">
+                                <span className="text-[9px] font-black text-white/80 uppercase tracking-tighter">Spectating</span>
+                            </div>
+                        )}
+                        {gameData.players.P2.id && (
+                            <div className="flex items-center gap-2 bg-white/20 rounded-full px-2 py-0.5">
+                                <span className="text-[10px] font-black text-white uppercase tracking-tighter">
+                                    {gameData.scores.P1} - {gameData.scores.P2}
+                                </span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -465,35 +546,76 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                     <div className="p-4 bg-white dark:bg-gray-900 flex flex-col items-center gap-3">
                         <div className="flex items-center gap-4">
                             <div className="flex flex-col items-center">
-                                <div className="text-2xl mb-1">{p1Move && gameData.winner ? getMoveIcon(p1Move) : '👤'}</div>
+                                <div className="text-2xl mb-1">👤</div>
                                 <span className="text-[10px] font-bold text-gray-500 truncate max-w-[60px]">{gameData.players.P1.name}</span>
+                                <div className="flex gap-1 mt-1">
+                                    {[...Array(2)].map((_, i) => (
+                                        <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < gameData.scores.P1 ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                                    ))}
+                                </div>
                             </div>
                             <span className="text-gray-300 font-bold italic text-xs">VS</span>
                             <div className="flex flex-col items-center">
-                                <div className="text-2xl mb-1">{p2Move && gameData.winner ? getMoveIcon(p2Move) : '👤'}</div>
+                                <div className="text-2xl mb-1">👤</div>
                                 <span className="text-[10px] font-bold text-gray-500 truncate max-w-[60px]">{gameData.players.P2.name || '???'}</span>
+                                <div className="flex gap-1 mt-1">
+                                    {[...Array(2)].map((_, i) => (
+                                        <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < gameData.scores.P2 ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                                    ))}
+                                </div>
                             </div>
                         </div>
                         <button
                             onClick={() => setIsExpanded(true)}
                             className={`w-full py-2 rounded-xl bg-${accentColor}-500 hover:bg-${accentColor}-600 text-white text-[11px] font-bold transition-all shadow-md active:scale-95`}
                         >
-                            {gameData.winner ? 'View Result' : (amPlaying ? 'Continue Playing' : 'View Game')}
+                            {gameData.winner ? 'View match' : (amPlaying ? 'Continue match' : 'View match')}
                         </button>
                     </div>
                 ) : (
                     <div className="p-4 bg-white dark:bg-gray-900 flex flex-col items-center">
-                        <div className="w-full flex justify-between items-center mb-6 px-2">
+                        <div className="w-full flex justify-between items-center mb-4 px-2">
                             <div className={`flex flex-col items-center p-2 rounded-xl border-2 transition-all ${isP1 ? selectedOutlineClass : 'border-transparent opacity-60'}`}>
-                                <div className="text-3xl mb-1">{p1Move && (gameData.winner || isP1) ? getMoveIcon(p1Move) : '❓'}</div>
+                                <div className="text-3xl mb-1">{myMove && isP1 ? getMoveIcon(myMove) : (gameData.winner && p1Move ? getMoveIcon(p1Move) : '❓')}</div>
                                 <span className="text-[10px] font-bold mt-1 max-w-[60px] truncate">{gameData.players.P1.name}</span>
+                                <div className="flex gap-1 mt-1">
+                                    {[...Array(2)].map((_, i) => (
+                                        <div key={i} className={`w-2 h-2 rounded-full ${i < gameData.scores.P1 ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                                    ))}
+                                </div>
                             </div>
                             <div className="text-gray-300 dark:text-gray-700 font-black text-xl italic">VS</div>
                             <div className={`flex flex-col items-center p-2 rounded-xl border-2 transition-all ${isP2 ? selectedOutlineClass : 'border-transparent opacity-60'}`}>
-                                <div className="text-3xl mb-1">{p2Move && (gameData.winner || isP2) ? getMoveIcon(p2Move) : '❓'}</div>
+                                <div className="text-3xl mb-1">{myMove && isP2 ? getMoveIcon(myMove) : (gameData.winner && p2Move ? getMoveIcon(p2Move) : '❓')}</div>
                                 <span className="text-[10px] font-bold mt-1 max-w-[60px] truncate">{gameData.players.P2.name || '???'}</span>
+                                <div className="flex gap-1 mt-1">
+                                    {[...Array(2)].map((_, i) => (
+                                        <div key={i} className={`w-2 h-2 rounded-full ${i < gameData.scores.P2 ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                                    ))}
+                                </div>
                             </div>
                         </div>
+
+                        {gameData.rounds?.length > 0 && (
+                            <div className="w-full mb-4 px-2 py-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                                <div className="text-[9px] font-black text-gray-400 uppercase mb-1 tracking-wider">Round History</div>
+                                <div className="flex flex-col gap-1">
+                                    {gameData.rounds.map((round, idx) => (
+                                        <div key={idx} className="flex items-center justify-between text-[10px]">
+                                            <span className="text-gray-500">Round {idx + 1}</span>
+                                            <div className="flex items-center gap-1.5">
+                                                <span>{getMoveIcon(round.P1)}</span>
+                                                <span className="text-gray-300">vs</span>
+                                                <span>{getMoveIcon(round.P2)}</span>
+                                            </div>
+                                            <span className={`font-bold ${round.result === 'draw' ? 'text-gray-400' : 'text-green-500'}`}>
+                                                {round.result === 'draw' ? 'Tie' : round.result === 'P1' ? 'P1 win' : 'P2 win'}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {!gameData.winner && amPlaying && !myMove && gameData.players.P2.id && (
                             <div className="grid grid-cols-3 gap-3 w-full mb-4">
@@ -519,7 +641,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                             </button>
                         )}
 
-                        <div className={`w-full p-2.5 rounded-xl text-center font-bold text-sm transition-all ${gameData.winner ? `bg-${accentColor}-500 text-white shadow-lg` : `text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800`}`}>
+                        <div className={`w-full p-2.5 rounded-xl text-center font-bold text-sm transition-all ${gameData.winner ? `bg-green-500 text-white shadow-lg` : `text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800`}`}>
                             {getRPSStatus()}
                         </div>
 

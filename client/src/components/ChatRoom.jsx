@@ -1267,6 +1267,10 @@ const ChatRoom = () => {
           let initialGame = null;
 
           if (['ttt', 'tic-tac-toe', 'tictactoe'].includes(gameArg)) {
+            if (selectedRecipients.length > 1) {
+              setError('Tic Tac Toe can only be sent to one person.');
+              return;
+            }
             handleSendGame({ gameType: 'tic-tac-toe' });
             setNewMessage('');
             return;
@@ -1275,6 +1279,10 @@ const ChatRoom = () => {
           } else if (['trivia', 'quiz'].includes(gameArg)) {
             initialGame = 'trivia';
           } else if (['rps', 'rock-paper-scissors'].includes(gameArg)) {
+            if (selectedRecipients.length > 1) {
+              setError('Rock Paper Scissors can only be sent to one person.');
+              return;
+            }
             handleSendGame({ gameType: 'rock-paper-scissors' });
             setNewMessage('');
             return;
@@ -1420,6 +1428,13 @@ const ChatRoom = () => {
 
   const handleSendGame = (gameData) => {
     if (!isConnected) return;
+
+    // Safety check for TTT/RPS recipients
+    if (selectedRecipients.length > 1 && (gameData.gameType === 'tic-tac-toe' || gameData.gameType === 'rock-paper-scissors')) {
+      setError('Match games can only be sent to one person at a time.');
+      return;
+    }
+
     socketManager.emit('send-message', { messageType: 'game', gameData, recipients: selectedRecipients });
   };
 

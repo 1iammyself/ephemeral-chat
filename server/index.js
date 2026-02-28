@@ -1655,6 +1655,12 @@ io.on('connection', (socket) => {
           socket.emit('error', { message: 'Invalid game data' });
           return;
         }
+
+        // TTT and RPS only allow 1 recipient in targeted messages
+        if (recipients && recipients.length > 1 && (gameData.gameType === 'tic-tac-toe' || gameData.gameType === 'rock-paper-scissors')) {
+          socket.emit('error', { message: 'Match games can only be sent to one person at a time.' });
+          return;
+        }
         if (gameData.gameType === 'would-you-rather') {
           if (!gameData.optionA || !gameData.optionB) {
             socket.emit('error', { message: 'Game requires two options' });
@@ -1699,6 +1705,8 @@ io.on('connection', (socket) => {
               P1: { id: socket.id, name: socket.nickname, move: null },
               P2: { id: null, name: null, move: null }
             },
+            scores: { P1: 0, P2: 0 },
+            rounds: [],
             winner: null,
             lastActivity: Date.now()
           };
@@ -1914,8 +1922,12 @@ io.on('connection', (socket) => {
       message.gameData.answers[socket.id] = answer;
       await roomManager.saveRoom(socket.roomCode, room);
 
-      // Broadcast the updated message
-      io.to(socket.roomCode).emit('message-updated', message);
+      // Broadcast the updated message with masking
+      const usersInRoom = await roomManager.getRoomUsers(socket.roomCode);
+      usersInRoom.forEach(u => {
+        const masked = roomManager.maskMessageForUser(message, u.socketId);
+        io.to(u.socketId).emit('message-updated', masked);
+      });
     } catch (error) {
       logger.error('Error handling game answer:', error);
     }
@@ -1938,10 +1950,23 @@ io.on('connection', (socket) => {
 
       if (action === 'join') {
         if (!gameData.players.O.id && gameData.players.X.id !== socket.id) {
+          // Check if it's a targeted match
+          const recipients = message.recipients || [];
+          if (recipients.length > 0 && !recipients.includes(socket.id)) {
+            socket.emit('error', { message: 'You are not invited to this match.' });
+            return;
+          }
+
           gameData.players.O = { id: socket.id, name: socket.nickname };
           gameData.lastActivity = Date.now();
           await roomManager.saveRoom(socket.roomCode, room);
-          io.to(socket.roomCode).emit('message-updated', message);
+
+          // Broadcast update with masking
+          const roomUsers = await roomManager.getRoomUsers(socket.roomCode);
+          roomUsers.forEach(user => {
+            const maskedMessage = roomManager.maskMessageForUser(message, user.socketId);
+            io.to(user.socketId).emit('message-updated', maskedMessage);
+          });
         }
         return;
       }
@@ -1986,6 +2011,107 @@ io.on('connection', (socket) => {
       }
     } catch (error) {
       logger.error('Error handling tic-tac-toe move:', error);
+    }
+  });
+
+  // Handle Rock Paper Scissors actions (Best of Three)
+  socket.on('rps-action', async ({ messageId, action, move }) => {
+    try {
+      if (!socket.roomCode || !messageId || !action) return;
+
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+
+      const messages = room.messages || [];
+      const message = messages.find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'rock-paper-scissors') return;
+
+      const { gameData } = message;
+      if (gameData.winner) return; // Game already over
+
+      const isP1 = gameData.players.P1.id === socket.id;
+      const isP2 = gameData.players.P2.id === socket.id;
+
+      if (action === 'join') {
+        if (!gameData.players.P2.id && gameData.players.P1.id !== socket.id) {
+          // Check if it's a targeted match
+          const recipients = message.recipients || [];
+          if (recipients.length > 0 && !recipients.includes(socket.id)) {
+            socket.emit('error', { message: 'You are not invited to this match.' });
+            return;
+          }
+
+          gameData.players.P2 = { id: socket.id, name: socket.nickname, move: null };
+          gameData.lastActivity = Date.now();
+          await roomManager.saveRoom(socket.roomCode, room);
+
+          // Broadcast update with masking
+          const usersInRoom = await roomManager.getRoomUsers(socket.roomCode);
+          usersInRoom.forEach(u => {
+            const masked = roomManager.maskMessageForUser(message, u.socketId);
+            io.to(u.socketId).emit('message-updated', masked);
+          });
+        }
+        return;
+      }
+
+      if (action === 'move') {
+        if (!['rock', 'paper', 'scissors'].includes(move)) return;
+        if (!isP1 && !isP2) return; // Must be joined to play
+
+        if (isP1 && !gameData.players.P1.move) {
+          gameData.players.P1.move = move;
+        } else if (isP2 && !gameData.players.P2.move) {
+          gameData.players.P2.move = move;
+        } else {
+          return; // Move already locked in
+        }
+
+        // Check if round is over
+        if (gameData.players.P1.move && gameData.players.P2.move) {
+          const m1 = gameData.players.P1.move;
+          const m2 = gameData.players.P2.move;
+          let roundResult = 'draw';
+
+          if (m1 !== m2) {
+            if (
+              (m1 === 'rock' && m2 === 'scissors') ||
+              (m1 === 'paper' && m2 === 'rock') ||
+              (m1 === 'scissors' && m2 === 'paper')
+            ) {
+              roundResult = 'P1';
+              gameData.scores.P1++;
+            } else {
+              roundResult = 'P2';
+              gameData.scores.P2++;
+            }
+          }
+
+          // Record round
+          gameData.rounds.push({
+            P1: m1,
+            P2: m2,
+            result: roundResult
+          });
+
+          // Check for match winner (Best of Three)
+          if (gameData.scores.P1 >= 2) {
+            gameData.winner = 'P1';
+          } else if (gameData.scores.P2 >= 2) {
+            gameData.winner = 'P2';
+          } else {
+            // Match continues, reset moves for next round
+            gameData.players.P1.move = null;
+            gameData.players.P2.move = null;
+          }
+        }
+
+        gameData.lastActivity = Date.now();
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+      }
+    } catch (error) {
+      logger.error('Error handling RPS action:', error);
     }
   });
 
