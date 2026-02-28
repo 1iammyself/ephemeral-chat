@@ -1242,13 +1242,27 @@ io.on('connection', (socket) => {
             const reconnectUserId = userId || socket.id;
             const beforeCount = room.users.length;
 
+            // ── Ensure roomData exists for this room ──
+            if (!roomData[roomCode]) {
+              roomData[roomCode] = {
+                hostId: socket.id, // Assume they are host if they are re-creating the metadata
+                lobbyLimit: 100,
+                lobbyCount: 0,
+                userRoles: {},
+                vibe: room.vibe || 'default',
+                topic: room.topic || '',
+                timer: room.timer || null
+              };
+              logger.info(`🏗️ Re-initialized roomData for ${roomCode} during Session Resumption`);
+            }
+
             // Transfer roles from stale records to the new socket ID in roomData
             const staleUsers = room.users.filter(u =>
               u.socketId !== socket.id &&
               (u.nickname === reconnectNickname || u.id === reconnectUserId)
             );
 
-            if (staleUsers.length > 0 && roomData[roomCode]) {
+            if (staleUsers.length > 0) {
               staleUsers.forEach(stale => {
                 // Transfer host status
                 if (roomData[roomCode].hostId === stale.socketId) {
@@ -1294,8 +1308,10 @@ io.on('connection', (socket) => {
             await roomManager.saveRoom(roomCode, room);
 
             // Automatically make them host if they are the ONLY person in the room now
-            if (room.users.length === 1 && roomData[roomCode]) {
+            if (room.users.length === 1) {
               roomData[roomCode].hostId = socket.id;
+              if (!roomData[roomCode].userRoles) roomData[roomCode].userRoles = {};
+              roomData[roomCode].userRoles[socket.id] = 'host';
               logger.info(`👑 Assigned host status to ${socket.id} (${reconnectNickname}) because they are the only user in the room (Session Resume)`);
             }
 
