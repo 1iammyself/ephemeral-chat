@@ -122,6 +122,7 @@ const ChessGame = ({ gameData, currentUserId, onMove, vibe: vibeId }) => {
     const [game, setGame] = useState(new Chess(gameData?.fen || undefined));
     const [selectedSquare, setSelectedSquare] = useState(null);
     const [validMoves, setValidMoves] = useState([]);
+    const [pendingPromotion, setPendingPromotion] = useState(null);
     const vibe = getVibeById(vibeId);
 
     const isWhite = gameData?.players?.white?.id === currentUserId;
@@ -149,10 +150,29 @@ const ChessGame = ({ gameData, currentUserId, onMove, vibe: vibeId }) => {
             const moves = game.moves({ square, verbose: true });
             setValidMoves(moves.map(m => m.to));
         } else if (selectedSquare && validMoves.includes(square)) {
-            onMove({ from: selectedSquare, to: square });
+            // Check for pawn promotion
+            const movePiece = game.get(selectedSquare);
+            const isPromotion = movePiece?.type === 'p' &&
+                ((movePiece.color === 'w' && square[1] === '8') ||
+                    (movePiece.color === 'b' && square[1] === '1'));
+
+            if (isPromotion) {
+                setPendingPromotion({ from: selectedSquare, to: square });
+            } else {
+                onMove({ from: selectedSquare, to: square });
+                setSelectedSquare(null);
+                setValidMoves([]);
+            }
+        } else {
             setSelectedSquare(null);
             setValidMoves([]);
-        } else {
+        }
+    };
+
+    const handleConfirmPromotion = (promotionPiece) => {
+        if (pendingPromotion) {
+            onMove({ ...pendingPromotion, promotion: promotionPiece });
+            setPendingPromotion(null);
             setSelectedSquare(null);
             setValidMoves([]);
         }
@@ -296,7 +316,7 @@ const ChessGame = ({ gameData, currentUserId, onMove, vibe: vibeId }) => {
                 aspectRatio: '1/1',
                 display: 'flex',
                 flexWrap: 'wrap',
-                background: vibe.id === 'Party' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.05)',
+                background: vibe.id === 'party' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.05)',
                 boxShadow: `0 8px 32px ${vibe.colors.primary}22`,
                 position: 'relative'
             }}>
@@ -348,6 +368,26 @@ const ChessGame = ({ gameData, currentUserId, onMove, vibe: vibeId }) => {
                     <span style={{ color: '#ff4444', animation: 'pulse 1s infinite' }}>Check!</span>
                 )}
             </div>
+
+            {/* Promotion Picker Overlay */}
+            {pendingPromotion && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700">
+                        <p className="text-center text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">Promote Pawn To:</p>
+                        <div className="flex gap-4">
+                            {['q', 'r', 'b', 'n'].map(type => (
+                                <button
+                                    key={type}
+                                    onClick={() => handleConfirmPromotion(type)}
+                                    className="w-16 h-16 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors p-2"
+                                >
+                                    {PIECES[game.turn()][type]('#4B5563', '#1F2937')}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -1,7 +1,6 @@
-import React from 'react';
-import { X, Trophy, Swords, Shield, History, Info } from 'lucide-react';
 import ChessGame from './ChessGame';
 import { getVibeById } from '../../utils/vibes';
+import { Chess } from '../../utils/chess-lib';
 
 const ChessModal = ({ isOpen, onClose, message, currentUserId, onMove, roomVibe }) => {
     if (!isOpen || !message) return null;
@@ -18,6 +17,46 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, onMove, roomVibe 
     const isWhite = gameData.players.white?.id === currentUserId;
     const isBlack = gameData.players.black?.id === currentUserId;
     const amPlaying = isWhite || isBlack;
+
+    // Use a temporary chess instance to calculate captured pieces and status
+    const game = new Chess(gameData.fen || undefined);
+    const board = game.board();
+
+    const initialPieces = {
+        w: { p: 8, n: 2, b: 2, r: 2, q: 1, k: 1 },
+        b: { p: 8, n: 2, b: 2, r: 2, q: 1, k: 1 }
+    };
+    const currentPieces = {
+        w: { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 },
+        b: { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 }
+    };
+    board.flat().filter(p => p).forEach(p => {
+        currentPieces[p.color][p.type]++;
+    });
+
+    const capturedByWhite = [];
+    const capturedByBlack = [];
+    ['p', 'n', 'b', 'r', 'q'].forEach(type => {
+        for (let i = 0; i < (initialPieces.b[type] - currentPieces.b[type]); i++) capturedByWhite.push({ type, color: 'b' });
+        for (let i = 0; i < (initialPieces.w[type] - currentPieces.w[type]); i++) capturedByBlack.push({ type, color: 'w' });
+    });
+
+    const isCheck = game.isCheck();
+    const isCheckmate = game.isCheckmate();
+    const isDraw = game.isDraw();
+    const isGameOver = isCheckmate || isDraw;
+
+    const getPieceIcon = (type, color) => {
+        const icons = {
+            p: color === 'w' ? '♙' : '♟',
+            n: color === 'w' ? '♘' : '♞',
+            b: color === 'w' ? '♗' : '♝',
+            r: color === 'w' ? '♖' : '♜',
+            q: color === 'w' ? '♕' : '♛',
+            k: color === 'w' ? '♔' : '♚'
+        };
+        return icons[type];
+    };
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
@@ -78,7 +117,11 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, onMove, roomVibe 
                                         <div className="w-10 h-10 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center text-xl shadow-sm">♔</div>
                                         <div>
                                             <p className="text-xs font-bold text-gray-900 dark:text-white">{gameData.players.white?.name || 'Waiting...'}</p>
-                                            <p className="text-[9px] text-gray-500 uppercase font-bold tracking-tighter">Player White</p>
+                                            <div className="flex gap-0.5 mt-0.5 min-h-[12px]">
+                                                {capturedByWhite.map((p, idx) => (
+                                                    <span key={idx} className="text-[10px] text-gray-400">{getPieceIcon(p.type, 'b')}</span>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
                                     {isWhite && <Shield className={`w-4 h-4 text-${accentColor}-500`} />}
@@ -93,7 +136,11 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, onMove, roomVibe 
                                         <div className="w-10 h-10 rounded-full bg-gray-900 border-2 border-gray-700 flex items-center justify-center text-xl text-white shadow-sm font-light">♚</div>
                                         <div>
                                             <p className="text-xs font-bold text-gray-900 dark:text-white">{gameData.players.black?.name || 'Waiting...'}</p>
-                                            <p className="text-[9px] text-gray-500 uppercase font-bold tracking-tighter">Player Black</p>
+                                            <div className="flex gap-0.5 mt-0.5 min-h-[12px]">
+                                                {capturedByBlack.map((p, idx) => (
+                                                    <span key={idx} className="text-[10px] text-gray-400">{getPieceIcon(p.type, 'w')}</span>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
                                     {isBlack && <Shield className={`w-4 h-4 text-${accentColor}-500`} />}
@@ -121,6 +168,20 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, onMove, roomVibe 
                                 )}
                             </div>
                         </div>
+
+                        {/* Game Status Message */}
+                        {(isCheck || isGameOver) && (
+                            <div className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center text-center animate-bounce-subtle ${isGameOver ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-500' : 'bg-red-50 dark:bg-red-900/20 border-red-500'}`}>
+                                <p className={`text-sm font-black uppercase tracking-widest ${isGameOver ? 'text-amber-600' : 'text-red-600'}`}>
+                                    {isCheckmate ? 'Checkmate!' : isCheck ? 'Check!' : isDraw ? 'Draw!' : ''}
+                                </p>
+                                {isGameOver && (
+                                    <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 mt-1">
+                                        {isCheckmate ? `${game.turn() === 'w' ? 'Black' : 'White'} Victory` : 'Game Over'}
+                                    </p>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 
