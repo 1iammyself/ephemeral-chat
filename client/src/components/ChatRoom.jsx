@@ -2177,7 +2177,7 @@ const ChatRoom = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className={`relative flex items-center w-full bg-white dark:bg-gray-800 rounded-full border dark:border-gray-700 shadow-sm px-1 py-0.5 sm:py-1 transition-all ${isAnonymousMode ? 'border-purple-400 dark:border-purple-600 ring-2 ring-purple-500/20' : ''}`}>
+                  <div className={`relative flex items-center w-full ${getVibeById(roomVibe).inputClass} rounded-full px-1 py-0.5 sm:py-1 transition-all ${isAnonymousMode ? 'border-purple-400 dark:border-purple-600 ring-4 ring-purple-500/20' : ''}`}>
                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" id="image-upload" />
 
                     <div className="relative flex-shrink-0" ref={featureMenuRef}>
@@ -2185,7 +2185,7 @@ const ChatRoom = () => {
                         type="button"
                         onClick={() => setShowFeatureMenu(!showFeatureMenu)}
                         disabled={!isConnected}
-                        className={`p-1.5 sm:p-2.5 rounded-full transition-all duration-200 ${showFeatureMenu ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-600 scale-110' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
+                        className={`p-1.5 sm:p-2.5 rounded-full transition-all duration-200 ${showFeatureMenu ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 text-${vibeAccent}-600 scale-110` : `hover:bg-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 text-gray-500 dark:text-gray-400`}`}
                         title="Features"
                       >
                         <Plus className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300 ${showFeatureMenu ? 'rotate-45' : ''}`} />
@@ -2485,7 +2485,7 @@ const ChatRoom = () => {
                           window.scrollTo(0, 0);
                         }}
                         placeholder={isAnonymousMode ? "Confess anonymously..." : "Type message..."}
-                        className={`w-full bg-transparent border-none focus:outline-none focus:ring-0 ${getVibeById(roomVibe).inputClass.replace(/bg-[\w-]+-\d+/g, '').replace(/border-[\w-]+-\d+/g, '')} dark:text-white text-[15px] sm:text-base px-2 py-2.5 min-w-0 placeholder:text-gray-400`}
+                        className="w-full bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white text-[15px] sm:text-base px-2 py-2.5 min-w-0 placeholder:text-gray-400"
                         disabled={!isConnected || isSending}
                         maxLength={500}
                         style={{ boxShadow: 'none' }}
