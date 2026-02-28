@@ -2154,10 +2154,10 @@ const ChatRoom = () => {
                 <button onClick={() => setSelectedRecipients([])} className={`text-xs text-${vibeAccent}-500 hover:text-${vibeAccent}-700 dark:hover:text-${vibeAccent}-200 underline`}>Clear selection</button>
               </div>
             )}
-            <div className="px-2 pt-2 sm:px-4 sm:pt-4 pb-0 sm:pb-4">
-              <form onSubmit={handleSendMessage} className="flex items-center space-x-1.5 sm:space-x-3">
+            <div className="px-2 pt-2 sm:px-4 sm:pt-4 pb-1 sm:pb-4 w-full">
+              <form onSubmit={handleSendMessage} className="flex items-center w-full">
                 {isRecording ? (
-                  <div className="flex-1 flex flex-col space-y-2">
+                  <div className="flex-1 flex flex-col space-y-2 w-full">
                     {/* Safari Audio Notice */}
 
                     <div className={`flex items-center justify-between bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20 rounded-lg px-4 py-2 border border-${vibeAccent}-100 dark:border-${vibeAccent}-800/30`}>
@@ -2177,21 +2177,22 @@ const ChatRoom = () => {
                     </div>
                   </div>
                 ) : (
-                  <>
+                  <div className={`relative flex items-center w-full bg-white dark:bg-gray-800 rounded-full border dark:border-gray-700 shadow-sm px-1 py-0.5 sm:py-1 transition-all ${isAnonymousMode ? 'border-purple-400 dark:border-purple-600 ring-2 ring-purple-500/20' : ''}`}>
                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" id="image-upload" />
 
-                    <div className="relative" ref={featureMenuRef}>
+                    <div className="relative flex-shrink-0" ref={featureMenuRef}>
                       <button
                         type="button"
                         onClick={() => setShowFeatureMenu(!showFeatureMenu)}
                         disabled={!isConnected}
-                        className={`p-2.5 sm:p-3 rounded-xl transition-all duration-200 ${showFeatureMenu ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-600 scale-110' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
+                        className={`p-1.5 sm:p-2.5 rounded-full transition-all duration-200 ${showFeatureMenu ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-600 scale-110' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
+                        title="Features"
                       >
-                        <Plus className={`w-5 h-5 transition-transform duration-300 ${showFeatureMenu ? 'rotate-45' : ''}`} />
+                        <Plus className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300 ${showFeatureMenu ? 'rotate-45' : ''}`} />
                       </button>
 
                       {showFeatureMenu && (
-                        <div className="absolute bottom-full mb-3 left-0 z-50 bg-white/95 dark:bg-gray-800/95 rounded-3xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 p-2 sm:p-3 flex flex-col space-y-2 w-[280px] sm:w-80 animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/5">
+                        <div className="absolute bottom-full mb-3 left-0 z-50 bg-white/95 dark:bg-gray-800/95 rounded-3xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 p-2 sm:p-3 flex flex-col space-y-2 w-[85vw] max-w-[280px] sm:max-w-[320px] animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/5">
                           {/* Floating Reaction Pill */}
                           <div className="flex items-center gap-1 bg-gray-50/80 dark:bg-gray-900/80 rounded-2xl p-1 px-1.5 border border-gray-100/50 dark:border-gray-800/50 shadow-inner">
                             <div className="flex items-center flex-1 overflow-x-auto scrollbar-none gap-1 py-0.5 no-scrollbar">
@@ -2384,7 +2385,7 @@ const ChatRoom = () => {
                       )}
                     </div>
 
-                    <div className="relative" ref={emojiPickerRef}>
+                    <div className="relative flex-shrink-0" ref={emojiPickerRef}>
                       <button
                         type="button"
                         onClick={() => {
@@ -2394,13 +2395,14 @@ const ChatRoom = () => {
                           setShowEmojiPicker(!showEmojiPicker);
                         }}
                         disabled={!isConnected}
-                        className={`p-2.5 sm:p-3 rounded-xl transition-colors ${showEmojiPicker ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 text-${vibeAccent}-500` : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
+                        className={`p-1.5 sm:p-2.5 rounded-full transition-colors ${showEmojiPicker ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 text-${vibeAccent}-500` : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
+                        title="Emoji"
                       >
-                        <Smile className="w-5 h-5" />
+                        <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
                       {showEmojiPicker && (
                         <div
-                          className="absolute bottom-full mb-2 left-0 z-50 animate-in fade-in zoom-in slide-in-from-bottom-2 duration-200 themed-emoji-picker"
+                          className="absolute bottom-full mb-2 left-0 sm:left-auto z-50 animate-in fade-in zoom-in slide-in-from-bottom-2 duration-200 themed-emoji-picker w-[85vw] max-w-[320px]"
                           style={{
                             '--epr-highlight-color': vibeHex,
                             '--epr-focus-bg-color': `${vibeHex}20`,
@@ -2414,43 +2416,43 @@ const ChatRoom = () => {
                             skinTonesDisabled
                             autoFocusSearch={false}
                             searchPlaceholder="Search emojis..."
-                            width={window.innerWidth < 640 ? 280 : 320}
-                            height={window.innerWidth < 640 ? 350 : 400}
+                            width="100%"
+                            height={window.innerWidth < 640 ? 300 : 400}
                             previewConfig={{ showPreview: false }}
                           />
                         </div>
                       )}
                     </div>
-                    <div className="relative flex-1">
+                    <div className="relative flex-1 min-w-0">
                       {suggestions.show && (
                         <div
                           ref={suggestionRef}
-                          className="absolute bottom-full left-0 w-full mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl overflow-hidden z-[60] animate-in slide-in-from-bottom-2 duration-200"
+                          className="absolute bottom-full left-0 -ml-12 sm:ml-0 mb-3 w-[85vw] sm:w-full max-w-[280px] sm:max-w-none bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50 rounded-3xl shadow-2xl overflow-hidden z-[60] animate-in slide-in-from-bottom-2 duration-300 ring-1 ring-black/5 dark:ring-white/5"
                         >
-                          <div className="max-h-48 overflow-y-auto">
+                          <div className="max-h-48 overflow-y-auto p-1.5 sm:p-2 space-y-0.5">
                             {suggestions.items.map((item, idx) => (
                               <button
                                 key={idx}
                                 onClick={() => applySuggestion(item)}
                                 onMouseEnter={() => setSuggestions(prev => ({ ...prev, index: idx }))}
-                                className={`w-full flex items-center space-x-3 px-4 py-2.5 transition-colors text-left ${idx === suggestions.index ? `bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20 text-${vibeAccent}-600 dark:text-${vibeAccent}-400` : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300'}`}
+                                className={`w-full flex items-center space-x-2 sm:space-x-3 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl transition-all text-left ${idx === suggestions.index ? `bg-${vibeAccent}-50/80 dark:bg-${vibeAccent}-900/20 text-${vibeAccent}-600 dark:text-${vibeAccent}-400 shadow-sm border border-${vibeAccent}-100 dark:border-${vibeAccent}-800/30` : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300 border border-transparent'}`}
                               >
                                 {suggestions.type === 'command' ? (
                                   <>
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${idx === suggestions.index ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40` : 'bg-gray-100 dark:bg-gray-700'}`}>
-                                      <item.icon className="w-4 h-4" />
+                                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shadow-sm ${idx === suggestions.index ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40` : 'bg-gray-100 dark:bg-gray-700'}`}>
+                                      <item.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                      <div className="font-bold text-sm">{item.value}</div>
-                                      <div className="text-[10px] opacity-70 truncate">{item.desc}</div>
+                                      <div className="font-bold text-[11px] sm:text-sm tracking-tight">{item.value}</div>
+                                      <div className="text-[9px] sm:text-[10px] font-medium opacity-70 truncate">{item.desc}</div>
                                     </div>
                                   </>
                                 ) : (
                                   <>
-                                    <div className={`w-8 h-8 rounded-full bg-gradient-to-br from-${vibeAccent}-500 to-${vibeAccent}-600 flex items-center justify-center text-white text-xs font-bold`}>
+                                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full shadow-sm bg-gradient-to-br from-${vibeAccent}-500 to-${vibeAccent}-600 flex items-center justify-center text-white text-[10px] sm:text-xs font-black`}>
                                       {item.nickname[0].toUpperCase()}
                                     </div>
-                                    <div className="font-bold text-sm">@{item.nickname}</div>
+                                    <div className="font-bold text-[11px] sm:text-sm tracking-tight">@{item.nickname}</div>
                                   </>
                                 )}
                               </button>
@@ -2469,9 +2471,7 @@ const ChatRoom = () => {
                         onPaste={(e) => e.preventDefault()}
                         onFocus={() => {
                           const isAndroid = /Android/.test(navigator.userAgent);
-
                           if (isAndroid) {
-                            // Android behavior - prevent scroll and ensure input stays visible
                             setTimeout(() => {
                               const inputContainer = messageInputRef.current?.closest('.chat-input-area');
                               if (inputContainer) {
@@ -2480,31 +2480,27 @@ const ChatRoom = () => {
                               window.scrollTo(0, 0);
                             }, 100);
                           }
-                          // iOS handling is done via the global focusin handler in useEffect
                         }}
-
                         onBlur={() => {
-                          // Reset scroll position (primarily for Android)
                           window.scrollTo(0, 0);
-                          // iOS class removal is handled by the global focusout handler in useEffect
                         }}
-
                         placeholder={isAnonymousMode ? "Confess anonymously..." : "Type message..."}
-                        className={`w-full input-field py-2.5 sm:py-3 px-3 sm:px-4 ${getVibeById(roomVibe).inputClass} dark:text-white border text-sm sm:text-base transition-all duration-300 rounded-xl focus:ring-2 focus:ring-primary-500/20 ${isAnonymousMode ? 'border-purple-400 dark:border-purple-600' : ''}`}
+                        className={`w-full bg-transparent border-none focus:outline-none focus:ring-0 ${getVibeById(roomVibe).inputClass.replace(/bg-[\w-]+-\d+/g, '').replace(/border-[\w-]+-\d+/g, '')} dark:text-white text-[15px] sm:text-base px-2 py-2.5 min-w-0 placeholder:text-gray-400`}
                         disabled={!isConnected || isSending}
                         maxLength={500}
+                        style={{ boxShadow: 'none' }}
                       />
                     </div>
                     <button
                       type="button"
                       onClick={() => setIsAnonymousMode(!isAnonymousMode)}
-                      className={`px-2.5 py-2.5 sm:py-3 rounded-xl transition-all text-lg ${isAnonymousMode ? `${getVibeById(roomVibe).accentClass} ring-2 ring-white/20` : 'text-gray-400 hover:text-primary-500 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                      className={`p-1.5 sm:p-2 rounded-full transition-all text-base sm:text-lg flex-shrink-0 ${isAnonymousMode ? `${getVibeById(roomVibe).accentClass} ring-2 ring-white/20` : 'text-gray-400 hover:text-primary-500 hover:bg-black/5 dark:hover:bg-white/5'}`}
                       title={isAnonymousMode ? 'Anonymous mode ON' : 'Send anonymously'}
                     >
                       👻
                     </button>
-                    <button type="submit" disabled={!newMessage.trim() || !isConnected || isSending} className={`${getVibeById(roomVibe).accentClass} px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl transition-all shadow-sm active:scale-95`}><Send className="w-5 h-5" /></button>
-                  </>
+                    <button type="submit" disabled={!newMessage.trim() || !isConnected || isSending} className={`flex-shrink-0 ml-1 sm:ml-2 ${getVibeById(roomVibe).accentClass} h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}><Send className="w-4 h-4 sm:w-5 sm:h-5 -ml-0.5" /></button>
+                  </div>
                 )}
               </form>
             </div>

@@ -288,33 +288,38 @@ Verbal Code: ${verbalCode || 'N/A'}`;
                 )}
 
                 <div className="pt-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Invite Link (Expires in 25 min)</label>
-                  <div className="flex items-center">
-                    <input
-                      type="text"
-                      readOnly
-                      value={inviteLink || 'Generating...'}
-                      data-allow-copy="true"
-                      className="flex-1 p-2 border rounded-l-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm truncate"
-                    />
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center justify-between">
+                    Invite Link
+                    <span className="text-[10px] text-gray-500 font-normal">Expires in 25 min</span>
+                  </label>
+                  <div className="flex items-center w-full">
+                    <div className="flex-1 min-w-0">
+                      <input
+                        type="text"
+                        readOnly
+                        value={inviteLink || 'Generating...'}
+                        data-allow-copy="true"
+                        className="w-full p-2 border rounded-l-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-xs sm:text-sm truncate m-0"
+                      />
+                    </div>
                     <button
                       onClick={() => inviteLink && copyToClipboard(inviteLink, 'inviteLink')}
                       disabled={!inviteLink}
-                      className={`p-2 transition-colors ${inviteLink ? 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700' : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'}`}
+                      className={`shrink-0 p-2 sm:px-3 sm:py-2 transition-colors border border-l-0 ${inviteLink ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-700 hover:bg-blue-100' : 'bg-gray-100 dark:bg-gray-800 text-gray-400 border-gray-200 cursor-not-allowed'}`}
                       title="Copy link"
                     >
-                      {isCopied.inviteLink ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+                      {isCopied.inviteLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                     </button>
                     <button
                       onClick={handleShare}
                       disabled={!inviteLink}
-                      className={`p-2 rounded-r-md transition-colors ${inviteLink ? 'bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700' : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'}`}
+                      className={`shrink-0 p-2 sm:px-3 sm:py-2 rounded-r-md transition-colors border border-l-0 ${inviteLink ? 'bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 border-green-200 dark:border-green-700 hover:bg-green-100' : 'bg-gray-100 dark:bg-gray-800 text-gray-400 border-gray-200 cursor-not-allowed'}`}
                       title="Share link"
                     >
-                      <Share2 className="w-5 h-5" />
+                      <Share2 className="w-4 h-4" />
                     </button>
                   </div>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Share this link with others to join easily</p>
+                  <p className="mt-1 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">Share this link with others to join easily</p>
                 </div>
 
                 {/* Verbal Join Code */}
@@ -376,8 +381,8 @@ Verbal Code: ${verbalCode || 'N/A'}`;
 
   // Show the room creation form
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md relative">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md relative shadow-2xl overflow-hidden">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"

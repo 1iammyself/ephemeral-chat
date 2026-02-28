@@ -149,11 +149,11 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
         };
 
         return (
-            <div className={`w-full max-w-[280px] overflow-hidden rounded-2xl shadow-lg border-2 ${cardBorderClass} animate-in fade-in zoom-in duration-300`}>
-                <div className={`p-3 ${headerClass} flex items-center justify-between`}>
-                    <div className="flex items-center gap-2">
-                        <Hash className="w-5 h-5 text-white" />
-                        <h3 className="text-white font-bold text-sm">Tic-Tac-Toe</h3>
+            <div className={`w-full max-w-[260px] sm:max-w-[280px] overflow-hidden rounded-2xl shadow-lg border-x border-b ${cardBorderClass} border-t-4 border-t-${accentColor}-500 animate-in fade-in zoom-in duration-300`}>
+                <div className={`p-2 sm:p-3 ${headerClass} flex items-center justify-between`}>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                        <Hash className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                        <h3 className="text-white font-bold text-xs sm:text-sm">Tic-Tac-Toe</h3>
                     </div>
                     <div className="flex items-center gap-1.5">
                         {isSpectator && (
@@ -249,11 +249,11 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
     // ── Would You Rather ──
     if (isWYR) {
         return (
-            <div className={`w-full max-w-sm overflow-hidden rounded-xl shadow-sm border ${cardBorderClass}`}>
-                <div className={`p-3 ${headerClass} flex items-center justify-between`}>
-                    <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-white" />
-                        <h3 className="text-white font-bold text-sm">Would You Rather</h3>
+            <div className={`w-full max-w-[260px] sm:max-w-[280px] overflow-hidden rounded-xl shadow-sm border-x border-b ${cardBorderClass} border-t-4 border-t-${accentColor}-500`}>
+                <div className={`p-2 sm:p-3 ${headerClass} flex items-center justify-between`}>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                        <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+                        <h3 className="text-white font-bold text-xs sm:text-sm">Would You Rather</h3>
                     </div>
                 </div>
 
@@ -376,11 +376,11 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
     // ── Trivia ──
     if (isTrivia) {
         return (
-            <div className={`w-full max-w-sm overflow-hidden rounded-xl shadow-sm border ${cardBorderClass}`}>
-                <div className={`p-3 ${headerClass} flex items-center justify-between`}>
-                    <div className="flex items-center gap-2">
-                        <HelpCircle className="w-4 h-4 text-white" />
-                        <h3 className="text-white font-bold text-sm">Trivia</h3>
+            <div className={`w-full max-w-[260px] sm:max-w-[280px] overflow-hidden rounded-xl shadow-sm border-x border-b ${cardBorderClass} border-t-4 border-t-${accentColor}-500`}>
+                <div className={`p-2 sm:p-3 ${headerClass} flex items-center justify-between`}>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                        <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+                        <h3 className="text-white font-bold text-xs sm:text-sm">Trivia</h3>
                     </div>
                     {!triviaRevealed && triviaTimeLeft !== null && (
                         <div className="flex items-center gap-1 bg-white/20 rounded-full px-2 py-0.5">
@@ -539,11 +539,11 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
         };
 
         return (
-            <div className={`w-full max-w-[280px] overflow-hidden rounded-2xl shadow-lg border-2 ${cardBorderClass} animate-in fade-in zoom-in duration-300`}>
-                <div className={`p-3 ${headerClass} flex items-center justify-between`}>
-                    <div className="flex items-center gap-2">
-                        <Sparkles className="w-5 h-5 text-white" />
-                        <h3 className="text-white font-bold text-sm">Best of Three RPS</h3>
+            <div className={`w-full max-w-[260px] sm:max-w-[280px] overflow-hidden rounded-2xl shadow-lg border-x border-b ${cardBorderClass} border-t-4 border-t-${accentColor}-500 animate-in fade-in zoom-in duration-300`}>
+                <div className={`p-2 sm:p-3 ${headerClass} flex items-center justify-between`}>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                        <Sparkles className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-white" />
+                        <h3 className="text-white font-bold text-xs sm:text-sm">Best of Three RPS</h3>
                     </div>
                     <div className="flex items-center gap-1.5">
                         {isSpectator && (
@@ -679,11 +679,11 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
     // ── Chess ──
     if (isChess) {
         return (
-            <div className={`w-full max-w-[280px] overflow-hidden rounded-2xl shadow-lg border-2 ${cardBorderClass} animate-in fade-in zoom-in duration-300`}>
-                <div className={`p-3 ${headerClass} flex items-center justify-between`}>
-                    <div className="flex items-center gap-2">
-                        <Trophy className="w-5 h-5 text-white" />
-                        <h3 className="text-white font-bold text-sm">Chess Match</h3>
+            <div className={`w-full max-w-[260px] sm:max-w-[280px] overflow-hidden rounded-2xl shadow-lg border-x border-b ${cardBorderClass} border-t-4 border-t-${accentColor}-500 animate-in fade-in zoom-in duration-300`}>
+                <div className={`p-2 sm:p-3 ${headerClass} flex items-center justify-between`}>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                        <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                        <h3 className="text-white font-bold text-xs sm:text-sm">Chess Match</h3>
                     </div>
                     {!gameData.players.black?.id && (
                         <div className="flex items-center gap-1.5 bg-white/20 rounded-full px-2 py-0.5">

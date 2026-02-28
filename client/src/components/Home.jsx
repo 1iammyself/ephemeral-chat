@@ -188,21 +188,21 @@ const Home = ({ children }) => {
         {children || (
           <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
             {/* Hero Section */}
-            <div className="text-center mb-16">
-              <h2 className="text-4xl font-extrabold text-gray-900 dark:text-white sm:text-5xl sm:tracking-tight lg:text-6xl">
+            <div className="text-center mb-10 sm:mb-16">
+              <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white sm:text-5xl sm:tracking-tight lg:text-6xl">
                 Secure, Temporary Chat Rooms
               </h2>
-              <p className="mt-5 max-w-2xl mx-auto text-xl text-gray-500 dark:text-gray-400">
+              <p className="mt-4 max-w-2xl mx-auto text-base sm:text-xl text-gray-500 dark:text-gray-400">
                 Create or join a room to start chatting.
               </p>
             </div>
 
             {/* Hero Action Card */}
-            <div className="mt-10 max-w-lg mx-auto space-y-4">
-              <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-6 sm:p-8 shadow-xl transition-colors duration-200">
+            <div className="mt-8 sm:mt-10 max-w-lg mx-auto space-y-4">
+              <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-5 sm:p-8 shadow-xl transition-colors duration-200">
                 <button
                   onClick={() => setShowCreateModal(true)}
-                  className="w-full flex justify-center items-center px-4 py-3 sm:py-4 text-base sm:text-lg font-bold rounded-xl text-white bg-[#22c55e] hover:bg-[#16a34a] transition-all transform active:scale-[0.98] shadow-lg shadow-green-500/20"
+                  className="w-full flex justify-center items-center px-4 py-2.5 sm:py-4 text-sm sm:text-lg font-bold rounded-xl text-white bg-[#22c55e] hover:bg-[#16a34a] transition-all transform active:scale-[0.98] shadow-lg shadow-green-500/20"
                 >
                   <Plus className="-ml-1 mr-2 h-5 w-5" />
                   Create New Room
@@ -210,7 +210,7 @@ const Home = ({ children }) => {
 
                 <button
                   onClick={() => navigate('/my-rooms')}
-                  className="w-full flex justify-center items-center px-4 py-3 sm:py-3.5 text-base sm:text-lg font-semibold rounded-xl text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all transform active:scale-[0.98] border border-blue-200 dark:border-blue-800/50 mt-3"
+                  className="w-full flex justify-center items-center px-4 py-2.5 sm:py-3.5 text-sm sm:text-lg font-semibold rounded-xl text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all transform active:scale-[0.98] border border-blue-200 dark:border-blue-800/50 mt-3"
                 >
                   <Timer className="-ml-1 mr-2 h-5 w-5" />
                   My Rooms

@@ -33,16 +33,16 @@ const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
 
     return (
         <>
-            <div className={`w-full max-w-sm bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border border-${accentColor}-100 dark:border-${accentColor}-800/50`}>
-                <div className={`p-4 ${headerClass}`}>
-                    <h3 className="text-white font-bold leading-tight">{question}</h3>
-                    <p className="text-white/80 text-xs mt-1 flex items-center">
+            <div className={`w-full max-w-[260px] sm:max-w-[320px] bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border-x border-b ${cardBorderClass} border-t-4 border-t-${accentColor}-500`}>
+                <div className={`p-2.5 sm:p-4 ${headerClass}`}>
+                    <h3 className="text-white font-bold leading-tight text-sm sm:text-base">{question}</h3>
+                    <p className="text-white/80 text-[10px] sm:text-xs mt-1 flex items-center">
                         <CheckCircle2 className="w-3 h-3 mr-1" />
                         {allowMultiple ? 'Select one or more' : 'Select one'}
                     </p>
                 </div>
 
-                <div className="p-4 space-y-3">
+                <div className="p-3 sm:p-4 space-y-2 sm:space-y-3">
                     {options.map((option) => {
                         const votes = option.votes || [];
                         const voteCount = votes.length;
@@ -53,22 +53,22 @@ const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
                             <div key={option.id} className="relative group">
                                 <button
                                     onClick={() => onVote(message.id, option.id)}
-                                    className={`w-full text-left p-3 rounded-lg border transition-all duration-200 flex items-center justify-between relative z-10 ${isVoted
+                                    className={`w-full text-left p-2 sm:p-3 rounded-lg border transition-all duration-200 flex items-center justify-between relative z-10 ${isVoted
                                         ? selectedOptionClass
                                         : `border-gray-100 dark:border-gray-700 hover:border-${accentColor}-300 dark:hover:border-${accentColor}-700 bg-gray-50 dark:bg-gray-700/50`
                                         }`}
                                 >
-                                    <div className="flex items-center space-x-3 mr-10">
+                                    <div className="flex items-center space-x-2 sm:space-x-3 mr-6 sm:mr-10">
                                         {isVoted ? (
-                                            <CheckCircle2 className={`w-5 h-5 ${checkIconClass} shrink-0`} />
+                                            <CheckCircle2 className={`w-4 h-4 sm:w-5 sm:h-5 ${checkIconClass} shrink-0`} />
                                         ) : (
-                                            <Circle className="w-5 h-5 text-gray-400 dark:text-gray-500 shrink-0" />
+                                            <Circle className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 dark:text-gray-500 shrink-0" />
                                         )}
-                                        <span className={`text-sm ${isVoted ? `font-semibold ${selectedTextClass}` : 'text-gray-700 dark:text-gray-300'}`}>
+                                        <span className={`text-[13px] sm:text-sm ${isVoted ? `font-semibold ${selectedTextClass}` : 'text-gray-700 dark:text-gray-300'}`}>
                                             {option.text}
                                         </span>
                                     </div>
-                                    <span className="text-xs font-bold text-gray-500 dark:text-gray-400 shrink-0">
+                                    <span className="text-[10px] sm:text-xs font-bold text-gray-500 dark:text-gray-400 shrink-0">
                                         {voteCount}
                                     </span>
                                 </button>

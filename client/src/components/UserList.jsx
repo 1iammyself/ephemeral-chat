@@ -79,34 +79,34 @@ const UserList = ({
     <div className="h-full flex flex-col">
       {/* Pending Guests Section (Host and Tier1 Only) */}
       {canManageGuestsCheck && pendingGuests.length > 0 && (
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-yellow-50 dark:bg-yellow-900/20 transition-colors duration-200">
-          <h3 className="font-medium text-yellow-800 dark:text-yellow-400 mb-3 text-xs uppercase tracking-wider flex items-center">
-            <Users className="w-3 h-3 mr-1" />
+        <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-yellow-50 dark:bg-yellow-900/20 transition-colors duration-200">
+          <h3 className="font-black text-yellow-800 dark:text-yellow-400 mb-2 text-[10px] uppercase tracking-widest flex items-center">
+            <Users className="w-3 h-3 mr-1.5" />
             Waiting Room ({pendingGuests.length})
           </h3>
-          <div className="space-y-2 max-h-40 overflow-y-auto scrollbar-thin">
+          <div className="space-y-1.5 max-h-40 overflow-y-auto scrollbar-thin">
             {pendingGuests.map(guest => (
-              <div key={guest.socketId} className="flex items-center justify-between bg-white dark:bg-gray-800 p-2 rounded border border-yellow-100 dark:border-yellow-900/30 shadow-sm transition-colors duration-200">
+              <div key={guest.socketId} className="flex items-center justify-between bg-white dark:bg-gray-800 p-1.5 sm:p-2 rounded-xl border border-yellow-100 dark:border-yellow-900/30 shadow-sm transition-colors duration-200">
                 <div className="flex items-center space-x-2 overflow-hidden">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium ${getAvatarColor(guest.nickname)}`}>
+                  <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-[10px] sm:text-xs text-white font-black tracking-tighter ${getAvatarColor(guest.nickname)}`}>
                     {getInitials(guest.nickname)}
                   </div>
-                  <span className="font-medium text-sm truncate text-gray-900 dark:text-gray-200">{guest.nickname}</span>
+                  <span className="font-bold text-[13px] sm:text-sm truncate text-gray-900 dark:text-gray-200 tracking-tight">{guest.nickname}</span>
                 </div>
-                <div className="flex space-x-2 flex-shrink-0">
+                <div className="flex space-x-1 sm:space-x-2 flex-shrink-0">
                   <button
                     onClick={() => onApprove(guest.socketId)}
-                    className="p-2 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors shadow-sm"
+                    className="p-1.5 sm:p-2 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg sm:rounded-full hover:bg-green-200 dark:hover:bg-green-900/50 transition-all shadow-sm active:scale-95"
                     title="Approve"
                   >
-                    <Check className="w-5 h-5" />
+                    <Check className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                   <button
                     onClick={() => onDeny(guest.socketId)}
-                    className="p-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors shadow-sm"
+                    className="p-1.5 sm:p-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg sm:rounded-full hover:bg-red-200 dark:hover:bg-red-900/50 transition-all shadow-sm active:scale-95"
                     title="Deny"
                   >
-                    <X className="w-5 h-5" />
+                    <X className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                 </div>
               </div>
@@ -116,10 +116,10 @@ const UserList = ({
       )}
 
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700 transition-colors duration-200 flex items-center justify-between">
+      <div className="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 transition-colors duration-200 flex items-center justify-between bg-black/5 dark:bg-white/5 backdrop-blur-sm">
         <div className="flex items-center space-x-2">
-          <Users className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-          <h3 className="font-medium text-gray-900 dark:text-white">
+          <Users className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
+          <h3 className="font-black text-sm sm:text-base text-gray-900 dark:text-white tracking-tight">
             Participants ({users.length})
           </h3>
         </div>
@@ -130,35 +130,35 @@ const UserList = ({
                 navigator.clipboard.writeText(verbalCode);
                 hapticSuccess();
               }}
-              className="lg:hidden flex items-center space-x-1 px-2 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors border border-indigo-100 dark:border-indigo-800"
+              className="lg:hidden flex items-center space-x-1 px-2 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all border border-indigo-100 dark:border-indigo-800 active:scale-95 shadow-sm"
               title="Click to copy join code"
             >
-              <Zap className="w-3.5 h-3.5" />
-              <span className="font-bold text-[10px] uppercase tracking-wider">Code</span>
+              <Zap className="w-3 h-3" />
+              <span className="font-black text-[9px] uppercase tracking-widest">Code</span>
             </button>
           )}
           {onShowActivityLogs && (
             <button
               onClick={onShowActivityLogs}
-              className={`p-1.5 rounded-lg transition-all relative ${hasNewLogs ? 'text-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              className={`p-1.5 rounded-lg transition-all relative ${hasNewLogs ? 'text-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
               title="Activity Log"
             >
-              <Info className="w-5 h-5" />
-              {hasNewLogs && <span className="absolute top-1 right-1 w-2 h-2 bg-primary-500 rounded-full border-2 border-white dark:border-gray-800"></span>}
+              <Info className="w-4 h-4 sm:w-5 sm:h-5" />
+              {hasNewLogs && <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-primary-500 rounded-full border border-white dark:border-gray-800"></span>}
             </button>
           )}
         </div>
       </div>
 
       {/* User List */}
-      <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4 pb-16 scrollbar-thin">
         {users.length === 0 ? (
           <div className="text-center text-gray-500 dark:text-gray-400 py-8">
-            <User className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">No users online</p>
+            <User className="w-8 h-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm font-semibold">No users online</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-1 sm:space-y-2">
             {users.map((user, index) => {
               const isCurrentUser = currentUser && (user.socketId === currentUser.socketId || user.socketId === currentUser.id || user.id === currentUser.id);
               const userRole = getUserRole(user);
@@ -171,11 +171,11 @@ const UserList = ({
               return (
                 <div key={user.socketId || user.id || index} className="relative">
                   <div
-                    className={`flex items-center space-x-3 p-2 rounded-lg transition-colors duration-200 cursor-pointer ${isCurrentUser
-                      ? `bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20`
+                    className={`flex items-center space-x-2.5 p-1.5 sm:p-2 rounded-xl transition-all duration-200 cursor-pointer ${isCurrentUser
+                      ? `bg-${vibeAccent}-50/80 dark:bg-${vibeAccent}-900/20 shadow-sm border border-${vibeAccent}-100 dark:border-${vibeAccent}-800/30`
                       : selectedRecipients.includes(user.socketId)
-                        ? `bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20 border border-${vibeAccent}-200 dark:border-${vibeAccent}-800`
-                        : 'hover:bg-gray-50 dark:hover:bg-gray-800 border border-transparent'
+                        ? `bg-${vibeAccent}-50/80 dark:bg-${vibeAccent}-900/20 border border-${vibeAccent}-300 dark:border-${vibeAccent}-600 shadow-sm`
+                        : 'hover:bg-gray-50/80 dark:hover:bg-gray-800/80 border border-transparent'
                       }`}
                     onClick={() => {
                       if (!isCurrentUser && onToggleRecipient) {
@@ -184,26 +184,26 @@ const UserList = ({
                     }}
                   >
                     <div className="relative">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm text-white font-medium shadow-sm ${getAvatarColor(user.nickname)}`}>
+                      <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-[10px] sm:text-xs text-white font-black tracking-tighter shadow-md shadow-black/10 ring-2 ring-white/10 ${getAvatarColor(user.nickname)}`}>
                         {getInitials(user.nickname)}
                       </div>
                       {!isCurrentUser && onToggleRecipient && (
-                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center ${selectedRecipients.includes(user.socketId) ? `bg-${vibeAccent}-500` : 'bg-gray-200 dark:bg-gray-600'
+                        <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center ${selectedRecipients.includes(user.socketId) ? `bg-${vibeAccent}-500` : 'bg-gray-200 dark:bg-gray-600'
                           }`}>
-                          {selectedRecipients.includes(user.socketId) && <Check className="w-2.5 h-2.5 text-white" />}
+                          {selectedRecipients.includes(user.socketId) && <Check className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white stroke-[3]" />}
                         </div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className={`text-sm font-medium truncate ${isCurrentUser ? `text-${vibeAccent}-700 dark:text-${vibeAccent}-300` : 'text-gray-900 dark:text-gray-200'
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1.5">
+                        <p className={`text-[13px] sm:text-sm font-bold truncate tracking-tight ${isCurrentUser ? `text-${vibeAccent}-700 dark:text-${vibeAccent}-300` : 'text-gray-900 dark:text-gray-200'
                           }`}>
                           {user.nickname}
-                          {isCurrentUser && ' (You)'}
+                          {isCurrentUser && <span className="opacity-60 font-medium ml-1">(You)</span>}
                         </p>
                         {/* Role Badge */}
                         {roleInfo.badge && (
-                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${roleInfo.bgColor} ${roleInfo.color} font-medium`}>
+                          <span className={`w-fit text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-full ${roleInfo.bgColor} ${roleInfo.color} font-black uppercase tracking-widest`}>
                             {roleInfo.badge} {roleInfo.label}
                           </span>
                         )}
@@ -216,9 +216,9 @@ const UserList = ({
                           e.stopPropagation();
                           setExpandedUser(expandedUser === user.socketId ? null : user.socketId);
                         }}
-                        className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
+                        className="p-1 sm:p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-all active:scale-95"
                       >
-                        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showAdminMenu ? 'rotate-180' : ''}`} />
+                        <ChevronDown className={`w-4 h-4 sm:w-5 sm:h-5 text-gray-500 transition-transform ${showAdminMenu ? 'rotate-180' : ''}`} />
                       </button>
                     )}
                   </div>

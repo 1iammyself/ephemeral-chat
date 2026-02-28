@@ -331,7 +331,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                             <span className="text-xs font-bold uppercase tracking-wide">Tap to View</span>
                           </div>
                         ) : (
-                          <img src={message.content} alt="shared" className="max-w-[200px] sm:max-w-md max-h-48 sm:max-h-96 object-cover rounded-lg shadow-inner" />
+                          <img src={message.content} alt="shared" className="max-w-[160px] sm:max-w-md max-h-40 sm:max-h-96 object-cover rounded-xl sm:rounded-2xl shadow-inner" />
                         )}
                       </div>
                     ) : isAudio ? (
@@ -367,10 +367,10 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         roomVibe={roomVibe}
                       />
                     ) : message.messageType === 'file' ? (
-                      <div className="flex items-center space-x-3 min-w-[200px]">
-                        <div className="p-2 bg-black/10 dark:bg-white/10 rounded-lg"><FileText className="w-6 h-6" /></div>
-                        <div className="flex-1 truncate"><p className="text-sm font-bold truncate">{message.fileName}</p><p className="text-[10px] opacity-60">{formatFileSize(message.fileSize)}</p></div>
-                        <a href={`data:${message.mimeType};base64,${message.content}`} download={message.fileName} className="p-2 hover:bg-black/10 dark:hover:bg-white/10 rounded-full transition-colors"><Download className="w-4 h-4" /></a>
+                      <div className="flex items-center space-x-2 sm:space-x-3 min-w-[160px] sm:min-w-[220px]">
+                        <div className="p-1.5 sm:p-2 bg-black/10 dark:bg-white/10 rounded-lg"><FileText className="w-5 h-5 sm:w-6 sm:h-6" /></div>
+                        <div className="flex-1 min-w-0 pr-2 space-y-0.5"><p className="text-[11px] sm:text-sm font-bold truncate leading-none">{message.fileName}</p><p className="text-[9px] sm:text-[10px] opacity-70 leading-none">{formatFileSize(message.fileSize)}</p></div>
+                        <a href={`data:${message.mimeType};base64,${message.content}`} download={message.fileName} className="p-1.5 sm:p-2 hover:bg-black/10 dark:hover:bg-white/10 rounded-full transition-colors flex-shrink-0"><Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" /></a>
                       </div>
                     ) : (
                       <div className="text-[15px] leading-relaxed select-text">
