@@ -1712,13 +1712,22 @@ io.on('connection', (socket) => {
             lastActivity: Date.now()
           };
         } else if (gameData.gameType === 'chess') {
+          const senderId = data.userId || socket.id; // Persistent ID preferred
+          const isTargeted = recipients && recipients.length === 1;
+          let invitedNickname = null;
+          if (isTargeted) {
+            const targetUser = room.users.find(u => u.socketId === recipients[0] || u.userId === recipients[0]);
+            invitedNickname = targetUser ? targetUser.nickname : null;
+          }
+
           data.gameData = {
             gameType: gameData.gameType,
             fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
             players: {
-              white: { id: socket.id, name: socket.nickname },
+              white: { id: senderId, socketId: socket.id, name: socket.nickname },
               black: null
             },
+            invitedNickname, // Store invited name for UI display
             turn: 'w',
             history: [],
             winner: null,
@@ -1816,9 +1825,10 @@ io.on('connection', (socket) => {
     if (updatedMessage) {
       // Broadcast update
       io.to(socket.roomCode).emit('message-updated', updatedMessage);
-
     }
   });
+
+
 
   // Edit Message
   socket.on('edit-message', async ({ messageId, newContent }) => {
@@ -1830,6 +1840,27 @@ io.on('connection', (socket) => {
     if (updatedMessage) {
       // Broadcast update
       io.to(socket.roomCode).emit('message-updated', updatedMessage);
+    }
+  });
+
+  // Delete Message
+  socket.on('delete-message', async ({ messageId }) => {
+    if (!socket.roomCode || !messageId) return;
+
+    // Check if user is sender or host before deleting
+    const room = await roomManager.getRoom(socket.roomCode);
+    if (!room) return;
+    const message = (room.messages || []).find(m => m.id === messageId);
+    if (!message) return;
+
+    const isSender = message.sender.id === (socket.userId || socket.id) || message.sender.socketId === socket.id;
+    const isHost = room.hostId === socket.id;
+
+    if (isSender || isHost) {
+      const removed = await roomManager.removeMessage(socket.roomCode, messageId);
+      if (removed) {
+        io.to(socket.roomCode).emit('message-deleted', { messageId });
+      }
     }
   });
 
@@ -2131,41 +2162,45 @@ io.on('connection', (socket) => {
   });
 
   // Handle Chess actions
-  socket.on('chess-join', async ({ messageId }) => {
+  socket.on('chess-join', async (data) => {
     try {
+      const { messageId, userId } = data;
       if (!socket.roomCode || !messageId) return;
 
       const room = await roomManager.getRoom(socket.roomCode);
       if (!room) return;
 
-      const messages = room.messages || [];
-      const message = messages.find(m => m.id === messageId);
+      const message = (room.messages || []).find(m => m.id === messageId);
       if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
 
       const { gameData } = message;
       if (gameData.winner) return;
 
-      // Join logic
-      const isTargeted = message.recipients && message.recipients.length > 0;
-      const isIntendedRecipient = isTargeted && message.recipients.includes(socket.id);
-      const isSender = gameData.players.white?.id === socket.id;
+      const joinerId = userId || socket.id;
+      const isWhite = gameData.players.white?.id === joinerId;
 
       if (!gameData.players.white?.id) {
-        // Fallback or initialization if not already set by sender
-        gameData.players.white = { id: socket.id, name: socket.nickname };
+        gameData.players.white = { id: joinerId, socketId: socket.id, name: socket.nickname };
       } else if (!gameData.players.black?.id) {
-        // Attempting to join as Black
-        if (isSender) return; // Sender cannot join as Black
+        if (isWhite) return; // Already joined as White
 
-        if (isTargeted && !isIntendedRecipient) {
-          // Targeted game: Only intended recipients can join
+        const isTargeted = message.recipients && message.recipients.length > 0;
+        if (isTargeted && !message.recipients.includes(joinerId) && !message.recipients.includes(socket.id)) {
           return;
         }
 
-        // Valid join as Black
-        gameData.players.black = { id: socket.id, name: socket.nickname };
+        gameData.players.black = { id: joinerId, socketId: socket.id, name: socket.nickname };
       } else {
-        return; // Game already full
+        // Re-sync socketId if existing player joins from new socket
+        if (gameData.players.white.id === joinerId) {
+          gameData.players.white.socketId = socket.id;
+          gameData.players.white.name = socket.nickname;
+        } else if (gameData.players.black.id === joinerId) {
+          gameData.players.black.socketId = socket.id;
+          gameData.players.black.name = socket.nickname;
+        } else {
+          return; // Game full
+        }
       }
 
       gameData.lastActivity = Date.now();
@@ -2176,26 +2211,26 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('chess-move', async ({ messageId, move }) => {
+  socket.on('chess-move', async (data) => {
     try {
+      const { messageId, move, userId } = data;
       if (!socket.roomCode || !messageId || !move) return;
 
       const room = await roomManager.getRoom(socket.roomCode);
       if (!room) return;
 
-      const messages = room.messages || [];
-      const message = messages.find(m => m.id === messageId);
+      const message = (room.messages || []).find(m => m.id === messageId);
       if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
 
       const { gameData } = message;
       if (gameData.winner) return;
 
-      const isWhite = gameData.players.white?.id === socket.id;
-      const isBlack = gameData.players.black?.id === socket.id;
-      const turnSuffix = gameData.turn || 'w';
+      const playerId = userId || socket.id;
+      const isWhite = gameData.players.white?.id === playerId;
+      const isBlack = gameData.players.black?.id === playerId;
 
-      if ((turnSuffix === 'w' && !isWhite) || (turnSuffix === 'b' && !isBlack)) {
-        return; // Not your turn
+      if ((gameData.turn === 'w' && !isWhite) || (gameData.turn === 'b' && !isBlack)) {
+        return;
       }
 
       const chess = new Chess(gameData.fen);
@@ -2205,22 +2240,143 @@ io.on('connection', (socket) => {
         gameData.fen = chess.fen();
         gameData.turn = chess.turn();
 
-        if (chess.isCheckmate()) {
-          gameData.winner = chess.turn() === 'w' ? 'black' : 'white';
-        } else if (chess.isDraw()) {
-          gameData.winner = 'draw';
+        if (chess.isCheckmate() || chess.isDraw()) {
+          const winner = chess.isDraw() ? 'draw' : (chess.turn() === 'w' ? 'black' : 'white');
+          gameData.winner = winner;
+          if (winner !== 'draw') {
+            gameData.winnerId = winner === 'white' ? gameData.players.white.id : gameData.players.black.id;
+          }
+          gameData.endedAt = Date.now();
+
+          // Apply 2-minute TTL for finished game
+          message.timestamp = new Date().toISOString();
+          message.overrideTtl = 120;
+          message.expiresAt = new Date(Date.now() + 120 * 1000).toISOString();
         }
 
-        gameData.history = (gameData.history || []);
+        gameData.history = gameData.history || [];
         gameData.history.push(moveResult.san);
-
         gameData.lastActivity = Date.now();
+
         await roomManager.saveRoom(socket.roomCode, room);
         io.to(socket.roomCode).emit('message-updated', message);
       }
     } catch (error) {
       logger.error('Error handling chess move:', error);
     }
+  });
+
+  // NEW: Chess Player Management Support
+  socket.on('chess-swap-request', async ({ messageId, targetUserId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
+
+      const isSender = message.sender.id === (socket.userId || socket.id) || message.sender.socketId === socket.id;
+      if (!isSender) return;
+
+      const targetSocket = io.sockets.sockets.get(targetUserId);
+      const targetInRoom = targetSocket && targetSocket.roomCode === socket.roomCode;
+
+      if (!targetSocket || !targetInRoom) {
+        // Auto-swap if player is not in room
+        const { gameData } = message;
+        const temp = gameData.players.white;
+        gameData.players.white = gameData.players.black;
+        gameData.players.black = temp;
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+      } else {
+        // Request approval
+        io.to(targetUserId).emit('chess-swap-offer', { messageId, fromNickname: socket.nickname });
+      }
+    } catch (err) { logger.error('chess-swap-request err:', err); }
+  });
+
+  socket.on('chess-swap-approve', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game') return;
+
+      // Approval must come from one of the actual players
+      const pid = socket.userId || socket.id;
+      const isPlayer = message.gameData.players.white?.id === pid || message.gameData.players.black?.id === pid;
+      if (!isPlayer) return;
+
+      const { gameData } = message;
+      const temp = gameData.players.white;
+      gameData.players.white = gameData.players.black;
+      gameData.players.black = temp;
+
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('chess-swap-approve err:', err); }
+  });
+
+  socket.on('chess-replace-request', async ({ messageId, role, targetUserId }) => {
+    try {
+      if (!socket.roomCode || !messageId || !role || !targetUserId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game') return;
+
+      const isSender = message.sender.id === (socket.userId || socket.id) || message.sender.socketId === socket.id;
+      if (!isSender) return;
+
+      const otherRole = role === 'white' ? 'black' : 'white';
+      const counterpart = message.gameData.players[otherRole];
+      const counterpartSocket = counterpart?.socketId ? io.sockets.sockets.get(counterpart.socketId) : null;
+      const counterpartInRoom = counterpartSocket && counterpartSocket.roomCode === socket.roomCode;
+
+      const targetUser = (room.users || []).find(u => u.socketId === targetUserId);
+      const targetId = targetUser?.userId || targetUserId;
+      const targetNick = targetUser?.nickname || 'New Player';
+
+      if (!counterpartInRoom) {
+        // Auto-replace (free swap) if receiver player (counterpart) is gone
+        const { gameData } = message;
+        gameData.players[role] = { id: targetId, socketId: targetUserId, name: targetNick };
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+      } else {
+        // Approval from the "receiver player" (counterpart) to confirm the swap
+        io.to(counterpart.socketId).emit('chess-replace-offer', {
+          messageId,
+          role,
+          targetUserId: targetUserId, // Use socketId for approving client to emit back
+          targetId: targetId, // Persistent ID
+          targetNickname: targetNick,
+          fromNickname: socket.nickname
+        });
+      }
+    } catch (err) { logger.error('chess-replace-request err:', err); }
+  });
+
+  socket.on('chess-replace-approve', async ({ messageId, role, targetUserId, targetId, targetNickname }) => {
+    try {
+      if (!socket.roomCode || !messageId || !role || !targetUserId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game') return;
+
+      const { gameData } = message;
+      gameData.players[role] = {
+        id: targetId || targetUserId,
+        socketId: targetUserId,
+        name: targetNickname || 'New Player'
+      };
+
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('chess-replace-approve err:', err); }
   });
 
 
@@ -2245,23 +2401,23 @@ io.on('connection', (socket) => {
       const message = await roomManager.getMessage(socket.roomCode, messageId);
       if (!message) return;
 
-      // Smart deletion for multi-recipient messages
-      if (message.isViewOnce) {
+      // Permission check: only sender can delete (except for view-once auto-deletion)
+      const requesterId = socket.userId || socket.id;
+      const isSender = message.sender.id === requesterId || message.sender.socketId === socket.id;
+
+      let shouldDelete = false;
+
+      if (isSender) {
+        shouldDelete = true;
+      } else if (message.isViewOnce) {
+        // Smart deletion for multi-recipient messages
         const recipients = message.recipients || [];
         const viewedBy = message.viewedBy || [];
 
         if (recipients.length > 0) {
-          // Targeted delivery: Only delete if all recipients have viewed it
           const allViewed = recipients.every(rId => viewedBy.includes(rId));
-          if (!allViewed) {
-            // Not everyone finished viewing, so we don't delete from server yet.
-            // The client who just finished will still hide it locally.
-            return;
-          }
+          if (allViewed) shouldDelete = true;
         } else {
-          // Broadcast message: Delete only if all currently active users have viewed it
-          // This ensures if someone joins later they can't see "already viewed" content
-          // but ensures everyone in the room has a chance to see it.
           const room = await roomManager.getRoom(socket.roomCode);
           if (room && room.users) {
             const currentOtherUsers = room.users
@@ -2269,14 +2425,16 @@ io.on('connection', (socket) => {
               .filter(id => id !== message.sender.socketId);
 
             const allOthersViewed = currentOtherUsers.every(id => viewedBy.includes(id));
-            if (!allOthersViewed) return;
+            if (allOthersViewed) shouldDelete = true;
           }
         }
       }
 
-      const removed = await roomManager.removeMessage(socket.roomCode, messageId);
-      if (removed) {
-        io.to(socket.roomCode).emit('message-deleted', { messageId });
+      if (shouldDelete) {
+        const removed = await roomManager.removeMessage(socket.roomCode, messageId);
+        if (removed) {
+          io.to(socket.roomCode).emit('message-deleted', { messageId });
+        }
       }
     } catch (error) {
       logger.error('Error deleting message:', error);

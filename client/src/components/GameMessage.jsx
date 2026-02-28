@@ -4,7 +4,7 @@ import { GAME_TYPES } from '../utils/games';
 import { getVibeById } from '../utils/vibes';
 import ChessGame from './games/ChessGame';
 
-const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRPSAction, onLaunchChess, roomVibe }) => {
+const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRPSAction, onLaunchChess, onDelete, roomVibe }) => {
     const { gameData } = message;
     const currentUserId = currentUser?.id || currentUser?.socketId;
     const vibe = getVibeById(roomVibe);
@@ -698,7 +698,9 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                         <Swords className="w-4 h-4 text-gray-300 italic" />
                         <div className="flex flex-col items-center">
                             <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xl shadow-inner border border-gray-200 dark:border-gray-700">♚</div>
-                            <span className="text-[10px] font-bold text-gray-500 mt-1 truncate max-w-[60px]">{gameData.players.black?.name || '???'}</span>
+                            <span className="text-[10px] font-bold text-gray-500 mt-1 truncate max-w-[60px]">
+                                {gameData.players.black?.name || gameData.invitedNickname || '???'}
+                            </span>
                         </div>
                     </div>
 
@@ -723,6 +725,30 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                         <div className={`w-full p-2.5 rounded-xl text-center font-bold text-[11px] bg-green-500 text-white shadow-lg`}>
                             {gameData.winner === 'draw' ? "Match Drawn" : `${gameData.winner === 'white' ? 'White' : 'Black'} Wins! 🏆`}
                         </div>
+                    )}
+
+                    {!gameData.winner && gameData.players.white?.id && gameData.players.black?.id && (
+                        <div className={`w-full p-2.5 rounded-xl text-center font-bold text-[11px] transition-all
+                            ${((gameData.turn === 'w' && gameData.players.white?.id === currentUserId) || (gameData.turn === 'b' && gameData.players.black?.id === currentUserId))
+                                ? 'bg-indigo-500 text-white shadow-md'
+                                : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'}`}>
+                            {((gameData.turn === 'w' && gameData.players.white?.id === currentUserId) || (gameData.turn === 'b' && gameData.players.black?.id === currentUserId))
+                                ? "Your move! ♟️"
+                                : `${gameData.turn === 'w' ? 'White' : 'Black'}'s Turn`}
+                        </div>
+                    )}
+
+                    {isSender && (
+                        <button
+                            onClick={() => {
+                                if (window.confirm('Are you sure you want to delete this chess game? This cannot be undone.')) {
+                                    onDelete(message.id);
+                                }
+                            }}
+                            className="text-[10px] font-bold text-rose-500 hover:text-rose-600 transition-colors uppercase tracking-widest mt-2"
+                        >
+                            Delete Game
+                        </button>
                     )}
                 </div>
             </div>

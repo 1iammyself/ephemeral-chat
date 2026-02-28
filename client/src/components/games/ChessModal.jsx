@@ -3,7 +3,7 @@ import { getVibeById } from '../../utils/vibes';
 import { Chess } from '../../utils/chess-lib';
 import { Trophy, X, Info, Swords, Shield, History } from 'lucide-react';
 
-const ChessModal = ({ isOpen, onClose, message, currentUserId, onMove, roomVibe }) => {
+const ChessModal = ({ isOpen, onClose, message, currentUserId, users, onMove, roomVibe }) => {
     if (!isOpen || !message) return null;
 
     const { gameData } = message;
@@ -18,6 +18,14 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, onMove, roomVibe 
     const isWhite = gameData.players.white?.id === currentUserId;
     const isBlack = gameData.players.black?.id === currentUserId;
     const amPlaying = isWhite || isBlack;
+    const isHost = message.sender.id === currentUserId || message.sender.socketId === currentUserId;
+
+    // Filter users eligible for replacement (not already playing)
+    const availableUsers = (users || []).filter(u =>
+        u.socketId !== gameData.players.white?.id &&
+        u.socketId !== gameData.players.black?.id &&
+        u.socketId !== currentUserId
+    );
 
     // Use a temporary chess instance to calculate captured pieces and status
     const game = new Chess(gameData.fen || undefined);
@@ -181,6 +189,61 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, onMove, roomVibe 
                                         {isCheckmate ? `${game.turn() === 'w' ? 'Black' : 'White'} Victory` : 'Game Over'}
                                     </p>
                                 )}
+                            </div>
+                        )}
+                        {/* Player Management (Host Only) */}
+                        {isHost && !gameData.winner && (
+                            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl p-4 border border-gray-100 dark:border-gray-800">
+                                <div className="flex items-center gap-2 mb-4 text-gray-400">
+                                    <Shield className="w-4 h-4 text-primary-500" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-primary-500">Host Management</span>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <button
+                                        onClick={() => onMove(message.id, 'chess-swap')}
+                                        className="w-full py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
+                                    >
+                                        <Swords className="w-3.5 h-3.5" />
+                                        Swap White / Black
+                                    </button>
+
+                                    {availableUsers.length > 0 && (
+                                        <div className="space-y-4 pt-2 border-t border-gray-200 dark:border-gray-700/50">
+                                            {/* Replace White */}
+                                            <div className="space-y-2">
+                                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">Replace White ({gameData.players.white?.name || 'Empty'})</p>
+                                                <div className="flex flex-wrap gap-2 justify-center">
+                                                    {availableUsers.slice(0, 4).map(user => (
+                                                        <button
+                                                            key={user.socketId}
+                                                            onClick={() => onMove(message.id, 'chess-replace', { targetUserId: user.socketId, role: 'white' })}
+                                                            className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-[10px] font-bold text-gray-600 dark:text-gray-400 hover:border-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-all active:scale-95 truncate max-w-[100px]"
+                                                        >
+                                                            {user.nickname}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Replace Black */}
+                                            <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800/50">
+                                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">Replace Black ({gameData.players.black?.name || 'Empty'})</p>
+                                                <div className="flex flex-wrap gap-2 justify-center">
+                                                    {availableUsers.slice(0, 4).map(user => (
+                                                        <button
+                                                            key={user.socketId}
+                                                            onClick={() => onMove(message.id, 'chess-replace', { targetUserId: user.socketId, role: 'black' })}
+                                                            className="px-3 py-1.5 bg-gray-900 dark:bg-black border border-gray-700 rounded-lg text-[10px] font-bold text-gray-300 hover:bg-gray-800 transition-all active:scale-95 truncate max-w-[100px]"
+                                                        >
+                                                            {user.nickname}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>

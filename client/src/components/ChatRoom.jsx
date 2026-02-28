@@ -418,6 +418,7 @@ const ChatRoom = () => {
   const [room, setRoom] = useState(null);
   const [messages, setMessages] = useState([]);
   const [users, setUsers] = useState([]);
+  const [persistentUserId] = useState(() => getCreatorId());
   const [currentUser, setCurrentUser] = useState(null);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -803,7 +804,7 @@ const ChatRoom = () => {
       setActiveTimer(data.room.timer);
       socketManager.setRoomType(data.room.settings?.persistenceMode || 'ephemeral');
 
-      setCurrentUser({ id: socketManager.socket?.id, socketId: socketManager.socket?.id, nickname: data.nickname, isAdmin: (myRole === 'host' || myRole === 'tier1') });
+      setCurrentUser({ id: persistentUserId, socketId: socketManager.socket?.id, nickname: data.nickname, isAdmin: (myRole === 'host' || myRole === 'tier1') });
       setIsJoined(true);
       setShowJoinModal(false);
       setError(null);
@@ -878,6 +879,8 @@ const ChatRoom = () => {
 
     const handleMessageUpdated = (updatedMessage) => {
       setMessages(prev => prev.map(m => m.id === updatedMessage.id ? updatedMessage : m));
+      // Keep active chess modal in sync
+      setActiveChessMatch(prev => (prev && prev.id === updatedMessage.id) ? updatedMessage : prev);
     };
 
     // Role and moderation event handlers
@@ -976,6 +979,19 @@ const ChatRoom = () => {
       });
     };
 
+    const handleChessSwapOffer = ({ messageId, fromNickname }) => {
+      if (window.confirm(`${fromNickname} wants to swap Chess colors (White/Black). Accept?`)) {
+        socketManager.emit('chess-swap-approve', { messageId });
+      }
+    };
+
+    const handleChessReplaceOffer = ({ messageId, role, targetUserId, targetId, targetNickname, fromNickname }) => {
+      const roleDisplayName = role === 'white' ? 'White' : 'Black';
+      if (window.confirm(`${fromNickname} wants to replace ${roleDisplayName} with ${targetNickname}. Confirm this change?`)) {
+        socketManager.emit('chess-replace-approve', { messageId, role, targetUserId, targetId, targetNickname });
+      }
+    };
+
     const handlePong = (startTime) => {
       setLatency(Date.now() - startTime);
     };
@@ -1008,6 +1024,8 @@ const ChatRoom = () => {
     socketManager.on('user-typing', handleUserTyping);
     socketManager.on('user-stop-typing', handleUserStopTyping);
     socketManager.on('room-reaction', handleRoomReaction);
+    socketManager.on('chess-swap-offer', handleChessSwapOffer);
+    socketManager.on('chess-replace-offer', handleChessReplaceOffer);
     socketManager.on('file-transfer-invite', handleFileTransferInvite);
     socketManager.on('messages-cleared', () => {
       setMessages([]);
@@ -1048,6 +1066,8 @@ const ChatRoom = () => {
       socketManager.off('user-typing', handleUserTyping);
       socketManager.off('user-stop-typing', handleUserStopTyping);
       socketManager.off('room-reaction', handleRoomReaction);
+      socketManager.off('chess-swap-offer', handleChessSwapOffer);
+      socketManager.off('chess-replace-offer', handleChessReplaceOffer);
       socketManager.off('file-transfer-invite', handleFileTransferInvite);
       socketManager.off('messages-cleared');
 
@@ -1449,6 +1469,10 @@ const ChatRoom = () => {
     socketManager.emit('send-message', { messageType: 'game', gameData, recipients: selectedRecipients });
   };
 
+  const handleDeleteMessage = (messageId) => {
+    socketManager.emit('delete-message', { messageId });
+  };
+
   const handleGameAnswer = (messageId, answer) => {
     if (!isConnected) return;
     socketManager.emit('game-answer', { messageId, answer });
@@ -1459,7 +1483,22 @@ const ChatRoom = () => {
     if (action === 'chess-move') {
       socketManager.emit('chess-move', { messageId, move: position });
     } else if (action === 'chess-join') {
-      socketManager.emit('chess-join', { messageId });
+      socketManager.emit('chess-join', { messageId, userId: persistentUserId });
+    } else if (action === 'chess-swap') {
+      const msg = messages.find(m => m.id === messageId);
+      // Use socketId for socket.io targeting
+      const targetUserId = msg.gameData.players.white?.id === persistentUserId
+        ? msg.gameData.players.black?.socketId
+        : msg.gameData.players.white?.socketId;
+
+      socketManager.emit('chess-swap-request', { messageId, targetUserId });
+    } else if (action === 'chess-replace') {
+      const { targetUserId, role } = position;
+      socketManager.emit('chess-replace-request', {
+        messageId,
+        role: role || 'black',
+        targetUserId // in ChessModal we passed user.socketId
+      });
     } else {
       socketManager.emit('tic-tac-toe-move', { messageId, action, position });
     }
@@ -2070,6 +2109,7 @@ const ChatRoom = () => {
               onTicTacToeMove={handleTicTacToeMove}
               onRPSAction={handleRPSAction}
               onLaunchChess={handleLaunchChess}
+              onDelete={handleDeleteMessage}
               roomVibe={roomVibe}
               onOpenEmojiPicker={(messageId) => {
                 setReactionTargetId(messageId);
@@ -2591,6 +2631,7 @@ const ChatRoom = () => {
         onClose={() => setActiveChessMatch(null)}
         message={activeChessMatch}
         currentUserId={currentUser?.id || currentUser?.socketId}
+        users={users}
         onMove={handleTicTacToeMove}
         roomVibe={roomVibe}
       />

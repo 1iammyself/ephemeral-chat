@@ -441,7 +441,10 @@ class RoomManager {
     message.timestamp = new Date().toISOString();
 
     // GAME TTL LOGIC: If a room's TTL is < 5 minutes (300 seconds), game TTL should be twice the room's TTL
-    if (message.messageType === 'game' && room.settings && room.settings.messageTTL > 0 && room.settings.messageTTL < 300) {
+    // CHESS EXCEPTION: Chess lasts until room ends or manual delete, unless it's finished.
+    const isChess = message.messageType === 'game' && message.gameData?.gameType === 'chess';
+
+    if (message.messageType === 'game' && !isChess && room.settings && room.settings.messageTTL > 0 && room.settings.messageTTL < 300) {
       if (!message.overrideTtl) {
         message.overrideTtl = room.settings.messageTTL * 2;
       }
@@ -552,6 +555,9 @@ class RoomManager {
 
         // 2. Fallback to room default TTL if set
         if (defaultTtlMs > 0) {
+          const isChess = msg.messageType === 'game' && msg.gameData?.gameType === 'chess';
+          if (isChess) return true; // Chess persists until manually deleted or room ends
+
           const msgTime = new Date(msg.timestamp);
           return (now - msgTime) < defaultTtlMs;
         }
