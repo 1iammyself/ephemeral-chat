@@ -2192,7 +2192,7 @@ const ChatRoom = () => {
                       </button>
 
                       {showFeatureMenu && (
-                        <div className="absolute bottom-full mb-3 left-0 z-50 bg-white/60 dark:bg-black/40 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] border border-white/20 p-2 sm:p-3 flex flex-col space-y-2 w-[85vw] max-w-[280px] sm:max-w-[320px] animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-2xl ring-1 ring-white/10 dark:ring-white/5">
+                        <div className="absolute bottom-full mb-3 left-0 z-50 bg-white/30 dark:bg-black/20 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] border border-white/20 p-2 sm:p-3 flex flex-col space-y-2 w-[85vw] max-w-[280px] sm:max-w-[320px] animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-2xl ring-1 ring-white/10 dark:ring-white/5">
                           {/* Floating Reaction Pill */}
                           <div className="flex items-center gap-1 bg-white/40 dark:bg-white/5 rounded-2xl p-1 px-1.5 border border-white/20 shadow-inner">
                             <div className="flex items-center flex-1 overflow-x-auto scrollbar-none gap-1 py-0.5 no-scrollbar">
@@ -2274,14 +2274,14 @@ const ChatRoom = () => {
                               }}
                               disabled={!isConnected || users.length < 2 || users.length > 7}
                               className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all border border-white/10 group ${users.length > 7
-                                ? 'bg-white/10 opacity-50 cursor-not-allowed'
-                                : 'bg-green-500/10 dark:bg-green-500/10 hover:bg-green-500/20 shadow-sm'
+                                ? 'bg-white/5 opacity-40 cursor-not-allowed'
+                                : 'bg-white/5 dark:bg-white/5 hover:bg-white/20 shadow-sm'
                                 }`}
                               title={users.length > 7 ? "Disabled: Max 7 users for voice calls" : "Start Voice Call"}
                             >
                               <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-1 transition-transform shadow-sm ${users.length > 7
-                                ? 'bg-white/10'
-                                : 'bg-green-500/20 dark:bg-green-500/30 group-hover:scale-110'
+                                ? 'bg-white/5'
+                                : 'bg-white/10 dark:bg-white/10 group-hover:scale-110'
                                 }`}>
                                 <Phone className={`w-4 h-4 ${users.length > 7 ? 'text-gray-400' : 'text-green-500'}`} />
                               </div>
@@ -2306,9 +2306,9 @@ const ChatRoom = () => {
                               type="button"
                               onClick={() => { startRecording(); setShowFeatureMenu(false); }}
                               disabled={!isConnected}
-                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-red-500/10 dark:bg-white/5 hover:bg-red-500/20 dark:hover:bg-white/10 transition-all border border-white/10 group"
+                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group"
                             >
-                              <div className="w-8 h-8 rounded-lg bg-red-500/20 dark:bg-white/10 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-sm">
+                              <div className="w-8 h-8 rounded-lg bg-white/10 dark:bg-white/10 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-sm">
                                 <Mic className="w-4 h-4 text-red-500" />
                               </div>
                               <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">Voice Note</span>
@@ -2318,9 +2318,9 @@ const ChatRoom = () => {
                               type="button"
                               onClick={handleSendIcebreaker}
                               disabled={!isConnected}
-                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-cyan-500/10 dark:bg-white/5 hover:bg-cyan-500/20 dark:hover:bg-white/10 transition-all border border-white/10 group"
+                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group"
                             >
-                              <div className="w-8 h-8 rounded-lg bg-cyan-500/20 dark:bg-white/10 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-sm">
+                              <div className="w-8 h-8 rounded-lg bg-white/10 dark:bg-white/10 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-sm">
                                 <Smile className="w-4 h-4 text-cyan-500" />
                               </div>
                               <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">Icebreaker</span>
@@ -2341,7 +2341,7 @@ const ChatRoom = () => {
                                       <button
                                         key={vibe.id}
                                         onClick={() => handleUpdateVibe(vibe.id)}
-                                        className={`w-6 h-6 rounded-md flex items-center justify-center text-xs transition-all ${roomVibe === vibe.id ? 'bg-primary-500 text-white shadow-lg' : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+                                        className={`w-6 h-6 rounded-md flex items-center justify-center text-xs transition-all ${roomVibe === vibe.id ? 'bg-primary-500 text-white shadow-lg' : 'bg-white/10 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10'}`}
                                         title={vibe.name}
                                       >
                                         {vibe.emoji}
@@ -2353,9 +2353,9 @@ const ChatRoom = () => {
                                   <button
                                     type="button"
                                     onClick={() => { setShowTopicEditor(true); setShowFeatureMenu(false); }}
-                                    className="flex items-center space-x-2 p-2 rounded-xl bg-gray-50/50 dark:bg-gray-900/40 hover:bg-gray-100 dark:hover:bg-gray-900/60 transition-colors border border-gray-100 dark:border-gray-700/30"
+                                    className="flex items-center space-x-2 p-2 rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/10 dark:hover:bg-white/10 transition-colors border border-white/10"
                                   >
-                                    <div className="w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0">
+                                    <div className="w-7 h-7 rounded-lg bg-white/10 dark:bg-white/5 flex items-center justify-center flex-shrink-0">
                                       <Edit2 className="w-3.5 h-3.5 text-orange-500" />
                                     </div>
                                     <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Topic</span>
