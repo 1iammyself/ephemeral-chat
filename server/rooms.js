@@ -211,7 +211,14 @@ class RoomManager {
    */
   async saveRoom(roomCode, roomData) {
     if (this.redis) {
-      await this.redis.setex(`room:${roomCode}`, this.ROOM_EXPIRY_MS / 1000, JSON.stringify(roomData));
+      // Calculate remaining TTL from the room's actual expiresAt, not a fixed default
+      let redisTtlSec = this.ROOM_EXPIRY_MS / 1000; // fallback
+      if (roomData.expiresAt) {
+        const remaining = Math.ceil((new Date(roomData.expiresAt) - Date.now()) / 1000);
+        // Use the actual remaining time, with a safety minimum of 60s and max of 24h
+        redisTtlSec = Math.max(60, Math.min(remaining, 86400));
+      }
+      await this.redis.setex(`room:${roomCode}`, redisTtlSec, JSON.stringify(roomData));
     } else {
       this.rooms.set(roomCode, roomData);
     }
@@ -628,6 +635,9 @@ class RoomManager {
           // If no recipients defined, it's a broadcast message (everyone sees it)
           if (!msg.recipients || msg.recipients.length === 0) return true;
 
+          // Chess games are ALWAYS visible to everyone in the room (for spectating)
+          if (msg.messageType === 'game' && msg.gameData?.gameType === 'chess') return true;
+
           // If I am the sender, I can see it
           if (matchesUser(msg.sender.socketId) || matchesUser(msg.sender.id)) return true;
 
@@ -693,6 +703,12 @@ class RoomManager {
       const originalCount = room.messages.length;
 
       room.messages = room.messages.filter(msg => {
+        // Active Chess games NEVER expire via pruning
+        const isChess = msg.messageType === 'game' && msg.gameData?.gameType === 'chess';
+        if (isChess && !msg.gameData?.winner && !msg.gameData?.endedAt) {
+          return true; // Keep active chess games forever
+        }
+
         // 1. Check if message has its own expiry override
         if (msg.expiresAt) {
           return new Date(msg.expiresAt) > now;

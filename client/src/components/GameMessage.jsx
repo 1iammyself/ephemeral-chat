@@ -708,7 +708,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                         </div>
                     </div>
 
-                    {(!gameData.players.white?.id || !gameData.players.black?.id) && !isPlayer ? (
+                    {(!gameData.players.white?.id || !gameData.players.black?.id) && !isPlayer && (!isTargeted || isIntendedRecipient) ? (
                         <button
                             onClick={handleChessJoin}
                             className={`w-full py-2.5 rounded-xl bg-gradient-to-r ${vibe.accentClass} text-white font-black text-xs uppercase tracking-widest shadow-lg hover:scale-[1.02] active:scale-95 transition-all`}
@@ -721,7 +721,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                             className={`w-full py-2.5 rounded-xl bg-gray-900 dark:bg-black text-white font-black text-xs uppercase tracking-widest shadow-lg hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2`}
                         >
                             <Trophy className="w-3.5 h-3.5 text-yellow-500" />
-                            Launch Board
+                            {isPlayer ? 'Launch Board' : 'Spectate Game'}
                         </button>
                     )}
 

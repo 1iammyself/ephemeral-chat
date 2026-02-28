@@ -1880,15 +1880,20 @@ io.on('connection', (socket) => {
 
       // Broadcast logic
       if (recipients && recipients.length > 0) {
-        // Targeted delivery
+        // Chess games should always be broadcast to the whole room (anyone can spectate)
+        const isChessGame = message.messageType === 'game' && message.gameData?.gameType === 'chess';
+        if (isChessGame) {
+          io.to(socket.roomCode).emit('new-message', message);
+        } else {
+          // Targeted delivery for non-chess messages
+          // 1. Send to sender (so they see their own message)
+          socket.emit('new-message', message);
 
-        // 1. Send to sender (so they see their own message)
-        socket.emit('new-message', message);
-
-        // 2. Send to each recipient
-        recipients.forEach(recipientId => {
-          io.to(recipientId).emit('new-message', message);
-        });
+          // 2. Send to each recipient
+          recipients.forEach(recipientId => {
+            io.to(recipientId).emit('new-message', message);
+          });
+        }
 
       } else {
         // Broadcast to all users in room (default)
@@ -2272,8 +2277,14 @@ io.on('connection', (socket) => {
         if (gameData.players.white?.id === joinerId || gameData.players.white?.name === socket.nickname) return; // Already joined as White
 
         const isTargeted = message.recipients && message.recipients.length > 0;
-        if (isTargeted && !message.recipients.includes(joinerId) && !message.recipients.includes(socket.id)) {
-          return;
+        if (isTargeted) {
+          // Check if this user was the intended recipient (by socketId, persistentId, or invited nickname)
+          const isIntendedRecipient = message.recipients.includes(joinerId) ||
+            message.recipients.includes(socket.id) ||
+            (gameData.invitedNickname && gameData.invitedNickname === socket.nickname);
+          if (!isIntendedRecipient) {
+            return;
+          }
         }
 
         gameData.players.black = { id: joinerId, socketId: socket.id, name: socket.nickname };
