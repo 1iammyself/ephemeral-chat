@@ -2561,7 +2561,7 @@ const ChatRoom = () => {
         onSend={handleSendGame}
         roomVibe={roomVibe}
         initialGameType={initialGameType}
-        roomTTL={room?.expiresAt && room?.createdAt ? Math.round((new Date(room.expiresAt) - new Date(room.createdAt)) / 1000) : 300}
+        roomTTL={room?.settings?.messageTTL || 60}
       />
       <DragDropOverlay isDragging={isDragging} />
       <PrivacyOverlay />

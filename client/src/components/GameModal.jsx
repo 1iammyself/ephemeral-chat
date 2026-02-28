@@ -262,7 +262,7 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                                     </div>
                                 </div>
                                 <p className="text-[9px] font-medium text-gray-400 italic leading-tight">
-                                    Players must answer within this time. Timer is set relative to room TTL ({getFormattedTime(roomTTL || 300)}).
+                                    Players must answer within this time. Timer is set relative to room TTL ({getFormattedTime(roomTTL)}).
                                 </p>
                             </div>
 
