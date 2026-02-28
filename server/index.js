@@ -1293,6 +1293,12 @@ io.on('connection', (socket) => {
             }
             await roomManager.saveRoom(roomCode, room);
 
+            // Automatically make them host if they are the ONLY person in the room now
+            if (room.users.length === 1 && roomData[roomCode]) {
+              roomData[roomCode].hostId = socket.id;
+              logger.info(`👑 Assigned host status to ${socket.id} (${reconnectNickname}) because they are the only user in the room (Session Resume)`);
+            }
+
             // Re-sync chess game player socketIds for this reconnecting user
             try {
               if (room.messages) {
@@ -1532,6 +1538,12 @@ io.on('connection', (socket) => {
             topic: '',
             timer: null
           };
+        }
+
+        // If they are the ONLY person in the room now, automatically grant them host
+        if (result.room.users.length === 1 && roomData[roomCode]) {
+          roomData[roomCode].hostId = socket.id;
+          logger.info(`👑 Assigned host status to ${socket.id} (${userNickname}) because they are the only user in the room (Standard Join)`);
         }
 
         const extendedRoom = {
