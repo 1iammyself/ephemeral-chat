@@ -1274,6 +1274,10 @@ const ChatRoom = () => {
             initialGame = 'would-you-rather';
           } else if (['trivia', 'quiz'].includes(gameArg)) {
             initialGame = 'trivia';
+          } else if (['rps', 'rock-paper-scissors'].includes(gameArg)) {
+            handleSendGame({ gameType: 'rock-paper-scissors' });
+            setNewMessage('');
+            return;
           }
 
           setInitialGameType(initialGame);
@@ -1427,6 +1431,11 @@ const ChatRoom = () => {
   const handleTicTacToeMove = (messageId, action, position) => {
     if (!isConnected) return;
     socketManager.emit('tic-tac-toe-move', { messageId, action, position });
+  };
+
+  const handleRPSAction = (messageId, action, move) => {
+    if (!isConnected) return;
+    socketManager.emit('rps-action', { messageId, action, move });
   };
 
   const handleVote = (messageId, optionId) => {
@@ -2023,6 +2032,7 @@ const ChatRoom = () => {
               onEdit={handleEditMessage}
               onGameAnswer={handleGameAnswer}
               onTicTacToeMove={handleTicTacToeMove}
+              onRPSAction={handleRPSAction}
               roomVibe={roomVibe}
               onOpenEmojiPicker={(messageId) => {
                 setReactionTargetId(messageId);

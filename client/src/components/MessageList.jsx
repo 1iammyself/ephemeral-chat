@@ -13,7 +13,7 @@ import LinkPreviewModal, { isDomainTrusted } from './LinkPreviewModal';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀', '🍕', '🍔', '🍦', '🍩', '🍺', '🎸', '🎮', '🚀', '🌈', '🍄'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onGameAnswer, onTicTacToeMove, roomVibe, onOpenEmojiPicker }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onGameAnswer, onTicTacToeMove, onRPSAction, roomVibe, onOpenEmojiPicker }) => {
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
   const { theme } = useTheme();
@@ -282,8 +282,8 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
               <div className="relative group/bubble max-w-[70%] sm:max-w-lg md:max-w-xl">
                 <div
                   className={`relative z-10 rounded-2xl transition-all duration-300 ${message.messageType === 'poll' ? 'shadow-sm' :
-                      message.messageType === 'game' ? '' :
-                        'shadow-sm px-3 py-2 sm:px-4 sm:py-3 box-border'
+                    message.messageType === 'game' ? '' :
+                      'shadow-sm px-3 py-2 sm:px-4 sm:py-3 box-border'
                     } ${message.messageType === 'game' ? '' :
                       (isOwnMessage
                         ? currentVibe.messageClass
@@ -358,6 +358,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         currentUser={currentUser}
                         onGameAnswer={onGameAnswer}
                         onTicTacToeMove={onTicTacToeMove}
+                        onRPSAction={onRPSAction}
                         roomVibe={roomVibe}
                       />
                     ) : message.messageType === 'file' ? (

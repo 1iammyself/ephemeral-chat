@@ -3,7 +3,7 @@ import { Sparkles, HelpCircle, Users, CheckCircle2, XCircle, Clock, Hash, Circle
 import { GAME_TYPES } from '../utils/games';
 import { getVibeById } from '../utils/vibes';
 
-const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, roomVibe }) => {
+const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRPSAction, roomVibe }) => {
     const { gameData } = message;
     const currentUserId = currentUser?.id || currentUser?.socketId;
     const vibe = getVibeById(roomVibe);
@@ -13,6 +13,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, room
     const isWYR = gameData.gameType === GAME_TYPES.WYR;
     const isTrivia = gameData.gameType === GAME_TYPES.TRIVIA;
     const isTicTacToe = gameData.gameType === GAME_TYPES.TIC_TAC_TOE;
+    const isRPS = gameData.gameType === GAME_TYPES.ROCK_PAPER_SCISSORS;
 
     const isPlayer = isTicTacToe && (gameData.players.X.id === currentUserId || gameData.players.O.id === currentUserId);
     const [isExpanded, setIsExpanded] = useState(false);
@@ -80,6 +81,16 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, room
     const handleTTTJoin = () => {
         if (!isTicTacToe || gameData.players.O.id) return;
         onTicTacToeMove(message.id, 'join');
+    };
+
+    const handleRPSJoin = () => {
+        if (!isRPS || gameData.players.P2.id) return;
+        onRPSAction(message.id, 'join');
+    };
+
+    const handleRPSMove = (move) => {
+        if (!isRPS || gameData.winner) return;
+        onRPSAction(message.id, 'move', move);
     };
 
     // Dynamic classes based on vibe
@@ -404,6 +415,121 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, room
                             </button>
                         </div>
                     </>
+                )}
+            </div>
+        );
+    }
+
+    // ── Rock Paper Scissors ──
+    if (isRPS) {
+        const isP1 = gameData.players.P1.id === currentUserId;
+        const isP2 = gameData.players.P2.id === currentUserId;
+        const amPlaying = isP1 || isP2;
+        const p1Move = gameData.players.P1.move;
+        const p2Move = gameData.players.P2.move;
+        const myMove = isP1 ? p1Move : isP2 ? p2Move : null;
+
+        const getRPSStatus = () => {
+            if (gameData.winner) {
+                if (gameData.winner === 'draw') return "It's a draw! 🤝";
+                const winnerName = gameData.players[gameData.winner].name;
+                return gameData.winner === (isP1 ? 'P1' : 'P2') ? "You Won! 🏆" : `${winnerName} Won!`;
+            }
+            if (!gameData.players.P2.id) return "Waiting for opponent...";
+            if (amPlaying) {
+                if (!myMove) return "Make your move!";
+                return "Waiting for opponent's move...";
+            }
+            return "Game in progress...";
+        };
+
+        const getMoveIcon = (move) => {
+            switch (move) {
+                case 'rock': return '🪨';
+                case 'paper': return '📄';
+                case 'scissors': return '✂️';
+                default: return '?';
+            }
+        };
+
+        return (
+            <div className={`w-full max-w-[280px] overflow-hidden rounded-2xl shadow-lg border-2 ${cardBorderClass} animate-in fade-in zoom-in duration-300`}>
+                <div className={`p-3 ${headerClass} flex items-center justify-between`}>
+                    <div className="flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-white" />
+                        <h3 className="text-white font-bold text-sm">Rock Paper Scissors</h3>
+                    </div>
+                </div>
+
+                {!isExpanded ? (
+                    <div className="p-4 bg-white dark:bg-gray-900 flex flex-col items-center gap-3">
+                        <div className="flex items-center gap-4">
+                            <div className="flex flex-col items-center">
+                                <div className="text-2xl mb-1">{p1Move && gameData.winner ? getMoveIcon(p1Move) : '👤'}</div>
+                                <span className="text-[10px] font-bold text-gray-500 truncate max-w-[60px]">{gameData.players.P1.name}</span>
+                            </div>
+                            <span className="text-gray-300 font-bold italic text-xs">VS</span>
+                            <div className="flex flex-col items-center">
+                                <div className="text-2xl mb-1">{p2Move && gameData.winner ? getMoveIcon(p2Move) : '👤'}</div>
+                                <span className="text-[10px] font-bold text-gray-500 truncate max-w-[60px]">{gameData.players.P2.name || '???'}</span>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setIsExpanded(true)}
+                            className={`w-full py-2 rounded-xl bg-${accentColor}-500 hover:bg-${accentColor}-600 text-white text-[11px] font-bold transition-all shadow-md active:scale-95`}
+                        >
+                            {gameData.winner ? 'View Result' : (amPlaying ? 'Continue Playing' : 'View Game')}
+                        </button>
+                    </div>
+                ) : (
+                    <div className="p-4 bg-white dark:bg-gray-900 flex flex-col items-center">
+                        <div className="w-full flex justify-between items-center mb-6 px-2">
+                            <div className={`flex flex-col items-center p-2 rounded-xl border-2 transition-all ${isP1 ? selectedOutlineClass : 'border-transparent opacity-60'}`}>
+                                <div className="text-3xl mb-1">{p1Move && (gameData.winner || isP1) ? getMoveIcon(p1Move) : '❓'}</div>
+                                <span className="text-[10px] font-bold mt-1 max-w-[60px] truncate">{gameData.players.P1.name}</span>
+                            </div>
+                            <div className="text-gray-300 dark:text-gray-700 font-black text-xl italic">VS</div>
+                            <div className={`flex flex-col items-center p-2 rounded-xl border-2 transition-all ${isP2 ? selectedOutlineClass : 'border-transparent opacity-60'}`}>
+                                <div className="text-3xl mb-1">{p2Move && (gameData.winner || isP2) ? getMoveIcon(p2Move) : '❓'}</div>
+                                <span className="text-[10px] font-bold mt-1 max-w-[60px] truncate">{gameData.players.P2.name || '???'}</span>
+                            </div>
+                        </div>
+
+                        {!gameData.winner && amPlaying && !myMove && gameData.players.P2.id && (
+                            <div className="grid grid-cols-3 gap-3 w-full mb-4">
+                                {['rock', 'paper', 'scissors'].map((move) => (
+                                    <button
+                                        key={move}
+                                        onClick={() => handleRPSMove(move)}
+                                        className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 border-dashed ${cardBorderClass} ${hoverBorderClass} transition-all active:scale-90 bg-gray-50 dark:bg-gray-800`}
+                                    >
+                                        <span className="text-2xl mb-1">{getMoveIcon(move)}</span>
+                                        <span className="text-[10px] font-bold capitalize text-gray-500">{move}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {!gameData.winner && !amPlaying && !gameData.players.P2.id && (
+                            <button
+                                onClick={handleRPSJoin}
+                                className={`w-full py-3 rounded-xl bg-gradient-to-r from-${accentColor}-500 to-${accentColor}-600 text-white font-black text-xs uppercase tracking-widest shadow-lg hover:scale-[1.02] active:scale-95 transition-all mb-4`}
+                            >
+                                Tap to Join Game
+                            </button>
+                        )}
+
+                        <div className={`w-full p-2.5 rounded-xl text-center font-bold text-sm transition-all ${gameData.winner ? `bg-${accentColor}-500 text-white shadow-lg` : `text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800`}`}>
+                            {getRPSStatus()}
+                        </div>
+
+                        <button
+                            onClick={() => setIsExpanded(false)}
+                            className="mt-4 text-[10px] font-bold text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors uppercase tracking-widest"
+                        >
+                            Collapse
+                        </button>
+                    </div>
                 )}
             </div>
         );

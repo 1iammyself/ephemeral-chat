@@ -141,11 +141,19 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                             </button>
                             <button
                                 onClick={() => handlePickGame(GAME_TYPES.TIC_TAC_TOE)}
-                                className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:border-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group sm:col-span-2`}
+                                className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:border-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group`}
                             >
                                 <Hash className={`w-6 h-6 text-${vibeAccent}-500 mb-2 group-hover:scale-110 transition-transform`} />
                                 <span className="font-bold text-gray-900 dark:text-white text-xs">Tic-Tac-Toe</span>
                                 <span className="text-[9px] text-gray-500 dark:text-gray-400 mt-1">Classic 3x3 game</span>
+                            </button>
+                            <button
+                                onClick={() => handlePickGame(GAME_TYPES.ROCK_PAPER_SCISSORS)}
+                                className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:border-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group`}
+                            >
+                                <Dices className={`w-6 h-6 text-${vibeAccent}-500 mb-2 group-hover:scale-110 transition-transform`} />
+                                <span className="font-bold text-gray-900 dark:text-white text-xs">Rock Paper Scissors</span>
+                                <span className="text-[9px] text-gray-500 dark:text-gray-400 mt-1">Classic RPS</span>
                             </button>
                         </div>
                     ) : !selectedTopic && !(wyrData || triviaData) ? (

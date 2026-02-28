@@ -1692,12 +1692,23 @@ io.on('connection', (socket) => {
             winningLine: null,
             lastActivity: Date.now()
           };
+        } else if (gameData.gameType === 'rock-paper-scissors') {
+          data.gameData = {
+            gameType: gameData.gameType,
+            players: {
+              P1: { id: socket.id, name: socket.nickname, move: null },
+              P2: { id: null, name: null, move: null }
+            },
+            winner: null,
+            lastActivity: Date.now()
+          };
         } else {
           socket.emit('error', { message: 'Unknown game type' });
           return;
         }
         messageContent = gameData.gameType === 'would-you-rather' ? 'Would You Rather' :
-          gameData.gameType === 'trivia' ? 'Trivia' : 'Tic-Tac-Toe';
+          gameData.gameType === 'trivia' ? 'Trivia' :
+            gameData.gameType === 'rock-paper-scissors' ? 'Rock Paper Scissors' : 'Tic-Tac-Toe';
       } else {
         messageContent = isEncrypted ? content : sanitizeInput(content.trim());
       }
