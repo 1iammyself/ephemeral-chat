@@ -16,6 +16,7 @@ export const VIBES = {
         accentClass: 'bg-primary-600 hover:bg-primary-700 text-white',
         effectType: null,
         description: 'Clean and minimal',
+        colors: { primary: '#3b82f6' },
         moodSound: null
     },
     party: {
@@ -30,6 +31,7 @@ export const VIBES = {
         accentClass: 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white',
         effectType: 'sparkles',
         description: 'Festive and fun',
+        colors: { primary: '#6366f1' },
         moodSound: 'lofi'
     },
     chill: {
@@ -44,6 +46,7 @@ export const VIBES = {
         accentClass: 'bg-teal-600 hover:bg-teal-700 text-white',
         effectType: 'rain',
         description: 'Relaxed vibes',
+        colors: { primary: '#14b8a6' },
         moodSound: 'rain'
     },
     focus: {
@@ -58,6 +61,7 @@ export const VIBES = {
         accentClass: 'bg-orange-600 hover:bg-orange-700 text-white',
         effectType: 'stars',
         description: 'Work mode',
+        colors: { primary: '#f97316' },
         moodSound: 'whitenoise'
     }
 };

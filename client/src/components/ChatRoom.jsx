@@ -1453,7 +1453,13 @@ const ChatRoom = () => {
 
   const handleTicTacToeMove = (messageId, action, position) => {
     if (!isConnected) return;
-    socketManager.emit('tic-tac-toe-move', { messageId, action, position });
+    if (action === 'chess-move') {
+      socketManager.emit('chess-move', { messageId, move: position });
+    } else if (action === 'chess-join') {
+      socketManager.emit('chess-join', { messageId });
+    } else {
+      socketManager.emit('tic-tac-toe-move', { messageId, action, position });
+    }
   };
 
   const handleRPSAction = (messageId, action, move) => {

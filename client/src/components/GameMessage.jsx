@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Sparkles, HelpCircle, Users, CheckCircle2, XCircle, Clock, Hash, Circle, X } from 'lucide-react';
+import { Sparkles, HelpCircle, Users, CheckCircle2, XCircle, Clock, Hash, Circle, X, Trophy } from 'lucide-react';
 import { GAME_TYPES } from '../utils/games';
 import { getVibeById } from '../utils/vibes';
 import ChessGame from './games/ChessGame';
