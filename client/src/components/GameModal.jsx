@@ -10,11 +10,18 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
     const [customTimer, setCustomTimer] = useState(15);
 
     // Calculate dynamic timer bounds based on room TTL
-    const dynamicRoomTtl = roomTTL && roomTTL < 300 ? roomTTL * 2 : (roomTTL || 30);
+    const dynamicRoomTtl = roomTTL && roomTTL < 300 ? roomTTL * 2 : (roomTTL || 300);
     const minTimer = Math.max(5, Math.floor(dynamicRoomTtl * 0.5));
-    const maxTimer = Math.floor(dynamicRoomTtl * 0.666);
-    const actualMaxTimer = Math.max(minTimer + 1, maxTimer); // Ensure max is always > min
-    const ttlLabel = roomTTL < 300 ? `${Math.floor(dynamicRoomTtl / 60)}m (Boosted 2x)` : `${Math.floor(dynamicRoomTtl / 60)}m`;
+    const maxTimer = Math.floor(dynamicRoomTtl * (2 / 3));
+    const actualMaxTimer = Math.max(minTimer + 1, maxTimer);
+
+    const getFormattedTime = (seconds) => {
+        if (seconds < 60) return `${seconds}s`;
+        return `${Math.floor(seconds / 60)}m`;
+    };
+
+    const ttlBoosted = roomTTL && roomTTL < 300;
+    const ttlLabel = ttlBoosted ? `${getFormattedTime(dynamicRoomTtl)} (Boosted 2x)` : getFormattedTime(dynamicRoomTtl);
 
     useEffect(() => {
         if (!isOpen) {
@@ -255,7 +262,7 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                                     </div>
                                 </div>
                                 <p className="text-[9px] font-medium text-gray-400 italic leading-tight">
-                                    Players must answer within this time. Timer is set relative to room TTL ({Math.floor(roomTTL / 60)}m).
+                                    Players must answer within this time. Timer is set relative to room TTL ({getFormattedTime(roomTTL || 300)}).
                                 </p>
                             </div>
 

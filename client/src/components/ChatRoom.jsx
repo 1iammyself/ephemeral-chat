@@ -2555,7 +2555,14 @@ const ChatRoom = () => {
         initialContent={editingMessage?.content}
       />
       <PollModal isOpen={showPollModal} onClose={() => setShowPollModal(false)} onSend={handleSendPoll} roomVibe={roomVibe} />
-      <GameModal isOpen={showGameModal} onClose={() => { setShowGameModal(false); setInitialGameType(null); }} onSend={handleSendGame} roomVibe={roomVibe} initialGameType={initialGameType} />
+      <GameModal
+        isOpen={showGameModal}
+        onClose={() => { setShowGameModal(false); setInitialGameType(null); }}
+        onSend={handleSendGame}
+        roomVibe={roomVibe}
+        initialGameType={initialGameType}
+        roomTTL={room?.settings?.lifetimeMinutes ? room.settings.lifetimeMinutes * 60 : 300}
+      />
       <DragDropOverlay isDragging={isDragging} />
       <PrivacyOverlay />
 
