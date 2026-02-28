@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Send, Dices, Sparkles, HelpCircle, ChevronLeft, Hash } from 'lucide-react';
 import { GAME_TYPES, getRandomWYR, getRandomTrivia, WYR_TOPIC_LIST, TRIVIA_TOPIC_LIST } from '../utils/games';
 
-const GameModal = ({ isOpen, onClose, onSend, roomVibe }) => {
+const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType }) => {
     const [gameType, setGameType] = useState(null); // null = select game, then select topic
     const [selectedTopic, setSelectedTopic] = useState(null);
     const [wyrData, setWyrData] = useState(null);
@@ -14,8 +14,10 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe }) => {
             setSelectedTopic(null);
             setWyrData(null);
             setTriviaData(null);
+        } else if (initialGameType) {
+            setGameType(initialGameType);
         }
-    }, [isOpen]);
+    }, [isOpen, initialGameType]);
 
     if (!isOpen) return null;
 

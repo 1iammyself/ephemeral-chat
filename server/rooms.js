@@ -432,6 +432,13 @@ class RoomManager {
     }
     message.timestamp = new Date().toISOString();
 
+    // GAME TTL LOGIC: If a room's TTL is < 5 minutes (300 seconds), game TTL should be twice the room's TTL
+    if (message.messageType === 'game' && room.settings && room.settings.messageTTL > 0 && room.settings.messageTTL < 300) {
+      if (!message.overrideTtl) {
+        message.overrideTtl = room.settings.messageTTL * 2;
+      }
+    }
+
     // Handle per-message override TTL (e.g., 10s override)
     if (message.overrideTtl && message.overrideTtl > 0) {
       const expiresAt = new Date(Date.now() + message.overrideTtl * 1000);

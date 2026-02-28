@@ -448,6 +448,7 @@ const ChatRoom = () => {
   const [reactionTargetId, setReactionTargetId] = useState(null);
   const [showPollModal, setShowPollModal] = useState(false);
   const [showGameModal, setShowGameModal] = useState(false);
+  const [initialGameType, setInitialGameType] = useState(null);
   const [showFeatureMenu, setShowFeatureMenu] = useState(false);
   const [roomVibe, setRoomVibe] = useState('default');
   const [roomTopic, setRoomTopic] = useState('');
@@ -1260,7 +1261,29 @@ const ChatRoom = () => {
       switch (cmd) {
         case '/camera': setShowCameraModal(true); break;
         case '/poll': setShowPollModal(true); break;
-        case '/game': setShowGameModal(true); break;
+        case '/game':
+        case '/games':
+          const gameArg = args.toLowerCase().trim();
+          let initialGame = null;
+
+          if (['ttt', 'tic-tac-toe', 'tictactoe'].includes(gameArg)) {
+            handleSendGame({ gameType: 'tic-tac-toe' });
+            setNewMessage('');
+            return;
+          } else if (['wyr', 'would-you-rather', 'wouldyourather'].includes(gameArg)) {
+            initialGame = 'would-you-rather';
+          } else if (['trivia', 'quiz'].includes(gameArg)) {
+            initialGame = 'trivia';
+          }
+
+          setInitialGameType(initialGame);
+          setShowGameModal(true);
+
+          if (cmd === '/games') {
+            setNewMessage('');
+            return;
+          }
+          break;
         case '/call':
           if (users.length > 7) {
             setError('Voice calls are disabled in rooms with more than 7 users for stability.');
@@ -2496,7 +2519,7 @@ const ChatRoom = () => {
         initialContent={editingMessage?.content}
       />
       <PollModal isOpen={showPollModal} onClose={() => setShowPollModal(false)} onSend={handleSendPoll} roomVibe={roomVibe} />
-      <GameModal isOpen={showGameModal} onClose={() => setShowGameModal(false)} onSend={handleSendGame} roomVibe={roomVibe} />
+      <GameModal isOpen={showGameModal} onClose={() => { setShowGameModal(false); setInitialGameType(null); }} onSend={handleSendGame} roomVibe={roomVibe} initialGameType={initialGameType} />
       <DragDropOverlay isDragging={isDragging} />
       <PrivacyOverlay />
 
