@@ -53,7 +53,9 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   // Set up timers for messages with TTL
   useEffect(() => {
     messages.forEach(message => {
-      const ttl = message.overrideTtl || messageTTL;
+      const isChess = (message.messageType === 'game' && message.gameData?.gameType === 'chess') || (message.gameData?.type === 'chess');
+      const ttl = isChess ? (message.overrideTtl || 0) : (message.overrideTtl || messageTTL);
+
       if (ttl && ttl > 0 && message.type !== 'system' && !messageTimers.has(message.id)) {
         const messageTime = new Date(message.timestamp).getTime();
         const expiryTime = messageTime + (ttl * 1000);
@@ -111,7 +113,8 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   };
 
   const getTimeLeft = (message) => {
-    const ttl = message.overrideTtl || messageTTL;
+    const isChess = (message.messageType === 'game' && message.gameData?.gameType === 'chess') || (message.gameData?.type === 'chess');
+    const ttl = isChess ? (message.overrideTtl || 0) : (message.overrideTtl || messageTTL);
     if (!ttl || ttl === 0 || message.type === 'system') return null;
     const messageTime = new Date(message.timestamp).getTime();
     const expiryTime = messageTime + (ttl * 1000);

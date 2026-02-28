@@ -437,6 +437,12 @@ class RoomManager {
       (message.gameData?.type === 'chess'); // Compatibility check
     const isFinished = !!message.gameData?.winner || !!message.gameData?.endedAt;
 
+    // Active Chess games NEVER have an expiry
+    if (isChess && !isFinished) {
+      delete message.expiresAt;
+      delete message.overrideTtl;
+    }
+
     if (this.redis && room.settings.messageTTL > 0) {
       const messageKey = `message:${roomCode}:${message.id}`;
 
@@ -583,6 +589,11 @@ class RoomManager {
 
       // Filter messages that haven't expired
       const validMessages = room.messages.filter(msg => {
+        const isChess = msg.messageType === 'game' && msg.gameData?.gameType === 'chess';
+        if (isChess && !(msg.gameData?.winner || msg.gameData?.endedAt)) {
+          return true; // Active Chess persists until manually deleted or room ends
+        }
+
         // 1. Check if message has its own expiry override
         if (msg.expiresAt) {
           return new Date(msg.expiresAt) > now;
@@ -590,8 +601,7 @@ class RoomManager {
 
         // 2. Fallback to room default TTL if set
         if (defaultTtlMs > 0) {
-          const isChess = msg.messageType === 'game' && msg.gameData?.gameType === 'chess';
-          if (isChess) return true; // Chess persists until manually deleted or room ends
+          // Finished Chess games will use their overrideTtl or fall back here
 
           const msgTime = new Date(msg.timestamp);
           return (now - msgTime) < defaultTtlMs;
