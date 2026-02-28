@@ -12,7 +12,7 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
     // Calculate dynamic timer bounds based on room TTL
     const dynamicRoomTtl = roomTTL && roomTTL < 300 ? roomTTL * 2 : (roomTTL || 300);
     const minTimer = Math.max(5, Math.floor(dynamicRoomTtl * 0.5));
-    const maxTimer = Math.floor(dynamicRoomTtl * (2 / 3));
+    const maxTimer = Math.floor(dynamicRoomTtl * 0.75);
     const actualMaxTimer = Math.max(minTimer + 1, maxTimer);
 
     const getFormattedTime = (seconds) => {
