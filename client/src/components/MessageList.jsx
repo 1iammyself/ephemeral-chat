@@ -52,27 +52,27 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
 
   // Set up timers for messages with TTL
   useEffect(() => {
-    if (messageTTL && messageTTL > 0) {
-      messages.forEach(message => {
-        if (message.type !== 'system' && !messageTimers.has(message.id)) {
-          const messageTime = new Date(message.timestamp).getTime();
-          const expiryTime = messageTime + (messageTTL * 1000);
-          const timeLeft = expiryTime - Date.now();
+    messages.forEach(message => {
+      const ttl = message.overrideTtl || messageTTL;
+      if (ttl && ttl > 0 && message.type !== 'system' && !messageTimers.has(message.id)) {
+        const messageTime = new Date(message.timestamp).getTime();
+        const expiryTime = messageTime + (ttl * 1000);
+        const timeLeft = expiryTime - Date.now();
 
-          if (timeLeft > 0) {
-            const timer = setTimeout(() => {
-              setMessageTimers(prev => new Map(prev).set(message.id, 'vanishing'));
-              setTimeout(() => {
-                setMessageTimers(prev => new Map(prev).set(message.id, 'expired'));
-              }, 500);
-            }, timeLeft);
-            setMessageTimers(prev => new Map(prev).set(message.id, timer));
-          } else {
-            setMessageTimers(prev => new Map(prev).set(message.id, 'expired'));
-          }
+        if (timeLeft > 0) {
+          const timer = setTimeout(() => {
+            setMessageTimers(prev => new Map(prev).set(message.id, 'vanishing'));
+            setTimeout(() => {
+              setMessageTimers(prev => new Map(prev).set(message.id, 'expired'));
+            }, 500);
+          }, timeLeft);
+          setMessageTimers(prev => new Map(prev).set(message.id, timer));
+        } else {
+          setMessageTimers(prev => new Map(prev).set(message.id, 'expired'));
         }
-      });
-    }
+      }
+    });
+
     return () => {
       messageTimers.forEach(timer => { if (typeof timer === 'object') clearTimeout(timer); });
     };
@@ -111,9 +111,10 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   };
 
   const getTimeLeft = (message) => {
-    if (!messageTTL || messageTTL === 0 || message.type === 'system') return null;
+    const ttl = message.overrideTtl || messageTTL;
+    if (!ttl || ttl === 0 || message.type === 'system') return null;
     const messageTime = new Date(message.timestamp).getTime();
-    const expiryTime = messageTime + (messageTTL * 1000);
+    const expiryTime = messageTime + (ttl * 1000);
     const timeLeft = Math.max(0, expiryTime - Date.now());
     if (timeLeft === 0) return null;
     return timeLeft < 60000 ? `${Math.ceil(timeLeft / 1000)}s` : `${Math.ceil(timeLeft / 60000)}m`;
@@ -280,10 +281,13 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
             <div className={`flex items-center w-full ${isOwnMessage ? 'justify-end pl-8 sm:pl-12' : 'justify-start pr-8 sm:pr-12'}`}>
               <div className="relative group/bubble max-w-[70%] sm:max-w-lg md:max-w-xl">
                 <div
-                  className={`relative z-10 rounded-2xl shadow-sm transition-all duration-300 ${message.messageType === 'poll' ? '' : 'px-3 py-2 sm:px-4 sm:py-3 box-border'
-                    } ${isOwnMessage
-                      ? currentVibe.messageClass
-                      : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 dark:text-gray-100 rounded-tl-none'
+                  className={`relative z-10 rounded-2xl transition-all duration-300 ${message.messageType === 'poll' ? 'shadow-sm' :
+                      message.messageType === 'game' ? '' :
+                        'shadow-sm px-3 py-2 sm:px-4 sm:py-3 box-border'
+                    } ${message.messageType === 'game' ? '' :
+                      (isOwnMessage
+                        ? currentVibe.messageClass
+                        : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 dark:text-gray-100 rounded-tl-none')
                     }`}
                 >
                   {/* Content Container */}
