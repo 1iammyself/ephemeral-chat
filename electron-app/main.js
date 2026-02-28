@@ -918,17 +918,6 @@ function showAboutDialog() {
 }
 
 function showLicensesDialog() {
-  const fs = require('fs');
-  const licensePath = path.join(__dirname, 'LICENSE-E2ECP.txt');
-  let licenseText = '';
-
-  try {
-    licenseText = fs.readFileSync(licensePath, 'utf8');
-  } catch (err) {
-    console.error('Failed to read license file:', err);
-    licenseText = 'License file reference: LICENSE-E2ECP.txt (included in application root)';
-  }
-
   dialog.showMessageBox(mainWindow, {
     type: 'info',
     title: 'Third-Party Licenses',

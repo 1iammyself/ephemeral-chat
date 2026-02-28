@@ -1,6 +1,7 @@
 import ChessGame from './ChessGame';
 import { getVibeById } from '../../utils/vibes';
 import { Chess } from '../../utils/chess-lib';
+import { Trophy, X, Info, Swords, Shield, History } from 'lucide-react';
 
 const ChessModal = ({ isOpen, onClose, message, currentUserId, onMove, roomVibe }) => {
     if (!isOpen || !message) return null;
