@@ -36,9 +36,6 @@ const MyRooms = () => {
     };
 
     const handleDeleteRoom = async (roomCode) => {
-        if (!confirm('Are you sure you want to delete this room? All users will be disconnected.')) {
-            return;
-        }
 
         try {
             const creatorId = getCreatorId();

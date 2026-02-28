@@ -740,11 +740,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
 
                     {isSender && (
                         <button
-                            onClick={() => {
-                                if (window.confirm('Are you sure you want to delete this chess game? This cannot be undone.')) {
-                                    onDelete(message.id);
-                                }
-                            }}
+                            onClick={() => onDelete(message.id)}
                             className="text-[10px] font-bold text-rose-500 hover:text-rose-600 transition-colors uppercase tracking-widest mt-2"
                         >
                             Delete Game

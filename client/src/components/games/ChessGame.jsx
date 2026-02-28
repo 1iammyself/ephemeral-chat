@@ -201,7 +201,7 @@ const ChessGame = ({ gameData, currentUserId, onMove, vibe: vibeId }) => {
         for (let i = 0; i < (initialPieces.w[type] - currentPieces.w[type]); i++) capturedByBlack.push({ type, color: 'w' });
     });
 
-    const rows = isBlack ? [...board] : [...board].reverse();
+    const rows = isBlack ? [...board].reverse() : [...board];
     const inCheck = game.inCheck();
     const kingSquare = inCheck ? game.board().flat().find(p => p?.type === 'k' && p?.color === game.turn())?.square : null;
 

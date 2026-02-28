@@ -67,7 +67,7 @@ const UserList = ({
   };
 
   const handleKick = (userId, nickname) => {
-    if (onKickUser && window.confirm(`Are you sure you want to kick ${nickname}?`)) {
+    if (onKickUser) {
       onKickUser(userId);
     }
     setExpandedUser(null);

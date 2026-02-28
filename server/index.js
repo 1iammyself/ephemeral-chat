@@ -2267,7 +2267,7 @@ io.on('connection', (socket) => {
   });
 
   // NEW: Chess Player Management Support
-  socket.on('chess-swap-request', async ({ messageId, targetUserId }) => {
+  socket.on('chess-swap-request', async ({ messageId }) => {
     try {
       if (!socket.roomCode || !messageId) return;
       const room = await roomManager.getRoom(socket.roomCode);
@@ -2275,39 +2275,8 @@ io.on('connection', (socket) => {
       const message = (room.messages || []).find(m => m.id === messageId);
       if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
 
-      const isSender = message.sender.id === (socket.userId || socket.id) || message.sender.socketId === socket.id;
-      if (!isSender) return;
-
-      const targetSocket = io.sockets.sockets.get(targetUserId);
-      const targetInRoom = targetSocket && targetSocket.roomCode === socket.roomCode;
-
-      if (!targetSocket || !targetInRoom) {
-        // Auto-swap if player is not in room
-        const { gameData } = message;
-        const temp = gameData.players.white;
-        gameData.players.white = gameData.players.black;
-        gameData.players.black = temp;
-        await roomManager.saveRoom(socket.roomCode, room);
-        io.to(socket.roomCode).emit('message-updated', message);
-      } else {
-        // Request approval
-        io.to(targetUserId).emit('chess-swap-offer', { messageId, fromNickname: socket.nickname });
-      }
-    } catch (err) { logger.error('chess-swap-request err:', err); }
-  });
-
-  socket.on('chess-swap-approve', async ({ messageId }) => {
-    try {
-      if (!socket.roomCode || !messageId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = (room.messages || []).find(m => m.id === messageId);
-      if (!message || message.messageType !== 'game') return;
-
-      // Approval must come from one of the actual players
-      const pid = socket.userId || socket.id;
-      const isPlayer = message.gameData.players.white?.id === pid || message.gameData.players.black?.id === pid;
-      if (!isPlayer) return;
+      const isHost = message.sender.id === (socket.userId || socket.id) || message.sender.socketId === socket.id;
+      if (!isHost) return;
 
       const { gameData } = message;
       const temp = gameData.players.white;
@@ -2316,7 +2285,7 @@ io.on('connection', (socket) => {
 
       await roomManager.saveRoom(socket.roomCode, room);
       io.to(socket.roomCode).emit('message-updated', message);
-    } catch (err) { logger.error('chess-swap-approve err:', err); }
+    } catch (err) { logger.error('chess-swap-request err:', err); }
   });
 
   socket.on('chess-replace-request', async ({ messageId, role, targetUserId }) => {
@@ -2325,58 +2294,21 @@ io.on('connection', (socket) => {
       const room = await roomManager.getRoom(socket.roomCode);
       if (!room) return;
       const message = (room.messages || []).find(m => m.id === messageId);
-      if (!message || message.messageType !== 'game') return;
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
 
-      const isSender = message.sender.id === (socket.userId || socket.id) || message.sender.socketId === socket.id;
-      if (!isSender) return;
-
-      const otherRole = role === 'white' ? 'black' : 'white';
-      const counterpart = message.gameData.players[otherRole];
-      const counterpartSocket = counterpart?.socketId ? io.sockets.sockets.get(counterpart.socketId) : null;
-      const counterpartInRoom = counterpartSocket && counterpartSocket.roomCode === socket.roomCode;
+      const isHost = message.sender.id === (socket.userId || socket.id) || message.sender.socketId === socket.id;
+      if (!isHost) return;
 
       const targetUser = (room.users || []).find(u => u.socketId === targetUserId);
       const targetId = targetUser?.userId || targetUserId;
       const targetNick = targetUser?.nickname || 'New Player';
 
-      if (!counterpartInRoom) {
-        // Auto-replace (free swap) if receiver player (counterpart) is gone
-        const { gameData } = message;
-        gameData.players[role] = { id: targetId, socketId: targetUserId, name: targetNick };
-        await roomManager.saveRoom(socket.roomCode, room);
-        io.to(socket.roomCode).emit('message-updated', message);
-      } else {
-        // Approval from the "receiver player" (counterpart) to confirm the swap
-        io.to(counterpart.socketId).emit('chess-replace-offer', {
-          messageId,
-          role,
-          targetUserId: targetUserId, // Use socketId for approving client to emit back
-          targetId: targetId, // Persistent ID
-          targetNickname: targetNick,
-          fromNickname: socket.nickname
-        });
-      }
-    } catch (err) { logger.error('chess-replace-request err:', err); }
-  });
-
-  socket.on('chess-replace-approve', async ({ messageId, role, targetUserId, targetId, targetNickname }) => {
-    try {
-      if (!socket.roomCode || !messageId || !role || !targetUserId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = (room.messages || []).find(m => m.id === messageId);
-      if (!message || message.messageType !== 'game') return;
-
       const { gameData } = message;
-      gameData.players[role] = {
-        id: targetId || targetUserId,
-        socketId: targetUserId,
-        name: targetNickname || 'New Player'
-      };
+      gameData.players[role] = { id: targetId, socketId: targetUserId, name: targetNick };
 
       await roomManager.saveRoom(socket.roomCode, room);
       io.to(socket.roomCode).emit('message-updated', message);
-    } catch (err) { logger.error('chess-replace-approve err:', err); }
+    } catch (err) { logger.error('chess-replace-request err:', err); }
   });
 
 

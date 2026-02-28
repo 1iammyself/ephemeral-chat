@@ -425,6 +425,55 @@ class RoomManager {
     }
   }
 
+
+  /**
+   * Internal helper to save a message with correct TTL
+   */
+  async saveMessage(roomCode, message) {
+    const room = await this.getRoom(roomCode);
+    if (!room) return;
+
+    const isChess = (message.messageType === 'game' && message.gameData?.gameType === 'chess') ||
+      (message.gameData?.type === 'chess'); // Compatibility check
+    const isFinished = !!message.gameData?.winner || !!message.gameData?.endedAt;
+
+    if (this.redis && room.settings.messageTTL > 0) {
+      const messageKey = `message:${roomCode}:${message.id}`;
+
+      // Calculate TTL:
+      // 1. If message has override (e.g. 120s for finished chess)
+      // 2. Otherwise use room default
+      // 3. EXCEPT if it is an active Chess game, then NO TTL (survives until room deletion)
+      let ttl = message.overrideTtl || room.settings.messageTTL;
+
+      if (isChess && !isFinished) {
+        // Active Chess persists until room ends. 
+        // We set to 0 (no expiry) so Redis doesn't auto-delete it. 
+        await this.redis.set(messageKey, JSON.stringify(message));
+      } else {
+        await this.redis.setex(messageKey, ttl, JSON.stringify(message));
+      }
+    } else if (!this.redis) {
+      // In-memory: update or push
+      const existingIdx = room.messages.findIndex(m => m.id === message.id);
+      if (existingIdx !== -1) {
+        room.messages[existingIdx] = message;
+      } else {
+        room.messages.push(message);
+      }
+
+      // Safety cap: prevent memory exhaustion (keep last 500 messages max)
+      if (room.messages.length > 500) {
+        const activeChess = room.messages.filter(m => m.messageType === 'game' && m.gameData?.gameType === 'chess' && !m.gameData?.winner);
+        const others = room.messages.filter(m => !(m.messageType === 'game' && m.gameData?.gameType === 'chess' && !m.gameData?.winner));
+        const otherCount = Math.max(0, 500 - activeChess.length);
+        room.messages = [...activeChess, ...others.slice(-otherCount)];
+      }
+
+      await this.saveRoom(roomCode, room);
+    }
+  }
+
   /**
    * Add message to room
    * @param {string} roomCode - Room code
@@ -438,11 +487,12 @@ class RoomManager {
     if (message.messageType !== 'image' && message.messageType !== 'audio') {
       message.content = sanitizeInput(message.content);
     }
-    message.timestamp = new Date().toISOString();
+
+    if (!message.timestamp) message.timestamp = new Date().toISOString();
 
     // GAME TTL LOGIC: If a room's TTL is < 5 minutes (300 seconds), game TTL should be twice the room's TTL
     // CHESS EXCEPTION: Chess lasts until room ends or manual delete, unless it's finished.
-    const isChess = message.messageType === 'game' && message.gameData?.gameType === 'chess';
+    const isChess = (message.messageType === 'game' && message.gameData?.gameType === 'chess') || (message.gameData?.type === 'chess');
 
     if (message.messageType === 'game' && !isChess && room.settings && room.settings.messageTTL > 0 && room.settings.messageTTL < 300) {
       if (!message.overrideTtl) {
@@ -457,27 +507,12 @@ class RoomManager {
     }
 
     // Initialize viewedBy array for view-once messages
-    if (message.isViewOnce) {
+    if (message.isViewOnce && !message.viewedBy) {
       message.viewedBy = [];
     }
 
-    // Handle message TTL with Redis
-    if (this.redis && room.settings.messageTTL > 0) {
-      const messageKey = `message:${roomCode}:${message.id}`;
-      // Use the smaller of override or room default for Redis expiry
-      const ttl = message.overrideTtl || room.settings.messageTTL;
-      await this.redis.setex(messageKey, ttl, JSON.stringify(message));
-    } else {
-      room.messages.push(message);
-
-      // Safety cap: prevent memory exhaustion (keep last 500 messages max)
-      if (room.messages.length > 500) {
-        room.messages = room.messages.slice(-500);
-      }
-
-      await this.saveRoom(roomCode, room);
-    }
-
+    // Call the unified saver
+    await this.saveMessage(roomCode, message);
     this.refreshRoomExpiry(roomCode);
   }
 
@@ -717,18 +752,8 @@ class RoomManager {
         if (!msg.viewedBy.includes(userId)) {
           msg.viewedBy.push(userId);
 
-          // Save back to storage
-          const room = await this.getRoom(roomCode);
-          if (this.redis && room.settings.messageTTL > 0) {
-            const messageKey = `message:${roomCode}:${messageId}`;
-            await this.redis.setex(messageKey, room.settings.messageTTL, JSON.stringify(msg));
-          } else {
-            const idx = room.messages.findIndex(m => m.id === messageId);
-            if (idx >= 0) {
-              room.messages[idx] = msg;
-              await this.saveRoom(roomCode, room);
-            }
-          }
+          // Save back to storage using unified logic
+          await this.saveMessage(roomCode, msg);
 
           // Broadcast via socket.io if available
           if (this._io) {
@@ -1215,13 +1240,8 @@ class RoomManager {
       message.reactions[emoji].push(userId);
     }
 
-    // Save back to storage
-    if (this.redis && room.settings.messageTTL > 0) {
-      const messageKey = `message:${roomCode}:${messageId}`;
-      await this.redis.setex(messageKey, room.settings.messageTTL, JSON.stringify(message));
-    } else if (!this.redis) {
-      await this.saveRoom(roomCode, room);
-    }
+    // Save back to storage using unified logic
+    await this.saveMessage(roomCode, message);
 
     return message;
   }
@@ -1258,13 +1278,8 @@ class RoomManager {
     message.content = sanitizeInput(newContent);
     message.isEdited = true;
 
-    // Save back to storage
-    if (this.redis && room.settings.messageTTL > 0) {
-      const messageKey = `message:${roomCode}:${messageId}`;
-      await this.redis.setex(messageKey, room.settings.messageTTL, JSON.stringify(message));
-    } else if (!this.redis) {
-      await this.saveRoom(roomCode, room);
-    }
+    // Save back to storage using unified logic
+    await this.saveMessage(roomCode, message);
 
     return message;
   }
@@ -1282,7 +1297,7 @@ class RoomManager {
     const room = await this.getRoom(roomCode);
     if (!room) return null;
 
-    const message = (room.messages || []).find(m => m.id === messageId);
+    const message = await this.getMessage(roomCode, messageId);
     if (!message || message.messageType !== 'poll' || !message.pollData) return null;
 
     const { pollData } = message;
@@ -1318,13 +1333,8 @@ class RoomManager {
       option.votes.push(voteObj);
     }
 
-    // Save back to storage
-    if (this.redis && room.settings.messageTTL > 0) {
-      const messageKey = `message:${roomCode}:${messageId}`;
-      await this.redis.setex(messageKey, room.settings.messageTTL, JSON.stringify(message));
-    } else {
-      await this.saveRoom(roomCode, room);
-    }
+    // Save back to storage using unified logic
+    await this.saveMessage(roomCode, message);
 
     return message;
   }

@@ -979,18 +979,6 @@ const ChatRoom = () => {
       });
     };
 
-    const handleChessSwapOffer = ({ messageId, fromNickname }) => {
-      if (window.confirm(`${fromNickname} wants to swap Chess colors (White/Black). Accept?`)) {
-        socketManager.emit('chess-swap-approve', { messageId });
-      }
-    };
-
-    const handleChessReplaceOffer = ({ messageId, role, targetUserId, targetId, targetNickname, fromNickname }) => {
-      const roleDisplayName = role === 'white' ? 'White' : 'Black';
-      if (window.confirm(`${fromNickname} wants to replace ${roleDisplayName} with ${targetNickname}. Confirm this change?`)) {
-        socketManager.emit('chess-replace-approve', { messageId, role, targetUserId, targetId, targetNickname });
-      }
-    };
 
     const handlePong = (startTime) => {
       setLatency(Date.now() - startTime);
@@ -1024,8 +1012,6 @@ const ChatRoom = () => {
     socketManager.on('user-typing', handleUserTyping);
     socketManager.on('user-stop-typing', handleUserStopTyping);
     socketManager.on('room-reaction', handleRoomReaction);
-    socketManager.on('chess-swap-offer', handleChessSwapOffer);
-    socketManager.on('chess-replace-offer', handleChessReplaceOffer);
     socketManager.on('file-transfer-invite', handleFileTransferInvite);
     socketManager.on('messages-cleared', () => {
       setMessages([]);
@@ -1066,8 +1052,6 @@ const ChatRoom = () => {
       socketManager.off('user-typing', handleUserTyping);
       socketManager.off('user-stop-typing', handleUserStopTyping);
       socketManager.off('room-reaction', handleRoomReaction);
-      socketManager.off('chess-swap-offer', handleChessSwapOffer);
-      socketManager.off('chess-replace-offer', handleChessReplaceOffer);
       socketManager.off('file-transfer-invite', handleFileTransferInvite);
       socketManager.off('messages-cleared');
 
