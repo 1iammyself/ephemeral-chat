@@ -1274,6 +1274,14 @@ const ChatRoom = () => {
             handleSendGame({ gameType: 'tic-tac-toe' });
             setNewMessage('');
             return;
+          } else if (['chess'].includes(gameArg)) {
+            if (selectedRecipients.length > 1) {
+              setError('Chess can only be sent to one person.');
+              return;
+            }
+            handleSendGame({ gameType: 'chess' });
+            setNewMessage('');
+            return;
           } else if (['wyr', 'would-you-rather', 'wouldyourather'].includes(gameArg)) {
             initialGame = 'would-you-rather';
           } else if (['trivia', 'quiz'].includes(gameArg)) {

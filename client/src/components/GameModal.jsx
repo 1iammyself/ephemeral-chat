@@ -45,6 +45,12 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
         if (type === GAME_TYPES.TIC_TAC_TOE) {
             onSend({ gameType: GAME_TYPES.TIC_TAC_TOE });
             handleClose();
+        } else if (type === GAME_TYPES.CHESS) {
+            onSend({ gameType: GAME_TYPES.CHESS });
+            handleClose();
+        } else if (type === GAME_TYPES.ROCK_PAPER_SCISSORS) {
+            onSend({ gameType: GAME_TYPES.ROCK_PAPER_SCISSORS });
+            handleClose();
         } else {
             setGameType(type);
         }
