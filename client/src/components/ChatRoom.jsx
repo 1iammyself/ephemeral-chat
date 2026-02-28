@@ -2192,9 +2192,9 @@ const ChatRoom = () => {
                       </button>
 
                       {showFeatureMenu && (
-                        <div className="absolute bottom-full mb-3 left-0 z-50 bg-white/95 dark:bg-gray-800/95 rounded-3xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 p-2 sm:p-3 flex flex-col space-y-2 w-[85vw] max-w-[280px] sm:max-w-[320px] animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/5">
+                        <div className="absolute bottom-full mb-3 left-0 z-50 bg-white/70 dark:bg-black/70 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] border border-white/20 p-2 sm:p-3 flex flex-col space-y-2 w-[85vw] max-w-[280px] sm:max-w-[320px] animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-2xl ring-1 ring-white/10 dark:ring-white/5">
                           {/* Floating Reaction Pill */}
-                          <div className="flex items-center gap-1 bg-gray-50/80 dark:bg-gray-900/80 rounded-2xl p-1 px-1.5 border border-gray-100/50 dark:border-gray-800/50 shadow-inner">
+                          <div className="flex items-center gap-1 bg-white/40 dark:bg-white/5 rounded-2xl p-1 px-1.5 border border-white/20 shadow-inner">
                             <div className="flex items-center flex-1 overflow-x-auto scrollbar-none gap-1 py-0.5 no-scrollbar">
                               {['❤️', '🔥', '👏', '😂', '😮', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👍', '🙏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀'].map(emoji => (
                                 <button
@@ -2242,9 +2242,9 @@ const ChatRoom = () => {
                                 setActivityLogs(prev => [log, ...prev].slice(0, 50));
                               }}
                               disabled={!isConnected}
-                              className={`flex flex-col items-center justify-center p-2 rounded-xl bg-${vibeAccent}-50/50 dark:bg-gray-900/40 hover:bg-${vibeAccent}-100 dark:hover:bg-gray-900/60 transition-all border border-${vibeAccent}-100/20 dark:border-gray-700/30 group`}
+                              className={`flex flex-col items-center justify-center p-2 rounded-xl bg-white/20 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`}
                             >
-                              <div className={`w-8 h-8 rounded-lg bg-${vibeAccent}-100 dark:bg-gray-800/80 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-sm`}>
+                              <div className={`w-8 h-8 rounded-lg bg-white/40 dark:bg-white/10 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-sm`}>
                                 <FileText className={`w-4 h-4 text-${vibeAccent}-500`} />
                               </div>
                               <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">Files</span>
@@ -2254,9 +2254,9 @@ const ChatRoom = () => {
                               type="button"
                               onClick={() => { setShowCameraModal(true); setShowFeatureMenu(false); }}
                               disabled={!isConnected}
-                              className={`flex flex-col items-center justify-center p-2 rounded-xl bg-${vibeAccent}-50/50 dark:bg-gray-900/40 hover:bg-${vibeAccent}-100 dark:hover:bg-gray-900/60 transition-all border border-${vibeAccent}-100/20 dark:border-gray-700/30 group`}
+                              className={`flex flex-col items-center justify-center p-2 rounded-xl bg-white/20 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`}
                             >
-                              <div className={`w-8 h-8 rounded-lg bg-${vibeAccent}-100 dark:bg-gray-800/80 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-sm`}>
+                              <div className={`w-8 h-8 rounded-lg bg-white/40 dark:bg-white/10 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-sm`}>
                                 <Camera className={`w-4 h-4 text-${vibeAccent}-500`} />
                               </div>
                               <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">Camera</span>
@@ -2273,15 +2273,15 @@ const ChatRoom = () => {
                                 }
                               }}
                               disabled={!isConnected || users.length < 2 || users.length > 7}
-                              className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all border group ${users.length > 7
-                                ? 'bg-gray-50/50 dark:bg-gray-900/20 border-gray-200/20 dark:border-gray-700/20 opacity-50 cursor-not-allowed'
-                                : 'bg-green-50/50 dark:bg-gray-900/40 hover:bg-green-100 dark:hover:bg-gray-900/60 border-green-100/20 dark:border-gray-700/30'
+                              className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all border border-white/10 group ${users.length > 7
+                                ? 'bg-white/10 opacity-50 cursor-not-allowed'
+                                : 'bg-green-500/10 dark:bg-green-500/10 hover:bg-green-500/20 shadow-sm'
                                 }`}
                               title={users.length > 7 ? "Disabled: Max 7 users for voice calls" : "Start Voice Call"}
                             >
                               <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-1 transition-transform shadow-sm ${users.length > 7
-                                ? 'bg-gray-100 dark:bg-gray-800/50'
-                                : 'bg-green-100 dark:bg-gray-800/80 group-hover:scale-110'
+                                ? 'bg-white/10'
+                                : 'bg-green-500/20 dark:bg-green-500/30 group-hover:scale-110'
                                 }`}>
                                 <Phone className={`w-4 h-4 ${users.length > 7 ? 'text-gray-400' : 'text-green-500'}`} />
                               </div>
@@ -2294,9 +2294,9 @@ const ChatRoom = () => {
                               type="button"
                               onClick={() => { setShowPollModal(true); setShowFeatureMenu(false); }}
                               disabled={!isConnected}
-                              className={`flex flex-col items-center justify-center p-2 rounded-xl bg-${vibeAccent}-50/50 dark:bg-gray-900/40 hover:bg-${vibeAccent}-100 dark:hover:bg-gray-900/60 transition-all border border-${vibeAccent}-100/20 dark:border-gray-700/30 group`}
+                              className={`flex flex-col items-center justify-center p-2 rounded-xl bg-white/20 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`}
                             >
-                              <div className={`w-8 h-8 rounded-lg bg-${vibeAccent}-100 dark:bg-gray-800/80 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-sm`}>
+                              <div className={`w-8 h-8 rounded-lg bg-white/40 dark:bg-white/10 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-sm`}>
                                 <BarChart2 className={`w-4 h-4 text-${vibeAccent}-500`} />
                               </div>
                               <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">Poll</span>
@@ -2306,9 +2306,9 @@ const ChatRoom = () => {
                               type="button"
                               onClick={() => { startRecording(); setShowFeatureMenu(false); }}
                               disabled={!isConnected}
-                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-red-50/50 dark:bg-gray-900/40 hover:bg-red-100 dark:hover:bg-gray-900/60 transition-all border border-red-100/20 dark:border-gray-700/30 group"
+                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-red-500/10 dark:bg-white/5 hover:bg-red-500/20 dark:hover:bg-white/10 transition-all border border-white/10 group"
                             >
-                              <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-gray-800/80 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-sm">
+                              <div className="w-8 h-8 rounded-lg bg-red-500/20 dark:bg-white/10 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-sm">
                                 <Mic className="w-4 h-4 text-red-500" />
                               </div>
                               <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">Voice Note</span>
@@ -2318,9 +2318,9 @@ const ChatRoom = () => {
                               type="button"
                               onClick={handleSendIcebreaker}
                               disabled={!isConnected}
-                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-cyan-50/50 dark:bg-gray-900/40 hover:bg-cyan-100 dark:hover:bg-gray-900/60 transition-all border border-cyan-100/20 dark:border-gray-700/30 group"
+                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-cyan-500/10 dark:bg-white/5 hover:bg-cyan-500/20 dark:hover:bg-white/10 transition-all border border-white/10 group"
                             >
-                              <div className="w-8 h-8 rounded-lg bg-cyan-100 dark:bg-gray-800/80 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-sm">
+                              <div className="w-8 h-8 rounded-lg bg-cyan-500/20 dark:bg-white/10 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-sm">
                                 <Smile className="w-4 h-4 text-cyan-500" />
                               </div>
                               <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">Icebreaker</span>
@@ -2407,8 +2407,12 @@ const ChatRoom = () => {
                             '--epr-highlight-color': vibeHex,
                             '--epr-focus-bg-color': `${vibeHex}20`,
                             '--epr-hover-bg-color': `${vibeHex}10`,
+                            '--epr-bg-color': 'transparent',
+                            '--epr-category-label-bg-color': 'transparent',
+                            '--epr-picker-border-radius': '1.5rem',
                           }}
                         >
+                          <div className="absolute inset-0 bg-white/70 dark:bg-black/70 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/20 -z-10" />
                           <EmojiPicker
                             onEmojiClick={onEmojiClick}
                             theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
@@ -2427,7 +2431,7 @@ const ChatRoom = () => {
                       {suggestions.show && (
                         <div
                           ref={suggestionRef}
-                          className="absolute bottom-full left-0 -ml-12 sm:ml-0 mb-3 w-[85vw] sm:w-full max-w-[280px] sm:max-w-none bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50 rounded-3xl shadow-2xl overflow-hidden z-[60] animate-in slide-in-from-bottom-2 duration-300 ring-1 ring-black/5 dark:ring-white/5"
+                          className="absolute bottom-full left-0 -ml-12 sm:ml-0 mb-3 w-[85vw] sm:w-full max-w-[280px] sm:max-w-none bg-white/70 dark:bg-black/70 backdrop-blur-2xl border border-white/20 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] overflow-hidden z-[60] animate-in slide-in-from-bottom-2 duration-300 ring-1 ring-white/10"
                         >
                           <div className="max-h-48 overflow-y-auto p-1.5 sm:p-2 space-y-0.5">
                             {suggestions.items.map((item, idx) => (
