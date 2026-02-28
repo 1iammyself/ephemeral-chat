@@ -118,15 +118,15 @@ const PIECES = {
     }
 };
 
-const ChessGame = ({ gameData, currentUserId, onMove, vibe: vibeId }) => {
+const ChessGame = ({ gameData, currentUserId, currentNickname, onMove, vibe: vibeId }) => {
     const [game, setGame] = useState(new Chess(gameData?.fen || undefined));
     const [selectedSquare, setSelectedSquare] = useState(null);
     const [validMoves, setValidMoves] = useState([]);
     const [pendingPromotion, setPendingPromotion] = useState(null);
     const vibe = getVibeById(vibeId);
 
-    const isWhite = gameData?.players?.white?.id === currentUserId;
-    const isBlack = gameData?.players?.black?.id === currentUserId;
+    const isWhite = gameData?.players?.white?.id === currentUserId || (currentNickname && gameData?.players?.white?.name === currentNickname);
+    const isBlack = gameData?.players?.black?.id === currentUserId || (currentNickname && gameData?.players?.black?.name === currentNickname);
     const isMyTurn = (game.turn() === 'w' && isWhite) || (game.turn() === 'b' && isBlack);
 
     useEffect(() => {

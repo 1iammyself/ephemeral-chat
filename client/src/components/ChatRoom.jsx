@@ -1450,7 +1450,7 @@ const ChatRoom = () => {
       return;
     }
 
-    socketManager.emit('send-message', { messageType: 'game', gameData, recipients: selectedRecipients });
+    socketManager.emit('send-message', { messageType: 'game', gameData, recipients: selectedRecipients, userId: persistentUserId });
   };
 
   const handleDeleteMessage = (messageId) => {
@@ -1465,7 +1465,7 @@ const ChatRoom = () => {
   const handleTicTacToeMove = (messageId, action, position) => {
     if (!isConnected) return;
     if (action === 'chess-move') {
-      socketManager.emit('chess-move', { messageId, move: position });
+      socketManager.emit('chess-move', { messageId, move: position, userId: persistentUserId });
     } else if (action === 'chess-join') {
       socketManager.emit('chess-join', { messageId, userId: persistentUserId });
     } else if (action === 'chess-swap') {
@@ -2615,6 +2615,7 @@ const ChatRoom = () => {
         onClose={() => setActiveChessMatch(null)}
         message={activeChessMatch}
         currentUserId={currentUser?.id || currentUser?.socketId}
+        currentNickname={currentUser?.nickname}
         users={users}
         onMove={handleTicTacToeMove}
         roomVibe={roomVibe}

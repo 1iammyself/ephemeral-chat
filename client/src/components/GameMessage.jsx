@@ -19,10 +19,14 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
 
     const isTargeted = message.recipients && message.recipients.length > 0;
     const isIntendedRecipient = isTargeted && message.recipients.includes(currentUserId);
-    const isSender = message.sender.socketId === currentUserId || message.sender.id === currentUserId;
+    const currentNickname = currentUser?.nickname;
+    const isSender = message.sender.socketId === currentUserId || message.sender.id === currentUserId || (currentNickname && message.sender.nickname === currentNickname);
     const isPlayer = (isTicTacToe && (gameData.players.X.id === currentUserId || gameData.players.O.id === currentUserId)) ||
         (isRPS && (gameData.players.P1.id === currentUserId || gameData.players.P2.id === currentUserId)) ||
-        (isChess && (gameData.players.white?.id === currentUserId || gameData.players.black?.id === currentUserId));
+        (isChess && (
+            gameData.players.white?.id === currentUserId || gameData.players.black?.id === currentUserId ||
+            (currentNickname && (gameData.players.white?.name === currentNickname || gameData.players.black?.name === currentNickname))
+        ));
     const isSpectator = !isPlayer && (isTicTacToe || isRPS || isChess);
     const [isExpanded, setIsExpanded] = useState(false);
     const [showVoteDetails, setShowVoteDetails] = useState(false);
@@ -727,16 +731,21 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                         </div>
                     )}
 
-                    {!gameData.winner && gameData.players.white?.id && gameData.players.black?.id && (
-                        <div className={`w-full p-2.5 rounded-xl text-center font-bold text-[11px] transition-all
-                            ${((gameData.turn === 'w' && gameData.players.white?.id === currentUserId) || (gameData.turn === 'b' && gameData.players.black?.id === currentUserId))
-                                ? 'bg-indigo-500 text-white shadow-md'
-                                : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'}`}>
-                            {((gameData.turn === 'w' && gameData.players.white?.id === currentUserId) || (gameData.turn === 'b' && gameData.players.black?.id === currentUserId))
-                                ? "Your move! ♟️"
-                                : `${gameData.turn === 'w' ? 'White' : 'Black'}'s Turn`}
-                        </div>
-                    )}
+                    {!gameData.winner && gameData.players.white?.id && gameData.players.black?.id && (() => {
+                        const isMyTurnAsWhite = gameData.turn === 'w' && (gameData.players.white?.id === currentUserId || gameData.players.white?.name === currentNickname);
+                        const isMyTurnAsBlack = gameData.turn === 'b' && (gameData.players.black?.id === currentUserId || gameData.players.black?.name === currentNickname);
+                        const isMyTurn = isMyTurnAsWhite || isMyTurnAsBlack;
+                        return (
+                            <div className={`w-full p-2.5 rounded-xl text-center font-bold text-[11px] transition-all
+                                ${isMyTurn
+                                    ? 'bg-indigo-500 text-white shadow-md'
+                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'}`}>
+                                {isMyTurn
+                                    ? "Your move! ♟️"
+                                    : `${gameData.turn === 'w' ? 'White' : 'Black'}'s Turn`}
+                            </div>
+                        );
+                    })()}
 
                     {isSender && (
                         <button

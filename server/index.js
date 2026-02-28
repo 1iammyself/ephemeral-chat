@@ -1233,6 +1233,7 @@ io.on('connection', (socket) => {
           socket.join(roomCode);
           socket.roomCode = roomCode;
           socket.nickname = nickname || session.nickname || generateRandomNickname();
+          socket.persistentUserId = userId || socket.id; // Store persistent ID on socket
 
           const room = await roomManager.getRoom(roomCode);
           if (room) {
@@ -1292,10 +1293,50 @@ io.on('connection', (socket) => {
             }
             await roomManager.saveRoom(roomCode, room);
 
+            // Re-sync chess game player socketIds for this reconnecting user
+            try {
+              if (room.messages) {
+                let chessUpdated = false;
+                const reconnId = userId || socket.id;
+                for (const msg of room.messages) {
+                  if (msg.messageType === 'game' && msg.gameData?.gameType === 'chess' && !msg.gameData.winner) {
+                    const gd = msg.gameData;
+                    if (gd.players.white && (gd.players.white.id === reconnId || gd.players.white.name === socket.nickname)) {
+                      gd.players.white.socketId = socket.id;
+                      gd.players.white.name = socket.nickname;
+                      if (gd.players.white.id !== reconnId && reconnId) gd.players.white.id = reconnId;
+                      chessUpdated = true;
+                    }
+                    if (gd.players.black && (gd.players.black.id === reconnId || gd.players.black.name === socket.nickname)) {
+                      gd.players.black.socketId = socket.id;
+                      gd.players.black.name = socket.nickname;
+                      if (gd.players.black.id !== reconnId && reconnId) gd.players.black.id = reconnId;
+                      chessUpdated = true;
+                    }
+                    if (msg.sender && msg.sender.nickname === socket.nickname && msg.sender.id !== reconnId && reconnId) {
+                      msg.sender.id = reconnId;
+                      msg.sender.socketId = socket.id;
+                      chessUpdated = true;
+                    }
+                  }
+                }
+                if (chessUpdated) {
+                  await roomManager.saveRoom(roomCode, room);
+                  for (const msg of room.messages) {
+                    if (msg.messageType === 'game' && msg.gameData?.gameType === 'chess' && !msg.gameData.winner) {
+                      io.to(roomCode).emit('message-updated', msg);
+                    }
+                  }
+                }
+              }
+            } catch (syncErr) {
+              logger.error('Error re-syncing chess games on session resume:', syncErr);
+            }
+
             const timeoutMs = await roomManager.getRoomTimeout(roomCode);
             securityManager.registerUserActivity(socket.id, userId || socket.id, roomCode, handleInactivityTimeout, timeoutMs);
 
-            const messages = await roomManager.getMessages(roomCode, socket.id);
+            const messages = await roomManager.getMessages(roomCode, socket.id, socket.persistentUserId);
             const enrichedUsers = getEnrichedUsers(roomCode);
 
             logger.info(`📱 User ${socket.nickname} reconnected to room ${roomCode} (session resumed)`);
@@ -1304,7 +1345,7 @@ io.on('connection', (socket) => {
             socket.to(roomCode).emit('user-joined', {
               user: {
                 socketId: socket.id,
-                id: socket.id,
+                id: userId || socket.id,
                 nickname: socket.nickname,
                 role: roomData[roomCode]?.userRoles?.[socket.id] || (roomData[roomCode]?.hostId === socket.id ? 'host' : 'user')
               },
@@ -1423,6 +1464,52 @@ io.on('connection', (socket) => {
         socket.join(roomCode);
         socket.roomCode = roomCode;
         socket.nickname = userNickname;
+        socket.persistentUserId = userId || socket.id; // Store persistent ID on socket
+
+        // Re-sync chess game player socketIds for this returning user
+        try {
+          const freshRoom = await roomManager.getRoom(roomCode);
+          if (freshRoom && freshRoom.messages) {
+            let chessUpdated = false;
+            for (const msg of freshRoom.messages) {
+              if (msg.messageType === 'game' && msg.gameData?.gameType === 'chess' && !msg.gameData.winner) {
+                const gd = msg.gameData;
+                // Match by persistent userId OR by nickname (for older games that used socket.id)
+                if (gd.players.white && (gd.players.white.id === userId || gd.players.white.name === userNickname)) {
+                  gd.players.white.socketId = socket.id;
+                  gd.players.white.name = userNickname;
+                  if (gd.players.white.id !== userId && userId) gd.players.white.id = userId; // Fix legacy ID
+                  chessUpdated = true;
+                  logger.info(`♟️ Re-synced chess white player socketId for ${userNickname} to ${socket.id}`);
+                }
+                if (gd.players.black && (gd.players.black.id === userId || gd.players.black.name === userNickname)) {
+                  gd.players.black.socketId = socket.id;
+                  gd.players.black.name = userNickname;
+                  if (gd.players.black.id !== userId && userId) gd.players.black.id = userId; // Fix legacy ID
+                  chessUpdated = true;
+                  logger.info(`♟️ Re-synced chess black player socketId for ${userNickname} to ${socket.id}`);
+                }
+                // Also fix the message sender ID if it used old socket.id
+                if (msg.sender && msg.sender.nickname === userNickname && msg.sender.id !== userId && userId) {
+                  msg.sender.id = userId;
+                  msg.sender.socketId = socket.id;
+                  chessUpdated = true;
+                }
+              }
+            }
+            if (chessUpdated) {
+              await roomManager.saveRoom(roomCode, freshRoom);
+              // Broadcast updated chess games to all room members
+              for (const msg of freshRoom.messages) {
+                if (msg.messageType === 'game' && msg.gameData?.gameType === 'chess' && !msg.gameData.winner) {
+                  io.to(roomCode).emit('message-updated', msg);
+                }
+              }
+            }
+          }
+        } catch (syncErr) {
+          logger.error('Error re-syncing chess games on join:', syncErr);
+        }
 
         // Register user activity and start inactivity timer
         const timeoutMs = await roomManager.getRoomTimeout(roomCode);
@@ -1431,7 +1518,7 @@ io.on('connection', (socket) => {
 
         // Send room data to user
         // Pass socket.id to filter private messages correctly
-        const messages = await roomManager.getMessages(roomCode, socket.id);
+        const messages = await roomManager.getMessages(roomCode, socket.id, socket.persistentUserId);
 
         // Ensure roomData exists and merge metadata
         if (!roomData[roomCode]) {
@@ -1479,7 +1566,7 @@ io.on('connection', (socket) => {
         socket.to(roomCode).emit('user-joined', {
           user: {
             socketId: socket.id,
-            id: socket.id,
+            id: userId || socket.id,
             nickname: userNickname,
             role: roomData[roomCode].userRoles?.[socket.id] || (roomData[roomCode].hostId === socket.id ? 'host' : 'user')
           },
@@ -1712,7 +1799,7 @@ io.on('connection', (socket) => {
             lastActivity: Date.now()
           };
         } else if (gameData.gameType === 'chess') {
-          const senderId = data.userId || socket.id; // Persistent ID preferred
+          const senderId = socket.persistentUserId || data.userId || socket.id; // Persistent ID preferred
           const isTargeted = recipients && recipients.length === 1;
           let invitedNickname = null;
           if (isTargeted) {
@@ -1770,7 +1857,7 @@ io.on('connection', (socket) => {
         } : {
           socketId: socket.id,
           nickname: socket.nickname,
-          id: socket.id
+          id: socket.persistentUserId || socket.id
         },
         timestamp: new Date().toISOString()
       };
@@ -2176,13 +2263,13 @@ io.on('connection', (socket) => {
       const { gameData } = message;
       if (gameData.winner) return;
 
-      const joinerId = userId || socket.id;
-      const isWhite = gameData.players.white?.id === joinerId;
+      const joinerId = userId || socket.persistentUserId || socket.id;
+      const isWhite = gameData.players.white?.id === joinerId || gameData.players.white?.name === socket.nickname;
 
       if (!gameData.players.white?.id) {
         gameData.players.white = { id: joinerId, socketId: socket.id, name: socket.nickname };
       } else if (!gameData.players.black?.id) {
-        if (isWhite) return; // Already joined as White
+        if (gameData.players.white?.id === joinerId || gameData.players.white?.name === socket.nickname) return; // Already joined as White
 
         const isTargeted = message.recipients && message.recipients.length > 0;
         if (isTargeted && !message.recipients.includes(joinerId) && !message.recipients.includes(socket.id)) {
@@ -2192,10 +2279,12 @@ io.on('connection', (socket) => {
         gameData.players.black = { id: joinerId, socketId: socket.id, name: socket.nickname };
       } else {
         // Re-sync socketId if existing player joins from new socket
-        if (gameData.players.white.id === joinerId) {
+        if (gameData.players.white.id === joinerId || gameData.players.white.name === socket.nickname) {
+          gameData.players.white.id = joinerId;
           gameData.players.white.socketId = socket.id;
           gameData.players.white.name = socket.nickname;
-        } else if (gameData.players.black.id === joinerId) {
+        } else if (gameData.players.black.id === joinerId || gameData.players.black.name === socket.nickname) {
+          gameData.players.black.id = joinerId;
           gameData.players.black.socketId = socket.id;
           gameData.players.black.name = socket.nickname;
         } else {
@@ -2225,9 +2314,9 @@ io.on('connection', (socket) => {
       const { gameData } = message;
       if (gameData.winner) return;
 
-      const playerId = userId || socket.id;
-      const isWhite = gameData.players.white?.id === playerId;
-      const isBlack = gameData.players.black?.id === playerId;
+      const playerId = socket.persistentUserId || userId || socket.id;
+      const isWhite = gameData.players.white?.id === playerId || gameData.players.white?.name === socket.nickname;
+      const isBlack = gameData.players.black?.id === playerId || gameData.players.black?.name === socket.nickname;
 
       if ((gameData.turn === 'w' && !isWhite) || (gameData.turn === 'b' && !isBlack)) {
         return;
@@ -2275,7 +2364,8 @@ io.on('connection', (socket) => {
       const message = (room.messages || []).find(m => m.id === messageId);
       if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
 
-      const isHost = message.sender.id === (socket.userId || socket.id) || message.sender.socketId === socket.id;
+      const requesterId = socket.persistentUserId || socket.id;
+      const isHost = message.sender.id === requesterId || message.sender.socketId === socket.id || message.sender.nickname === socket.nickname;
       if (!isHost) return;
 
       const { gameData } = message;
@@ -2296,11 +2386,12 @@ io.on('connection', (socket) => {
       const message = (room.messages || []).find(m => m.id === messageId);
       if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
 
-      const isHost = message.sender.id === (socket.userId || socket.id) || message.sender.socketId === socket.id;
+      const requesterId = socket.persistentUserId || socket.id;
+      const isHost = message.sender.id === requesterId || message.sender.socketId === socket.id || message.sender.nickname === socket.nickname;
       if (!isHost) return;
 
       const targetUser = (room.users || []).find(u => u.socketId === targetUserId);
-      const targetId = targetUser?.userId || targetUserId;
+      const targetId = targetUser?.id || targetUser?.userId || targetUserId;
       const targetNick = targetUser?.nickname || 'New Player';
 
       const { gameData } = message;
@@ -2334,8 +2425,8 @@ io.on('connection', (socket) => {
       if (!message) return;
 
       // Permission check: only sender can delete (except for view-once auto-deletion)
-      const requesterId = socket.userId || socket.id;
-      const isSender = message.sender.id === requesterId || message.sender.socketId === socket.id;
+      const requesterId = socket.persistentUserId || socket.id;
+      const isSender = message.sender.id === requesterId || message.sender.socketId === socket.id || (socket.nickname && message.sender.nickname === socket.nickname);
 
       let shouldDelete = false;
 

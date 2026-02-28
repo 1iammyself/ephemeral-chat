@@ -562,9 +562,10 @@ class RoomManager {
    * Get messages for a room
    * @param {string} roomCode - Room code
    * @param {string} [userId] - Optional user ID to filter private messages and mask game data
+   * @param {string} [persistentId] - Optional persistent user ID for additional matching
    * @returns {Promise<Array>} Array of messages
    */
-  async getMessages(roomCode, userId = null) {
+  async getMessages(roomCode, userId = null, persistentId = null) {
     const room = await this.getRoom(roomCode);
     if (!room) return [];
 
@@ -621,16 +622,17 @@ class RoomManager {
 
     // Filter private messages and mask game data if userId is provided
     if (userId) {
+      const matchesUser = (id) => id === userId || (persistentId && id === persistentId);
       messages = messages
         .filter(msg => {
           // If no recipients defined, it's a broadcast message (everyone sees it)
           if (!msg.recipients || msg.recipients.length === 0) return true;
 
           // If I am the sender, I can see it
-          if (msg.sender.socketId === userId || msg.sender.id === userId) return true;
+          if (matchesUser(msg.sender.socketId) || matchesUser(msg.sender.id)) return true;
 
           // If I am in the recipients list, I can see it
-          return msg.recipients.includes(userId);
+          return msg.recipients.some(r => matchesUser(r));
         })
         .map(msg => this.maskMessageForUser(msg, userId));
     }

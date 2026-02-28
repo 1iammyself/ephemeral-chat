@@ -3,7 +3,7 @@ import { getVibeById } from '../../utils/vibes';
 import { Chess } from '../../utils/chess-lib';
 import { Trophy, X, Info, Swords, Shield, History } from 'lucide-react';
 
-const ChessModal = ({ isOpen, onClose, message, currentUserId, users, onMove, roomVibe }) => {
+const ChessModal = ({ isOpen, onClose, message, currentUserId, currentNickname, users, onMove, roomVibe }) => {
     if (!isOpen || !message) return null;
 
     const { gameData } = message;
@@ -15,17 +15,19 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, users, onMove, ro
             vibe.id === 'focus' ? 'orange' : 'primary';
 
     const headerClass = vibe.accentClass;
-    const isWhite = gameData.players.white?.id === currentUserId;
-    const isBlack = gameData.players.black?.id === currentUserId;
+    const isWhite = gameData.players.white?.id === currentUserId || (currentNickname && gameData.players.white?.name === currentNickname);
+    const isBlack = gameData.players.black?.id === currentUserId || (currentNickname && gameData.players.black?.name === currentNickname);
     const amPlaying = isWhite || isBlack;
-    const isHost = message.sender.id === currentUserId || message.sender.socketId === currentUserId;
+    const isHost = message.sender.id === currentUserId || message.sender.socketId === currentUserId || (currentNickname && message.sender.nickname === currentNickname);
 
     // Filter users eligible for replacement (not already playing)
-    const availableUsers = (users || []).filter(u =>
-        u.socketId !== gameData.players.white?.id &&
-        u.socketId !== gameData.players.black?.id &&
-        u.socketId !== currentUserId
-    );
+    const availableUsers = (users || []).filter(u => {
+        const isCurrentPlayer = u.id === gameData.players.white?.id || u.id === gameData.players.black?.id ||
+            u.socketId === gameData.players.white?.socketId || u.socketId === gameData.players.black?.socketId ||
+            u.nickname === gameData.players.white?.name || u.nickname === gameData.players.black?.name;
+        const isMe = u.socketId === currentUserId || u.id === currentUserId;
+        return !isCurrentPlayer && !isMe;
+    });
 
     // Use a temporary chess instance to calculate captured pieces and status
     const game = new Chess(gameData.fen || undefined);
@@ -106,6 +108,7 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, users, onMove, ro
                         <ChessGame
                             gameData={gameData}
                             currentUserId={currentUserId}
+                            currentNickname={currentNickname}
                             onMove={(move) => onMove(message.id, 'chess-move', move)}
                             vibe={vibe.id}
                         />
