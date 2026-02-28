@@ -17,10 +17,11 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, room
     const isPlayer = isTicTacToe && (gameData.players.X.id === currentUserId || gameData.players.O.id === currentUserId);
     const [isExpanded, setIsExpanded] = useState(false);
 
-    // Trivia timer: 15 seconds from message timestamp
+    // Trivia timer: Dynamic based on gameData.timer (defaults to 15 if missing)
     useEffect(() => {
         if (!isTrivia) return;
-        const endTime = new Date(message.timestamp).getTime() + 15000;
+        const durationSecs = gameData.timer || 15;
+        const endTime = new Date(message.timestamp).getTime() + (durationSecs * 1000);
 
         const tick = () => {
             const left = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));

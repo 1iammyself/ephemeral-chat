@@ -1676,7 +1676,8 @@ io.on('connection', (socket) => {
             question: sanitizeInput(gameData.question),
             options: gameData.options.map(o => sanitizeInput(o)),
             answer: gameData.answer,
-            answers: {}
+            answers: {},
+            timer: gameData.timer ? parseInt(gameData.timer, 10) : 15 // Default to 15s if missing
           };
         } else if (gameData.gameType === 'tic-tac-toe') {
           data.gameData = {

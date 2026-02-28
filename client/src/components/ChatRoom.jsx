@@ -1997,7 +1997,18 @@ const ChatRoom = () => {
         )}
       </div>
 
-      {error && <div className="mx-4 mt-2 bg-red-100 dark:bg-red-900/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-2 rounded-lg text-sm text-center md:w-fit md:mx-auto">{error}</div>}
+      {error && (
+        <div className="mx-4 mt-2 bg-red-100 dark:bg-red-900/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-2 rounded-lg text-sm flex items-center justify-between md:w-fit md:mx-auto shadow-sm animate-in fade-in slide-in-from-top-2 z-[60] relative">
+          <span>{error}</span>
+          <button
+            onClick={() => setError(null)}
+            className="ml-3 p-1 hover:bg-red-200 dark:hover:bg-red-800/50 rounded-md transition-colors flex-shrink-0"
+            title="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       <div className={`flex-1 flex overflow-hidden min-h-0 ${sidebarPosition === 'left' ? 'flex-row-reverse' : ''}`}>
         <div className="flex-1 flex flex-col min-w-0 min-h-0">

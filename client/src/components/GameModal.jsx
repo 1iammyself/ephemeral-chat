@@ -2,11 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { X, Send, Dices, Sparkles, HelpCircle, ChevronLeft, Hash } from 'lucide-react';
 import { GAME_TYPES, getRandomWYR, getRandomTrivia, WYR_TOPIC_LIST, TRIVIA_TOPIC_LIST } from '../utils/games';
 
-const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType }) => {
+const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL }) => {
     const [gameType, setGameType] = useState(null); // null = select game, then select topic
     const [selectedTopic, setSelectedTopic] = useState(null);
     const [wyrData, setWyrData] = useState(null);
     const [triviaData, setTriviaData] = useState(null);
+    const [customTimer, setCustomTimer] = useState(15);
+
+    // Calculate dynamic timer bounds based on room TTL
+    const dynamicRoomTtl = roomTTL && roomTTL < 300 ? roomTTL * 2 : (roomTTL || 30);
+    const minTimer = Math.max(5, Math.floor(dynamicRoomTtl * 0.5));
+    const maxTimer = Math.floor(dynamicRoomTtl * 0.666);
+    const actualMaxTimer = Math.max(minTimer + 1, maxTimer); // Ensure max is always > min
 
     useEffect(() => {
         if (!isOpen) {
@@ -17,7 +24,12 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType }) => {
         } else if (initialGameType) {
             setGameType(initialGameType);
         }
-    }, [isOpen, initialGameType]);
+
+        if (isOpen) {
+            // Reset to default minimum whenever opened
+            setCustomTimer(minTimer);
+        }
+    }, [isOpen, initialGameType, minTimer]);
 
     if (!isOpen) return null;
 
@@ -57,7 +69,8 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType }) => {
                 gameType: GAME_TYPES.TRIVIA,
                 question: triviaData.question,
                 options: triviaData.options,
-                answer: triviaData.answer
+                answer: triviaData.answer,
+                timer: customTimer
             });
         }
         handleClose();
@@ -204,6 +217,27 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType }) => {
                                     ))}
                                 </div>
                             </div>
+
+                            {/* Trivia Custom Timer Slider */}
+                            <div className="px-1 py-2">
+                                <div className="flex justify-between items-center mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+                                    <span>Time to answer</span>
+                                    <span className={`font-bold text-${vibeAccent}-500`}>{customTimer}s</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min={minTimer}
+                                    max={actualMaxTimer}
+                                    value={customTimer}
+                                    onChange={(e) => setCustomTimer(parseInt(e.target.value, 10))}
+                                    className={`w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-${vibeAccent}-500`}
+                                />
+                                <div className="flex justify-between items-center mt-1 text-[10px] text-gray-400">
+                                    <span>{minTimer}s</span>
+                                    <span>{actualMaxTimer}s</span>
+                                </div>
+                            </div>
+
                             <div className="flex gap-2">
                                 <button onClick={handleShuffle} className="flex-1 py-2.5 px-4 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center justify-center gap-2">
                                     <Dices className="w-4 h-4" /> Shuffle
