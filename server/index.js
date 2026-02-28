@@ -11,6 +11,7 @@ const socketIo = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const { Chess } = require('chess.js');
 const { createClient } = require('redis');
 const RoomManager = require('./rooms');
 const SecurityManager = require('./security');
@@ -1656,8 +1657,8 @@ io.on('connection', (socket) => {
           return;
         }
 
-        // TTT and RPS only allow 1 recipient in targeted messages
-        if (recipients && recipients.length > 1 && (gameData.gameType === 'tic-tac-toe' || gameData.gameType === 'rock-paper-scissors')) {
+        // TTT, RPS, and Chess only allow 1 recipient in targeted messages
+        if (recipients && recipients.length > 1 && (gameData.gameType === 'tic-tac-toe' || gameData.gameType === 'rock-paper-scissors' || gameData.gameType === 'chess')) {
           socket.emit('error', { message: 'Match games can only be sent to one person at a time.' });
           return;
         }
@@ -1710,13 +1711,27 @@ io.on('connection', (socket) => {
             winner: null,
             lastActivity: Date.now()
           };
+        } else if (gameData.gameType === 'chess') {
+          data.gameData = {
+            gameType: gameData.gameType,
+            fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+            players: {
+              white: { id: socket.id, name: socket.nickname },
+              black: null
+            },
+            turn: 'w',
+            history: [],
+            winner: null,
+            lastActivity: Date.now()
+          };
         } else {
           socket.emit('error', { message: 'Unknown game type' });
           return;
         }
         messageContent = gameData.gameType === 'would-you-rather' ? 'Would You Rather' :
           gameData.gameType === 'trivia' ? 'Trivia' :
-            gameData.gameType === 'rock-paper-scissors' ? 'Rock Paper Scissors' : 'Tic-Tac-Toe';
+            gameData.gameType === 'rock-paper-scissors' ? 'Rock Paper Scissors' :
+              gameData.gameType === 'chess' ? 'Chess' : 'Tic-Tac-Toe';
       } else {
         messageContent = isEncrypted ? content : sanitizeInput(content.trim());
       }
@@ -2112,6 +2127,99 @@ io.on('connection', (socket) => {
       }
     } catch (error) {
       logger.error('Error handling RPS action:', error);
+    }
+  });
+
+  // Handle Chess actions
+  socket.on('chess-join', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+
+      const messages = room.messages || [];
+      const message = messages.find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
+
+      const { gameData } = message;
+      if (gameData.winner) return;
+
+      // Join logic
+      const isTargeted = message.recipients && message.recipients.length > 0;
+      const isIntendedRecipient = isTargeted && message.recipients.includes(socket.id);
+      const isSender = gameData.players.white?.id === socket.id;
+
+      if (!gameData.players.white?.id) {
+        // Fallback or initialization if not already set by sender
+        gameData.players.white = { id: socket.id, name: socket.nickname };
+      } else if (!gameData.players.black?.id) {
+        // Attempting to join as Black
+        if (isSender) return; // Sender cannot join as Black
+
+        if (isTargeted && !isIntendedRecipient) {
+          // Targeted game: Only intended recipients can join
+          return;
+        }
+
+        // Valid join as Black
+        gameData.players.black = { id: socket.id, name: socket.nickname };
+      } else {
+        return; // Game already full
+      }
+
+      gameData.lastActivity = Date.now();
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (error) {
+      logger.error('Error handling chess join:', error);
+    }
+  });
+
+  socket.on('chess-move', async ({ messageId, move }) => {
+    try {
+      if (!socket.roomCode || !messageId || !move) return;
+
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+
+      const messages = room.messages || [];
+      const message = messages.find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
+
+      const { gameData } = message;
+      if (gameData.winner) return;
+
+      const isWhite = gameData.players.white?.id === socket.id;
+      const isBlack = gameData.players.black?.id === socket.id;
+      const turnSuffix = gameData.turn || 'w';
+
+      if ((turnSuffix === 'w' && !isWhite) || (turnSuffix === 'b' && !isBlack)) {
+        return; // Not your turn
+      }
+
+      const chess = new Chess(gameData.fen);
+      const moveResult = chess.move(move);
+
+      if (moveResult) {
+        gameData.fen = chess.fen();
+        gameData.turn = chess.turn();
+
+        if (chess.isCheckmate()) {
+          gameData.winner = chess.turn() === 'w' ? 'black' : 'white';
+        } else if (chess.isDraw()) {
+          gameData.winner = 'draw';
+        }
+
+        gameData.history = (gameData.history || []);
+        gameData.history.push(moveResult.san);
+
+        gameData.lastActivity = Date.now();
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+      }
+    } catch (error) {
+      logger.error('Error handling chess move:', error);
     }
   });
 

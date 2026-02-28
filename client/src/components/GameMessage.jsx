@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Sparkles, HelpCircle, Users, CheckCircle2, XCircle, Clock, Hash, Circle, X } from 'lucide-react';
 import { GAME_TYPES } from '../utils/games';
 import { getVibeById } from '../utils/vibes';
+import ChessGame from './games/ChessGame';
 
 const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRPSAction, roomVibe }) => {
     const { gameData } = message;
@@ -14,11 +15,15 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
     const isTrivia = gameData.gameType === GAME_TYPES.TRIVIA;
     const isTicTacToe = gameData.gameType === GAME_TYPES.TIC_TAC_TOE;
     const isRPS = gameData.gameType === GAME_TYPES.ROCK_PAPER_SCISSORS;
+    const isChess = gameData.gameType === GAME_TYPES.CHESS;
 
+    const isTargeted = message.recipients && message.recipients.length > 0;
+    const isIntendedRecipient = isTargeted && message.recipients.includes(currentUserId);
     const isSender = message.sender.socketId === currentUserId || message.sender.id === currentUserId;
     const isPlayer = (isTicTacToe && (gameData.players.X.id === currentUserId || gameData.players.O.id === currentUserId)) ||
-        (isRPS && (gameData.players.P1.id === currentUserId || gameData.players.P2.id === currentUserId));
-    const isSpectator = !isPlayer && (isTicTacToe || isRPS);
+        (isRPS && (gameData.players.P1.id === currentUserId || gameData.players.P2.id === currentUserId)) ||
+        (isChess && (gameData.players.white?.id === currentUserId || gameData.players.black?.id === currentUserId));
+    const isSpectator = !isPlayer && (isTicTacToe || isRPS || isChess);
     const [isExpanded, setIsExpanded] = useState(false);
     const [showVoteDetails, setShowVoteDetails] = useState(false);
 
@@ -95,6 +100,16 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
     const handleRPSMove = (move) => {
         if (!isRPS || gameData.winner) return;
         onRPSAction(message.id, 'move', move);
+    };
+
+    const handleChessMove = (move) => {
+        if (!isChess || gameData.winner) return;
+        onTicTacToeMove(message.id, 'chess-move', move); // Re-using onTicTacToeMove as a generic game action handler
+    };
+
+    const handleChessJoin = () => {
+        if (!isChess || (gameData.players.white?.id && gameData.players.black?.id)) return;
+        onTicTacToeMove(message.id, 'chess-join');
     };
 
     // Dynamic classes based on vibe
@@ -657,7 +672,74 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
         );
     }
 
-    return null;
+    // ── Chess ──
+    if (isChess) {
+        return (
+            <div className={`w-full max-w-[420px] overflow-hidden rounded-2xl shadow-lg border-2 ${cardBorderClass} animate-in fade-in zoom-in duration-300`}>
+                <div className={`p-3 ${headerClass} flex items-center justify-between`}>
+                    <div className="flex items-center gap-2">
+                        <Trophy className="w-5 h-5 text-white" />
+                        <h3 className="text-white font-bold text-sm">Chess Match</h3>
+                    </div>
+                    {isSpectator && (
+                        <div className="bg-white/10 rounded-full px-2 py-0.5 border border-white/20">
+                            <span className="text-[9px] font-black text-white/80 uppercase tracking-tighter">Spectating</span>
+                        </div>
+                    )}
+                </div>
+
+                <div className="p-4 bg-white dark:bg-gray-900">
+                    {(!gameData.players.white?.id || !gameData.players.black?.id) && !isPlayer ? (
+                        <div className="text-center p-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+                            <p className="text-sm font-bold text-gray-500 mb-4">
+                                {isTargeted ? (isIntendedRecipient ? "You've been challenged to Chess!" : "A private match is in progress") : "A game of Chess has been started!"}
+                            </p>
+                            {(!isTargeted || isIntendedRecipient) && (
+                                <button
+                                    onClick={handleChessJoin}
+                                    className={`px-8 py-3 rounded-xl bg-gradient-to-r ${vibe.accentClass} text-white font-black text-xs uppercase tracking-widest shadow-lg hover:scale-[1.02] active:scale-95 transition-all`}
+                                >
+                                    Join Game
+                                </button>
+                            )}
+                            {isTargeted && !isIntendedRecipient && (
+                                <div className="flex items-center justify-center gap-2 text-gray-400">
+                                    <Users className="w-4 h-4" />
+                                    <span className="text-xs font-bold uppercase tracking-widest">Private Game</span>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center px-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                <div className={`flex items-center gap-2 ${gameData.turn === 'w' ? `text-${accentColor}-500` : ''}`}>
+                                    <div className={`w-2 h-2 rounded-full ${gameData.turn === 'w' ? `bg-${accentColor}-500 animate-pulse` : 'bg-gray-200 dark:bg-gray-700'}`} />
+                                    White: {gameData.players.white?.name || 'Waiting...'}
+                                </div>
+                                <div className={`flex items-center gap-2 ${gameData.turn === 'b' ? `text-${accentColor}-500` : ''}`}>
+                                    Black: {gameData.players.black?.name || 'Waiting...'}
+                                    <div className={`w-2 h-2 rounded-full ${gameData.turn === 'b' ? `bg-${accentColor}-500 animate-pulse` : 'bg-gray-200 dark:bg-gray-700'}`} />
+                                </div>
+                            </div>
+
+                            <ChessGame
+                                gameData={gameData}
+                                currentUserId={currentUserId}
+                                onMove={handleChessMove}
+                                vibe={vibe.id}
+                            />
+
+                            {gameData.winner && (
+                                <div className={`p-3 rounded-xl text-center font-bold text-sm bg-green-500 text-white shadow-lg animate-bounce`}>
+                                    {gameData.winner === 'draw' ? "Game Drawn!" : `${gameData.winner === 'white' ? 'White' : 'Black'} Wins by Checkmate! 🏆`}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
 };
 
 export default GameMessage;

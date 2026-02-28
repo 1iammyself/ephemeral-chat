@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Send, Dices, Sparkles, HelpCircle, ChevronLeft, Hash } from 'lucide-react';
+import { X, Send, Dices, Sparkles, HelpCircle, ChevronLeft, Hash, Trophy } from 'lucide-react';
 import { GAME_TYPES, getRandomWYR, getRandomTrivia, WYR_TOPIC_LIST, TRIVIA_TOPIC_LIST } from '../utils/games';
 
 const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL }) => {
@@ -79,6 +79,11 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                 options: triviaData.options,
                 answer: triviaData.answer,
                 timer: customTimer
+            });
+        } else if (gameType === GAME_TYPES.CHESS) {
+            onSend({
+                gameType: GAME_TYPES.CHESS,
+                players: { white: null, black: null }
             });
         }
         handleClose();
@@ -162,6 +167,14 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                                 <Dices className={`w-6 h-6 text-${vibeAccent}-500 mb-2 group-hover:scale-110 transition-transform`} />
                                 <span className="font-bold text-gray-900 dark:text-white text-xs">Rock Paper Scissors</span>
                                 <span className="text-[9px] text-gray-500 dark:text-gray-400 mt-1">Classic RPS</span>
+                            </button>
+                            <button
+                                onClick={() => handlePickGame(GAME_TYPES.CHESS)}
+                                className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:border-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group`}
+                            >
+                                <Trophy className={`w-6 h-6 text-${vibeAccent}-500 mb-2 group-hover:scale-110 transition-transform`} />
+                                <span className="font-bold text-gray-900 dark:text-white text-xs">Chess</span>
+                                <span className="text-[9px] text-gray-500 dark:text-gray-400 mt-1">Classic Strategy</span>
                             </button>
                         </div>
                     ) : !selectedTopic && !(wyrData || triviaData) ? (

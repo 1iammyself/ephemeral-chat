@@ -7,7 +7,8 @@ export const GAME_TYPES = {
     WYR: 'would-you-rather',
     TRIVIA: 'trivia',
     TIC_TAC_TOE: 'tic-tac-toe',
-    ROCK_PAPER_SCISSORS: 'rock-paper-scissors'
+    ROCK_PAPER_SCISSORS: 'rock-paper-scissors',
+    CHESS: 'chess'
 };
 
 export const WOULD_YOU_RATHER_TOPICS = {

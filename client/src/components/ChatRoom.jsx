@@ -1429,8 +1429,8 @@ const ChatRoom = () => {
   const handleSendGame = (gameData) => {
     if (!isConnected) return;
 
-    // Safety check for TTT/RPS recipients
-    if (selectedRecipients.length > 1 && (gameData.gameType === 'tic-tac-toe' || gameData.gameType === 'rock-paper-scissors')) {
+    // Match games (TTT, RPS, Chess) only allow 1 recipient in targeted messages
+    if (selectedRecipients.length > 1 && (gameData.gameType === 'tic-tac-toe' || gameData.gameType === 'rock-paper-scissors' || gameData.gameType === 'chess')) {
       setError('Match games can only be sent to one person at a time.');
       return;
     }
