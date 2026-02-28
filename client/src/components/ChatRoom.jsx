@@ -56,6 +56,7 @@ import { RefreshButton } from './PWAHandler';
 import { getCreatorId } from '../utils/creator';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess } from '../utils/platform';
 import FileTransferModal from './FileTransferModal';
+import ChessModal from './games/ChessModal';
 import { toast } from 'react-toastify';
 
 const SLASH_COMMANDS = [
@@ -423,6 +424,9 @@ const ChatRoom = () => {
   const [error, setError] = useState(null);
   const [inviteToken, setInviteToken] = useState(null);
   const [showCallModal, setShowCallModal] = useState(false);
+  const [activePoll, setActivePoll] = useState(null);
+  const [activeChessMatch, setActiveChessMatch] = useState(null);
+  const [showGameModal, setShowGameModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [callState, setCallState] = useState({ state: CallState.IDLE });
   const [isRecording, setIsRecording] = useState(false);
@@ -447,7 +451,6 @@ const ChatRoom = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [reactionTargetId, setReactionTargetId] = useState(null);
   const [showPollModal, setShowPollModal] = useState(false);
-  const [showGameModal, setShowGameModal] = useState(false);
   const [initialGameType, setInitialGameType] = useState(null);
   const [showFeatureMenu, setShowFeatureMenu] = useState(false);
   const [roomVibe, setRoomVibe] = useState('default');
@@ -1462,6 +1465,11 @@ const ChatRoom = () => {
     }
   };
 
+  const handleLaunchChess = (message) => {
+    setActiveChessMatch(message);
+    hapticLight();
+  };
+
   const handleRPSAction = (messageId, action, move) => {
     if (!isConnected) return;
     socketManager.emit('rps-action', { messageId, action, move });
@@ -1912,12 +1920,11 @@ const ChatRoom = () => {
                   <div className="flex items-end space-x-0.5 h-4 pb-1" title={`Latency: ${latency}ms`}>
                     {[1, 2, 3, 4].map((bar) => {
                       const activeBars = latency < 100 ? 4 : latency < 200 ? 3 : latency < 400 ? 2 : 1;
-                      const isActive = bar <= activeBars;
                       const colorClass = latency < 100 ? 'bg-green-500' : latency < 300 ? 'bg-yellow-500' : 'bg-red-500';
                       return (
                         <div
                           key={bar}
-                          className={`w-0.5 rounded-t-[1px] transition-all duration-300 ${isActive ? colorClass : 'bg-gray-300 dark:bg-gray-600 opacity-40'}`}
+                          className={`w-0.5 rounded-t-[1px] transition-all duration-300 ${bar <= activeBars ? colorClass : 'bg-gray-300 dark:bg-gray-600 opacity-40'}`}
                           style={{ height: `${bar * 25}%` }}
                         />
                       );
@@ -2062,6 +2069,7 @@ const ChatRoom = () => {
               onGameAnswer={handleGameAnswer}
               onTicTacToeMove={handleTicTacToeMove}
               onRPSAction={handleRPSAction}
+              onLaunchChess={handleLaunchChess}
               roomVibe={roomVibe}
               onOpenEmojiPicker={(messageId) => {
                 setReactionTargetId(messageId);
@@ -2576,6 +2584,15 @@ const ChatRoom = () => {
         roomVibe={roomVibe}
         initialGameType={initialGameType}
         roomTTL={room?.settings?.messageTTL || 60}
+      />
+
+      <ChessModal
+        isOpen={!!activeChessMatch}
+        onClose={() => setActiveChessMatch(null)}
+        message={activeChessMatch}
+        currentUserId={currentUser?.id || currentUser?.socketId}
+        onMove={handleTicTacToeMove}
+        roomVibe={roomVibe}
       />
       <DragDropOverlay isDragging={isDragging} />
       <PrivacyOverlay />

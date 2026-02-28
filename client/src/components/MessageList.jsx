@@ -13,7 +13,7 @@ import LinkPreviewModal, { isDomainTrusted } from './LinkPreviewModal';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀', '🍕', '🍔', '🍦', '🍩', '🍺', '🎸', '🎮', '🚀', '🌈', '🍄'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onGameAnswer, onTicTacToeMove, onRPSAction, roomVibe, onOpenEmojiPicker }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onGameAnswer, onTicTacToeMove, onRPSAction, onLaunchChess, roomVibe, onOpenEmojiPicker }) => {
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
   const { theme } = useTheme();
@@ -359,6 +359,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         onGameAnswer={onGameAnswer}
                         onTicTacToeMove={onTicTacToeMove}
                         onRPSAction={onRPSAction}
+                        onLaunchChess={onLaunchChess}
                         roomVibe={roomVibe}
                       />
                     ) : message.messageType === 'file' ? (

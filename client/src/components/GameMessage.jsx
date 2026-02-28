@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Sparkles, HelpCircle, Users, CheckCircle2, XCircle, Clock, Hash, Circle, X, Trophy } from 'lucide-react';
+import { Sparkles, HelpCircle, Users, CheckCircle2, XCircle, Clock, Hash, Circle, X, Trophy, Swords } from 'lucide-react';
 import { GAME_TYPES } from '../utils/games';
 import { getVibeById } from '../utils/vibes';
 import ChessGame from './games/ChessGame';
 
-const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRPSAction, roomVibe }) => {
+const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRPSAction, onLaunchChess, roomVibe }) => {
     const { gameData } = message;
     const currentUserId = currentUser?.id || currentUser?.socketId;
     const vibe = getVibeById(roomVibe);
@@ -675,65 +675,53 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
     // ── Chess ──
     if (isChess) {
         return (
-            <div className={`w-full max-w-[420px] overflow-hidden rounded-2xl shadow-lg border-2 ${cardBorderClass} animate-in fade-in zoom-in duration-300`}>
+            <div className={`w-full max-w-[280px] overflow-hidden rounded-2xl shadow-lg border-2 ${cardBorderClass} animate-in fade-in zoom-in duration-300`}>
                 <div className={`p-3 ${headerClass} flex items-center justify-between`}>
                     <div className="flex items-center gap-2">
                         <Trophy className="w-5 h-5 text-white" />
                         <h3 className="text-white font-bold text-sm">Chess Match</h3>
                     </div>
-                    {isSpectator && (
-                        <div className="bg-white/10 rounded-full px-2 py-0.5 border border-white/20">
-                            <span className="text-[9px] font-black text-white/80 uppercase tracking-tighter">Spectating</span>
+                    {!gameData.players.black?.id && (
+                        <div className="flex items-center gap-1.5 bg-white/20 rounded-full px-2 py-0.5">
+                            <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                            <span className="text-[9px] font-black text-white uppercase tracking-tighter">Waiting</span>
                         </div>
                     )}
                 </div>
 
-                <div className="p-4 bg-white dark:bg-gray-900">
-                    {(!gameData.players.white?.id || !gameData.players.black?.id) && !isPlayer ? (
-                        <div className="text-center p-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700">
-                            <p className="text-sm font-bold text-gray-500 mb-4">
-                                {isTargeted ? (isIntendedRecipient ? "You've been challenged to Chess!" : "A private match is in progress") : "A game of Chess has been started!"}
-                            </p>
-                            {(!isTargeted || isIntendedRecipient) && (
-                                <button
-                                    onClick={handleChessJoin}
-                                    className={`px-8 py-3 rounded-xl bg-gradient-to-r ${vibe.accentClass} text-white font-black text-xs uppercase tracking-widest shadow-lg hover:scale-[1.02] active:scale-95 transition-all`}
-                                >
-                                    Join Game
-                                </button>
-                            )}
-                            {isTargeted && !isIntendedRecipient && (
-                                <div className="flex items-center justify-center gap-2 text-gray-400">
-                                    <Users className="w-4 h-4" />
-                                    <span className="text-xs font-bold uppercase tracking-widest">Private Game</span>
-                                </div>
-                            )}
+                <div className="p-4 bg-white dark:bg-gray-900 flex flex-col items-center gap-4">
+                    <div className="flex items-center gap-4 w-full justify-center">
+                        <div className="flex flex-col items-center">
+                            <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xl shadow-inner border border-gray-200 dark:border-gray-700">♔</div>
+                            <span className="text-[10px] font-bold text-gray-500 mt-1 truncate max-w-[60px]">{gameData.players.white?.name}</span>
                         </div>
+                        <Swords className="w-4 h-4 text-gray-300 italic" />
+                        <div className="flex flex-col items-center">
+                            <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xl shadow-inner border border-gray-200 dark:border-gray-700">♚</div>
+                            <span className="text-[10px] font-bold text-gray-500 mt-1 truncate max-w-[60px]">{gameData.players.black?.name || '???'}</span>
+                        </div>
+                    </div>
+
+                    {(!gameData.players.white?.id || !gameData.players.black?.id) && !amPlaying ? (
+                        <button
+                            onClick={handleChessJoin}
+                            className={`w-full py-2.5 rounded-xl bg-gradient-to-r ${vibe.accentClass} text-white font-black text-xs uppercase tracking-widest shadow-lg hover:scale-[1.02] active:scale-95 transition-all`}
+                        >
+                            Join Match
+                        </button>
                     ) : (
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center px-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
-                                <div className={`flex items-center gap-2 ${gameData.turn === 'w' ? `text-${accentColor}-500` : ''}`}>
-                                    <div className={`w-2 h-2 rounded-full ${gameData.turn === 'w' ? `bg-${accentColor}-500 animate-pulse` : 'bg-gray-200 dark:bg-gray-700'}`} />
-                                    White: {gameData.players.white?.name || 'Waiting...'}
-                                </div>
-                                <div className={`flex items-center gap-2 ${gameData.turn === 'b' ? `text-${accentColor}-500` : ''}`}>
-                                    Black: {gameData.players.black?.name || 'Waiting...'}
-                                    <div className={`w-2 h-2 rounded-full ${gameData.turn === 'b' ? `bg-${accentColor}-500 animate-pulse` : 'bg-gray-200 dark:bg-gray-700'}`} />
-                                </div>
-                            </div>
+                        <button
+                            onClick={() => onLaunchChess(message)}
+                            className={`w-full py-2.5 rounded-xl bg-gray-900 dark:bg-black text-white font-black text-xs uppercase tracking-widest shadow-lg hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2`}
+                        >
+                            <Trophy className="w-3.5 h-3.5 text-yellow-500" />
+                            Launch Board
+                        </button>
+                    )}
 
-                            <ChessGame
-                                gameData={gameData}
-                                currentUserId={currentUserId}
-                                onMove={handleChessMove}
-                                vibe={vibe.id}
-                            />
-
-                            {gameData.winner && (
-                                <div className={`p-3 rounded-xl text-center font-bold text-sm bg-green-500 text-white shadow-lg animate-bounce`}>
-                                    {gameData.winner === 'draw' ? "Game Drawn!" : `${gameData.winner === 'white' ? 'White' : 'Black'} Wins by Checkmate! 🏆`}
-                                </div>
-                            )}
+                    {gameData.winner && (
+                        <div className={`w-full p-2.5 rounded-xl text-center font-bold text-[11px] bg-green-500 text-white shadow-lg`}>
+                            {gameData.winner === 'draw' ? "Match Drawn" : `${gameData.winner === 'white' ? 'White' : 'Black'} Wins! 🏆`}
                         </div>
                     )}
                 </div>
