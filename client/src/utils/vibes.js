@@ -8,7 +8,7 @@ export const VIBES = {
         id: 'default',
         name: 'Default',
         emoji: '💬',
-        bgClass: 'bg-gray-50 dark:bg-gray-900',
+        bgClass: 'bg-gray-50 dark:bg-black',
         messageClass: 'bg-primary-600 dark:bg-primary-700 text-white rounded-tr-none',
         sidebarClass: 'bg-white/30 dark:bg-black/40',
         panelClass: 'bg-white/30 dark:bg-black/40',
