@@ -2019,7 +2019,7 @@ const ChatRoom = () => {
         {/* Topic Pill */}
         {roomTopic && (
           <div
-            className={`pointer-events-auto bg-${vibeAccent}-50/90 dark:bg-${vibeAccent}-950/40 backdrop-blur-md border border-${vibeAccent}-200/50 dark:border-${vibeAccent}-500/20 px-4 py-1.5 rounded-full shadow-sm flex items-center space-x-2 animate-in slide-in-from-top-2 max-w-[80%] cursor-move touch-none`}
+            className={`pointer-events-auto bg-${vibeAccent}-100/20 dark:bg-${vibeAccent}-950/40 backdrop-blur-md border border-${vibeAccent}-200/20 dark:border-${vibeAccent}-500/20 px-4 py-1.5 rounded-full shadow-sm flex items-center space-x-2 animate-in slide-in-from-top-2 max-w-[80%] cursor-move touch-none`}
             style={{ transform: `translateX(${offsets.topic}px)` }}
             onMouseDown={(e) => handleStartPillDrag(e, 'topic')}
             onTouchStart={(e) => handleStartPillDrag(e, 'topic')}
@@ -2368,9 +2368,9 @@ const ChatRoom = () => {
                                       else setShowTimerModal(true);
                                       setShowFeatureMenu(false);
                                     }}
-                                    className={`flex items-center space-x-2 p-2 rounded-xl border transition-all ${activeTimer ? 'bg-red-50 border-red-100 dark:bg-red-900/10 dark:border-red-900/20' : `bg-gray-50 border-gray-100 dark:bg-gray-900/50 dark:border-gray-800`}`}
+                                    className={`flex items-center space-x-2 p-2 rounded-xl border border-white/10 transition-all ${activeTimer ? 'bg-red-500/10 hover:bg-red-500/20 shadow-sm' : 'bg-white/5 dark:bg-white/5 hover:bg-white/10 dark:hover:bg-white/10 shadow-sm'}`}
                                   >
-                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${activeTimer ? 'bg-red-100 dark:bg-red-900/30' : `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/30`}`}>
+                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${activeTimer ? 'bg-red-500/20' : 'bg-white/10 dark:bg-white/10'}`}>
                                       {activeTimer ? <X className="w-3.5 h-3.5 text-red-500" /> : <Clock className={`w-3.5 h-3.5 text-${vibeAccent}-500`} />}
                                     </div>
                                     <span className={`text-xs font-medium ${activeTimer ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
