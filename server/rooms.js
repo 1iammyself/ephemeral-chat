@@ -39,11 +39,11 @@ class RoomManager {
 
     // Start garbage collector for in-memory messages
     if (!this.redis) {
-      this.cleanupInterval = setInterval(() => this.pruneExpiredMessages(), 60 * 1000);
+      this.messagePruneInterval = setInterval(() => this.pruneExpiredMessages(), 60 * 1000);
     }
 
     // Periodic cleanup for expired persistent rooms
-    this.cleanupInterval = setInterval(() => {
+    this.roomCleanupInterval = setInterval(() => {
       this.cleanupExpiredRooms();
     }, 5 * 60 * 1000); // Every 5 minutes
   }
@@ -644,7 +644,7 @@ class RoomManager {
           // If I am in the recipients list, I can see it
           return msg.recipients.some(r => matchesUser(r));
         })
-        .map(msg => this.maskMessageForUser(msg, userId));
+        .map(msg => this.maskMessageForUser(msg, userId, persistentId));
     }
 
     return messages;
@@ -652,18 +652,69 @@ class RoomManager {
 
   /**
    * Mask sensitive game data for non-senders
+   * @param {object} message - The message to mask
+   * @param {string} userId - The socket ID of the requesting user
+   * @param {string} [persistentId] - The persistent user ID of the requesting user
    */
-  maskMessageForUser(message, userId) {
-    if (message.messageType !== 'game' || !message.gameData || !message.gameData.answers) {
+  maskMessageForUser(message, userId, persistentId) {
+    if (message.messageType !== 'game' || !message.gameData) {
+      return message;
+    }
+
+    const { gameType } = message.gameData;
+
+    // RPS move masking: hide pending (unrevealed) moves from non-players and the opponent
+    if (gameType === 'rock-paper-scissors') {
+      const gd = message.gameData;
+      const isP1 = gd.players.P1.id === userId || gd.players.P1.id === persistentId ||
+                    gd.players.P1.socketId === userId ||
+                    (persistentId && gd.players.P1.socketId === persistentId);
+      const isP2 = gd.players.P2.id && (gd.players.P2.id === userId || gd.players.P2.id === persistentId ||
+                    gd.players.P2.socketId === userId ||
+                    (persistentId && gd.players.P2.socketId === persistentId));
+
+      // If the round is complete (both moved) or the game has a winner, show everything
+      if (gd.winner || (gd.players.P1.move && gd.players.P2.move)) {
+        return message;
+      }
+
+      // Otherwise mask pending moves: each player sees their own move but not the opponent's
+      const maskedP1 = { ...gd.players.P1 };
+      const maskedP2 = { ...gd.players.P2 };
+
+      if (!isP1) {
+        // Non-P1 users: hide P1's pending move (show that they HAVE moved, not WHAT)
+        maskedP1.move = maskedP1.move ? 'locked' : null;
+      }
+      if (!isP2) {
+        // Non-P2 users: hide P2's pending move
+        maskedP2.move = maskedP2.move ? 'locked' : null;
+      }
+
+      return {
+        ...message,
+        gameData: {
+          ...gd,
+          players: {
+            P1: maskedP1,
+            P2: maskedP2
+          }
+        }
+      };
+    }
+
+    // WYR / Trivia answer masking
+    if (!message.gameData.answers) {
       return message;
     }
 
     // Senders see everything
-    if (message.sender.socketId === userId || message.sender.id === userId) {
+    if (message.sender.socketId === userId || message.sender.id === userId ||
+        (persistentId && message.sender.id === persistentId)) {
       return message;
     }
 
-    const { gameType, answers } = message.gameData;
+    const { answers } = message.gameData;
     if (gameType === 'would-you-rather' || gameType === 'trivia') {
       const stats = {};
       Object.values(answers).forEach(val => {

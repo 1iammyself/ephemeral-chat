@@ -427,6 +427,7 @@ const ChatRoom = () => {
   const [showCallModal, setShowCallModal] = useState(false);
   const [activePoll, setActivePoll] = useState(null);
   const [activeChessMatch, setActiveChessMatch] = useState(null);
+  const [chessApprovalRequest, setChessApprovalRequest] = useState(null); // { type: 'swap'|'replace', messageId, ... }
   const [showGameModal, setShowGameModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [callState, setCallState] = useState({ state: CallState.IDLE });
@@ -635,7 +636,7 @@ const ChatRoom = () => {
         setActiveTimer(response.room.timer);
         socketManager.setRoomType(response.room.settings?.persistenceMode || 'ephemeral');
 
-        setCurrentUser({ id: socketManager.socket?.id, socketId: socketManager.socket?.id, nickname: response.nickname, isAdmin: myRole === 'host' || myRole === 'tier1' });
+        setCurrentUser({ id: persistentUserId, socketId: socketManager.socket?.id, nickname: response.nickname, isAdmin: myRole === 'host' || myRole === 'tier1' });
 
         if (response.sessionToken) {
           setSessionToken(response.sessionToken);
@@ -984,6 +985,26 @@ const ChatRoom = () => {
       setLatency(Date.now() - startTime);
     };
 
+    // Chess swap/replace approval handlers
+    const handleChessSwapApproval = ({ messageId, requestedBy }) => {
+      setChessApprovalRequest({ type: 'swap', messageId, requestedBy });
+    };
+    const handleChessReplaceApproval = ({ messageId, role, newPlayerName, requestedBy }) => {
+      setChessApprovalRequest({ type: 'replace', messageId, role, newPlayerName, requestedBy });
+    };
+    const handleChessSwapDeclined = ({ messageId, declinedBy }) => {
+      setError(`Swap request declined by ${declinedBy}`);
+    };
+    const handleChessReplaceDeclined = ({ messageId, declinedBy }) => {
+      setError(`Replace request declined by ${declinedBy}`);
+    };
+    const handleChessSwapPending = ({ messageId, waitingFor }) => {
+      // Host notification — swap request sent, waiting for approval
+    };
+    const handleChessReplacePending = ({ messageId, role, waitingFor }) => {
+      // Host notification — replace request sent, waiting for approval
+    };
+
     socketManager.on('connect', handleConnect);
     socketManager.on('disconnect', handleDisconnect);
     socketManager.on('room-joined', handleRoomJoined);
@@ -1013,6 +1034,12 @@ const ChatRoom = () => {
     socketManager.on('user-stop-typing', handleUserStopTyping);
     socketManager.on('room-reaction', handleRoomReaction);
     socketManager.on('file-transfer-invite', handleFileTransferInvite);
+    socketManager.on('chess-swap-approval-needed', handleChessSwapApproval);
+    socketManager.on('chess-replace-approval-needed', handleChessReplaceApproval);
+    socketManager.on('chess-swap-declined', handleChessSwapDeclined);
+    socketManager.on('chess-replace-declined', handleChessReplaceDeclined);
+    socketManager.on('chess-swap-pending', handleChessSwapPending);
+    socketManager.on('chess-replace-pending', handleChessReplacePending);
     socketManager.on('messages-cleared', () => {
       setMessages([]);
       setActivityLogs(prev => [{
@@ -1053,6 +1080,12 @@ const ChatRoom = () => {
       socketManager.off('user-stop-typing', handleUserStopTyping);
       socketManager.off('room-reaction', handleRoomReaction);
       socketManager.off('file-transfer-invite', handleFileTransferInvite);
+      socketManager.off('chess-swap-approval-needed', handleChessSwapApproval);
+      socketManager.off('chess-replace-approval-needed', handleChessReplaceApproval);
+      socketManager.off('chess-swap-declined', handleChessSwapDeclined);
+      socketManager.off('chess-replace-declined', handleChessReplaceDeclined);
+      socketManager.off('chess-swap-pending', handleChessSwapPending);
+      socketManager.off('chess-replace-pending', handleChessReplacePending);
       socketManager.off('messages-cleared');
 
       // Explicitly leave the room before disconnecting
@@ -1071,6 +1104,19 @@ const ChatRoom = () => {
     }, 5000);
     return () => clearInterval(interval);
   }, [isConnected]);
+
+  // Auto-decline chess approval dialog after 30 seconds of inactivity
+  useEffect(() => {
+    if (!chessApprovalRequest) return;
+    const timeout = setTimeout(() => {
+      socketManager.emit(chessApprovalRequest.type === 'swap' ? 'chess-swap-response' : 'chess-replace-response', {
+        messageId: chessApprovalRequest.messageId,
+        approved: false
+      });
+      setChessApprovalRequest(null);
+    }, 30_000);
+    return () => clearTimeout(timeout);
+  }, [chessApprovalRequest]);
 
   // High-Assurance Quick Actions (Electron only, Option C)
   useEffect(() => {
@@ -2620,6 +2666,56 @@ const ChatRoom = () => {
         onMove={handleTicTacToeMove}
         roomVibe={roomVibe}
       />
+
+      {/* Chess Swap/Replace Approval Dialog */}
+      {chessApprovalRequest && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => {
+            socketManager.emit(chessApprovalRequest.type === 'swap' ? 'chess-swap-response' : 'chess-replace-response', {
+              messageId: chessApprovalRequest.messageId,
+              approved: false
+            });
+            setChessApprovalRequest(null);
+          }} />
+          <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-sm w-full border border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-black text-gray-900 dark:text-white mb-2">
+              {chessApprovalRequest.type === 'swap' ? '♟ Swap Request' : '♟ Replace Request'}
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              {chessApprovalRequest.type === 'swap'
+                ? `${chessApprovalRequest.requestedBy} wants to swap White and Black sides. Do you approve?`
+                : `${chessApprovalRequest.requestedBy} wants to replace you with ${chessApprovalRequest.newPlayerName}. Do you approve?`
+              }
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  socketManager.emit(chessApprovalRequest.type === 'swap' ? 'chess-swap-response' : 'chess-replace-response', {
+                    messageId: chessApprovalRequest.messageId,
+                    approved: true
+                  });
+                  setChessApprovalRequest(null);
+                }}
+                className="flex-1 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors"
+              >
+                Approve
+              </button>
+              <button
+                onClick={() => {
+                  socketManager.emit(chessApprovalRequest.type === 'swap' ? 'chess-swap-response' : 'chess-replace-response', {
+                    messageId: chessApprovalRequest.messageId,
+                    approved: false
+                  });
+                  setChessApprovalRequest(null);
+                }}
+                className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-bold transition-colors"
+              >
+                Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <DragDropOverlay isDragging={isDragging} />
       <PrivacyOverlay />
 

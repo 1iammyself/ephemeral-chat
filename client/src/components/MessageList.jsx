@@ -88,7 +88,11 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
           const msgId = entry.target.dataset.id;
           if (msgId && !viewedMessages.has(msgId)) {
             const msg = messages.find(m => m.id === msgId);
-            const isOwn = msg && currentUser && (msg.sender.id === currentUser.id || msg.sender.socketId === currentUser.socketId);
+            const isOwn = msg && currentUser && (
+              msg.sender.id === currentUser.id ||
+              msg.sender.socketId === currentUser.socketId ||
+              (currentUser.nickname && msg.sender.nickname === currentUser.nickname)
+            );
 
             // BUG FIX: Don't auto-read view-once images/audio
             const isAutoViewable = msg && !(msg.isViewOnce && (msg.messageType === 'image' || msg.messageType === 'audio'));
@@ -204,7 +208,11 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   return (
     <div className="flex flex-col space-y-2 sm:space-y-3 pb-4 px-2 sm:px-4">
       {messages.filter(m => messageTimers.get(m.id) !== 'expired').map((message, index) => {
-        const isOwnMessage = currentUser && (message.sender.socketId === currentUser.socketId || message.sender.id === currentUser.id);
+        const isOwnMessage = currentUser && (
+          message.sender.socketId === currentUser.socketId ||
+          message.sender.id === currentUser.id ||
+          (currentUser.nickname && message.sender.nickname === currentUser.nickname)
+        );
 
         const isVanishing = messageTimers.get(message.id) === 'vanishing';
         const timeLeft = getTimeLeft(message);

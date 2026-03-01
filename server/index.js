@@ -245,7 +245,15 @@ async function initializeRedis() {
         if (!room.users || room.users.length === 0) continue;
 
         const before = room.users.length;
-        const activeUsers = room.users.filter(u => io.sockets.sockets.has(u.socketId));
+        // Build a Set of socketIds that have a pending deferred removal (grace period)
+        const deferredSocketIds = new Set();
+        for (const [, def] of deferredRemovals.entries()) {
+          if (def.roomCode === roomCode) deferredSocketIds.add(def.socketId);
+        }
+        // Keep users that are either still connected OR within their grace period
+        const activeUsers = room.users.filter(u =>
+          io.sockets.sockets.has(u.socketId) || deferredSocketIds.has(u.socketId)
+        );
 
         if (activeUsers.length !== before) {
           const removed = before - activeUsers.length;
@@ -849,7 +857,14 @@ io.on('connection', (socket) => {
     try {
       const managedRoom = await roomManager.getRoom(roomCode);
       if (managedRoom && managedRoom.users) {
-        const activeUsers = managedRoom.users.filter(u => io.sockets.sockets.has(u.socketId));
+        // Preserve users within their reconnection grace period
+        const deferredSocketIds = new Set();
+        for (const [, def] of deferredRemovals.entries()) {
+          if (def.roomCode === roomCode) deferredSocketIds.add(def.socketId);
+        }
+        const activeUsers = managedRoom.users.filter(u =>
+          io.sockets.sockets.has(u.socketId) || deferredSocketIds.has(u.socketId)
+        );
         if (activeUsers.length !== managedRoom.users.length) {
           logger.info(`🧹 Knock cleanup: removed ${managedRoom.users.length - activeUsers.length} stale user(s) from room ${roomCode}`);
           managedRoom.users = activeUsers;
@@ -914,7 +929,7 @@ io.on('connection', (socket) => {
         // Now notify the new host about this knock
         io.to(newHostId).emit('user-knocking', {
           socketId: socket.id,
-          nickname: nickname
+          nickname: sanitizeInput(nickname || 'Unknown')
         });
       } else {
         // No valid members (shouldn't happen since liveUserCount > 0, but safeguard)
@@ -935,7 +950,7 @@ io.on('connection', (socket) => {
       managers.forEach(mgr => {
         mgr.emit('user-knocking', {
           socketId: socket.id,
-          nickname: nickname
+          nickname: sanitizeInput(nickname || 'Unknown')
         });
       });
     }
@@ -1315,44 +1330,82 @@ io.on('connection', (socket) => {
               logger.info(`👑 Assigned host status to ${socket.id} (${reconnectNickname}) because they are the only user in the room (Session Resume)`);
             }
 
-            // Re-sync chess game player socketIds for this reconnecting user
+            // Re-sync game player socketIds for this reconnecting user (chess, TTT, RPS)
             try {
               if (room.messages) {
-                let chessUpdated = false;
+                let gamesUpdated = false;
                 const reconnId = userId || socket.id;
                 for (const msg of room.messages) {
-                  if (msg.messageType === 'game' && msg.gameData?.gameType === 'chess' && !msg.gameData.winner) {
-                    const gd = msg.gameData;
+                  if (msg.messageType !== 'game' || !msg.gameData) continue;
+                  const gd = msg.gameData;
+
+                  // Chess re-sync
+                  if (gd.gameType === 'chess' && !gd.winner) {
                     if (gd.players.white && (gd.players.white.id === reconnId || gd.players.white.name === socket.nickname)) {
                       gd.players.white.socketId = socket.id;
                       gd.players.white.name = socket.nickname;
                       if (gd.players.white.id !== reconnId && reconnId) gd.players.white.id = reconnId;
-                      chessUpdated = true;
+                      gamesUpdated = true;
                     }
                     if (gd.players.black && (gd.players.black.id === reconnId || gd.players.black.name === socket.nickname)) {
                       gd.players.black.socketId = socket.id;
                       gd.players.black.name = socket.nickname;
                       if (gd.players.black.id !== reconnId && reconnId) gd.players.black.id = reconnId;
-                      chessUpdated = true;
+                      gamesUpdated = true;
                     }
                     if (msg.sender && msg.sender.nickname === socket.nickname && msg.sender.id !== reconnId && reconnId) {
                       msg.sender.id = reconnId;
                       msg.sender.socketId = socket.id;
-                      chessUpdated = true;
+                      gamesUpdated = true;
                     }
                   }
+
+                  // Tic-Tac-Toe re-sync
+                  if (gd.gameType === 'tic-tac-toe' && !gd.winner) {
+                    if (gd.players.X && (gd.players.X.id === reconnId || gd.players.X.id === socket.id || gd.players.X.name === socket.nickname)) {
+                      gd.players.X.socketId = socket.id;
+                      gd.players.X.id = reconnId;
+                      gamesUpdated = true;
+                    }
+                    if (gd.players.O && gd.players.O.id && (gd.players.O.id === reconnId || gd.players.O.id === socket.id || gd.players.O.name === socket.nickname)) {
+                      gd.players.O.socketId = socket.id;
+                      gd.players.O.id = reconnId;
+                      gamesUpdated = true;
+                    }
+                  }
+
+                  // RPS re-sync
+                  if (gd.gameType === 'rock-paper-scissors' && !gd.winner) {
+                    if (gd.players.P1 && (gd.players.P1.id === reconnId || gd.players.P1.id === socket.id || gd.players.P1.name === socket.nickname)) {
+                      gd.players.P1.socketId = socket.id;
+                      gd.players.P1.id = reconnId;
+                      gamesUpdated = true;
+                    }
+                    if (gd.players.P2 && gd.players.P2.id && (gd.players.P2.id === reconnId || gd.players.P2.id === socket.id || gd.players.P2.name === socket.nickname)) {
+                      gd.players.P2.socketId = socket.id;
+                      gd.players.P2.id = reconnId;
+                      gamesUpdated = true;
+                    }
+                  }
+
+                  // Also fix sender.id for any game message by this user
+                  if (msg.sender && msg.sender.nickname === socket.nickname && msg.sender.id !== reconnId && reconnId) {
+                    msg.sender.id = reconnId;
+                    msg.sender.socketId = socket.id;
+                    gamesUpdated = true;
+                  }
                 }
-                if (chessUpdated) {
+                if (gamesUpdated) {
                   await roomManager.saveRoom(roomCode, room);
                   for (const msg of room.messages) {
-                    if (msg.messageType === 'game' && msg.gameData?.gameType === 'chess' && !msg.gameData.winner) {
+                    if (msg.messageType === 'game' && msg.gameData && !msg.gameData.winner) {
                       io.to(roomCode).emit('message-updated', msg);
                     }
                   }
                 }
               }
             } catch (syncErr) {
-              logger.error('Error re-syncing chess games on session resume:', syncErr);
+              logger.error('Error re-syncing games on session resume:', syncErr);
             }
 
             const timeoutMs = await roomManager.getRoomTimeout(roomCode);
@@ -1463,7 +1516,12 @@ io.on('connection', (socket) => {
           }
 
           logger.info(`🧹 Cleaning ${staleUsers.length} stale user(s) from room ${roomCode}: ${staleUsers.map(u => u.nickname).join(', ')}`);
-          roomObj.users = roomObj.users.filter(u => io.sockets.sockets.has(u.socketId));
+          // Preserve users with pending deferred removals (grace period) unless they're the reconnecting user's stale entries
+          const deferredSocketIds = new Set();
+          for (const [, def] of deferredRemovals.entries()) {
+            if (def.roomCode === roomCode) deferredSocketIds.add(def.socketId);
+          }
+          roomObj.users = roomObj.users.filter(u => io.sockets.sockets.has(u.socketId) || deferredSocketIds.has(u.socketId));
           await roomManager.saveRoom(roomCode, roomObj);
         }
       }
@@ -1488,42 +1546,73 @@ io.on('connection', (socket) => {
         socket.nickname = userNickname;
         socket.persistentUserId = userId || socket.id; // Store persistent ID on socket
 
-        // Re-sync chess game player socketIds for this returning user
+        // Re-sync game player socketIds for this returning user (chess, TTT, RPS)
         try {
           const freshRoom = await roomManager.getRoom(roomCode);
           if (freshRoom && freshRoom.messages) {
-            let chessUpdated = false;
+            let gamesUpdated = false;
             for (const msg of freshRoom.messages) {
-              if (msg.messageType === 'game' && msg.gameData?.gameType === 'chess' && !msg.gameData.winner) {
-                const gd = msg.gameData;
-                // Match by persistent userId OR by nickname (for older games that used socket.id)
+              if (msg.messageType !== 'game' || !msg.gameData) continue;
+              const gd = msg.gameData;
+
+              // Chess re-sync
+              if (gd.gameType === 'chess' && !gd.winner) {
                 if (gd.players.white && (gd.players.white.id === userId || gd.players.white.name === userNickname)) {
                   gd.players.white.socketId = socket.id;
                   gd.players.white.name = userNickname;
-                  if (gd.players.white.id !== userId && userId) gd.players.white.id = userId; // Fix legacy ID
-                  chessUpdated = true;
+                  if (gd.players.white.id !== userId && userId) gd.players.white.id = userId;
+                  gamesUpdated = true;
                   logger.info(`♟️ Re-synced chess white player socketId for ${userNickname} to ${socket.id}`);
                 }
                 if (gd.players.black && (gd.players.black.id === userId || gd.players.black.name === userNickname)) {
                   gd.players.black.socketId = socket.id;
                   gd.players.black.name = userNickname;
-                  if (gd.players.black.id !== userId && userId) gd.players.black.id = userId; // Fix legacy ID
-                  chessUpdated = true;
+                  if (gd.players.black.id !== userId && userId) gd.players.black.id = userId;
+                  gamesUpdated = true;
                   logger.info(`♟️ Re-synced chess black player socketId for ${userNickname} to ${socket.id}`);
                 }
-                // Also fix the message sender ID if it used old socket.id
-                if (msg.sender && msg.sender.nickname === userNickname && msg.sender.id !== userId && userId) {
-                  msg.sender.id = userId;
-                  msg.sender.socketId = socket.id;
-                  chessUpdated = true;
+              }
+
+              // Tic-Tac-Toe re-sync
+              if (gd.gameType === 'tic-tac-toe' && !gd.winner) {
+                if (gd.players.X && (gd.players.X.id === userId || gd.players.X.id === socket.id || gd.players.X.name === userNickname)) {
+                  gd.players.X.socketId = socket.id;
+                  if (userId) gd.players.X.id = userId;
+                  gamesUpdated = true;
+                }
+                if (gd.players.O && gd.players.O.id && (gd.players.O.id === userId || gd.players.O.id === socket.id || gd.players.O.name === userNickname)) {
+                  gd.players.O.socketId = socket.id;
+                  if (userId) gd.players.O.id = userId;
+                  gamesUpdated = true;
                 }
               }
+
+              // RPS re-sync
+              if (gd.gameType === 'rock-paper-scissors' && !gd.winner) {
+                if (gd.players.P1 && (gd.players.P1.id === userId || gd.players.P1.id === socket.id || gd.players.P1.name === userNickname)) {
+                  gd.players.P1.socketId = socket.id;
+                  if (userId) gd.players.P1.id = userId;
+                  gamesUpdated = true;
+                }
+                if (gd.players.P2 && gd.players.P2.id && (gd.players.P2.id === userId || gd.players.P2.id === socket.id || gd.players.P2.name === userNickname)) {
+                  gd.players.P2.socketId = socket.id;
+                  if (userId) gd.players.P2.id = userId;
+                  gamesUpdated = true;
+                }
+              }
+
+              // Fix sender.id for any game message by this user
+              if (msg.sender && msg.sender.nickname === userNickname && msg.sender.id !== userId && userId) {
+                msg.sender.id = userId;
+                msg.sender.socketId = socket.id;
+                gamesUpdated = true;
+              }
             }
-            if (chessUpdated) {
+            if (gamesUpdated) {
               await roomManager.saveRoom(roomCode, freshRoom);
-              // Broadcast updated chess games to all room members
+              // Broadcast updated games to all room members
               for (const msg of freshRoom.messages) {
-                if (msg.messageType === 'game' && msg.gameData?.gameType === 'chess' && !msg.gameData.winner) {
+                if (msg.messageType === 'game' && msg.gameData && !msg.gameData.winner) {
                   io.to(roomCode).emit('message-updated', msg);
                 }
               }
@@ -1802,12 +1891,13 @@ io.on('connection', (socket) => {
             timer: gameData.timer ? parseInt(gameData.timer, 10) : 15 // Default to 15s if missing
           };
         } else if (gameData.gameType === 'tic-tac-toe') {
+          const tttSenderId = socket.persistentUserId || data.userId || socket.id;
           data.gameData = {
             gameType: gameData.gameType,
             board: Array(9).fill(null),
             players: {
-              X: { id: socket.id, name: socket.nickname },
-              O: { id: null, name: null }
+              X: { id: tttSenderId, socketId: socket.id, name: socket.nickname },
+              O: { id: null, socketId: null, name: null }
             },
             turn: 'X',
             winner: null,
@@ -1815,11 +1905,12 @@ io.on('connection', (socket) => {
             lastActivity: Date.now()
           };
         } else if (gameData.gameType === 'rock-paper-scissors') {
+          const rpsSenderId = socket.persistentUserId || data.userId || socket.id;
           data.gameData = {
             gameType: gameData.gameType,
             players: {
-              P1: { id: socket.id, name: socket.nickname, move: null },
-              P2: { id: null, name: null, move: null }
+              P1: { id: rpsSenderId, socketId: socket.id, name: socket.nickname, move: null },
+              P2: { id: null, socketId: null, name: null, move: null }
             },
             scores: { P1: 0, P2: 0 },
             rounds: [],
@@ -1831,8 +1922,11 @@ io.on('connection', (socket) => {
           const isTargeted = recipients && recipients.length === 1;
           let invitedNickname = null;
           if (isTargeted) {
-            const targetUser = room.users.find(u => u.socketId === recipients[0] || u.userId === recipients[0]);
-            invitedNickname = targetUser ? targetUser.nickname : null;
+            const chessRoom = await roomManager.getRoom(socket.roomCode);
+            if (chessRoom && chessRoom.users) {
+              const targetUser = chessRoom.users.find(u => u.socketId === recipients[0] || u.id === recipients[0]);
+              invitedNickname = targetUser ? targetUser.nickname : null;
+            }
           }
 
           data.gameData = {
@@ -1963,26 +2057,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Delete Message
-  socket.on('delete-message', async ({ messageId }) => {
-    if (!socket.roomCode || !messageId) return;
-
-    // Check if user is sender or host before deleting
-    const room = await roomManager.getRoom(socket.roomCode);
-    if (!room) return;
-    const message = (room.messages || []).find(m => m.id === messageId);
-    if (!message) return;
-
-    const isSender = message.sender.id === (socket.userId || socket.id) || message.sender.socketId === socket.id;
-    const isHost = room.hostId === socket.id;
-
-    if (isSender || isHost) {
-      const removed = await roomManager.removeMessage(socket.roomCode, messageId);
-      if (removed) {
-        io.to(socket.roomCode).emit('message-deleted', { messageId });
-      }
-    }
-  });
+  // Delete Message – handled in comprehensive delete-message handler below
 
   // Pulse
   socket.on('send-pulse', async ({ roomCode }) => {
@@ -2001,6 +2076,13 @@ io.on('connection', (socket) => {
   socket.on('panic-burn', async () => {
     if (!socket.roomCode) return;
     try {
+      // Only host, tier1, or tier2 can panic-burn (clear all messages)
+      const rd = roomData[socket.roomCode];
+      const requesterRole = rd?.userRoles?.[socket.id] || (rd?.hostId === socket.id ? 'host' : 'user');
+      if (!['host', 'tier1', 'tier2'].includes(requesterRole)) {
+        socket.emit('error-message', 'Only elevated roles can clear all messages');
+        return;
+      }
       await roomManager.clearMessages(socket.roomCode);
       io.to(socket.roomCode).emit('messages-cleared');
     } catch (err) {
@@ -2038,6 +2120,12 @@ io.on('connection', (socket) => {
     if (socket.roomCode === roomCode) {
       socket.to(roomCode).emit('user-stop-typing', { userId: socket.id });
     }
+  });
+
+  // Client heartbeat to keep the inactivity timer alive for passive users (spectators, readers)
+  socket.on('user-activity', () => {
+    if (!socket.roomCode) return;
+    securityManager.updateUserActivity(socket.id, handleInactivityTimeout);
   });
 
   // Handle message viewed events (for view-once images)
@@ -2091,7 +2179,7 @@ io.on('connection', (socket) => {
       // Broadcast the updated message with masking
       const usersInRoom = await roomManager.getRoomUsers(socket.roomCode);
       usersInRoom.forEach(u => {
-        const masked = roomManager.maskMessageForUser(message, u.socketId);
+        const masked = roomManager.maskMessageForUser(message, u.socketId, u.id || u.userId);
         io.to(u.socketId).emit('message-updated', masked);
       });
     } catch (error) {
@@ -2114,25 +2202,36 @@ io.on('connection', (socket) => {
       const { gameData } = message;
       if (gameData.winner) return; // Game already over
 
+      const playerId = socket.persistentUserId || socket.id;
+      const isX = gameData.players.X.id === playerId || gameData.players.X.id === socket.id || gameData.players.X.name === socket.nickname;
+      const isO = gameData.players.O.id === playerId || gameData.players.O.id === socket.id || gameData.players.O.name === socket.nickname;
+
       if (action === 'join') {
-        if (!gameData.players.O.id && gameData.players.X.id !== socket.id) {
-          // Check if it's a targeted match
+        if (!gameData.players.O.id && !isX) {
+          // Check if it's a targeted match - check both socket.id and persistentUserId
           const recipients = message.recipients || [];
-          if (recipients.length > 0 && !recipients.includes(socket.id)) {
+          if (recipients.length > 0 && !recipients.includes(socket.id) && !recipients.includes(playerId)) {
             socket.emit('error', { message: 'You are not invited to this match.' });
             return;
           }
 
-          gameData.players.O = { id: socket.id, name: socket.nickname };
+          gameData.players.O = { id: playerId, socketId: socket.id, name: socket.nickname };
           gameData.lastActivity = Date.now();
           await roomManager.saveRoom(socket.roomCode, room);
 
           // Broadcast update with masking
           const roomUsers = await roomManager.getRoomUsers(socket.roomCode);
           roomUsers.forEach(user => {
-            const maskedMessage = roomManager.maskMessageForUser(message, user.socketId);
+            const maskedMessage = roomManager.maskMessageForUser(message, user.socketId, user.id || user.userId);
             io.to(user.socketId).emit('message-updated', maskedMessage);
           });
+        } else if (isX || isO) {
+          // Re-sync socketId for reconnecting player
+          if (isX) { gameData.players.X.socketId = socket.id; gameData.players.X.id = playerId; }
+          if (isO) { gameData.players.O.socketId = socket.id; gameData.players.O.id = playerId; }
+          gameData.lastActivity = Date.now();
+          await roomManager.saveRoom(socket.roomCode, room);
+          io.to(socket.roomCode).emit('message-updated', message);
         }
         return;
       }
@@ -2140,7 +2239,11 @@ io.on('connection', (socket) => {
       if (action === 'move') {
         if (position === undefined || position < 0 || position > 8) return;
         if (gameData.board[position]) return; // Position already taken
-        if (gameData.players[gameData.turn].id !== socket.id) return; // Not your turn
+
+        // Turn check using persistent identity
+        const currentTurnPlayer = gameData.players[gameData.turn];
+        const isMyTurn = currentTurnPlayer.id === playerId || currentTurnPlayer.id === socket.id || currentTurnPlayer.name === socket.nickname;
+        if (!isMyTurn) return; // Not your turn
 
         // Update board
         gameData.board[position] = gameData.turn;
@@ -2195,26 +2298,39 @@ io.on('connection', (socket) => {
       const { gameData } = message;
       if (gameData.winner) return; // Game already over
 
-      const isP1 = gameData.players.P1.id === socket.id;
-      const isP2 = gameData.players.P2.id === socket.id;
+      const playerId = socket.persistentUserId || socket.id;
+      const isP1 = gameData.players.P1.id === playerId || gameData.players.P1.id === socket.id || gameData.players.P1.name === socket.nickname;
+      const isP2 = gameData.players.P2.id === playerId || gameData.players.P2.id === socket.id || gameData.players.P2.name === socket.nickname;
 
       if (action === 'join') {
-        if (!gameData.players.P2.id && gameData.players.P1.id !== socket.id) {
-          // Check if it's a targeted match
+        if (!gameData.players.P2.id && !isP1) {
+          // Check if it's a targeted match - check both socket.id and persistentUserId
           const recipients = message.recipients || [];
-          if (recipients.length > 0 && !recipients.includes(socket.id)) {
+          if (recipients.length > 0 && !recipients.includes(socket.id) && !recipients.includes(playerId)) {
             socket.emit('error', { message: 'You are not invited to this match.' });
             return;
           }
 
-          gameData.players.P2 = { id: socket.id, name: socket.nickname, move: null };
+          gameData.players.P2 = { id: playerId, socketId: socket.id, name: socket.nickname, move: null };
           gameData.lastActivity = Date.now();
           await roomManager.saveRoom(socket.roomCode, room);
 
           // Broadcast update with masking
           const usersInRoom = await roomManager.getRoomUsers(socket.roomCode);
           usersInRoom.forEach(u => {
-            const masked = roomManager.maskMessageForUser(message, u.socketId);
+            const masked = roomManager.maskMessageForUser(message, u.socketId, u.id || u.userId);
+            io.to(u.socketId).emit('message-updated', masked);
+          });
+        } else if (isP1 || isP2) {
+          // Re-sync socketId for reconnecting player
+          if (isP1) { gameData.players.P1.socketId = socket.id; gameData.players.P1.id = playerId; }
+          if (isP2) { gameData.players.P2.socketId = socket.id; gameData.players.P2.id = playerId; }
+          gameData.lastActivity = Date.now();
+          await roomManager.saveRoom(socket.roomCode, room);
+
+          const usersInRoom = await roomManager.getRoomUsers(socket.roomCode);
+          usersInRoom.forEach(u => {
+            const masked = roomManager.maskMessageForUser(message, u.socketId, u.id || u.userId);
             io.to(u.socketId).emit('message-updated', masked);
           });
         }
@@ -2274,7 +2390,13 @@ io.on('connection', (socket) => {
 
         gameData.lastActivity = Date.now();
         await roomManager.saveRoom(socket.roomCode, room);
-        io.to(socket.roomCode).emit('message-updated', message);
+
+        // Always broadcast with masking to hide pending moves from spectators and the other player
+        const usersInRoom = await roomManager.getRoomUsers(socket.roomCode);
+        usersInRoom.forEach(u => {
+          const masked = roomManager.maskMessageForUser(message, u.socketId, u.id || u.userId);
+          io.to(u.socketId).emit('message-updated', masked);
+        });
       }
     } catch (error) {
       logger.error('Error handling RPS action:', error);
@@ -2394,7 +2516,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // NEW: Chess Player Management Support
+  // Chess Player Management with Approval Flow
   socket.on('chess-swap-request', async ({ messageId }) => {
     try {
       if (!socket.roomCode || !messageId) return;
@@ -2408,13 +2530,122 @@ io.on('connection', (socket) => {
       if (!isHost) return;
 
       const { gameData } = message;
-      const temp = gameData.players.white;
-      gameData.players.white = gameData.players.black;
-      gameData.players.black = temp;
+      if (!gameData.players.white || !gameData.players.black) {
+        // Can't swap if one side is empty — just do it
+        const temp = gameData.players.white;
+        gameData.players.white = gameData.players.black;
+        gameData.players.black = temp;
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        return;
+      }
 
+      // Check if both players are online
+      const whiteOnline = io.sockets.sockets.has(gameData.players.white.socketId);
+      const blackOnline = io.sockets.sockets.has(gameData.players.black.socketId);
+
+      if (!whiteOnline && !blackOnline) {
+        // Both offline — host can freely swap
+        const temp = gameData.players.white;
+        gameData.players.white = gameData.players.black;
+        gameData.players.black = temp;
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        return;
+      }
+
+      // At least one player is online — send approval request to online player(s)
+      const pendingKey = `swap_${messageId}`;
+      if (!message._pendingSwap) {
+        message._pendingSwap = { requestedBy: requesterId, approvals: new Set(), needed: 0 };
+      }
+
+      // Send approval request to online players who are not the host
+      const onlinePlayers = [];
+      if (whiteOnline && gameData.players.white.id !== requesterId) {
+        onlinePlayers.push(gameData.players.white);
+      }
+      if (blackOnline && gameData.players.black.id !== requesterId) {
+        onlinePlayers.push(gameData.players.black);
+      }
+
+      if (onlinePlayers.length === 0) {
+        // Host is the only online player — free swap
+        const temp = gameData.players.white;
+        gameData.players.white = gameData.players.black;
+        gameData.players.black = temp;
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        return;
+      }
+
+      // Store pending swap info on the message temporarily (in-memory only)
+      gameData._pendingSwap = {
+        requestedBy: requesterId,
+        requesterName: socket.nickname,
+        responses: {},
+        needed: onlinePlayers.length
+      };
       await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('message-updated', message);
+
+      // Notify online players who need to approve
+      onlinePlayers.forEach(player => {
+        io.to(player.socketId).emit('chess-swap-approval-needed', {
+          messageId,
+          requestedBy: socket.nickname
+        });
+      });
+
+      // Also notify host that request was sent
+      socket.emit('chess-swap-pending', { messageId, waitingFor: onlinePlayers.map(p => p.name) });
     } catch (err) { logger.error('chess-swap-request err:', err); }
+  });
+
+  socket.on('chess-swap-response', async ({ messageId, approved }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
+
+      const { gameData } = message;
+      if (!gameData._pendingSwap) return;
+
+      const responderId = socket.persistentUserId || socket.id;
+      gameData._pendingSwap.responses[responderId] = approved;
+
+      if (!approved) {
+        // Declined — cancel the swap
+        const requesterSocketId = gameData.players.white?.id === gameData._pendingSwap.requestedBy
+          ? gameData.players.white.socketId
+          : (gameData.players.black?.id === gameData._pendingSwap.requestedBy
+            ? gameData.players.black.socketId : null);
+
+        // Notify host (the sender of the game message)
+        io.to(message.sender.socketId).emit('chess-swap-declined', {
+          messageId,
+          declinedBy: socket.nickname
+        });
+        delete gameData._pendingSwap;
+        await roomManager.saveRoom(socket.roomCode, room);
+        return;
+      }
+
+      // Check if all needed approvals are in
+      const approvalCount = Object.values(gameData._pendingSwap.responses).filter(v => v === true).length;
+      if (approvalCount >= gameData._pendingSwap.needed) {
+        // All approved — do the swap
+        const temp = gameData.players.white;
+        gameData.players.white = gameData.players.black;
+        gameData.players.black = temp;
+        delete gameData._pendingSwap;
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+      } else {
+        await roomManager.saveRoom(socket.roomCode, room);
+      }
+    } catch (err) { logger.error('chess-swap-response err:', err); }
   });
 
   socket.on('chess-replace-request', async ({ messageId, role, targetUserId }) => {
@@ -2434,11 +2665,69 @@ io.on('connection', (socket) => {
       const targetNick = targetUser?.nickname || 'New Player';
 
       const { gameData } = message;
-      gameData.players[role] = { id: targetId, socketId: targetUserId, name: targetNick };
+      const currentPlayer = gameData.players[role];
 
+      // Check if the player being replaced is currently online
+      const isCurrentPlayerOnline = currentPlayer && currentPlayer.socketId && io.sockets.sockets.has(currentPlayer.socketId);
+
+      if (!isCurrentPlayerOnline || !currentPlayer?.id) {
+        // Player is offline or slot is empty — free replacement
+        gameData.players[role] = { id: targetId, socketId: targetUserId, name: targetNick };
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        return;
+      }
+
+      // Player is online — require their approval
+      gameData._pendingReplace = {
+        role,
+        newPlayer: { id: targetId, socketId: targetUserId, name: targetNick },
+        requestedBy: requesterId,
+        requesterName: socket.nickname
+      };
       await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('message-updated', message);
+
+      io.to(currentPlayer.socketId).emit('chess-replace-approval-needed', {
+        messageId,
+        role,
+        newPlayerName: targetNick,
+        requestedBy: socket.nickname
+      });
+
+      socket.emit('chess-replace-pending', {
+        messageId,
+        role,
+        waitingFor: currentPlayer.name
+      });
     } catch (err) { logger.error('chess-replace-request err:', err); }
+  });
+
+  socket.on('chess-replace-response', async ({ messageId, approved }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
+
+      const { gameData } = message;
+      if (!gameData._pendingReplace) return;
+
+      if (approved) {
+        const { role, newPlayer } = gameData._pendingReplace;
+        gameData.players[role] = newPlayer;
+        delete gameData._pendingReplace;
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+      } else {
+        io.to(message.sender.socketId).emit('chess-replace-declined', {
+          messageId,
+          declinedBy: socket.nickname
+        });
+        delete gameData._pendingReplace;
+        await roomManager.saveRoom(socket.roomCode, room);
+      }
+    } catch (err) { logger.error('chess-replace-response err:', err); }
   });
 
 
@@ -2463,18 +2752,27 @@ io.on('connection', (socket) => {
       const message = await roomManager.getMessage(socket.roomCode, messageId);
       if (!message) return;
 
-      // Permission check: only sender can delete (except for view-once auto-deletion)
+      // Permission check: sender, host, or view-once auto-deletion can delete
       const requesterId = socket.persistentUserId || socket.id;
       const isSender = message.sender.id === requesterId || message.sender.socketId === socket.id || (socket.nickname && message.sender.nickname === socket.nickname);
+      const isRoomHost = (roomData[socket.roomCode] && roomData[socket.roomCode].hostId === socket.id);
 
       let shouldDelete = false;
 
-      if (isSender) {
+      if (isSender || isRoomHost) {
         shouldDelete = true;
       } else if (message.isViewOnce) {
+        // Ensure the requesting user is marked as having viewed the message
+        // (handles race condition where delete-message arrives before message-viewed is processed)
+        if (!message.viewedBy) message.viewedBy = [];
+        if (!message.viewedBy.includes(socket.id)) {
+          message.viewedBy.push(socket.id);
+          await roomManager.saveMessage(socket.roomCode, message);
+        }
+        const viewedBy = message.viewedBy;
+
         // Smart deletion for multi-recipient messages
         const recipients = message.recipients || [];
-        const viewedBy = message.viewedBy || [];
 
         if (recipients.length > 0) {
           const allViewed = recipients.every(rId => viewedBy.includes(rId));
@@ -2702,7 +3000,12 @@ io.on('connection', (socket) => {
         const managedRoom = await roomManager.getRoom(roomCode);
         if (managedRoom && managedRoom.users) {
           const before = managedRoom.users.length;
-          managedRoom.users = managedRoom.users.filter(u => io.sockets.sockets.has(u.socketId));
+          // Preserve users with pending deferred removals (grace period)
+          const deferredSocketIds = new Set();
+          for (const [, def] of deferredRemovals.entries()) {
+            if (def.roomCode === roomCode) deferredSocketIds.add(def.socketId);
+          }
+          managedRoom.users = managedRoom.users.filter(u => io.sockets.sockets.has(u.socketId) || deferredSocketIds.has(u.socketId));
           if (managedRoom.users.length !== before) {
             logger.info(`🧹 Cleaned ${before - managedRoom.users.length} stale user(s) from room ${roomCode} during departure`);
             await roomManager.saveRoom(roomCode, managedRoom);
@@ -2795,7 +3098,12 @@ io.on('connection', (socket) => {
           const managedRoom = await roomManager.getRoom(roomCode);
           if (managedRoom && managedRoom.users) {
             const before = managedRoom.users.length;
-            managedRoom.users = managedRoom.users.filter(u => io.sockets.sockets.has(u.socketId));
+            // Preserve users with pending deferred removals (grace period)
+            const deferredSocketIds = new Set();
+            for (const [, def] of deferredRemovals.entries()) {
+              if (def.roomCode === roomCode) deferredSocketIds.add(def.socketId);
+            }
+            managedRoom.users = managedRoom.users.filter(u => io.sockets.sockets.has(u.socketId) || deferredSocketIds.has(u.socketId));
             if (managedRoom.users.length !== before) {
               logger.info(`🧹 Cleaned ${before - managedRoom.users.length} stale user(s) from room ${roomCode} during deferred departure`);
               await roomManager.saveRoom(roomCode, managedRoom);

@@ -87,7 +87,9 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
     const handleTTTMove = (index) => {
         if (!isTicTacToe || gameData.winner) return;
         if (gameData.board[index]) return;
-        if (gameData.players[gameData.turn].id !== currentUserId) return;
+        // Check if it's my turn using both id and nickname
+        const currentTurnPlayer = gameData.players[gameData.turn];
+        if (currentTurnPlayer.id !== currentUserId && !(currentNickname && currentTurnPlayer.name === currentNickname)) return;
         onTicTacToeMove(message.id, 'move', index);
     };
 
@@ -132,9 +134,9 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
 
     // ── Tic-Tac-Toe ──
     if (isTicTacToe) {
-        const isMyTurn = gameData.players[gameData.turn]?.id === currentUserId;
-        const isPlayerX = gameData.players.X.id === currentUserId;
-        const isPlayerO = gameData.players.O.id === currentUserId;
+        const isPlayerX = gameData.players.X.id === currentUserId || (currentNickname && gameData.players.X.name === currentNickname);
+        const isPlayerO = gameData.players.O.id === currentUserId || (currentNickname && gameData.players.O.name === currentNickname);
+        const isMyTurn = (isPlayerX && gameData.turn === 'X') || (isPlayerO && gameData.turn === 'O');
         const amPlaying = isPlayerX || isPlayerO;
 
         const getStatusMessage = () => {
@@ -225,7 +227,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                             {getStatusMessage()}
                         </div>
 
-                        {!gameData.players.O.id && currentUserId !== gameData.players.X.id && (
+                        {!gameData.players.O.id && !isPlayerX && (
                             <button
                                 onClick={handleTTTJoin}
                                 className={`mt-3 w-full py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-indigo-500 text-white font-black text-xs uppercase tracking-widest shadow-lg hover:scale-[1.02] active:scale-95 transition-all`}
@@ -506,8 +508,8 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
 
     // ── Rock Paper Scissors ──
     if (isRPS) {
-        const isP1 = gameData.players.P1.id === currentUserId;
-        const isP2 = gameData.players.P2.id === currentUserId;
+        const isP1 = gameData.players.P1.id === currentUserId || (currentNickname && gameData.players.P1.name === currentNickname);
+        const isP2 = gameData.players.P2.id === currentUserId || (currentNickname && gameData.players.P2.name === currentNickname);
         const amPlaying = isP1 || isP2;
         const p1Move = gameData.players.P1.move;
         const p2Move = gameData.players.P2.move;
@@ -534,7 +536,8 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                 case 'rock': return '🪨';
                 case 'paper': return '📄';
                 case 'scissors': return '✂️';
-                default: return '?';
+                case 'locked': return '🔒';
+                default: return '❓';
             }
         };
 
