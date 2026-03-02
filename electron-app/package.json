@@ -38,6 +38,8 @@
     "files": [
       "main.js",
       "preload.js",
+      "proximity-bridge.js",
+      "proximity-native.js",
       "icons/**/*",
       "sounds/**/*",
       "LICENSE-E2ECP.txt"

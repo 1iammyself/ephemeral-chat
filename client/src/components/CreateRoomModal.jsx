@@ -69,7 +69,13 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
         body: JSON.stringify({ password: password || undefined }),
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        const text = await response.text();
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error('Server returned an invalid response');
+      }
 
       if (response.ok && data.inviteLink) {
         setInviteLink(data.inviteLink);
@@ -146,11 +152,25 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
       }
 
       if (!response || !response.ok) {
-        const errorData = response ? await response.json().catch(() => ({})) : {};
+        let errorData = {};
+        if (response) {
+          try {
+            const text = await response.text();
+            errorData = text ? JSON.parse(text) : {};
+          } catch {
+            errorData = { error: `Server error (${response.status})` };
+          }
+        }
         throw new Error(errorData.error || lastError || 'Failed to create room');
       }
 
-      const data = await response.json();
+      let data;
+      try {
+        const text = await response.text();
+        data = JSON.parse(text);
+      } catch {
+        throw new Error('Server returned an invalid response. Please try again.');
+      }
 
       if (data.roomCode) {
         setCreatedRoom({

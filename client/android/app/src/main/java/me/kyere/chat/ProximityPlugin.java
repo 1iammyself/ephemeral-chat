@@ -408,7 +408,7 @@ public class ProximityPlugin extends Plugin {
             result.put("nearby", ContextCompat.checkSelfPermission(getContext(),
                     "android.permission.NEARBY_WIFI_DEVICES") == PackageManager.PERMISSION_GRANTED);
         } else {
-            result.put("nearby", result.getBoolean("location"));
+            result.put("nearby", result.optBoolean("location", false));
         }
         
         call.resolve(result);
