@@ -1,6 +1,8 @@
 /**
  * Room vibe configurations for Ephemeral Chat
  * Each vibe changes the room's background and ambient theme
+ * 
+ * Available moodSounds: rain, lofi, whitenoise, campfire, ocean, forest, cafe, jazz
  */
 
 export const VIBES = {

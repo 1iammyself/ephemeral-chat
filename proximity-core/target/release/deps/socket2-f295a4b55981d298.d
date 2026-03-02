@@ -1,0 +1,11 @@
+C:\Users\kyere\Documents\codes\ephemeral-chat\proximity-core\target\release\deps\socket2-f295a4b55981d298.d: C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\lib.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\sockaddr.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\socket.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\sockref.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\sys\windows.rs
+
+C:\Users\kyere\Documents\codes\ephemeral-chat\proximity-core\target\release\deps\libsocket2-f295a4b55981d298.rlib: C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\lib.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\sockaddr.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\socket.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\sockref.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\sys\windows.rs
+
+C:\Users\kyere\Documents\codes\ephemeral-chat\proximity-core\target\release\deps\libsocket2-f295a4b55981d298.rmeta: C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\lib.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\sockaddr.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\socket.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\sockref.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\sys\windows.rs
+
+C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\lib.rs:
+C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\sockaddr.rs:
+C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\socket.rs:
+C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\sockref.rs:
+C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.10\src\sys\windows.rs:

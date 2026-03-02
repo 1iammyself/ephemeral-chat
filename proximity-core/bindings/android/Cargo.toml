@@ -1,0 +1,20 @@
+[package]
+name = "proximity-android"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Android JNI bindings for proximity-core"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+proximity-core = { path = "../../core" }
+jni = "0.21"
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.14"

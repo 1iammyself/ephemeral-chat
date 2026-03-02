@@ -1,0 +1,14 @@
+C:\Users\kyere\Documents\codes\ephemeral-chat\proximity-core\target\release\deps\serde-4cfaf19620200f1c.d: C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs C:\Users\kyere\Documents\codes\ephemeral-chat\proximity-core\target\release\build\serde-987afe65b1bdc65c\out/private.rs
+
+C:\Users\kyere\Documents\codes\ephemeral-chat\proximity-core\target\release\deps\libserde-4cfaf19620200f1c.rlib: C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs C:\Users\kyere\Documents\codes\ephemeral-chat\proximity-core\target\release\build\serde-987afe65b1bdc65c\out/private.rs
+
+C:\Users\kyere\Documents\codes\ephemeral-chat\proximity-core\target\release\deps\libserde-4cfaf19620200f1c.rmeta: C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs C:\Users\kyere\Documents\codes\ephemeral-chat\proximity-core\target\release\build\serde-987afe65b1bdc65c\out/private.rs
+
+C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs:
+C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs:
+C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs:
+C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs:
+C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs:
+C:\Users\kyere\Documents\codes\ephemeral-chat\proximity-core\target\release\build\serde-987afe65b1bdc65c\out/private.rs:
+
+# env-dep:OUT_DIR=C:\\Users\\kyere\\Documents\\codes\\ephemeral-chat\\proximity-core\\target\\release\\build\\serde-987afe65b1bdc65c\\out

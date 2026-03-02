@@ -92,5 +92,34 @@ export const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Oper
 export const isAndroid = /Android/i.test(navigator.userAgent);
 export const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
+// ==================== SECURITY CAPABILITY DETECTION ====================
+
+/** True when the browser/WebView supports WebCrypto (SubtleCrypto) */
+export const hasWebCrypto = !!(globalThis.crypto?.subtle);
+
+/** True when WebTransport is available (Chromium 113+, NOT Android WebView) */
+export const hasWebTransport = typeof globalThis.WebTransport !== 'undefined';
+
+/** True when Electron exposes security IPC bridge */
+export const hasElectronSecurity = !!(window.electronAPI?.security);
+
+/**
+ * Get a summary of which security features are available on the current platform.
+ * Useful for diagnostics and deciding which fallback paths to take.
+ */
+export function getSecurityCapabilities() {
+  return {
+    platform: isElectron ? 'electron' : isCapacitor ? 'capacitor' : 'web',
+    webCrypto: hasWebCrypto,
+    webTransport: hasWebTransport,
+    electronSecurity: hasElectronSecurity,
+    serviceWorker: 'serviceWorker' in navigator,
+    // SharedArrayBuffer is needed by some WASM crypto modules
+    sharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
+    // WebAssembly is needed for native crypto implementations
+    wasm: typeof WebAssembly !== 'undefined',
+  };
+}
+
 // Initialize wake lock re-acquire handler
 setupWakeLockReacquire();

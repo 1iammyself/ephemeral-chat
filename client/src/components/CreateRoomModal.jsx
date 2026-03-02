@@ -8,6 +8,7 @@ import { sanitizeInput, generateRoomKey } from '../utils/security';
 import { getCreatorId } from '../utils/creator';
 import { useTheme } from '../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
+import { secureFetch } from '../utils/secure-fetch.js';
 // Removed @cap.js/widget - using honeypot instead
 
 const CreateRoomModal = ({ onClose, onRoomCreated }) => {
@@ -62,7 +63,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const generateInviteLink = async (roomCode, password) => {
     try {
       setIsGeneratingInvite(true);
-      const response = await fetch(`${API_BASE}/api/rooms/${roomCode}/invite`, {
+      const response = await secureFetch(`${API_BASE}/api/rooms/${roomCode}/invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: password || undefined }),
@@ -115,7 +116,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
       let lastError;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          response = await fetch(`${API_BASE}/api/rooms`, {
+          response = await secureFetch(`${API_BASE}/api/rooms`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

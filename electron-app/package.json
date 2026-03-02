@@ -55,6 +55,15 @@
         ]
       }
     ],
+    "fileAssociations": [
+      {
+        "ext": "eph",
+        "name": "Ephemeral Drop",
+        "description": "Ephemeral Drop Auth Packet",
+        "mimeType": "application/x-ephemeral-drop",
+        "role": "Viewer"
+      }
+    ],
     "win": {
       "target": [
         {

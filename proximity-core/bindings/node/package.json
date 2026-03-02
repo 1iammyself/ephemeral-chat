@@ -1,0 +1,12 @@
+{
+  "name": "proximity-native",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Native Rust QUIC proximity engine for Electron (napi-rs addon)",
+  "main": "index.js",
+  "scripts": {
+    "build": "node scripts/copy-addon.js",
+    "build:debug": "node scripts/copy-addon.js --debug"
+  },
+  "devDependencies": {}
+}

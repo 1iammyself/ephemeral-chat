@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MessageCircle, Lock, Users, AlertCircle, Check, Loader2, Shield, Clock, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import { secureFetch } from '../utils/secure-fetch.js';
 // Removed @cap.js/widget - using honeypot instead
 
 const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite = false, isWaitingForHost = false }) => {
@@ -62,7 +63,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
     const checkRoomAndInvite = async () => {
       try {
         // First, check room info
-        const roomResponse = await fetch(`${API_BASE}/api/rooms/${roomCode}`);
+        const roomResponse = await secureFetch(`${API_BASE}/api/rooms/${roomCode}`);
         const roomData = await roomResponse.json();
 
         if (!isMounted) return;
@@ -98,7 +99,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
     const validateInviteToken = async () => {
       try {
         setIsCheckingInvite(true);
-        const response = await fetch(`${API_BASE}/api/rooms/${roomCode}/validate-invite`, {
+        const response = await secureFetch(`${API_BASE}/api/rooms/${roomCode}/validate-invite`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token: inviteToken }),

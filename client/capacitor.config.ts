@@ -7,7 +7,14 @@ const config: CapacitorConfig = {
   server: {
     // Use the production URL
     url: 'https://chat.kyere.me',
-    cleartext: false
+    cleartext: false,
+    // Allow YouTube and SoundCloud embeds for Watch Party feature
+    allowNavigation: [
+      'https://*.youtube.com',
+      'https://*.youtube-nocookie.com',
+      'https://*.soundcloud.com',
+      'https://w.soundcloud.com',
+    ]
   },
   android: {
     // Enable mixed content for WebSocket connections
@@ -18,12 +25,14 @@ const config: CapacitorConfig = {
   ios: {
     // iOS-specific configuration
     contentInset: 'automatic',
-    // Allow inline media playback
+    // Allow inline media playback (required for Watch Party sync)
     allowsLinkPreview: false,
     // Scroll to input to prevent keyboard covering input fields
     scrollEnabled: true,
-    // Disable long-press link previews for privacy
-    limitsNavigationsToAppBoundDomains: true
+    // IMPORTANT: Must be false when using allowNavigation for embeds.
+    // If true, WKWebView blocks all navigations outside the app domain,
+    // which kills YouTube/SoundCloud iframe embeds.
+    limitsNavigationsToAppBoundDomains: false
   },
   plugins: {
     SplashScreen: {

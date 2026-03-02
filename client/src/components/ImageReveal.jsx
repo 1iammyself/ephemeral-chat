@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { ShieldAlert } from 'lucide-react';
+import { secureFetch } from '../utils/secure-fetch.js';
 
 /**
  * ImageReveal Component
@@ -60,7 +61,7 @@ const ImageReveal = ({ viewToken }) => {
             setIsLoading(true);
             try {
                 const apiBase = import.meta.env.VITE_API_URL || '';
-                const res = await fetch(`${apiBase}/api/reveal-image`, {
+                const res = await secureFetch(`${apiBase}/api/reveal-image`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ viewToken })

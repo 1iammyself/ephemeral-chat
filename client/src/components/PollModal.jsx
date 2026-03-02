@@ -5,6 +5,7 @@ const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
     const [question, setQuestion] = useState('');
     const [options, setOptions] = useState(['', '']);
     const [allowMultiple, setAllowMultiple] = useState(false);
+    const [allowCustomAnswers, setAllowCustomAnswers] = useState(false);
 
     if (!isOpen) return null;
 
@@ -33,13 +34,15 @@ const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
             onSend({
                 question: question.trim(),
                 options: options.filter(opt => opt.trim()),
-                allowMultiple
+                allowMultiple,
+                allowCustomAnswers
             });
             onClose();
             // Reset form
             setQuestion('');
             setOptions(['', '']);
             setAllowMultiple(false);
+            setAllowCustomAnswers(false);
         }
     };
 
@@ -126,6 +129,23 @@ const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
                         >
                             <span
                                 className={`inline-block h-3.5 sm:h-4 w-3.5 sm:w-4 transform rounded-full bg-white transition-transform ${allowMultiple ? 'translate-x-5 sm:translate-x-6' : 'translate-x-1'
+                                    }`}
+                            />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center justify-between py-1 sm:py-2">
+                        <label className="text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-300">
+                            Allow &quot;Other&quot; answers
+                        </label>
+                        <button
+                            type="button"
+                            onClick={() => setAllowCustomAnswers(!allowCustomAnswers)}
+                            className={`relative inline-flex h-5 sm:h-6 w-9 sm:w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-${vibeAccent}-500 focus:ring-offset-2 ${allowCustomAnswers ? `bg-${vibeAccent}-600` : 'bg-gray-200 dark:bg-gray-700'
+                                }`}
+                        >
+                            <span
+                                className={`inline-block h-3.5 sm:h-4 w-3.5 sm:w-4 transform rounded-full bg-white transition-transform ${allowCustomAnswers ? 'translate-x-5 sm:translate-x-6' : 'translate-x-1'
                                     }`}
                             />
                         </button>

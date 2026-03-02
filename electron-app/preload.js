@@ -50,6 +50,77 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   onToggleAnonymous: (callback) => {
     ipcRenderer.on('toggle-anonymous', () => callback());
+  },
+
+  // Proximity / Nearby Transfer
+  proximity: {
+    getNetworkInfo: () => ipcRenderer.invoke('proximity-get-network-info'),
+    getLocalIp: () => ipcRenderer.invoke('proximity-get-local-ip'),
+    getDeviceId: () => ipcRenderer.invoke('proximity-get-device-id'),
+    getDeviceName: () => ipcRenderer.invoke('proximity-get-device-name'),
+    saveFile: (fileData) => ipcRenderer.invoke('proximity-save-file', fileData),
+    showInFolder: (filePath) => ipcRenderer.invoke('proximity-show-in-folder', filePath),
+    openFile: (filePath) => ipcRenderer.invoke('proximity-open-file', filePath)
+  },
+
+  // Native QUIC Proximity (Rust engine)
+  proximityNative: {
+    init: (options) => ipcRenderer.invoke('proximity-native-init', options),
+    start: () => ipcRenderer.invoke('proximity-native-start'),
+    stop: () => ipcRenderer.invoke('proximity-native-stop'),
+    isAvailable: () => ipcRenderer.invoke('proximity-native-is-available'),
+    getPeers: () => ipcRenderer.invoke('proximity-native-get-peers'),
+    connect: (address) => ipcRenderer.invoke('proximity-native-connect', address),
+    getPairingCode: (peerId) => ipcRenderer.invoke('proximity-native-pairing-code', peerId),
+    sendFile: (peerId, filePath) => ipcRenderer.invoke('proximity-native-send-file', peerId, filePath),
+    acceptTransfer: (transferId) => ipcRenderer.invoke('proximity-native-accept-transfer', transferId),
+    rejectTransfer: (transferId) => ipcRenderer.invoke('proximity-native-reject-transfer', transferId),
+    cancelTransfer: (transferId) => ipcRenderer.invoke('proximity-native-cancel-transfer', transferId),
+    // Swarm
+    createSwarm: () => ipcRenderer.invoke('proximity-native-create-swarm'),
+    joinSwarm: (swarmId, knownPeers) => ipcRenderer.invoke('proximity-native-join-swarm', swarmId, knownPeers),
+    leaveSwarm: () => ipcRenderer.invoke('proximity-native-leave-swarm'),
+    getSwarmInfo: () => ipcRenderer.invoke('proximity-native-swarm-info'),
+    calculateRoute: (source, dest, parallelPaths) => ipcRenderer.invoke('proximity-native-swarm-route', source, dest, parallelPaths),
+    // Event listener
+    onEvent: (callback) => {
+      ipcRenderer.on('proximity-native-event', (event, data) => callback(data));
+    },
+    offEvent: () => {
+      ipcRenderer.removeAllListeners('proximity-native-event');
+    },
+  },
+
+  // ─── Security Stack (MASQUE, OHTTP, Privacy Pass, Crypto) ───
+  security: {
+    // MASQUE / QUIC tunnel
+    masqueInit: (proxyUrl) => ipcRenderer.invoke('security-masque-init', { proxyUrl }),
+    masqueIsAvailable: () => ipcRenderer.invoke('security-masque-is-available'),
+    masqueSend: (target, payload) => ipcRenderer.invoke('security-masque-send', { target, payload }),
+
+    // OHTTP config (fetched via Node net — no browser fingerprint)
+    ohttpFetchConfig: (configUrl) => ipcRenderer.invoke('security-ohttp-fetch-config', { configUrl }),
+
+    // Privacy Pass token management (backed by main process memory)
+    ppStoreTokens: (tokens) => ipcRenderer.invoke('security-pp-store-tokens', tokens),
+    ppGetToken: () => ipcRenderer.invoke('security-pp-get-token'),
+    ppGetCount: () => ipcRenderer.invoke('security-pp-get-count'),
+
+    // Crypto RNG (Node CSPRNG fallback)
+    randomBytes: (size) => ipcRenderer.invoke('security-random-bytes', size),
+  },
+
+  // ─── Now Playing (System Media Detection) ───
+  nowPlaying: {
+    getStatus: () => ipcRenderer.invoke('now-playing-get-status'),
+    startPolling: (intervalMs) => ipcRenderer.invoke('now-playing-start-polling', intervalMs || 3000),
+    stopPolling: () => ipcRenderer.invoke('now-playing-stop-polling'),
+    onUpdate: (callback) => {
+      ipcRenderer.on('now-playing-update', (event, data) => callback(data));
+    },
+    offUpdate: () => {
+      ipcRenderer.removeAllListeners('now-playing-update');
+    },
   }
 });
 

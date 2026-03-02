@@ -65,122 +65,118 @@ const TraceHashModal = ({ onClose }) => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 ml-0">
             <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
 
-            <div className="relative w-full max-w-lg bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-700 transition-all duration-300">
+            <div className="relative w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-700 transition-all duration-300">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6">
+                <div className="bg-gradient-to-r from-sky-400 to-cyan-500 px-5 py-4">
                     <div className="flex justify-between items-center text-white">
-                        <div className="flex items-center space-x-3">
-                            <Shield className="w-6 h-6" />
-                            <h2 className="text-xl font-bold">Forensic Trace Tool</h2>
+                        <div className="flex items-center space-x-2">
+                            <Shield className="w-5 h-5" />
+                            <h2 className="text-lg font-bold">Trace Tool</h2>
                         </div>
-                        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-                            <X className="w-5 h-5" />
+                        <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-full transition-colors">
+                            <X className="w-4 h-4" />
                         </button>
                     </div>
-                    <p className="text-blue-100 text-sm mt-1 opacity-90">
-                        Identify the user behind a forensic watermark hash.
-                    </p>
                 </div>
 
-                <div className="p-6">
+                <div className="p-4">
                     {!results ? (
-                        <form onSubmit={handleVerify} className="space-y-5">
+                        <form onSubmit={handleVerify} className="space-y-3">
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                    Target Hash (from screenshot)
+                                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                                    Watermark Hash
                                 </label>
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                                     <input
                                         type="text"
                                         value={targetHash}
                                         onChange={(e) => setTargetHash(e.target.value)}
                                         placeholder="e.g. 3FC4CCFE7458"
                                         maxLength={12}
-                                        className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-forensic uppercase tracking-wider"
+                                        className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-sky-400 outline-none transition-all font-forensic uppercase tracking-wider text-sm"
                                         required
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                    Usernames to Cross-check
+                                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                                    Usernames
                                 </label>
                                 <div className="relative">
-                                    <Users className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                                    <Users className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-400" />
                                     <textarea
                                         value={usernamesInput}
                                         onChange={(e) => setUsernamesInput(e.target.value.toLowerCase())}
-                                        placeholder="Paste room participants here... (comma or line separated)"
-                                        className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[120px] text-sm lowercase"
+                                        placeholder="Comma or line separated"
+                                        className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-sky-400 outline-none transition-all min-h-[56px] text-sm lowercase resize-y"
+                                        rows={2}
                                         required
                                     />
                                 </div>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    Usernames are automatically converted to lowercase (hashes are case-sensitive)
+                                <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                                    Auto-lowercased · hashes are case-sensitive
                                 </p>
                             </div>
 
                             <button
                                 type="submit"
                                 disabled={isProcessing || !targetHash || !usernamesInput}
-                                className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 transition-all transform active:scale-[0.98] flex items-center justify-center space-x-2"
+                                className="w-full py-3 bg-sky-400 hover:bg-sky-500 disabled:opacity-50 text-white font-bold rounded-xl shadow-lg shadow-sky-400/20 transition-all transform active:scale-[0.98] flex items-center justify-center space-x-2 text-sm"
                             >
                                 {isProcessing ? (
                                     <>
-                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        <span>Analyzing Hashes...</span>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        <span>Analyzing...</span>
                                     </>
                                 ) : (
                                     <>
-                                        <Search className="w-5 h-5" />
+                                        <Search className="w-4 h-4" />
                                         <span>Trace Identity</span>
                                     </>
                                 )}
                             </button>
                         </form>
                     ) : (
-                        <div className="space-y-6 py-2">
-                            <div className={`p-6 rounded-2xl border ${results.found ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
-                                <div className="flex items-start space-x-4">
+                        <div className="space-y-4 py-1">
+                            <div className={`p-4 rounded-xl border ${results.found ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+                                <div className="flex items-start space-x-3">
                                     {results.found ? (
-                                        <CheckCircle2 className="w-8 h-8 text-green-600 dark:text-green-400 mt-1" />
+                                        <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
                                     ) : (
-                                        <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400 mt-1" />
+                                        <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
                                     )}
-                                    <div>
-                                        <h3 className={`text-lg font-bold ${results.found ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'}`}>
-                                            {results.found ? 'Match Found' : 'No Match Detected'}
+                                    <div className="min-w-0">
+                                        <h3 className={`text-base font-bold ${results.found ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'}`}>
+                                            {results.found ? 'Match Found' : 'No Match'}
                                         </h3>
-                                        <p className={`text-sm mt-1 ${results.found ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                                            <p className={`text-sm mt-1 ${results.found ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
-                                                Target: <span className="font-forensic font-bold uppercase tracking-wide">{results.targetHash}</span>
-                                            </p>
+                                        <p className={`text-xs mt-0.5 ${results.found ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
+                                            Hash: <span className="font-forensic font-bold uppercase tracking-wide">{results.targetHash}</span>
                                         </p>
                                     </div>
                                 </div>
 
                                 {results.found && (
-                                    <div className="mt-6 bg-white dark:bg-gray-800 p-4 rounded-xl border border-green-200 dark:border-green-800 shadow-sm">
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Identified User:</p>
-                                        <p className="text-2xl font-black text-gray-900 dark:text-white mt-1 break-all">
+                                    <div className="mt-3 bg-white dark:bg-gray-800 p-3 rounded-lg border border-green-200 dark:border-green-800">
+                                        <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider">Identified User</p>
+                                        <p className="text-xl font-black text-gray-900 dark:text-white mt-0.5 break-all">
                                             {results.found}
                                         </p>
                                     </div>
                                 )}
                             </div>
 
-                            <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-                                Scanned {results.searchedCount} usernames from provided list.
+                            <p className="text-center text-[10px] text-gray-400">
+                                Scanned {results.searchedCount} username{results.searchedCount !== 1 ? 's' : ''}
                             </p>
 
                             <button
                                 onClick={reset}
-                                className="w-full py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all flex items-center justify-center space-x-2"
+                                className="w-full py-2.5 border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all flex items-center justify-center space-x-2 text-sm"
                             >
-                                <Trash2 className="w-4 h-4" />
-                                <span>Clear and Try Again</span>
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Try Again</span>
                             </button>
                         </div>
                     )}

@@ -940,6 +940,14 @@ class RoomManager {
       this.roomTimers.delete(roomCode);
     }
 
+    // Clean up persisted media state for this room (if io reference available)
+    if (this._io && this._io._activeMedia) {
+      delete this._io._activeMedia[roomCode];
+    }
+    if (this._io && this._io._mediaWatchers) {
+      delete this._io._mediaWatchers[roomCode];
+    }
+
     // Clean up any invite tokens for this room
     if (this.roomToTokens.has(roomCode)) {
       const tokens = this.roomToTokens.get(roomCode);
@@ -1415,6 +1423,160 @@ class RoomManager {
     // Save back to storage using unified logic
     await this.saveMessage(roomCode, message);
 
+    return message;
+  }
+
+  /**
+   * Add a custom "Other" option to a poll and auto-vote the creator for it
+   * @param {string} roomCode - Room code
+   * @param {string} messageId - Message ID of the poll
+   * @param {string} text - Custom answer text (already sanitized)
+   * @param {string} userId - ID of the user adding the custom answer
+   * @param {string} nickname - Nickname of the user
+   * @returns {Promise<Object|null>} Updated message or null
+   */
+  async addPollCustomOption(roomCode, messageId, text, userId, nickname) {
+    const room = await this.getRoom(roomCode);
+    if (!room) return null;
+
+    const message = await this.getMessage(roomCode, messageId);
+    if (!message || message.messageType !== 'poll' || !message.pollData) return null;
+    if (!message.pollData.allowCustomAnswers) return null;
+
+    const { pollData } = message;
+    const { options, allowMultiple } = pollData;
+
+    // Prevent too many custom options (max 15 total options)
+    if (options.length >= 15) return null;
+
+    // Prevent duplicate custom text (case-insensitive)
+    const lowerText = text.toLowerCase();
+    if (options.some(o => o.text.toLowerCase() === lowerText)) return null;
+
+    // Prevent the same user from adding more than 3 custom options
+    const userCustomCount = options.filter(o => o.addedBy === userId).length;
+    if (userCustomCount >= 3) return null;
+
+    // Create the new option
+    const newOption = {
+      id: `opt_custom_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      text,
+      votes: [],
+      isCustom: true,
+      addedBy: userId,
+      addedByNickname: nickname
+    };
+
+    // Auto-vote the creator for this option
+    if (!allowMultiple) {
+      // Remove their votes from other options first
+      options.forEach(opt => {
+        if (opt.votes) {
+          opt.votes = opt.votes.filter(v => v.userId !== userId);
+        }
+      });
+    }
+    newOption.votes.push({
+      userId,
+      nickname,
+      timestamp: new Date().toISOString()
+    });
+
+    options.push(newOption);
+
+    await this.saveMessage(roomCode, message);
+    return message;
+  }
+
+  /**
+   * Create a sub-poll (follow-up poll) under a specific poll option
+   * @param {string} roomCode - Room code
+   * @param {string} messageId - Parent poll message ID
+   * @param {string} optionId - Parent option to attach sub-poll to
+   * @param {Object} subPollData - { question, options: string[], allowMultiple? }
+   * @returns {Promise<Object|null>} Updated message or null
+   */
+  async createSubPoll(roomCode, messageId, optionId, subPollData) {
+    const room = await this.getRoom(roomCode);
+    if (!room) return null;
+
+    const message = await this.getMessage(roomCode, messageId);
+    if (!message || message.messageType !== 'poll' || !message.pollData) return null;
+
+    const option = message.pollData.options.find(o => o.id === optionId);
+    if (!option) return null;
+
+    // Don't allow sub-poll if one already exists on this option
+    if (option.subPoll) return null;
+
+    // Sanitize sub-poll data
+    const question = typeof subPollData.question === 'string'
+      ? subPollData.question.trim().substring(0, 200) : '';
+    if (!question) return null;
+
+    const opts = (subPollData.options || [])
+      .filter(o => typeof o === 'string' && o.trim())
+      .slice(0, 5)
+      .map((text, idx) => ({
+        id: `subopt_${Date.now()}_${idx}`,
+        text: text.trim().substring(0, 100),
+        votes: []
+      }));
+
+    if (opts.length < 2) return null;
+
+    option.subPoll = {
+      question,
+      options: opts,
+      allowMultiple: !!subPollData.allowMultiple
+    };
+
+    await this.saveMessage(roomCode, message);
+    return message;
+  }
+
+  /**
+   * Vote on a sub-poll option
+   * @param {string} roomCode - Room code
+   * @param {string} messageId - Parent poll message ID
+   * @param {string} optionId - Parent option containing the sub-poll
+   * @param {string} subOptionId - Sub-poll option ID to vote for
+   * @param {string} userId - Voter ID
+   * @param {string} nickname - Voter nickname
+   * @returns {Promise<Object|null>} Updated message or null
+   */
+  async voteSubPoll(roomCode, messageId, optionId, subOptionId, userId, nickname) {
+    const room = await this.getRoom(roomCode);
+    if (!room) return null;
+
+    const message = await this.getMessage(roomCode, messageId);
+    if (!message || message.messageType !== 'poll' || !message.pollData) return null;
+
+    const parentOption = message.pollData.options.find(o => o.id === optionId);
+    if (!parentOption || !parentOption.subPoll) return null;
+
+    const subOpts = parentOption.subPoll.options;
+    const subOption = subOpts.find(o => o.id === subOptionId);
+    if (!subOption) return null;
+
+    if (!subOption.votes) subOption.votes = [];
+
+    const voterIndex = subOption.votes.findIndex(v => v.userId === userId);
+    if (voterIndex !== -1) {
+      // Toggle off
+      subOption.votes.splice(voterIndex, 1);
+    } else {
+      const voteObj = { userId, nickname, timestamp: new Date().toISOString() };
+      if (!parentOption.subPoll.allowMultiple) {
+        // Remove from all other sub-options first
+        subOpts.forEach(opt => {
+          if (opt.votes) opt.votes = opt.votes.filter(v => v.userId !== userId);
+        });
+      }
+      subOption.votes.push(voteObj);
+    }
+
+    await this.saveMessage(roomCode, message);
     return message;
   }
 

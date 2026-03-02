@@ -1,0 +1,22 @@
+[package]
+name = "proximity-node"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Node.js/Electron bindings for proximity-core via napi-rs"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+proximity-core = { path = "../../core" }
+napi = { version = "2.16", features = ["async", "serde-json"] }
+napi-derive = "2.16"
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[build-dependencies]
+napi-build = "1"

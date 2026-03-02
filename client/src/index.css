@@ -614,3 +614,24 @@ cap-widget {
   -ms-overflow-style: none !important;
   scrollbar-width: none !important;
 }
+
+/* ── Emoji Picker transparent glassmorphic overrides ── */
+.themed-emoji-picker .EmojiPickerReact {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.themed-emoji-picker .EmojiPickerReact .epr-header,
+.themed-emoji-picker .EmojiPickerReact .epr-body,
+.themed-emoji-picker .EmojiPickerReact .epr-search-container,
+.themed-emoji-picker .EmojiPickerReact .epr-category-nav {
+  background: transparent !important;
+}
+.themed-emoji-picker .EmojiPickerReact .epr-emoji-category-label {
+  background: transparent !important;
+}
+.themed-emoji-picker .EmojiPickerReact .epr-search-container input {
+  background: rgba(128, 128, 128, 0.15) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}

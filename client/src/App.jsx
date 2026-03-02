@@ -6,6 +6,9 @@ import JoinRoomModal from './components/JoinRoomModal';
 import InviteHandler from './components/InviteHandler.jsx';
 import PWAHandler from './components/PWAHandler';
 import MyRooms from './components/MyRooms'; // Import MyRooms component
+import MyDrops from './components/MyDrops';
+import DropPage from './components/DropPage';
+import NearbyTransfer from './components/NearbyTransfer';
 import AppRestrictionBanner from './components/AppRestrictionBanner';
 import DesktopSecurityGuard from './components/DesktopSecurityGuard';
 import DeepLinkHandler from './components/DeepLinkHandler';
@@ -44,6 +47,9 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/my-rooms" element={<MyRooms />} /> {/* Add MyRooms route */}
+          <Route path="/my-drops" element={<MyDrops />} />
+          <Route path="/drop/:dropId" element={<DropPage />} />
+          <Route path="/nearby" element={<NearbyTransfer />} />
           <Route path="/room/:roomCode" element={<ChatRoom />} />
           <Route path="/join" element={
             <Home>

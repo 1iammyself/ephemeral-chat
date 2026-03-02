@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { UserX, Clock, Shield, Plus, Zap, Wifi, Edit, Lock, KeyRound, Loader2, Timer } from 'lucide-react';
+import { UserX, Clock, Shield, Plus, Zap, Wifi, Edit, Lock, KeyRound, Loader2, Timer, Package, Download, Radio } from 'lucide-react';
 import CreateRoomModal from './CreateRoomModal';
+import CreateDropModal from './CreateDropModal';
+import DropCreatedModal from './DropCreatedModal';
+import ClaimDropModal from './ClaimDropModal';
+import DropViewer from './DropViewer';
 import TraceHashModal from './TraceHashModal';
 import ThemeToggle from './ThemeToggle';
 import { joinWithVerbalCode, checkRoom } from '../utils/api';
@@ -14,6 +18,10 @@ const Home = ({ children }) => {
   const [verbalCode, setVerbalCode] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showTraceModal, setShowTraceModal] = useState(false);
+  const [showCreateDropModal, setShowCreateDropModal] = useState(false);
+  const [showClaimDropModal, setShowClaimDropModal] = useState(false);
+  const [dropCreatedData, setDropCreatedData] = useState(null);
+  const [dropClaimData, setDropClaimData] = useState(null);
   const [isJoining, setIsJoining] = useState(false);
   const [isJoiningVerbal, setIsJoiningVerbal] = useState(false);
   const [urlParamsProcessed, setUrlParamsProcessed] = useState(false);
@@ -36,6 +44,10 @@ const Home = ({ children }) => {
       window.history.replaceState({}, '', window.location.pathname);
       // Then open the modal
       setShowCreateModal(true);
+    } else if (action === 'create-drop') {
+      setUrlParamsProcessed(true);
+      window.history.replaceState({}, '', window.location.pathname);
+      setShowCreateDropModal(true);
     } else if (joinCode) {
       setUrlParamsProcessed(true);
       // Decode the verbal code (handles %20 -> spaces)
@@ -216,6 +228,54 @@ const Home = ({ children }) => {
                   My Rooms
                 </button>
 
+                {/* Ephemeral Drops Section */}
+                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                  <p className="text-center text-xs font-medium text-purple-600 dark:text-purple-400 mb-3 flex items-center justify-center gap-1">
+                    <Package className="w-3.5 h-3.5" />
+                    Ephemeral Drops — Encrypted Dead Drops
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setShowCreateDropModal(true)}
+                      className="flex justify-center items-center px-3 py-2.5 text-sm font-bold rounded-xl text-white bg-purple-500 hover:bg-purple-600 transition-all transform active:scale-[0.98] shadow-lg shadow-purple-500/20"
+                    >
+                      <Package className="-ml-1 mr-1.5 h-4 w-4" />
+                      Create Drop
+                    </button>
+                    <button
+                      onClick={() => setShowClaimDropModal(true)}
+                      className="flex justify-center items-center px-3 py-2.5 text-sm font-bold rounded-xl text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-all transform active:scale-[0.98] border border-purple-200 dark:border-purple-800/50"
+                    >
+                      <Download className="-ml-1 mr-1.5 h-4 w-4" />
+                      Claim Drop
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => navigate('/my-drops')}
+                    className="w-full flex justify-center items-center px-4 py-2 text-xs font-medium rounded-lg text-purple-500 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all mt-2"
+                  >
+                    My Drops →
+                  </button>
+                </div>
+
+                {/* Nearby Transfer Section */}
+                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                  <p className="text-center text-xs font-medium text-emerald-600 dark:text-emerald-400 mb-3 flex items-center justify-center gap-1">
+                    <Radio className="w-3.5 h-3.5" />
+                    Nearby Transfer — P2P File Sharing
+                  </p>
+                  <button
+                    onClick={() => navigate('/nearby')}
+                    className="w-full flex justify-center items-center px-4 py-2.5 text-sm font-bold rounded-xl text-white bg-emerald-500 hover:bg-emerald-600 transition-all transform active:scale-[0.98] shadow-lg shadow-emerald-500/20"
+                  >
+                    <Radio className="-ml-1 mr-2 h-4 w-4" />
+                    Nearby Transfer
+                  </button>
+                  <p className="text-center text-[10px] text-gray-400 dark:text-gray-500 mt-1.5">
+                    Send files & messages to devices on the same network
+                  </p>
+                </div>
+
                 {/* Verbal Join Section */}
                 <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-700">
                   <p className="text-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
@@ -303,6 +363,45 @@ const Home = ({ children }) => {
             />
           )
         }
+
+        {/* Create Drop Modal */}
+        {showCreateDropModal && (
+          <CreateDropModal
+            onClose={() => setShowCreateDropModal(false)}
+            onDropCreated={(data) => {
+              setShowCreateDropModal(false);
+              setDropCreatedData(data);
+            }}
+          />
+        )}
+
+        {/* Drop Created Modal */}
+        {dropCreatedData && (
+          <DropCreatedModal
+            onClose={() => setDropCreatedData(null)}
+            dropData={dropCreatedData}
+          />
+        )}
+
+        {/* Claim Drop Modal */}
+        {showClaimDropModal && (
+          <ClaimDropModal
+            onClose={() => setShowClaimDropModal(false)}
+            onDropClaimed={(data) => {
+              setShowClaimDropModal(false);
+              // Open DropViewer directly with the claim data (avoid double-claim via route)
+              setDropClaimData(data);
+            }}
+          />
+        )}
+
+        {/* Drop Viewer (after claiming) */}
+        {dropClaimData && (
+          <DropViewer
+            onClose={() => setDropClaimData(null)}
+            claimData={dropClaimData}
+          />
+        )}
       </main >
 
       {/* Footer */}

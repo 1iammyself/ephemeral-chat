@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Users, Crown, User, Check, X, ChevronDown, Shield, UserX, Info, Zap } from 'lucide-react';
+import { Users, Crown, User, Check, X, ChevronDown, Shield, UserX, Info, Zap, Music } from 'lucide-react';
 import { ROLES, ROLE_INFO, canKick, canChangeRole, canManageGuests, getAssignableRoles } from '../utils/roles';
 import { hapticSuccess } from '../utils/platform';
+import NowPlayingBadge from './NowPlayingBadge';
 
 const UserList = ({
   users,
@@ -18,7 +19,8 @@ const UserList = ({
   onShowActivityLogs,
   hasNewLogs = false,
   verbalCode = null,
-  roomVibe
+  roomVibe,
+  nowPlayingMap = {}
 }) => {
   const [expandedUser, setExpandedUser] = useState(null);
 
@@ -208,6 +210,10 @@ const UserList = ({
                           </span>
                         )}
                       </div>
+                      {/* Now Playing Badge */}
+                      {nowPlayingMap[user.socketId] && (
+                        <NowPlayingBadge nowPlaying={nowPlayingMap[user.socketId]} compact={true} />
+                      )}
                     </div>
                     {/* Admin Controls Toggle */}
                     {(canKickUser || canChangeUserRole) && (

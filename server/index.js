@@ -31,6 +31,15 @@ const { convertAudioToAAC } = require('./utils/audio-converter');
 const { RtcTokenBuilder, RtcRole } = require('agora-token');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const { startRelayServer, registerTransfer, unregisterTransfer } = require('./relay-manager');
+const { DropManager } = require('./drops');
+const { createDropRoutes } = require('./drops-routes');
+const { setupNearbyNamespace } = require('./nearby');
+
+// ─── Security Hardening Modules ────────────────────────────
+const { initGatewayKeys, ohttpGatewayMiddleware, startKeyRotation: startOHTTPKeyRotation, stopKeyRotation: stopOHTTPKeyRotation } = require('./ohttp-gateway');
+const { initIssuer, attachPrivacyPassRoutes, privacyPassAuth, startCleanup: startPPCleanup, stopCleanup: stopPPCleanup } = require('./privacy-pass-issuer');
+const { attachICESignaling } = require('./ice-signaling');
+const { trafficPaddingMiddleware, startServerChaff, stopServerChaff, isChaff, stripPadding, padResponseMiddleware } = require('./traffic-padding');
 
 // Initialize Cap.js for proof-of-work CAPTCHA
 const cap = new Cap({
@@ -42,11 +51,46 @@ const cap = new Cap({
 // Initialize in-memory storage
 logger.info('🔌 Using in-memory storage for rooms and messages');
 
+// Initialize Drop Manager (Ephemeral Drops feature)
+const dropManager = new DropManager();
+logger.info('📦 Ephemeral Drops system initialized');
+
 async function initializeServer() {
   console.log('[DEBUG] Inside initializeServer...');
   logger.info('🚀 Starting server with in-memory storage...');
   // Initialize Redis if configured
   await initializeRedis();
+
+  // ─── Security Hardening Init ────────────────────────────
+  // OHTTP Gateway (RFC 9458) — metadata-protecting relay
+  try {
+    await initGatewayKeys();
+    ohttpGatewayMiddleware(app);
+    startOHTTPKeyRotation(24 * 60 * 60 * 1000); // Rotate keys every 24h
+    logger.info('🔒 OHTTP Gateway initialized');
+  } catch (e) {
+    logger.warn('⚠️  OHTTP Gateway init failed (non-fatal):', e.message);
+  }
+
+  // Privacy Pass (RFC 9578) — anonymous auth tokens
+  try {
+    initIssuer();
+    attachPrivacyPassRoutes(app);
+    startPPCleanup(5 * 60 * 1000); // Clean spent tokens every 5 min
+    logger.info('🎫 Privacy Pass Issuer initialized');
+  } catch (e) {
+    logger.warn('⚠️  Privacy Pass init failed (non-fatal):', e.message);
+  }
+
+  // ICE Signaling — P2P hole punching relay
+  try {
+    attachICESignaling(io, {
+      getRoomMembers: (roomCode) => io.sockets.adapter.rooms.get(roomCode)
+    });
+    logger.info('🕳️  ICE Signaling attached for P2P hole punching');
+  } catch (e) {
+    logger.warn('⚠️  ICE Signaling init failed (non-fatal):', e.message);
+  }
 
   // Start e2ecp relay process - REMOVED (Lazy loaded now)
   // startRelayServer();
@@ -132,8 +176,8 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Privacy-Pass'],
+  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar', 'X-Padded'],
   maxAge: 86400 // 24 hours
 };
 
@@ -168,10 +212,24 @@ const io = socketIo(server, {
   perMessageDeflate: false // Disable to prevent Base64 corruption
 });
 
+// Initialize the Nearby Transfer signaling namespace
+setupNearbyNamespace(io);
+
 const PORT = process.env.PORT || 3001
 
 // Apply JSON middleware
 app.use(express.json());
+
+// ─── Traffic Padding Middleware (RFC-compliant traffic analysis resistance) ──
+// Pads all JSON API responses to fixed bucket sizes so network observers
+// cannot infer content type or message length from packet sizes.
+app.use('/api', padResponseMiddleware);
+
+// ─── Privacy Pass Auth Middleware (RFC 9578) ────────────────
+// Validates anonymous auth tokens on all /api routes.
+// If no token is present, the request proceeds normally (soft validation).
+// If a token IS present but invalid/spent, the request is rejected with 401.
+app.use('/api', privacyPassAuth);
 
 // Root endpoint for API status / health checks
 app.get('/', (req, res) => {
@@ -324,6 +382,10 @@ function getEnrichedUsers(roomCode) {
     };
   });
 }
+
+// ─── Ephemeral Drops API Routes ─────────────────────────────
+app.use('/api/drops', createDropRoutes(dropManager));
+logger.info('📦 Drop API routes mounted at /api/drops');
 
 // REST API Routes
 app.get('/api/invite/:token', async (req, res) => {
@@ -768,6 +830,33 @@ app.delete('/api/rooms/:roomCode/delete', async (req, res) => {
   }
 });
 
+// ─── Socket.IO Traffic Padding Middleware ──────────────────
+// Intercepts padded-message events: drops chaff, strips padding from real
+// messages. Also starts per-room server-originated chaff on room join.
+io.use(trafficPaddingMiddleware);
+
+// Per-room chaff tracking — keeps a setInterval per room
+const roomChaffIntervals = new Map();
+
+/**
+ * Ensure server-originated chaff is running for a room.
+ * Called after any successful join-room.
+ */
+function ensureRoomChaff(roomCode) {
+  if (roomChaffIntervals.has(roomCode)) return; // already running
+  startServerChaff(io, roomCode);
+  roomChaffIntervals.set(roomCode, true);
+}
+
+/**
+ * Stop chaff for a room (called when room empties).
+ */
+function cleanupRoomChaff(roomCode) {
+  if (roomChaffIntervals.has(roomCode)) {
+    stopServerChaff(roomCode);
+    roomChaffIntervals.delete(roomCode);
+  }
+}
 
 io.on('connection', (socket) => {
   // logger.info(`🔌 User connected: ${socket.id}`);
@@ -1246,6 +1335,7 @@ io.on('connection', (socket) => {
           securityManager.clearDisconnectedSession(sessionToken);
 
           socket.join(roomCode);
+          ensureRoomChaff(roomCode); // Start traffic-analysis-resistant chaff
           socket.roomCode = roomCode;
           socket.nickname = nickname || session.nickname || generateRandomNickname();
           socket.persistentUserId = userId || socket.id; // Store persistent ID on socket
@@ -1542,6 +1632,7 @@ io.on('connection', (socket) => {
 
         // logger.info(`User ${userNickname} (${socket.id}) successfully joined room ${roomCode}`);
         socket.join(roomCode);
+        ensureRoomChaff(roomCode); // Start traffic-analysis-resistant chaff
         socket.roomCode = roomCode;
         socket.nickname = userNickname;
         socket.persistentUserId = userId || socket.id; // Store persistent ID on socket
@@ -1676,7 +1767,8 @@ io.on('connection', (socket) => {
           nickname: userNickname,
           isInviteOnly: result.room.settings?.isInviteOnly || false,
           inactivityTimeoutMs: securityManager.INACTIVITY_TIMEOUT_MS,
-          sessionToken
+          sessionToken,
+          activeMedia: io._activeMedia?.[roomCode] || null
         });
 
         // Notify others
@@ -1747,7 +1839,18 @@ io.on('connection', (socket) => {
       }
 
       // Support for text, image, audio, and file messages
-      let { content, messageType = 'text', isViewOnce = false, imageData, pollData, recipients = [], replyTo, isEncrypted, iv, fileName, mimeType, fileSize, isAnonymous, overrideTtl } = data;
+      // ─── v2 ratchet fields (PQXDH + Double Ratchet encrypted payloads) ───
+      let { content, messageType = 'text', isViewOnce = false, imageData, pollData, recipients = [], replyTo, isEncrypted, iv, fileName, mimeType, fileSize, isAnonymous, overrideTtl,
+            v: payloadVersion, header: ratchetHeader, ciphertext: ratchetCiphertext, ratchet: isRatchet } = data;
+
+      // ─── v2 normalization: map v2 ciphertext → content so server pipeline works ─
+      const isV2 = payloadVersion === 2 && isRatchet;
+      if (isV2) {
+        // v2 messages carry their encrypted data in `ciphertext`, not `content`.
+        // Map it so the rest of the handler (messageContent, message object) works.
+        if (!content) content = ratchetCiphertext;
+        if (messageType === 'image' && !imageData) imageData = ratchetCiphertext;
+      }
 
       // Normalize content/imageData: If it's an image and content is provided but imageData isn't, use content for imageData
       if (messageType === 'image' && !imageData && content) {
@@ -1827,6 +1930,10 @@ io.on('connection', (socket) => {
         }
       } else if (messageType === 'audio' && isEncrypted) {
         messageContent = content; // Keep encrypted string as is
+      } else if (messageType === 'poll' && isV2) {
+        // v2-encrypted poll: server cannot inspect poll structure.
+        // The decrypted JSON is reconstructed by the receiving client.
+        messageContent = content; // encrypted ciphertext string
       } else if (messageType === 'poll') {
         if (!pollData || !pollData.question || !Array.isArray(pollData.options)) {
           socket.emit('error', { message: 'Invalid poll data' });
@@ -1852,8 +1959,13 @@ io.on('connection', (socket) => {
         data.pollData = {
           question: sanitizedQuestion,
           options: sanitizedOptions,
-          allowMultiple: !!pollData.allowMultiple
+          allowMultiple: !!pollData.allowMultiple,
+          allowCustomAnswers: !!pollData.allowCustomAnswers
         };
+      } else if (messageType === 'game' && isV2) {
+        // v2-encrypted game: server cannot inspect game structure.
+        // The decrypted JSON is reconstructed by the receiving client.
+        messageContent = content; // encrypted ciphertext string
       } else if (messageType === 'game') {
         const { gameData } = data;
         if (!gameData || !gameData.gameType) {
@@ -1950,6 +2062,36 @@ io.on('connection', (socket) => {
           gameData.gameType === 'trivia' ? 'Trivia' :
             gameData.gameType === 'rock-paper-scissors' ? 'Rock Paper Scissors' :
               gameData.gameType === 'chess' ? 'Chess' : 'Tic-Tac-Toe';
+      } else if (messageType === 'tournament') {
+        // Tournament creation
+        const td = data.tournamentData;
+        if (!td || !td.gameType || !td.format || !td.name) {
+          socket.emit('error', { message: 'Invalid tournament data' });
+          return;
+        }
+        const validGameTypes = ['tic-tac-toe', 'rock-paper-scissors', 'chess', 'trivia'];
+        const validFormats = ['single-elimination', 'double-elimination', 'round-robin'];
+        if (!validGameTypes.includes(td.gameType)) return;
+        if (!validFormats.includes(td.format)) return;
+
+        const creatorId = socket.persistentUserId || socket.id;
+        data.tournamentData = {
+          name: sanitizeInput(td.name.trim()).substring(0, 60),
+          gameType: td.gameType,
+          format: td.format,
+          status: 'waiting',
+          maxPlayers: Math.min(Math.max(parseInt(td.maxPlayers) || 8, 2), 16),
+          bestOf: td.gameType === 'rock-paper-scissors' ? Math.min(Math.max(parseInt(td.bestOf) || 1, 1), 5) : 1,
+          triviaRounds: td.gameType === 'trivia' ? Math.min(Math.max(parseInt(td.triviaRounds) || 5, 3), 15) : undefined,
+          createdBy: creatorId,
+          players: [{
+            id: creatorId,
+            nickname: socket.nickname,
+            socketId: socket.id
+          }],
+          bracket: null
+        };
+        messageContent = `🏆 ${data.tournamentData.name}`;
       } else {
         messageContent = isEncrypted ? content : sanitizeInput(content.trim());
       }
@@ -1961,12 +2103,22 @@ io.on('connection', (socket) => {
         isViewOnce,
         pollData: messageType === 'poll' ? data.pollData : undefined,
         gameData: messageType === 'game' ? data.gameData : undefined,
+        tournamentData: messageType === 'tournament' ? data.tournamentData : undefined,
         fileName: messageType === 'file' ? fileName : undefined,
         mimeType: messageType === 'file' ? mimeType : undefined,
         fileSize: messageType === 'file' ? fileSize : undefined,
         recipients, // Store recipients
         isEncrypted: !!isEncrypted, // Store encryption flag
         iv: iv || null, // Store IV if encrypted
+        // ─── v2 ratchet fields (Double Ratchet + PQXDH) ────────
+        // These MUST be forwarded verbatim so the receiving client can
+        // recognize and decrypt v2 payloads.  The server NEVER decrypts.
+        ...(isV2 ? {
+          v: 2,
+          header: ratchetHeader,
+          ciphertext: ratchetCiphertext,
+          ratchet: true,
+        } : {}),
         replyTo: replyTo || null, // Store reply text/preview
         reactions: {}, // Initialize reactions
         hasBeenViewed: false,
@@ -2045,13 +2197,26 @@ io.on('connection', (socket) => {
 
 
   // Edit Message
-  socket.on('edit-message', async ({ messageId, newContent }) => {
-    if (!socket.roomCode || !messageId || !newContent) return;
+  // ─── v2-aware: accepts both legacy { newContent } and v2 { v, header, ciphertext, ratchet } ─
+  socket.on('edit-message', async (data) => {
+    const { messageId, newContent, v: editV, header: editHeader, ciphertext: editCiphertext, ratchet: editRatchet, isEncrypted: editEncrypted, iv: editIv } = data || {};
+    const isV2Edit = editV === 2 && editRatchet;
+    const effectiveContent = isV2Edit ? editCiphertext : newContent;
+    if (!socket.roomCode || !messageId || !effectiveContent) return;
 
     // Call roomManager
-    const updatedMessage = await roomManager.editMessage(socket.roomCode, messageId, newContent, socket.id);
+    const updatedMessage = await roomManager.editMessage(socket.roomCode, messageId, effectiveContent, socket.id);
 
     if (updatedMessage) {
+      // Attach v2 ratchet fields so the receiving client can decrypt
+      if (isV2Edit) {
+        updatedMessage.v = 2;
+        updatedMessage.header = editHeader;
+        updatedMessage.ciphertext = editCiphertext;
+        updatedMessage.iv = editIv;
+        updatedMessage.ratchet = true;
+        updatedMessage.isEncrypted = true;
+      }
       // Broadcast update
       io.to(socket.roomCode).emit('message-updated', updatedMessage);
     }
@@ -2104,6 +2269,185 @@ io.on('connection', (socket) => {
     });
   });
 
+  // ─── Watch Party: Synced Media Player ────────────────────────────
+  // Track media watchers per room (stored in-memory; rooms are ephemeral)
+  if (!io._mediaWatchers) io._mediaWatchers = {};  // { roomCode: Set<socketId> }
+  // Persist active media state per room so reconnecting users get it back
+  if (!io._activeMedia) io._activeMedia = {};      // { roomCode: { type, id, url, sharedBy, sharedAt } }
+
+  // Allowed media types whitelist
+  const ALLOWED_MEDIA_TYPES = ['youtube', 'soundcloud'];
+  // Allowed sync actions whitelist
+  const ALLOWED_SYNC_ACTIONS = ['play', 'pause', 'seek'];
+  // URL validation: must be a real YouTube or SoundCloud URL
+  const SAFE_YT_URL = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)\//;
+  const SAFE_SC_URL = /^https?:\/\/(www\.)?soundcloud\.com\//;
+
+  socket.on('media-share', (data) => {
+    if (!socket.roomCode) return;
+    if (!checkRateLimit(socket.id, 10, 60000)) return;
+
+    // ── Encrypted v2 payload: relay opaquely (E2E encrypted by Double Ratchet) ──
+    if (data && data.v === 2 && data.ratchet === true && data.ciphertext) {
+      // Size-limit the opaque blob to prevent abuse (~128KB generous ceiling)
+      if (typeof data.ciphertext !== 'string' || data.ciphertext.length > 131072) return;
+      if (typeof data.iv !== 'string' || data.iv.length > 256) return;
+      if (data.header && typeof data.header !== 'object') return;
+      io.to(socket.roomCode).emit('media-share', data);
+      // Store encrypted blob so reconnecting users with ratchet session can decrypt
+      io._activeMedia[socket.roomCode] = { v: 2, ratchet: true, ciphertext: data.ciphertext, iv: data.iv, header: data.header, sharedAt: Date.now() };
+      logger.info(`Encrypted media shared in room ${socket.roomCode}`);
+      return;
+    }
+
+    // ── Cleartext fallback: full input validation (backward compat) ──
+    const type = typeof data.type === 'string' ? data.type.toLowerCase().trim() : '';
+    if (!ALLOWED_MEDIA_TYPES.includes(type)) return;
+
+    const rawUrl = typeof data.url === 'string' ? data.url.trim() : '';
+    if (!rawUrl || rawUrl.length > 2048) return;
+
+    // Validate URL matches the declared type
+    if (type === 'youtube' && !SAFE_YT_URL.test(rawUrl)) return;
+    if (type === 'soundcloud' && !SAFE_SC_URL.test(rawUrl)) return;
+
+    // Validate YouTube video ID if provided (must be 11 alphanumeric/dash/underscore chars)
+    const rawId = typeof data.id === 'string' ? data.id.trim() : null;
+    if (type === 'youtube') {
+      if (!rawId || !/^[a-zA-Z0-9_-]{11}$/.test(rawId)) return;
+    }
+
+    // Sanitize the sharedBy name (use socket.nickname as authoritative source)
+    const sharedBy = sanitizeInput(socket.nickname || 'Someone').substring(0, 30);
+
+    const payload = {
+      type,
+      id: rawId,
+      url: rawUrl,
+      sharedBy,
+    };
+
+    // Broadcast to entire room (including sender so UI updates)
+    io.to(socket.roomCode).emit('media-share', payload);
+    // Persist active media state for reconnecting users
+    io._activeMedia[socket.roomCode] = { ...payload, sharedAt: Date.now() };
+    logger.info(`Media shared in room ${socket.roomCode}: ${type} by ${sharedBy}`);
+  });
+
+  socket.on('media-sync', (data) => {
+    if (!socket.roomCode) return;
+    // Rate limit sync events (generous for seek but prevents abuse)
+    if (!checkRateLimit(socket.id, 40, 60000)) return;
+
+    // ── Encrypted v2 payload: relay opaquely ──
+    if (data && data.v === 2 && data.ratchet === true && data.ciphertext) {
+      if (typeof data.ciphertext !== 'string' || data.ciphertext.length > 65536) return;
+      if (typeof data.iv !== 'string' || data.iv.length > 256) return;
+      if (data.header && typeof data.header !== 'object') return;
+      socket.to(socket.roomCode).emit('media-sync', data);
+      return;
+    }
+
+    // ── Cleartext fallback: full input validation ──
+    const action = typeof data.action === 'string' ? data.action.toLowerCase().trim() : '';
+    if (!ALLOWED_SYNC_ACTIONS.includes(action)) return;
+
+    const currentTime = typeof data.currentTime === 'number'
+      ? Math.max(0, Math.min(data.currentTime, 86400))  // Cap at 24h
+      : 0;
+
+    // Forward play / pause / seek to all *other* participants
+    socket.to(socket.roomCode).emit('media-sync', {
+      action,
+      currentTime,
+      userId: socket.id,
+    });
+  });
+
+  socket.on('media-join', () => {
+    if (!socket.roomCode) return;
+    if (!checkRateLimit(socket.id, 10, 60000)) return;  // Prevent rapid join/leave spam
+    if (!io._mediaWatchers[socket.roomCode]) io._mediaWatchers[socket.roomCode] = new Set();
+    io._mediaWatchers[socket.roomCode].add(socket.id);
+    io.to(socket.roomCode).emit('media-sync-count', { count: io._mediaWatchers[socket.roomCode].size });
+  });
+
+  socket.on('media-leave', () => {
+    if (!socket.roomCode) return;
+    if (!checkRateLimit(socket.id, 10, 60000)) return;  // Prevent rapid join/leave spam
+    if (io._mediaWatchers[socket.roomCode]) {
+      io._mediaWatchers[socket.roomCode].delete(socket.id);
+      const count = io._mediaWatchers[socket.roomCode].size;
+      if (count === 0) delete io._mediaWatchers[socket.roomCode];
+      else io.to(socket.roomCode).emit('media-sync-count', { count });
+    }
+  });
+
+  socket.on('media-close', () => {
+    if (!socket.roomCode) return;
+    if (!checkRateLimit(socket.id, 5, 60000)) return;
+
+    // Only host or elevated roles can close the media player for the room
+    const room = roomData[socket.roomCode];
+    if (room) {
+      const userRole = room.userRoles?.[socket.id] || (room.hostId === socket.id ? 'host' : 'user');
+      if (userRole !== 'host' && userRole !== 'tier1' && userRole !== 'tier2') {
+        // Regular users can only leave — not close for everyone
+        return;
+      }
+    }
+
+    socket.to(socket.roomCode).emit('media-close');
+    delete io._mediaWatchers[socket.roomCode];
+    delete io._activeMedia[socket.roomCode];  // Clear persisted media state
+  });
+
+  // ─── Now Playing Status ─────────────────────────────────────────
+  socket.on('now-playing-update', (data) => {
+    if (!socket.roomCode) return;
+    // Rate limit: now-playing updates are infrequent (every 4s at most from polling)
+    if (!checkRateLimit(socket.id, 20, 60000)) return;
+
+    // ── Encrypted v2 payload: relay opaquely ──
+    if (data && data.v === 2 && data.ratchet === true && data.ciphertext) {
+      if (typeof data.ciphertext !== 'string' || data.ciphertext.length > 65536) return;
+      if (typeof data.iv !== 'string' || data.iv.length > 256) return;
+      if (data.header && typeof data.header !== 'object') return;
+      socket.to(socket.roomCode).emit('now-playing-update', {
+        ...data,
+        userId: socket.id,
+        nickname: socket.nickname,
+      });
+      return;
+    }
+
+    // ── Cleartext fallback: full input validation ──
+    let nowPlaying = null;
+    if (data.nowPlaying && typeof data.nowPlaying === 'object') {
+      const title = typeof data.nowPlaying.title === 'string'
+        ? sanitizeInput(data.nowPlaying.title).substring(0, 120)
+        : '';
+      const artist = typeof data.nowPlaying.artist === 'string'
+        ? sanitizeInput(data.nowPlaying.artist).substring(0, 80)
+        : '';
+      const source = typeof data.nowPlaying.source === 'string'
+        ? sanitizeInput(data.nowPlaying.source).substring(0, 30)
+        : '';
+
+      // Only broadcast if there's actually a title
+      if (title.length > 0) {
+        nowPlaying = { title, artist, source };
+      }
+    }
+
+    // Broadcast this user's now-playing status to the room
+    socket.to(socket.roomCode).emit('now-playing-update', {
+      userId: socket.id,
+      nickname: socket.nickname,
+      nowPlaying,
+    });
+  });
+
   // Health Check
   socket.on('latency-ping', (startTime) => {
     socket.emit('latency-pong', startTime);
@@ -2146,7 +2490,9 @@ io.on('connection', (socket) => {
     try {
       if (!socket.roomCode || !messageId || !optionId) return;
 
-      const updatedMessage = await roomManager.votePoll(socket.roomCode, messageId, optionId, socket.id, socket.nickname);
+      // Use persistent identity so reconnecting users can't double-vote
+      const voterId = socket.persistentUserId || socket.id;
+      const updatedMessage = await roomManager.votePoll(socket.roomCode, messageId, optionId, voterId, socket.nickname);
       if (updatedMessage) {
         io.to(socket.roomCode).emit('message-updated', updatedMessage);
 
@@ -2156,7 +2502,792 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle game answer
+  // Handle poll custom answer ("Other" / open-ended)
+  socket.on('poll-custom-answer', async ({ messageId, customText }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      if (typeof customText !== 'string' || !customText.trim()) return;
+      if (!checkRateLimit(socket.id, 10, 60000)) return;
+
+      const voterId = socket.persistentUserId || socket.id;
+      const sanitized = sanitizeInput(customText.trim()).substring(0, 100);
+      if (!sanitized) return;
+
+      const updatedMessage = await roomManager.addPollCustomOption(
+        socket.roomCode, messageId, sanitized, voterId, socket.nickname
+      );
+      if (updatedMessage) {
+        io.to(socket.roomCode).emit('message-updated', updatedMessage);
+      }
+    } catch (error) {
+      logger.error('Error adding custom poll answer:', error);
+    }
+  });
+
+  // Handle sub-poll creation (follow-up poll under a poll option)
+  socket.on('create-sub-poll', async ({ messageId, optionId, subPollData }) => {
+    try {
+      if (!socket.roomCode || !messageId || !optionId) return;
+      if (!subPollData || !subPollData.question || !Array.isArray(subPollData.options)) return;
+      if (!checkRateLimit(socket.id, 5, 60000)) return;
+
+      const updatedMessage = await roomManager.createSubPoll(
+        socket.roomCode, messageId, optionId, subPollData
+      );
+      if (updatedMessage) {
+        io.to(socket.roomCode).emit('message-updated', updatedMessage);
+      }
+    } catch (error) {
+      logger.error('Error creating sub-poll:', error);
+    }
+  });
+
+  // Handle sub-poll voting
+  socket.on('vote-sub-poll', async ({ messageId, optionId, subOptionId }) => {
+    try {
+      if (!socket.roomCode || !messageId || !optionId || !subOptionId) return;
+
+      const voterId = socket.persistentUserId || socket.id;
+      const updatedMessage = await roomManager.voteSubPoll(
+        socket.roomCode, messageId, optionId, subOptionId, voterId, socket.nickname
+      );
+      if (updatedMessage) {
+        io.to(socket.roomCode).emit('message-updated', updatedMessage);
+      }
+    } catch (error) {
+      logger.error('Error voting on sub-poll:', error);
+    }
+  });
+
+  // ─── Tournament Events ────────────────────────────────────────────
+
+  // Join a tournament
+  socket.on('tournament-join', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      if (!checkRateLimit(socket.id, 10, 60000)) return;
+
+      const message = await roomManager.getMessage(socket.roomCode, messageId);
+      if (!message || message.messageType !== 'tournament' || !message.tournamentData) return;
+
+      const td = message.tournamentData;
+      if (td.status !== 'waiting') return;
+
+      const playerId = socket.persistentUserId || socket.id;
+
+      // Already joined?
+      if (td.players.some(p => p.id === playerId)) return;
+
+      // Room full?
+      if (td.players.length >= td.maxPlayers) return;
+
+      td.players.push({
+        id: playerId,
+        nickname: socket.nickname,
+        socketId: socket.id
+      });
+
+      await roomManager.saveMessage(socket.roomCode, message);
+      io.to(socket.roomCode).emit('message-updated', message);
+
+      logger.info(`🏆 ${socket.nickname} joined tournament in room ${socket.roomCode}`);
+    } catch (error) {
+      logger.error('Error joining tournament:', error);
+    }
+  });
+
+  // Start a tournament (creator only)
+  socket.on('tournament-start', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      if (!checkRateLimit(socket.id, 5, 60000)) return;
+
+      const message = await roomManager.getMessage(socket.roomCode, messageId);
+      if (!message || message.messageType !== 'tournament' || !message.tournamentData) return;
+
+      const td = message.tournamentData;
+      const creatorId = socket.persistentUserId || socket.id;
+
+      if (td.createdBy !== creatorId) return;
+      if (td.status !== 'waiting') return;
+      if (td.players.length < 2) return;
+
+      // Shuffle players for seeding
+      const shuffled = [...td.players].sort(() => Math.random() - 0.5);
+
+      // Generate bracket based on format
+      if (td.format === 'round-robin') {
+        const n = shuffled.length;
+        const isOdd = n % 2 !== 0;
+        const padded = isOdd ? [...shuffled, null] : [...shuffled];
+        const total = padded.length;
+        const roundCount = total - 1;
+        const matchesPerRound = total / 2;
+        const rounds = [];
+        const fixed = padded[0];
+        const rotating = padded.slice(1);
+
+        for (let r = 0; r < roundCount; r++) {
+          const round = [];
+          const all = [fixed, ...rotating];
+          for (let m = 0; m < matchesPerRound; m++) {
+            const p1 = all[m];
+            const p2 = all[total - 1 - m];
+            if (!p1 || !p2) continue;
+            round.push({
+              id: `m_rr${r + 1}_${m}`,
+              round: r + 1, matchIndex: m,
+              player1: { id: p1.id, nickname: p1.nickname },
+              player2: { id: p2.id, nickname: p2.nickname },
+              winner: null, status: 'pending', gameMessageId: null
+            });
+          }
+          rounds.push(round);
+          rotating.unshift(rotating.pop());
+        }
+
+        const standings = shuffled.map(p => ({
+          playerId: p.id, nickname: p.nickname,
+          wins: 0, losses: 0, draws: 0, points: 0
+        }));
+
+        td.bracket = { rounds, standings };
+      } else if (td.format === 'double-elimination') {
+        // Double elimination — winners bracket + losers bracket + grand finals
+        const bracketSize = Math.pow(2, Math.ceil(Math.log2(shuffled.length)));
+        const totalRounds = Math.log2(bracketSize);
+
+        // Winners bracket (same as single elimination)
+        const winnersFirstRound = [];
+        for (let i = 0; i < bracketSize / 2; i++) {
+          const p1 = shuffled[i] || null;
+          const p2 = shuffled[bracketSize - 1 - i] || null;
+          const match = {
+            id: `m_w1_${i}`,
+            round: 1, matchIndex: i, bracket: 'winners',
+            player1: p1 ? { id: p1.id, nickname: p1.nickname } : null,
+            player2: p2 ? { id: p2.id, nickname: p2.nickname } : null,
+            winner: null, status: (!p1 || !p2) ? 'bye' : 'pending',
+            gameMessageId: null
+          };
+          if (!p1 && p2) match.winner = p2.id;
+          if (p1 && !p2) match.winner = p1.id;
+          winnersFirstRound.push(match);
+        }
+
+        const winnersRounds = [winnersFirstRound];
+        for (let r = 2; r <= totalRounds; r++) {
+          const mc = bracketSize / Math.pow(2, r);
+          const round = [];
+          for (let i = 0; i < mc; i++) {
+            round.push({
+              id: `m_w${r}_${i}`,
+              round: r, matchIndex: i, bracket: 'winners',
+              player1: null, player2: null,
+              winner: null, status: 'pending', gameMessageId: null
+            });
+          }
+          winnersRounds.push(round);
+        }
+
+        // Advance bye winners in winners bracket
+        if (winnersRounds.length >= 2) {
+          for (let i = 0; i < winnersFirstRound.length; i++) {
+            const match = winnersFirstRound[i];
+            if (match.status === 'bye' && match.winner) {
+              const nextMatch = winnersRounds[1][Math.floor(i / 2)];
+              if (!nextMatch) continue;
+              const wp = match.player1?.id === match.winner ? match.player1 : match.player2;
+              if (i % 2 === 0) nextMatch.player1 = wp;
+              else nextMatch.player2 = wp;
+            }
+          }
+        }
+
+        // Losers bracket — starts with losers from winners R1
+        const losersRoundCount = (totalRounds - 1) * 2;
+        const losersRounds = [];
+        let lmc = Math.max(1, Math.floor(bracketSize / 4));
+        for (let r = 1; r <= losersRoundCount; r++) {
+          const round = [];
+          for (let i = 0; i < lmc; i++) {
+            round.push({
+              id: `m_l${r}_${i}`,
+              round: r, matchIndex: i, bracket: 'losers',
+              player1: null, player2: null,
+              winner: null, status: 'pending', gameMessageId: null
+            });
+          }
+          losersRounds.push(round);
+          if (r % 2 === 0) lmc = Math.max(1, Math.floor(lmc / 2));
+        }
+
+        // Grand finals
+        const grandFinals = [{
+          id: 'm_gf_0',
+          round: 1, matchIndex: 0, bracket: 'grand-finals',
+          player1: null, player2: null,
+          winner: null, status: 'pending', gameMessageId: null
+        }];
+
+        td.bracket = { winnersRounds, losersRounds, grandFinals, totalRounds, format: 'double-elimination' };
+      } else {
+        // Single elimination bracket
+        const bracketSize = Math.pow(2, Math.ceil(Math.log2(shuffled.length)));
+        const totalRounds = Math.log2(bracketSize);
+
+        const firstRound = [];
+        for (let i = 0; i < bracketSize / 2; i++) {
+          const p1 = shuffled[i] || null;
+          const p2 = shuffled[bracketSize - 1 - i] || null;
+          const match = {
+            id: `m_r1_${i}`,
+            round: 1, matchIndex: i,
+            player1: p1 ? { id: p1.id, nickname: p1.nickname } : null,
+            player2: p2 ? { id: p2.id, nickname: p2.nickname } : null,
+            winner: null, status: (!p1 || !p2) ? 'bye' : 'pending',
+            gameMessageId: null
+          };
+          if (!p1 && p2) match.winner = p2.id;
+          if (p1 && !p2) match.winner = p1.id;
+          firstRound.push(match);
+        }
+
+        const rounds = [firstRound];
+        for (let r = 2; r <= totalRounds; r++) {
+          const mc = bracketSize / Math.pow(2, r);
+          const round = [];
+          for (let i = 0; i < mc; i++) {
+            round.push({
+              id: `m_r${r}_${i}`,
+              round: r, matchIndex: i,
+              player1: null, player2: null,
+              winner: null, status: 'pending', gameMessageId: null
+            });
+          }
+          rounds.push(round);
+        }
+
+        // Advance bye winners to round 2
+        if (rounds.length >= 2) {
+          for (let i = 0; i < firstRound.length; i++) {
+            const match = firstRound[i];
+            if (match.status === 'bye' && match.winner) {
+              const nextMatch = rounds[1][Math.floor(i / 2)];
+              if (!nextMatch) continue;
+              const wp = match.player1?.id === match.winner ? match.player1 : match.player2;
+              if (i % 2 === 0) nextMatch.player1 = wp;
+              else nextMatch.player2 = wp;
+            }
+          }
+        }
+
+        td.bracket = { rounds, totalRounds };
+      }
+
+      // For trivia tournaments, initialize trivia-specific data
+      if (td.gameType === 'trivia') {
+        const totalTriviaRounds = Math.min(Math.max(parseInt(td.triviaRounds) || 5, 3), 15);
+        td.triviaData = {
+          totalRounds: totalTriviaRounds,
+          currentRound: 0,
+          scores: shuffled.reduce((acc, p) => {
+            acc[p.id] = { nickname: p.nickname, score: 0, streak: 0, bestStreak: 0 };
+            return acc;
+          }, {}),
+          rounds: [], // Will be populated as questions are submitted
+          status: 'waiting-question' // waiting-question, answering, round-complete
+        };
+        // Override bracket for trivia (bracket is unused, trivia uses triviaData)
+        td.bracket = td.bracket || { rounds: [], standings: [] };
+      }
+
+      td.status = 'in-progress';
+      td.startedAt = new Date().toISOString();
+
+      await roomManager.saveMessage(socket.roomCode, message);
+      io.to(socket.roomCode).emit('message-updated', message);
+
+      logger.info(`🏆 Tournament started in room ${socket.roomCode} with ${td.players.length} players (${td.format})`);
+    } catch (error) {
+      logger.error('Error starting tournament:', error);
+    }
+  });
+
+  // Submit a trivia question for the current tournament round (creator only)
+  socket.on('tournament-trivia-question', async ({ messageId, question, options, answer, timer }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      if (!checkRateLimit(socket.id, 10, 60000)) return;
+
+      const message = await roomManager.getMessage(socket.roomCode, messageId);
+      if (!message || message.messageType !== 'tournament' || !message.tournamentData) return;
+
+      const td = message.tournamentData;
+      if (td.status !== 'in-progress' || td.gameType !== 'trivia' || !td.triviaData) return;
+
+      const creatorId = socket.persistentUserId || socket.id;
+      if (td.createdBy !== creatorId) return;
+
+      if (td.triviaData.status !== 'waiting-question') return;
+      if (td.triviaData.currentRound >= td.triviaData.totalRounds) return;
+
+      // Validate question data
+      if (!question || !Array.isArray(options) || options.length < 2 || options.length > 6 || answer === undefined) return;
+      if (answer < 0 || answer >= options.length) return;
+
+      const roundNum = td.triviaData.currentRound + 1;
+      const timerSecs = Math.min(Math.max(parseInt(timer) || 15, 5), 60);
+
+      td.triviaData.rounds.push({
+        roundNumber: roundNum,
+        question: sanitizeInput(question.trim()).substring(0, 200),
+        options: options.map(o => sanitizeInput(o.trim()).substring(0, 100)),
+        answer,
+        timer: timerSecs,
+        answers: {}, // playerId -> { choice, answeredAt }
+        startedAt: Date.now(),
+        status: 'active' // active, complete
+      });
+
+      td.triviaData.currentRound = roundNum;
+      td.triviaData.status = 'answering';
+
+      await roomManager.saveMessage(socket.roomCode, message);
+      io.to(socket.roomCode).emit('message-updated', message);
+
+      // Auto-close round after timer + buffer
+      setTimeout(async () => {
+        try {
+          const latestMessage = await roomManager.getMessage(socket.roomCode, messageId);
+          if (!latestMessage?.tournamentData?.triviaData) return;
+          const ltd = latestMessage.tournamentData.triviaData;
+          const currentRound = ltd.rounds[ltd.rounds.length - 1];
+          if (currentRound && currentRound.status === 'active' && currentRound.roundNumber === roundNum) {
+            currentRound.status = 'complete';
+
+            // Score this round
+            const correctAnswer = currentRound.answer;
+            for (const [playerId, ans] of Object.entries(currentRound.answers)) {
+              if (ans.choice === correctAnswer) {
+                // Base points + speed bonus
+                const elapsed = (ans.answeredAt - currentRound.startedAt) / 1000;
+                const speedBonus = Math.max(0, Math.round((1 - elapsed / currentRound.timer) * 50));
+                const points = 100 + speedBonus;
+                if (ltd.scores[playerId]) {
+                  ltd.scores[playerId].score += points;
+                  ltd.scores[playerId].streak++;
+                  if (ltd.scores[playerId].streak > ltd.scores[playerId].bestStreak) {
+                    ltd.scores[playerId].bestStreak = ltd.scores[playerId].streak;
+                  }
+                }
+              } else {
+                if (ltd.scores[playerId]) ltd.scores[playerId].streak = 0;
+              }
+            }
+
+            // Players who didn't answer get streak reset
+            for (const playerId of Object.keys(ltd.scores)) {
+              if (!currentRound.answers[playerId]) {
+                ltd.scores[playerId].streak = 0;
+              }
+            }
+
+            // Check if tournament is complete
+            if (ltd.currentRound >= ltd.totalRounds) {
+              ltd.status = 'complete';
+              latestMessage.tournamentData.status = 'completed';
+            } else {
+              ltd.status = 'waiting-question';
+            }
+
+            await roomManager.saveMessage(socket.roomCode, latestMessage);
+            io.to(socket.roomCode).emit('message-updated', latestMessage);
+          }
+        } catch (err) {
+          logger.error('Error auto-closing trivia round:', err);
+        }
+      }, (timerSecs + 2) * 1000);
+
+      logger.info(`🧠 Trivia round ${roundNum} started in tournament (room ${socket.roomCode})`);
+    } catch (error) {
+      logger.error('Error submitting trivia question:', error);
+    }
+  });
+
+  // Answer a trivia tournament question
+  socket.on('tournament-trivia-answer', async ({ messageId, choice }) => {
+    try {
+      if (!socket.roomCode || !messageId || choice === undefined) return;
+      if (!checkRateLimit(socket.id, 20, 60000)) return;
+
+      const message = await roomManager.getMessage(socket.roomCode, messageId);
+      if (!message || message.messageType !== 'tournament' || !message.tournamentData) return;
+
+      const td = message.tournamentData;
+      if (td.status !== 'in-progress' || td.gameType !== 'trivia' || !td.triviaData) return;
+      if (td.triviaData.status !== 'answering') return;
+
+      const currentRound = td.triviaData.rounds[td.triviaData.rounds.length - 1];
+      if (!currentRound || currentRound.status !== 'active') return;
+
+      const playerId = socket.persistentUserId || socket.id;
+
+      // Must be a tournament player
+      if (!td.players.some(p => p.id === playerId)) return;
+
+      // Already answered this round?
+      if (currentRound.answers[playerId]) return;
+
+      // Validate choice
+      if (typeof choice !== 'number' || choice < 0 || choice >= currentRound.options.length) return;
+
+      currentRound.answers[playerId] = {
+        choice,
+        answeredAt: Date.now()
+      };
+
+      await roomManager.saveMessage(socket.roomCode, message);
+      // Only notify the answering user (don't reveal answers to others)
+      socket.emit('tournament-trivia-answer-ack', { messageId, roundNumber: currentRound.roundNumber });
+
+      // If all players have answered, close round early
+      const answeredCount = Object.keys(currentRound.answers).length;
+      if (answeredCount >= td.players.length) {
+        currentRound.status = 'complete';
+
+        // Score this round
+        const correctAnswer = currentRound.answer;
+        for (const [pid, ans] of Object.entries(currentRound.answers)) {
+          if (ans.choice === correctAnswer) {
+            const elapsed = (ans.answeredAt - currentRound.startedAt) / 1000;
+            const speedBonus = Math.max(0, Math.round((1 - elapsed / currentRound.timer) * 50));
+            const points = 100 + speedBonus;
+            if (td.triviaData.scores[pid]) {
+              td.triviaData.scores[pid].score += points;
+              td.triviaData.scores[pid].streak++;
+              if (td.triviaData.scores[pid].streak > td.triviaData.scores[pid].bestStreak) {
+                td.triviaData.scores[pid].bestStreak = td.triviaData.scores[pid].streak;
+              }
+            }
+          } else {
+            if (td.triviaData.scores[pid]) td.triviaData.scores[pid].streak = 0;
+          }
+        }
+
+        // Check if tournament is complete
+        if (td.triviaData.currentRound >= td.triviaData.totalRounds) {
+          td.triviaData.status = 'complete';
+          td.status = 'completed';
+        } else {
+          td.triviaData.status = 'waiting-question';
+        }
+
+        await roomManager.saveMessage(socket.roomCode, message);
+        io.to(socket.roomCode).emit('message-updated', message);
+      }
+    } catch (error) {
+      logger.error('Error answering trivia question:', error);
+    }
+  });
+
+  // Report match result (after a game completes)
+  socket.on('tournament-match-result', async ({ messageId, matchId, winnerId }) => {
+    try {
+      if (!socket.roomCode || !messageId || !matchId || !winnerId) return;
+
+      const message = await roomManager.getMessage(socket.roomCode, messageId);
+      if (!message || message.messageType !== 'tournament' || !message.tournamentData) return;
+
+      const td = message.tournamentData;
+      if (td.status !== 'in-progress') return;
+
+      const { rounds, standings } = td.bracket;
+
+      if (td.format === 'round-robin') {
+        // Find the match and set winner
+        const { rounds, standings } = td.bracket;
+        let matchFound = false;
+        for (const round of rounds) {
+          const match = round.find(m => m.id === matchId);
+          if (match && match.status !== 'completed') {
+            match.winner = winnerId;
+            match.status = 'completed';
+            matchFound = true;
+
+            // Update standings
+            if (standings) {
+              const winner = standings.find(s => s.playerId === winnerId);
+              const loserId = match.player1.id === winnerId ? match.player2.id : match.player1.id;
+              const loser = standings.find(s => s.playerId === loserId);
+
+              if (winner) { winner.wins++; winner.points += 3; }
+              if (loser) { loser.losses++; }
+            }
+            break;
+          }
+        }
+        if (!matchFound) return;
+
+        // Check if all matches are done
+        const allDone = rounds.every(r => r.every(m => m.status === 'completed'));
+        if (allDone) td.status = 'completed';
+      } else if (td.format === 'double-elimination' && td.bracket.format === 'double-elimination') {
+        // Double elimination: advance winner in winners/losers, loser drops to losers
+        const { winnersRounds, losersRounds, grandFinals } = td.bracket;
+        let matchFound = false;
+
+        // Search all brackets for the match
+        const allBrackets = [
+          ...winnersRounds.map((r, idx) => ({ rounds: winnersRounds, roundIdx: idx, bracket: 'winners' })),
+          ...losersRounds.map((r, idx) => ({ rounds: losersRounds, roundIdx: idx, bracket: 'losers' })),
+          [{ rounds: [grandFinals], roundIdx: 0, bracket: 'grand-finals' }]
+        ].flat();
+
+        for (const { rounds, roundIdx, bracket } of allBrackets) {
+          const round = rounds[roundIdx];
+          if (!round) continue;
+          const matchIdx = round.findIndex(m => m.id === matchId);
+          if (matchIdx === -1) continue;
+
+          const match = round[matchIdx];
+          if (match.status === 'completed') return;
+
+          match.winner = winnerId;
+          match.status = 'completed';
+          matchFound = true;
+
+          const winnerPlayer = match.player1?.id === winnerId ? match.player1 : match.player2;
+          const loserPlayer = match.player1?.id === winnerId ? match.player2 : match.player1;
+
+          if (bracket === 'winners') {
+            // Winner advances in winners bracket
+            if (roundIdx < winnersRounds.length - 1) {
+              const nextMatch = winnersRounds[roundIdx + 1][Math.floor(matchIdx / 2)];
+              if (nextMatch) {
+                if (matchIdx % 2 === 0) nextMatch.player1 = winnerPlayer;
+                else nextMatch.player2 = winnerPlayer;
+              }
+            } else {
+              // Winners bracket final — winner goes to grand finals
+              if (grandFinals[0]) grandFinals[0].player1 = winnerPlayer;
+            }
+
+            // Loser drops to losers bracket
+            if (loserPlayer && losersRounds.length > 0) {
+              const losersRoundIdx = roundIdx * 2; // Map winners round to losers round
+              if (losersRoundIdx < losersRounds.length) {
+                const losersMatch = losersRounds[losersRoundIdx][matchIdx % losersRounds[losersRoundIdx].length];
+                if (losersMatch) {
+                  if (!losersMatch.player1) losersMatch.player1 = loserPlayer;
+                  else if (!losersMatch.player2) losersMatch.player2 = loserPlayer;
+                }
+              }
+            }
+          } else if (bracket === 'losers') {
+            // Winner advances in losers bracket
+            if (roundIdx < losersRounds.length - 1) {
+              const nextMatch = losersRounds[roundIdx + 1][Math.floor(matchIdx / 2)];
+              if (nextMatch) {
+                if (matchIdx % 2 === 0) nextMatch.player1 = winnerPlayer;
+                else if (!nextMatch.player2) nextMatch.player2 = winnerPlayer;
+              }
+            } else {
+              // Losers bracket final — winner goes to grand finals
+              if (grandFinals[0]) grandFinals[0].player2 = winnerPlayer;
+            }
+          } else if (bracket === 'grand-finals') {
+            td.status = 'completed';
+          }
+          break;
+        }
+
+        if (!matchFound) return;
+      } else {
+        // Single elimination: advance winner
+        const { rounds } = td.bracket;
+        for (let r = 0; r < rounds.length; r++) {
+          const round = rounds[r];
+          const matchIdx = round.findIndex(m => m.id === matchId);
+          if (matchIdx === -1) continue;
+
+          const match = round[matchIdx];
+          if (match.status === 'completed') return;
+          match.winner = winnerId;
+          match.status = 'completed';
+
+          const winnerPlayer = match.player1?.id === winnerId ? match.player1 : match.player2;
+
+          // Advance to next round
+          if (r < rounds.length - 1) {
+            const nextMatch = rounds[r + 1][Math.floor(matchIdx / 2)];
+            if (nextMatch) {
+              if (matchIdx % 2 === 0) nextMatch.player1 = winnerPlayer;
+              else nextMatch.player2 = winnerPlayer;
+            }
+          }
+
+          // Check if finals are done
+          if (r === rounds.length - 1) {
+            td.status = 'completed';
+          }
+          break;
+        }
+      }
+
+      await roomManager.saveMessage(socket.roomCode, message);
+      io.to(socket.roomCode).emit('message-updated', message);
+
+      logger.info(`🏆 Tournament match ${matchId} completed in room ${socket.roomCode}, winner: ${winnerId}`);
+    } catch (error) {
+      logger.error('Error reporting tournament match result:', error);
+    }
+  });
+
+  // Start a specific tournament match (auto-create a game message)
+  socket.on('tournament-start-match', async ({ tournamentMessageId, matchId }) => {
+    try {
+      if (!socket.roomCode || !tournamentMessageId || !matchId) return;
+      if (!checkRateLimit(socket.id, 10, 60000)) return;
+
+      const message = await roomManager.getMessage(socket.roomCode, tournamentMessageId);
+      if (!message || message.messageType !== 'tournament' || !message.tournamentData) return;
+
+      const td = message.tournamentData;
+      if (td.status !== 'in-progress') return;
+
+      // Find the match across all bracket structures
+      let targetMatch = null;
+      const allRoundsToSearch = [];
+
+      if (td.bracket.rounds) {
+        // Single elimination or round-robin
+        allRoundsToSearch.push(...td.bracket.rounds);
+      }
+      if (td.bracket.winnersRounds) {
+        allRoundsToSearch.push(...td.bracket.winnersRounds);
+      }
+      if (td.bracket.losersRounds) {
+        allRoundsToSearch.push(...td.bracket.losersRounds);
+      }
+      if (td.bracket.grandFinals) {
+        allRoundsToSearch.push(td.bracket.grandFinals);
+      }
+
+      for (const round of allRoundsToSearch) {
+        const m = (Array.isArray(round) ? round : []).find(rm => rm.id === matchId);
+        if (m) { targetMatch = m; break; }
+      }
+      if (!targetMatch) return;
+      if (targetMatch.status === 'completed' || targetMatch.status === 'bye') return;
+      if (!targetMatch.player1 || !targetMatch.player2) return;
+      if (targetMatch.gameMessageId) return; // Already started
+
+      const playerId = socket.persistentUserId || socket.id;
+      // Only match participants can start the match
+      if (playerId !== targetMatch.player1.id && playerId !== targetMatch.player2.id) return;
+
+      // Determine game data based on tournament game type
+      const gameType = td.gameType;
+      const p1 = targetMatch.player1;
+      const p2 = targetMatch.player2;
+      let gameData;
+
+      if (gameType === 'tic-tac-toe') {
+        gameData = {
+          gameType: 'tic-tac-toe',
+          board: Array(9).fill(null),
+          players: {
+            X: { id: p1.id, socketId: null, name: p1.nickname },
+            O: { id: p2.id, socketId: null, name: p2.nickname }
+          },
+          turn: 'X',
+          winner: null,
+          winningLine: null,
+          lastActivity: Date.now()
+        };
+      } else if (gameType === 'rock-paper-scissors') {
+        gameData = {
+          gameType: 'rock-paper-scissors',
+          players: {
+            P1: { id: p1.id, socketId: null, name: p1.nickname, move: null },
+            P2: { id: p2.id, socketId: null, name: p2.nickname, move: null }
+          },
+          scores: { P1: 0, P2: 0 },
+          rounds: [],
+          winner: null,
+          bestOf: td.bestOf || 3,
+          lastActivity: Date.now()
+        };
+      } else if (gameType === 'chess') {
+        gameData = {
+          gameType: 'chess',
+          fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+          players: {
+            white: { id: p1.id, socketId: null, name: p1.nickname },
+            black: { id: p2.id, socketId: null, name: p2.nickname }
+          },
+          turn: 'w',
+          history: [],
+          winner: null,
+          lastActivity: Date.now()
+        };
+      } else {
+        return; // Trivia handled differently
+      }
+
+      // Tag the game with tournament reference
+      gameData.tournamentRef = {
+        tournamentMessageId,
+        matchId,
+        player1Id: p1.id,
+        player2Id: p2.id
+      };
+
+      const gameTypeName = gameType === 'tic-tac-toe' ? 'Tic-Tac-Toe' :
+        gameType === 'rock-paper-scissors' ? 'Rock Paper Scissors' : 'Chess';
+
+      const gameMessage = {
+        id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        content: `🏆 Tournament: ${p1.nickname} vs ${p2.nickname} — ${gameTypeName}`,
+        messageType: 'game',
+        gameData,
+        sender: { id: 'system', nickname: '🏆 Tournament', socketId: 'system' },
+        timestamp: new Date().toISOString(),
+        reactions: {}
+      };
+
+      // Save the game message
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+
+      // Apply TTL if needed
+      if (room.settings?.messageTTL) {
+        gameMessage.expiresAt = Date.now() + room.settings.messageTTL;
+      }
+      // But active games are exempt from TTL
+      delete gameMessage.expiresAt;
+
+      room.messages = room.messages || [];
+      room.messages.push(gameMessage);
+      await roomManager.saveRoom(socket.roomCode, room);
+
+      // Link match to game message
+      targetMatch.gameMessageId = gameMessage.id;
+      targetMatch.status = 'in-progress';
+      await roomManager.saveMessage(socket.roomCode, message);
+
+      // Broadcast both the new game message and the updated tournament
+      io.to(socket.roomCode).emit('new-message', gameMessage);
+      io.to(socket.roomCode).emit('message-updated', message);
+
+      logger.info(`🏆 Tournament match ${matchId} started: ${p1.nickname} vs ${p2.nickname} (${gameTypeName}) in room ${socket.roomCode}`);
+    } catch (error) {
+      logger.error('Error starting tournament match:', error);
+    }
+  });
+
+  // Handle game answer (Would You Rather, Truth or Dare, etc.)
   socket.on('game-answer', async ({ messageId, answer }) => {
     try {
       if (!socket.roomCode || !messageId || answer === undefined) return;
@@ -2168,12 +3299,15 @@ io.on('connection', (socket) => {
       const message = messages.find(m => m.id === messageId);
       if (!message || message.messageType !== 'game' || !message.gameData) return;
 
+      // Use persistent identity so reconnecting users can't double-answer
+      const answererId = socket.persistentUserId || socket.id;
+
       // Prevent double-answering
       if (!message.gameData.answers) message.gameData.answers = {};
-      if (message.gameData.answers[socket.id] !== undefined) return;
+      if (message.gameData.answers[answererId] !== undefined) return;
 
-      // Store the answer
-      message.gameData.answers[socket.id] = answer;
+      // Store the answer keyed by persistent ID
+      message.gameData.answers[answererId] = answer;
       await roomManager.saveRoom(socket.roomCode, room);
 
       // Broadcast the updated message with masking
@@ -2277,6 +3411,17 @@ io.on('connection', (socket) => {
 
         await roomManager.saveRoom(socket.roomCode, room);
         io.to(socket.roomCode).emit('message-updated', message);
+
+        // Auto-report tournament result if this game is part of a tournament
+        if (gameData.winner && gameData.winner !== 'draw' && gameData.tournamentRef) {
+          const ref = gameData.tournamentRef;
+          const winnerId = gameData.winner === 'X' ? gameData.players.X.id : gameData.players.O.id;
+          socket.emit('tournament-match-result', {
+            messageId: ref.tournamentMessageId,
+            matchId: ref.matchId,
+            winnerId
+          });
+        }
       }
     } catch (error) {
       logger.error('Error handling tic-tac-toe move:', error);
@@ -2397,6 +3542,17 @@ io.on('connection', (socket) => {
           const masked = roomManager.maskMessageForUser(message, u.socketId, u.id || u.userId);
           io.to(u.socketId).emit('message-updated', masked);
         });
+
+        // Auto-report tournament result if this game is part of a tournament
+        if (gameData.winner && gameData.tournamentRef) {
+          const ref = gameData.tournamentRef;
+          const winnerId = gameData.winner === 'P1' ? gameData.players.P1.id : gameData.players.P2.id;
+          socket.emit('tournament-match-result', {
+            messageId: ref.tournamentMessageId,
+            matchId: ref.matchId,
+            winnerId
+          });
+        }
       }
     } catch (error) {
       logger.error('Error handling RPS action:', error);
@@ -2510,6 +3666,17 @@ io.on('connection', (socket) => {
 
         await roomManager.saveRoom(socket.roomCode, room);
         io.to(socket.roomCode).emit('message-updated', message);
+
+        // Auto-report tournament result if this game is part of a tournament
+        if (gameData.winner && gameData.winner !== 'draw' && gameData.tournamentRef) {
+          const ref = gameData.tournamentRef;
+          const winnerId = gameData.winnerId || (gameData.winner === 'white' ? gameData.players.white.id : gameData.players.black.id);
+          socket.emit('tournament-match-result', {
+            messageId: ref.tournamentMessageId,
+            matchId: ref.matchId,
+            winnerId
+          });
+        }
       }
     } catch (error) {
       logger.error('Error handling chess move:', error);
@@ -2950,6 +4117,12 @@ io.on('connection', (socket) => {
     socket.roomCode = null;
     socket.nickname = null;
 
+    // Stop server chaff for the room if it's now empty
+    const socketRoomCheck = io.sockets.adapter.rooms.get(roomCode);
+    if (!socketRoomCheck || socketRoomCheck.size === 0) {
+      cleanupRoomChaff(roomCode);
+    }
+
     if (isExplicit) {
       // ── Explicit leave (user clicked "Leave") ── immediate full cleanup
       if (roomData[roomCode]?.userRoles?.[socketId]) {
@@ -3135,6 +4308,40 @@ io.on('connection', (socket) => {
     }
   };
 
+  // ─── v2 Security: PQXDH Key-Bundle Relay ─────────────────
+  // The server does NOT inspect key bundles — it merely forwards them
+  // between room members so both peers can complete the PQXDH handshake.
+  socket.on('key-bundle-offer', ({ roomCode: rc, keyBundle }) => {
+    if (!rc || !keyBundle) return;
+    // Broadcast to all OTHER members in the room (not back to sender)
+    socket.to(rc).emit('key-bundle-offer', {
+      keyBundle,
+      from: socket.id
+    });
+    logger.info(`🔑 Key-bundle offer relayed in room ${rc} from ${socket.id}`);
+  });
+
+  socket.on('key-bundle-answer', ({ roomCode: rc, keyBundle }) => {
+    if (!rc || !keyBundle) return;
+    socket.to(rc).emit('key-bundle-answer', {
+      keyBundle,
+      from: socket.id
+    });
+    logger.info(`🔑 Key-bundle answer relayed in room ${rc} from ${socket.id}`);
+  });
+
+  // ─── v2 Security: Padded/chaff message passthrough ────────
+  // The server relays padded messages without inspecting them.
+  // Chaff is indistinguishable from real traffic at this layer.
+  socket.on('padded-message', (data) => {
+    if (!socket.roomCode || !data?.payload) return;
+    socket.to(socket.roomCode).emit('padded-message', {
+      payload: data.payload,
+      from: socket.id,
+      timestamp: Date.now()
+    });
+  });
+
   socket.on('leave-room', async () => {
     await handleUserDeparture(true);
   });
@@ -3144,6 +4351,16 @@ io.on('connection', (socket) => {
 
     // Cleanup file transfer tracking
     unregisterTransfer(socket.id);
+
+    // Cleanup media watcher tracking
+    if (socket.roomCode && io._mediaWatchers?.[socket.roomCode]) {
+      io._mediaWatchers[socket.roomCode].delete(socket.id);
+      const count = io._mediaWatchers[socket.roomCode].size;
+      if (count === 0) delete io._mediaWatchers[socket.roomCode];
+      else io.to(socket.roomCode).emit('media-sync-count', { count });
+    }
+    // Note: Do NOT delete io._activeMedia on disconnect — media persists for the room
+    // It will be cleaned up when the room is deleted or host closes media
 
     // Handle user departure logic
     await handleUserDeparture(false);
@@ -3202,6 +4419,9 @@ startServer().catch(err => {
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   logger.info('🛑 Shutting down server...');
+  // Stop security module timers
+  stopOHTTPKeyRotation();
+  stopPPCleanup();
   if (redisClient) {
     await redisClient.quit();
   }

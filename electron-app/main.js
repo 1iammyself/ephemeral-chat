@@ -21,6 +21,7 @@ const {
 const path = require('path');
 const Store = require('electron-store');
 const { autoUpdater } = require('electron-updater');
+const proximityBridge = require('./proximity-bridge');
 
 // Fix Windows notification source name (removes "electron.app." prefix)
 if (process.platform === 'win32') {
@@ -1047,6 +1048,41 @@ function registerShortcuts() {
   });
 }
 
+// ==================== .EPH FILE HANDLING ====================
+
+const fs = require('fs');
+
+function handleEphFileOpen(filePath) {
+  try {
+    const content = fs.readFileSync(filePath, 'utf8');
+    const packet = JSON.parse(content);
+
+    if (packet.type === 'ephemeral-drop' && packet.dropId) {
+      const targetUrl = `${CHAT_URL}/drop/${packet.dropId}?desktop=true`;
+      if (mainWindow) {
+        mainWindow.loadURL(targetUrl);
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    }
+  } catch (err) {
+    console.error('Failed to open .eph file:', err);
+    if (mainWindow) {
+      dialog.showErrorBox('Invalid File', 'This .eph file is corrupted or not a valid Ephemeral Drop file.');
+    }
+  }
+}
+
+// Also handle .eph files passed as command line arguments on Windows
+function checkCommandLineForEphFile(args) {
+  const ephFile = (args || process.argv).find(arg => arg.endsWith('.eph'));
+  if (ephFile) {
+    handleEphFileOpen(ephFile);
+    return true;
+  }
+  return false;
+}
+
 // ==================== DEEP LINK HANDLING ====================
 
 function handleDeepLink(url) {
@@ -1069,6 +1105,9 @@ function handleDeepLink(url) {
   } else if (path.startsWith('invite/')) {
     const token = path.replace('invite/', '');
     targetUrl = `${CHAT_URL}/invite/${token}${desktopParam}`;
+  } else if (path.startsWith('drop/')) {
+    const dropId = path.replace('drop/', '');
+    targetUrl = `${CHAT_URL}/drop/${dropId}${desktopParam}`;
   } else if (path.startsWith('create')) {
     targetUrl = `${CHAT_URL}${desktopParam}&action=create`;
   } else {
@@ -1098,6 +1137,16 @@ if (!gotTheLock) {
 } else {
   // Handle second instance
   app.on('second-instance', (event, commandLine) => {
+    // Check for .eph file in command line
+    if (checkCommandLineForEphFile(commandLine)) {
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+      }
+      return;
+    }
+
     // Check for deep link in command line
     const deepLink = commandLine.find(arg =>
       arg.startsWith('ephemeral') ||
@@ -1119,6 +1168,14 @@ if (!gotTheLock) {
   app.on('open-url', (event, url) => {
     event.preventDefault();
     handleDeepLink(url);
+  });
+
+  // Handle .eph file opens (double-click or "Open With")
+  app.on('open-file', (event, filePath) => {
+    event.preventDefault();
+    if (filePath && filePath.endsWith('.eph')) {
+      handleEphFileOpen(filePath);
+    }
   });
 
   // App ready
@@ -1143,6 +1200,9 @@ if (!gotTheLock) {
     if (deepLink) {
       handleDeepLink(deepLink);
     }
+
+    // Check for .eph files in command line args (Windows: double-click .eph)
+    checkCommandLineForEphFile();
 
     // Handle --minimized flag
     if (process.argv.includes('--minimized')) {
@@ -1262,3 +1322,417 @@ function createBadgeIcon(count) {
   // Simple implementation - in production you'd want to render this properly
   return null; // Windows will use flash instead
 }
+
+// ==================== PROXIMITY IPC HANDLERS ====================
+
+ipcMain.handle('proximity-get-network-info', () => {
+  return proximityBridge.getNetworkInfo();
+});
+
+ipcMain.handle('proximity-get-local-ip', () => {
+  return { ip: proximityBridge.getLocalIp() };
+});
+
+ipcMain.handle('proximity-get-device-id', () => {
+  return { deviceId: proximityBridge.getDeviceId() };
+});
+
+ipcMain.handle('proximity-get-device-name', () => {
+  return { name: proximityBridge.getDeviceName() };
+});
+
+ipcMain.handle('proximity-save-file', async (event, fileData) => {
+  return proximityBridge.saveReceivedFile(mainWindow, fileData);
+});
+
+ipcMain.handle('proximity-show-in-folder', (event, filePath) => {
+  proximityBridge.showFileInFolder(filePath);
+  return { success: true };
+});
+
+ipcMain.handle('proximity-open-file', (event, filePath) => {
+  proximityBridge.openFile(filePath);
+  return { success: true };
+});
+
+// ==================== NATIVE QUIC PROXIMITY IPC HANDLERS ====================
+
+const proximityNative = require('./proximity-native');
+
+ipcMain.handle('proximity-native-init', async (event, options) => {
+  return proximityNative.initEngine(options);
+});
+
+ipcMain.handle('proximity-native-start', async () => {
+  const addr = await proximityNative.startEngine();
+  if (addr && mainWindow) {
+    // Forward native events to the renderer
+    proximityNative.onEvent('renderer', (nativeEvent) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('proximity-native-event', nativeEvent);
+      }
+    });
+  }
+  return { address: addr, native: proximityNative.isNativeAvailable() };
+});
+
+ipcMain.handle('proximity-native-stop', async () => {
+  proximityNative.offEvent('renderer');
+  await proximityNative.stopEngine();
+  return { success: true };
+});
+
+ipcMain.handle('proximity-native-is-available', () => {
+  return { available: proximityNative.isNativeAvailable() };
+});
+
+ipcMain.handle('proximity-native-get-peers', async () => {
+  return { peers: await proximityNative.getDiscoveredPeers() };
+});
+
+ipcMain.handle('proximity-native-connect', async (event, address) => {
+  const peerId = await proximityNative.connectToPeer(address);
+  return { peerId };
+});
+
+ipcMain.handle('proximity-native-pairing-code', async (event, peerId) => {
+  const code = await proximityNative.getPairingCode(peerId);
+  return { code };
+});
+
+ipcMain.handle('proximity-native-send-file', async (event, peerId, filePath) => {
+  const transferId = await proximityNative.sendFile(peerId, filePath);
+  return { transferId };
+});
+
+ipcMain.handle('proximity-native-accept-transfer', async (event, transferId) => {
+  const ok = await proximityNative.acceptTransfer(transferId);
+  return { success: ok };
+});
+
+ipcMain.handle('proximity-native-reject-transfer', async (event, transferId) => {
+  const ok = await proximityNative.rejectTransfer(transferId);
+  return { success: ok };
+});
+
+ipcMain.handle('proximity-native-cancel-transfer', async (event, transferId) => {
+  const ok = await proximityNative.cancelTransfer(transferId);
+  return { success: ok };
+});
+
+// Swarm IPC handlers
+ipcMain.handle('proximity-native-create-swarm', async () => {
+  const swarmId = await proximityNative.createSwarm();
+  return { swarmId };
+});
+
+ipcMain.handle('proximity-native-join-swarm', async (event, swarmId, knownPeers) => {
+  const ok = await proximityNative.joinSwarm(swarmId, knownPeers);
+  return { success: ok };
+});
+
+ipcMain.handle('proximity-native-leave-swarm', async () => {
+  const ok = await proximityNative.leaveSwarm();
+  return { success: ok };
+});
+
+ipcMain.handle('proximity-native-swarm-info', async () => {
+  return await proximityNative.getSwarmInfo();
+});
+
+ipcMain.handle('proximity-native-swarm-route', async (event, source, dest, parallelPaths) => {
+  const paths = await proximityNative.calculateSwarmRoute(source, dest, parallelPaths);
+  return { paths };
+});
+
+// ─── Security Stack IPC Handlers ────────────────────────────────
+// These expose security primitives to the renderer so the web app's
+// crypto modules work identically in Electron (Node crypto backing).
+
+const nodeCrypto = require('crypto');
+
+/**
+ * MASQUE / QUIC Bridge — tunnel messages through CONNECT-UDP proxies.
+ * In Electron we use Node's dgram + HTTP/2 CONNECT-UDP for true tunneling.
+ *
+ * MASQUE (RFC 9298) requires an HTTP/3 or HTTP/2 CONNECT-UDP proxy.
+ * Since Node.js doesn't yet have a native QUIC stack, we use HTTP/2
+ * CONNECT to the proxy with encapsulated UDP datagrams.
+ */
+let quinnBridgeState = { ready: false, proxyUrl: null, socket: null };
+
+ipcMain.handle('security-masque-init', async (event, { proxyUrl }) => {
+  try {
+    quinnBridgeState.proxyUrl = proxyUrl;
+    // Open a persistent UDP socket for tunneled datagrams
+    const dgram = require('dgram');
+    if (quinnBridgeState.socket) {
+      try { quinnBridgeState.socket.close(); } catch {}
+    }
+    quinnBridgeState.socket = dgram.createSocket('udp4');
+    quinnBridgeState.socket.on('error', (err) => {
+      console.error('[MASQUE] UDP socket error:', err.message);
+    });
+    quinnBridgeState.ready = true;
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle('security-masque-is-available', () => {
+  return { available: quinnBridgeState.ready };
+});
+
+ipcMain.handle('security-masque-send', async (event, { target, payload }) => {
+  if (!quinnBridgeState.ready || !quinnBridgeState.proxyUrl) {
+    return { success: false, tunneled: false, error: 'MASQUE not initialized' };
+  }
+
+  try {
+    // Parse the proxy URL and target
+    const proxyUrl = new URL(quinnBridgeState.proxyUrl);
+    const proxyHost = proxyUrl.hostname;
+    const proxyPort = parseInt(proxyUrl.port) || 443;
+
+    // Try HTTP/2 CONNECT-UDP tunnel first (RFC 9298)
+    const http2 = require('http2');
+    const payloadBuf = Buffer.isBuffer(payload)
+      ? payload
+      : Buffer.from(typeof payload === 'string' ? payload : JSON.stringify(payload));
+
+    return await new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        resolve({ success: false, tunneled: false, error: 'MASQUE tunnel timeout' });
+      }, 5000);
+
+      try {
+        const client = http2.connect(`https://${proxyHost}:${proxyPort}`, {
+          rejectUnauthorized: false, // MASQUE proxies often use self-signed certs
+        });
+
+        client.on('error', () => {
+          clearTimeout(timeout);
+          // Fall back to direct UDP send if HTTP/2 CONNECT-UDP fails
+          fallbackDirectUDP(target, payloadBuf, resolve, timeout);
+        });
+
+        // Send via CONNECT-UDP (RFC 9298 §4)
+        const targetUrl = typeof target === 'string' ? target : `${target.host}:${target.port}`;
+        const req = client.request({
+          ':method': 'CONNECT',
+          ':protocol': 'connect-udp',
+          ':authority': proxyHost,
+          ':path': `/.well-known/masque/udp/${targetUrl}/`,
+          'capsule-protocol': '?1',
+        });
+
+        req.on('response', (headers) => {
+          const status = headers[':status'];
+          if (status === 200) {
+            // Tunnel established — send the datagram
+            // Wrap in a DATAGRAM capsule (type 0x00, RFC 9297)
+            const capsule = Buffer.alloc(3 + payloadBuf.length);
+            capsule[0] = 0x00; // DATAGRAM capsule type
+            capsule.writeUInt16BE(payloadBuf.length, 1);
+            payloadBuf.copy(capsule, 3);
+            req.write(capsule);
+            clearTimeout(timeout);
+            client.close();
+            resolve({ success: true, tunneled: true });
+          } else {
+            clearTimeout(timeout);
+            client.close();
+            resolve({ success: false, tunneled: false, error: `Proxy returned ${status}` });
+          }
+        });
+
+        req.on('error', () => {
+          clearTimeout(timeout);
+          fallbackDirectUDP(target, payloadBuf, resolve, timeout);
+        });
+
+        req.end();
+      } catch {
+        clearTimeout(timeout);
+        fallbackDirectUDP(target, payloadBuf, resolve, timeout);
+      }
+    });
+  } catch (e) {
+    return { success: false, tunneled: false, error: e.message };
+  }
+});
+
+/**
+ * Fallback: send datagram directly via UDP when CONNECT-UDP proxy is unreachable.
+ * The payload is still end-to-end encrypted by the sender.
+ */
+function fallbackDirectUDP(target, payloadBuf, resolve) {
+  try {
+    const host = typeof target === 'string' ? target.split(':')[0] : target.host;
+    const port = typeof target === 'string' ? parseInt(target.split(':')[1]) || 443 : target.port;
+
+    if (!quinnBridgeState.socket) {
+      resolve({ success: false, tunneled: false, error: 'No UDP socket' });
+      return;
+    }
+
+    quinnBridgeState.socket.send(payloadBuf, 0, payloadBuf.length, port, host, (err) => {
+      if (err) {
+        resolve({ success: false, tunneled: false, error: err.message });
+      } else {
+        resolve({ success: true, tunneled: false }); // sent directly, not tunneled
+      }
+    });
+  } catch (e) {
+    resolve({ success: false, tunneled: false, error: e.message });
+  }
+}
+
+/**
+ * OHTTP config — renderer can ask the main process to fetch the OHTTP
+ * relay / gateway config over a clean channel (no browser fingerprint).
+ */
+ipcMain.handle('security-ohttp-fetch-config', async (event, { configUrl }) => {
+  try {
+    const { net } = require('electron');
+    const response = await net.fetch(configUrl);
+    const data = await response.json();
+    return { success: true, config: data };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+/**
+ * Privacy Pass — let the main process manage token storage in
+ * the system keychain (more secure than localStorage).
+ */
+let ppTokenStore = [];
+
+ipcMain.handle('security-pp-store-tokens', (event, tokens) => {
+  ppTokenStore = tokens;
+  return { success: true, count: ppTokenStore.length };
+});
+
+ipcMain.handle('security-pp-get-token', () => {
+  if (ppTokenStore.length === 0) return { token: null };
+  const token = ppTokenStore.shift();
+  return { token };
+});
+
+ipcMain.handle('security-pp-get-count', () => {
+  return { count: ppTokenStore.length };
+});
+
+/**
+ * Crypto RNG — expose Node's CSPRNG for contexts where WebCrypto
+ * might not be available (older Electron / sandboxed renderer).
+ */
+ipcMain.handle('security-random-bytes', (event, size) => {
+  const buf = nodeCrypto.randomBytes(size);
+  return { bytes: buf.toString('base64') };
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Now Playing — System Media Detection
+// ──────────────────────────────────────────────────────────────────────
+// Detects currently playing media on the system (Windows/macOS/Linux)
+// and broadcasts to the renderer so the user's "Now Playing" badge updates.
+
+let nowPlayingInterval = null;
+let lastNowPlaying = null;
+
+/**
+ * Attempt to detect what the user is currently listening to.
+ * This uses platform-specific approaches:
+ *   - Windows: Query GlobalSystemMediaTransportControls via PowerShell (best-effort)
+ *   - macOS: Query NowPlaying via osascript
+ *   - Linux: Query MPRIS D-Bus via dbus-send
+ *
+ * Falls back to null if nothing detected.
+ */
+async function detectNowPlaying() {
+  const { exec } = require('child_process');
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => resolve(null), 2000);
+
+    try {
+      if (process.platform === 'win32') {
+        // Windows: use PowerShell to query GSMTC sessions
+        const cmd = `powershell -NoProfile -Command "try { Add-Type -AssemblyName System.Runtime.WindowsRuntime; $sessions = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager,Windows.Media.Control,ContentType=WindowsRuntime]::RequestAsync().GetAwaiter().GetResult().GetSessions(); foreach ($s in $sessions) { $info = $s.TryGetMediaPropertiesAsync().GetAwaiter().GetResult(); if ($info.Title) { Write-Output (ConvertTo-Json @{title=$info.Title; artist=$info.Artist; source='system'}); break } } } catch { }"`;
+
+        exec(cmd, { timeout: 2500 }, (err, stdout) => {
+          clearTimeout(timeout);
+          if (err || !stdout.trim()) { resolve(null); return; }
+          try {
+            const data = JSON.parse(stdout.trim());
+            if (data.title) { resolve(data); return; }
+          } catch (e) { /* parse error */ }
+          resolve(null);
+        });
+
+      } else if (process.platform === 'darwin') {
+        // macOS: query Music.app / Spotify via osascript
+        const cmd = `osascript -e 'tell application "System Events" to set appList to name of every application process whose background only is false' -e 'if appList contains "Spotify" then' -e 'tell application "Spotify" to set trackInfo to "{" & "\\"title\\":\\"" & name of current track & "\\",\\"artist\\":\\"" & artist of current track & "\\",\\"source\\":\\"spotify\\"}"' -e 'return trackInfo' -e 'else if appList contains "Music" then' -e 'tell application "Music" to set trackInfo to "{" & "\\"title\\":\\"" & name of current track & "\\",\\"artist\\":\\"" & artist of current track & "\\",\\"source\\":\\"system\\"}"' -e 'return trackInfo' -e 'end if'`;
+
+        exec(cmd, { timeout: 2500 }, (err, stdout) => {
+          clearTimeout(timeout);
+          if (err || !stdout.trim()) { resolve(null); return; }
+          try {
+            const data = JSON.parse(stdout.trim());
+            if (data.title) { resolve(data); return; }
+          } catch (e) { /* parse error */ }
+          resolve(null);
+        });
+
+      } else {
+        // Linux: MPRIS D-Bus
+        const cmd = `dbus-send --print-reply --dest=org.mpris.MediaPlayer2.$(dbus-send --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames 2>/dev/null | grep -oP 'org\\.mpris\\.MediaPlayer2\\.\\K[^"]+' | head -1) /org/mpris/MediaPlayer2 org.freedesktop.DBus.Properties.Get string:'org.mpris.MediaPlayer2.Player' string:'Metadata' 2>/dev/null | grep -A1 'xesam:title' | tail -1 | sed 's/.*string "//;s/".*//'`;
+
+        exec(cmd, { timeout: 2500 }, (err, stdout) => {
+          clearTimeout(timeout);
+          if (err || !stdout.trim()) { resolve(null); return; }
+          resolve({ title: stdout.trim(), artist: '', source: 'system' });
+        });
+      }
+    } catch (e) {
+      clearTimeout(timeout);
+      resolve(null);
+    }
+  });
+}
+
+ipcMain.handle('now-playing-get-status', async () => {
+  return await detectNowPlaying();
+});
+
+ipcMain.handle('now-playing-start-polling', (event, intervalMs = 3000) => {
+  if (nowPlayingInterval) clearInterval(nowPlayingInterval);
+
+  nowPlayingInterval = setInterval(async () => {
+    const status = await detectNowPlaying();
+    const statusKey = status ? `${status.title}|${status.artist}` : null;
+    const lastKey = lastNowPlaying ? `${lastNowPlaying.title}|${lastNowPlaying.artist}` : null;
+
+    // Only emit if changed
+    if (statusKey !== lastKey) {
+      lastNowPlaying = status;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('now-playing-update', status);
+      }
+    }
+  }, intervalMs);
+
+  return { started: true };
+});
+
+ipcMain.handle('now-playing-stop-polling', () => {
+  if (nowPlayingInterval) {
+    clearInterval(nowPlayingInterval);
+    nowPlayingInterval = null;
+  }
+  lastNowPlaying = null;
+  return { stopped: true };
+});

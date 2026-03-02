@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { generateInviteLink } from '../utils/api'; // Import API utility
+import CapacitorNowPlaying, { sanitizeNowPlaying } from '../plugins/nowPlaying';
 import {
   Send,
   Users,
@@ -26,6 +27,7 @@ import {
   Dices,
   Ghost,
   EyeOff,
+  Trophy,
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -36,8 +38,17 @@ import UserList from './UserList';
 import AudioCallModal from './AudioCallModal';
 import PollModal from './PollModal';
 import GameModal from './GameModal';
+import TournamentModal from './TournamentModal';
 import webRTCService, { CallState } from '../webrtc';
-import { encryptMessage, decryptMessage } from '../utils/security';
+import {
+  encryptMessageSecure, decryptMessageSecure, // v2 Double Ratchet
+  initSecureSession, completeKeyExchange,
+  destroySecureSession, getKeyBundle
+} from '../utils/security';
+import { initTrafficPadding, stopTrafficPadding, withJitter } from '../crypto/traffic-padding';
+import { initOHTTP } from '../crypto/ohttp';
+import { initPrivacyPass, getAuthToken, refreshTokensIfNeeded, isPrivacyPassReady } from '../crypto/privacy-pass';
+import { TransportManager, TRANSPORT } from '../transport/transport-manager';
 import { Mp3Recorder } from '../utils/mp3Recorder';
 import ThemeToggle from './ThemeToggle';
 import PrivacyOverlay from './PrivacyOverlay';
@@ -50,6 +61,8 @@ import ActivityLog from './ActivityLog';
 import CameraModal from './CameraModal';
 import { getVibeById, getAllVibes } from '../utils/vibes';
 import AmbientPlayer from './AmbientPlayer';
+import SharedMediaPlayer, { detectMediaUrl } from './SharedMediaPlayer';
+import NowPlayingBadge from './NowPlayingBadge';
 import { canManageRoom } from '../utils/roles';
 import { getRandomIcebreaker } from '../utils/icebreakers';
 import { RefreshButton } from './PWAHandler';
@@ -71,6 +84,8 @@ const SLASH_COMMANDS = [
   { icon: Edit2, label: 'Topic', value: '/topic', desc: 'Set room topic', adminOnly: true },
   { icon: Clock, label: 'Timer', value: '/timer', desc: 'Start a countdown', adminOnly: true },
   { icon: Activity, label: 'Vibe', value: '/vibe', desc: 'Change room vibe', adminOnly: true },
+  { icon: Activity, label: 'Watch Party', value: '/media', desc: 'Share YouTube/SoundCloud' },
+  { icon: Trophy, label: 'Tournament', value: '/tournament', desc: 'Create a tournament' },
 ];
 
 // Safari detection (robust hybrid check)
@@ -429,10 +444,16 @@ const ChatRoom = () => {
   const [activeChessMatch, setActiveChessMatch] = useState(null);
   const [chessApprovalRequest, setChessApprovalRequest] = useState(null); // { type: 'swap'|'replace', messageId, ... }
   const [showGameModal, setShowGameModal] = useState(false);
+  const [showTournamentModal, setShowTournamentModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [callState, setCallState] = useState({ state: CallState.IDLE });
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
+
+  // Watch Party / Now Playing state
+  const [nowPlayingMap, setNowPlayingMap] = useState({}); // { [userId]: { title, artist, source } }
+  const [showMediaPlayer, setShowMediaPlayer] = useState(true);
+  const [initialMedia, setInitialMedia] = useState(null); // Persisted media state from server on rejoin
 
   // Stealth Actions State
   const [isStealthMode, setIsStealthMode] = useState(false);
@@ -477,6 +498,14 @@ const ChatRoom = () => {
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [verbalCode, setVerbalCode] = useState(null); // State for verbal code display
 
+  // ─── v2 Security Session State ───────────────────────────
+  const [secureSessionReady, setSecureSessionReady] = useState(false);
+  const [isInitiator, setIsInitiator] = useState(false);
+  const transportManagerRef = useRef(null);
+  // Refs that mirror state so socket event closures always see latest values
+  const secureSessionReadyRef = useRef(false);
+  const isInitiatorRef = useRef(false);
+
   // Suggestions State
   const [suggestions, setSuggestions] = useState({ show: false, type: null, items: [], index: 0, query: '' });
   const suggestionRef = useRef(null);
@@ -490,7 +519,9 @@ const ChatRoom = () => {
   const [audioViewOnce, setAudioViewOnce] = useState(true);
   const [isAnonymousMode, setIsAnonymousMode] = useState(false);
 
-
+  // ─── Sync security refs with state (avoids stale closures in socket handlers) ──
+  useEffect(() => { secureSessionReadyRef.current = secureSessionReady; }, [secureSessionReady]);
+  useEffect(() => { isInitiatorRef.current = isInitiator; }, [isInitiator]);
 
   const messageInputRef = useRef(null);
 
@@ -613,19 +644,37 @@ const ChatRoom = () => {
         setIsConnected(true);
         setRoom(response.room);
         let msgs = response.messages || [];
-        if (roomKey) {
-          msgs = await Promise.all(msgs.map(async (msg) => {
-            if (msg.isEncrypted) {
-              try {
-                const decrypted = await decryptMessage(msg.content, msg.iv, roomKey);
-                return { ...msg, content: decrypted };
-              } catch (e) {
-                return { ...msg, content: '⚠️ Decryption failed' };
+        // Decrypt history messages — v2 ratchet first; v1 only if no v2 session
+        msgs = await Promise.all(msgs.map(async (msg) => {
+          if (msg.v === 2 && msg.ratchet) {
+            try {
+              const decrypted = await decryptMessageSecure(msg, roomCode);
+              const result = { ...msg, content: decrypted, isEncrypted: false };
+              if (msg.messageType === 'poll' && !msg.pollData) {
+                try { result.pollData = JSON.parse(decrypted); } catch {}
               }
+              if (msg.messageType === 'game' && !msg.gameData) {
+                try { result.gameData = JSON.parse(decrypted); } catch {}
+              }
+              return result;
+            } catch (e) {
+              return { ...msg, content: '⚠️ v2 Decryption failed' };
             }
-            return msg;
-          }));
-        }
+          }
+          if (msg.isEncrypted && msg.iv) {
+            // Legacy v1 message in history — only attempt if no v2 session
+            // (otherwise this is a stored downgrade-attack payload)
+            try {
+              const decrypted = await decryptMessageSecure(
+                { encrypted: msg.content, iv: msg.iv }, roomCode
+              );
+              return { ...msg, content: decrypted };
+            } catch (e) {
+              return { ...msg, content: '⚠️ Decryption failed' };
+            }
+          }
+          return msg;
+        }));
         setMessages(msgs);
         setUsers(response.room?.users || []);
 
@@ -648,6 +697,64 @@ const ChatRoom = () => {
         setIsWaitingForHost(false);
         setIsReconnecting(false);
         setError(null);
+
+        // ─── v2 Security: Initialize PQXDH + Double Ratchet ───
+        // The first user in the room is the initiator; they publish their
+        // key bundle and wait for the peer to answer.
+        const amInitiator = myRole === 'host' || (response.room?.users?.length || 0) <= 1;
+        setIsInitiator(amInitiator);
+
+        try {
+          const { keyBundle, ratchetReady } = await initSecureSession(roomCode, amInitiator, null);
+          // Broadcast our key bundle to the room
+          socketManager.emit('key-bundle-offer', { roomCode, keyBundle });
+          if (ratchetReady) setSecureSessionReady(true);
+          console.log('🔐 v2 key bundle published, waiting for peer…');
+
+          // Initialize traffic padding with chaff sending over real socket
+          initTrafficPadding('medium', (paddedMsg, isChaff) => {
+            socketManager.emit('padded-message', {
+              payload: btoa(String.fromCharCode(...paddedMsg)),
+              isChaff
+            });
+          });
+
+          // Initialize Privacy Pass tokens (non-blocking)
+          const serverUrl = socketManager.getServerUrl();
+          initPrivacyPass(serverUrl).catch(() => {});
+
+          // Initialize OHTTP client — routes all HTTP through the oblivious relay
+          // so the server never sees the client's IP address.
+          initOHTTP({
+            enabled: true,
+            relayUrl: `${serverUrl}/ohttp/request`,  // OHTTP relay endpoint
+            gatewayUrl: serverUrl,                     // Gateway is same server
+            configUrl: `${serverUrl}/ohttp/config`     // Gateway HPKE key config
+          });
+
+          // ─── Initialize TransportManager (P2P + MASQUE fallback) ──
+          try {
+            const tm = new TransportManager({
+              socketManager,
+              relayUrl: serverUrl,
+              iceConfig: {
+                iceServers: [
+                  { urls: 'stun:stun.l.google.com:19302' },
+                  { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+              }
+            });
+            tm.onTransportSelected = (peerId, type) => {
+              console.log(`🔗 P2P transport for ${peerId}: ${type}`);
+            };
+            transportManagerRef.current = tm;
+          } catch (tmErr) {
+            console.warn('⚠️ TransportManager init failed (socket fallback):', tmErr.message);
+          }
+        } catch (e) {
+          console.warn('⚠️ v2 secure session init failed (falling back to v1):', e.message);
+        }
+
         return;
       }
       setError(response.error || 'Failed to join room');
@@ -781,19 +888,35 @@ const ChatRoom = () => {
       setRoom(data.room);
       setUsers(data.users || []);
       let msgs = data.messages || [];
-      if (roomKey) {
-        msgs = await Promise.all(msgs.map(async (msg) => {
-          if (msg.isEncrypted) {
-            try {
-              const decrypted = await decryptMessage(msg.content, msg.iv, roomKey);
-              return { ...msg, content: decrypted };
-            } catch (e) {
-              return { ...msg, content: '⚠️ Decryption failed' };
+      // Decrypt history — v2 ratchet first; v1 only if no v2 session
+      msgs = await Promise.all(msgs.map(async (msg) => {
+        if (msg.v === 2 && msg.ratchet) {
+          try {
+            const decrypted = await decryptMessageSecure(msg, roomCode);
+            const result = { ...msg, content: decrypted, isEncrypted: false };
+            if (msg.messageType === 'poll' && !msg.pollData) {
+              try { result.pollData = JSON.parse(decrypted); } catch {}
             }
+            if (msg.messageType === 'game' && !msg.gameData) {
+              try { result.gameData = JSON.parse(decrypted); } catch {}
+            }
+            return result;
+          } catch (e) {
+            return { ...msg, content: '⚠️ v2 Decryption failed' };
           }
-          return msg;
-        }));
-      }
+        }
+        if (msg.isEncrypted && msg.iv) {
+          try {
+            const decrypted = await decryptMessageSecure(
+              { encrypted: msg.content, iv: msg.iv }, roomCode
+            );
+            return { ...msg, content: decrypted };
+          } catch (e) {
+            return { ...msg, content: '⚠️ Decryption failed' };
+          }
+        }
+        return msg;
+      }));
       setMessages(msgs);
       setUsers(data.users || []);
 
@@ -809,15 +932,84 @@ const ChatRoom = () => {
       setIsJoined(true);
       setShowJoinModal(false);
       setError(null);
+
+      // Restore persisted media state if the room had an active media session
+      if (data.activeMedia) {
+        setInitialMedia(data.activeMedia);
+      }
     };
 
+    // ─── v2 Key Exchange Handlers ──────────────────────────
+    const handleKeyBundleOffer = async ({ keyBundle, from }) => {
+      // A peer published their key bundle — complete the PQXDH handshake
+      if (!roomCode) return;
+      try {
+        await completeKeyExchange(roomCode, keyBundle, isInitiatorRef.current);
+        setSecureSessionReady(true);
+        console.log('🔐 PQXDH handshake complete (received offer from', from, ')');
+        // Send our bundle back so the peer can also complete
+        const myBundle = getKeyBundle(roomCode);
+        if (myBundle) {
+          socketManager.emit('key-bundle-answer', { roomCode, keyBundle: myBundle });
+        }
+      } catch (e) {
+        console.warn('⚠️ Key exchange from offer failed:', e.message);
+      }
+    };
+
+    const handleKeyBundleAnswer = async ({ keyBundle, from }) => {
+      // The peer answered our key bundle — complete our side
+      if (!roomCode) return;
+      try {
+        await completeKeyExchange(roomCode, keyBundle, isInitiatorRef.current);
+        setSecureSessionReady(true);
+        console.log('🔐 PQXDH handshake complete (received answer from', from, ')');
+      } catch (e) {
+        console.warn('⚠️ Key exchange from answer failed:', e.message);
+      }
+    };
+
+    // ─── v2-Aware Message Handler ──────────────────────────
     const handleNewMessage = async (message) => {
-      if (message.isEncrypted && roomKey) {
+      // v2 ratchet-encrypted messages (Double Ratchet + traffic padding)
+      if (message.v === 2 && message.ratchet) {
         try {
-          const decrypted = await decryptMessage(message.content, message.iv, roomKey);
+          const decrypted = await decryptMessageSecure(message, roomCode);
           message.content = decrypted;
+          message.isEncrypted = false; // Mark as decrypted for rendering
+
+          // ── Reconstruct structured data for polls/games ──
+          // The server cannot inspect encrypted payloads, so pollData / gameData
+          // are absent. The decrypted content is the JSON-stringified structure.
+          if (message.messageType === 'poll' && !message.pollData) {
+            try { message.pollData = JSON.parse(decrypted); } catch {}
+          }
+          if (message.messageType === 'game' && !message.gameData) {
+            try { message.gameData = JSON.parse(decrypted); } catch {}
+          }
         } catch (e) {
-          message.content = '⚠️ Decryption failed';
+          message.content = '⚠️ v2 Decryption failed';
+        }
+        setMessages(prev => [...prev, message]);
+        return;
+      }
+      // v1 legacy messages — REJECT in v2 rooms, only allow in pre-upgrade rooms
+      if (message.isEncrypted && message.iv) {
+        if (secureSessionReadyRef.current) {
+          // v2 session active — reject v1 payloads (downgrade attack protection)
+          console.error('🛑 DOWNGRADE BLOCKED: v1 payload received in v2-secured room.');
+          message.content = '⚠️ Message rejected: legacy encryption not accepted in this room.';
+        } else {
+          // No v2 session (genuinely old clients on both sides)
+          try {
+            const decrypted = await decryptMessageSecure(
+              { encrypted: message.content, iv: message.iv },
+              roomCode
+            );
+            message.content = decrypted;
+          } catch (e) {
+            message.content = '⚠️ Decryption failed';
+          }
         }
       }
       setMessages(prev => [...prev, message]);
@@ -832,6 +1024,11 @@ const ChatRoom = () => {
         const filtered = prev.filter(u => u.socketId === user.socketId ? false : u.nickname !== user.nickname);
         return [...filtered, user];
       });
+
+      // Attempt P2P transport to the new peer (non-blocking)
+      if (user?.socketId && transportManagerRef.current) {
+        transportManagerRef.current.connect(user.socketId, roomCode).catch(() => {});
+      }
 
       const displayName = user?.nickname || 'Someone';
       const log = { id: `log_${Date.now()}`, type: 'join', content: `${displayName} joined the room`, timestamp: new Date().toISOString() };
@@ -1015,6 +1212,8 @@ const ChatRoom = () => {
     socketManager.on('user-left', handleUserLeft);
     socketManager.on('room-error', handleError);
     socketManager.on('latency-pong', handlePong);
+    socketManager.on('key-bundle-offer', handleKeyBundleOffer);
+    socketManager.on('key-bundle-answer', handleKeyBundleAnswer);
     socketManager.on('knock-approved', handleKnockApproved);
     socketManager.on('knock-denied', handleKnockDenied);
     socketManager.on('user-knocking', handleUserKnocking);
@@ -1050,6 +1249,95 @@ const ChatRoom = () => {
       }, ...prev].slice(0, 50));
     });
 
+    // Now Playing status from other users
+    const handleNowPlayingUpdate = async (data) => {
+      // ── Encrypted v2 payload: decrypt first ──
+      if (data && data.v === 2 && data.ratchet === true && data.ciphertext) {
+        try {
+          const decrypted = await decryptMessageSecure(data, roomCode);
+          const parsed = JSON.parse(decrypted);
+          // parsed = { nowPlaying: { title, artist, source } | null }
+          const safe = parsed.nowPlaying ? sanitizeNowPlaying(parsed.nowPlaying) : null;
+          const userId = data.userId;
+          if (userId && safe) {
+            setNowPlayingMap(prev => ({ ...prev, [userId]: safe }));
+          } else if (userId) {
+            setNowPlayingMap(prev => { const copy = { ...prev }; delete copy[userId]; return copy; });
+          }
+        } catch (e) {
+          console.warn('now-playing-update v2 decrypt failed:', e);
+        }
+        return;
+      }
+
+      // ── Cleartext fallback ──
+      if (data.userId && data.nowPlaying && typeof data.nowPlaying === 'object') {
+        // Sanitize incoming now-playing data from other users (defense-in-depth)
+        const safe = sanitizeNowPlaying(data.nowPlaying);
+        if (safe) {
+          setNowPlayingMap(prev => ({ ...prev, [data.userId]: safe }));
+        } else {
+          setNowPlayingMap(prev => { const copy = { ...prev }; delete copy[data.userId]; return copy; });
+        }
+      } else if (data.userId) {
+        setNowPlayingMap(prev => { const copy = { ...prev }; delete copy[data.userId]; return copy; });
+      }
+    };
+    socketManager.on('now-playing-update', handleNowPlayingUpdate);
+
+    // Electron: start polling system media if available
+    if (window.electronAPI?.nowPlaying) {
+      window.electronAPI.nowPlaying.startPolling(4000);
+      window.electronAPI.nowPlaying.onUpdate(async (rawStatus) => {
+        // Sanitize native system media data before broadcasting
+        const status = sanitizeNowPlaying(rawStatus);
+        // Encrypt + jitter if secure session is ready; cleartext fallback otherwise
+        if (secureSessionReadyRef.current) {
+          try {
+            const payload = await encryptMessageSecure(JSON.stringify({ nowPlaying: status }), roomCode);
+            await withJitter(() => socketManager.emit('now-playing-update', payload));
+          } catch (e) {
+            console.warn('Electron now-playing encrypt failed, sending cleartext:', e);
+            await withJitter(() => socketManager.emit('now-playing-update', { nowPlaying: status }));
+          }
+        } else {
+          socketManager.emit('now-playing-update', { nowPlaying: status });
+        }
+        // Also update local map so our own badge shows
+        const myId = socketManager.id;
+        if (myId && status) {
+          setNowPlayingMap(prev => ({ ...prev, [myId]: status }));
+        } else if (myId) {
+          setNowPlayingMap(prev => { const copy = { ...prev }; delete copy[myId]; return copy; });
+        }
+      });
+    }
+
+    // Capacitor (Android): poll native MediaSession for Spotify, YT Music, etc.
+    // (NowPlaying bridge already sanitizes internally before calling callbacks)
+    if (CapacitorNowPlaying.isAvailable() && !window.electronAPI?.nowPlaying) {
+      CapacitorNowPlaying.startPolling(4000, async (status) => {
+        // Encrypt + jitter if secure session is ready; cleartext fallback otherwise
+        if (secureSessionReadyRef.current) {
+          try {
+            const payload = await encryptMessageSecure(JSON.stringify({ nowPlaying: status }), roomCode);
+            await withJitter(() => socketManager.emit('now-playing-update', payload));
+          } catch (e) {
+            console.warn('Capacitor now-playing encrypt failed, sending cleartext:', e);
+            await withJitter(() => socketManager.emit('now-playing-update', { nowPlaying: status }));
+          }
+        } else {
+          socketManager.emit('now-playing-update', { nowPlaying: status });
+        }
+        const myId = socketManager.id;
+        if (myId && status) {
+          setNowPlayingMap(prev => ({ ...prev, [myId]: status }));
+        } else if (myId) {
+          setNowPlayingMap(prev => { const copy = { ...prev }; delete copy[myId]; return copy; });
+        }
+      });
+    }
+
     return () => {
       socketManager.off('connect', handleConnect);
       socketManager.off('disconnect', handleDisconnect);
@@ -1061,6 +1349,8 @@ const ChatRoom = () => {
       socketManager.off('user-left', handleUserLeft);
       socketManager.off('room-error', handleError);
       socketManager.off('latency-pong', handlePong);
+      socketManager.off('key-bundle-offer', handleKeyBundleOffer);
+      socketManager.off('key-bundle-answer', handleKeyBundleAnswer);
       socketManager.off('knock-approved', handleKnockApproved);
       socketManager.off('knock-denied', handleKnockDenied);
       socketManager.off('user-knocking', handleUserKnocking);
@@ -1087,6 +1377,23 @@ const ChatRoom = () => {
       socketManager.off('chess-swap-pending', handleChessSwapPending);
       socketManager.off('chess-replace-pending', handleChessReplacePending);
       socketManager.off('messages-cleared');
+      socketManager.off('now-playing-update', handleNowPlayingUpdate);
+      if (window.electronAPI?.nowPlaying) {
+        window.electronAPI.nowPlaying.stopPolling();
+        window.electronAPI.nowPlaying.offUpdate();
+      }
+      CapacitorNowPlaying.stopPolling();
+
+      // ─── v2 Security: Clean up ratchet state + padding ───
+      destroySecureSession(roomCode);
+      stopTrafficPadding();
+      setSecureSessionReady(false);
+
+      // ─── P2P Transport: Tear down ICE connections ───
+      if (transportManagerRef.current) {
+        try { transportManagerRef.current.destroy?.(); } catch (_) {}
+        transportManagerRef.current = null;
+      }
 
       // Explicitly leave the room before disconnecting
       socketManager.emit('leave-room');
@@ -1389,6 +1696,29 @@ const ChatRoom = () => {
             if (vibe) handleUpdateVibe(vibe.id);
           }
           break;
+        case '/media':
+        case '/watch':
+        case '/watchparty':
+          // If user passed a URL, auto-share it; otherwise just show the player
+          if (args) {
+            const detected = detectMediaUrl(args);
+            if (detected) {
+              socketManager.emit('media-share', {
+                roomCode,
+                type: detected.type,
+                id: detected.id || null,
+                url: detected.url,
+                sharedBy: currentUser?.nickname || 'Someone',
+              });
+            } else {
+              setError('Paste a YouTube or SoundCloud URL after /media');
+            }
+          }
+          setShowMediaPlayer(true);
+          break;
+        case '/tournament':
+          setShowTournamentModal(true);
+          break;
         default:
           // Just send as regular message if not a valid command
           break;
@@ -1436,13 +1766,21 @@ const ChatRoom = () => {
       // If mentions exist, they take precedence
       const finalRecipients = mentionedSocketIds.length > 0 ? mentionedSocketIds : selectedRecipients;
 
-      let isEncrypted = false;
-      let iv = null;
-      if (roomKey) {
-        const result = await encryptMessage(content, roomKey);
-        content = result.encrypted;
-        iv = result.iv;
-        isEncrypted = true;
+      // ─── v2 encryption ONLY (Double Ratchet + PQXDH) ─────
+      // NO v1 fallback: if the ratchet session is not ready, block the send.
+      // Falling back to basic AES-GCM is a downgrade attack surface.
+      if (!secureSessionReady) {
+        setError('🔒 Secure session not ready — please wait for the key exchange to complete.');
+        return;
+      }
+
+      let v2Payload;
+      try {
+        v2Payload = await encryptMessageSecure(content, roomCode);
+      } catch (e) {
+        console.error('v2 encrypt failed — message NOT sent:', e.message);
+        setError('Encryption failed. Please rejoin the room.');
+        return;
       }
 
       const replyData = replyingTo ? {
@@ -1451,14 +1789,17 @@ const ChatRoom = () => {
         sender: replyingTo.sender.nickname
       } : null;
 
-      socketManager.emit('send-message', {
-        content,
-        isEncrypted,
-        iv,
-        recipients: finalRecipients,
-        replyTo: replyData,
-        isAnonymous: isAnonymousMode,
-        overrideTtl: overrideTtl ? 10 : null // 10-second self-destruct override
+      // ─── Send v2 ratchet-encrypted payload ────────────────
+      await withJitter(() => {
+        socketManager.emit('send-message', {
+          ...v2Payload,   // { v: 2, header, ciphertext, ratchet: true }
+          messageType: 'text',
+          recipients: finalRecipients,
+          replyTo: replyData,
+          isAnonymous: isAnonymousMode,
+          isEncrypted: true,
+          overrideTtl: overrideTtl ? 10 : null
+        });
       });
 
       // Clear override after one use
@@ -1472,22 +1813,30 @@ const ChatRoom = () => {
       setError('Failed to send message');
     } finally {
       setIsSending(false);
-      // Maintain focus on mobile devices to prevent keyboard from dismissing
-      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if (isMobile) {
-        setTimeout(() => {
-          messageInputRef.current?.focus();
-        }, 50);
-      }
     }
   };
 
-  const handleSendPoll = (pollData) => {
+  const handleSendPoll = async (pollData) => {
     if (!isConnected) return;
-    socketManager.emit('send-message', { messageType: 'poll', pollData, recipients: selectedRecipients });
+    if (!secureSessionReady) {
+      setError('🔒 Secure session not ready — cannot send poll.');
+      return;
+    }
+    try {
+      const v2Payload = await encryptMessageSecure(JSON.stringify(pollData), roomCode);
+      socketManager.emit('send-message', {
+        ...v2Payload,
+        messageType: 'poll',
+        isEncrypted: true,
+        recipients: selectedRecipients
+      });
+    } catch (e) {
+      console.error('Poll encryption failed:', e.message);
+      setError('Failed to encrypt poll.');
+    }
   };
 
-  const handleSendGame = (gameData) => {
+  const handleSendGame = async (gameData) => {
     if (!isConnected) return;
 
     // Match games (TTT, RPS, Chess) only allow 1 recipient in targeted messages
@@ -1496,7 +1845,58 @@ const ChatRoom = () => {
       return;
     }
 
-    socketManager.emit('send-message', { messageType: 'game', gameData, recipients: selectedRecipients, userId: persistentUserId });
+    if (!secureSessionReady) {
+      setError('🔒 Secure session not ready — cannot send game.');
+      return;
+    }
+    try {
+      const v2Payload = await encryptMessageSecure(JSON.stringify(gameData), roomCode);
+      socketManager.emit('send-message', {
+        ...v2Payload,
+        messageType: 'game',
+        isEncrypted: true,
+        recipients: selectedRecipients,
+        userId: persistentUserId
+      });
+    } catch (e) {
+      console.error('Game encryption failed:', e.message);
+      setError('Failed to encrypt game data.');
+    }
+  };
+
+  // ─── Tournament Handlers ──────────────────────────────────────────
+  const handleCreateTournament = async (tournamentConfig) => {
+    if (!isConnected) return;
+    try {
+      socketManager.emit('send-message', {
+        content: `🏆 ${tournamentConfig.name}`,
+        messageType: 'tournament',
+        tournamentData: tournamentConfig,
+        userId: persistentUserId
+      });
+    } catch (e) {
+      console.error('Tournament creation failed:', e);
+    }
+  };
+
+  const handleJoinTournament = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('tournament-join', { messageId });
+  };
+
+  const handleStartTournament = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('tournament-start', { messageId });
+  };
+
+  const handleTournamentMatchResult = (messageId, matchId, winnerId) => {
+    if (!isConnected) return;
+    socketManager.emit('tournament-match-result', { messageId, matchId, winnerId });
+  };
+
+  const handleStartMatch = (tournamentMessageId, matchId) => {
+    if (!isConnected) return;
+    socketManager.emit('tournament-start-match', { tournamentMessageId, matchId });
   };
 
   const handleDeleteMessage = (messageId) => {
@@ -1712,35 +2112,68 @@ const ChatRoom = () => {
       // For other files, we send raw base64 as before
       let content = isImage ? e.target.result : e.target.result.split(',')[1];
 
-      let isEncrypted = false;
-      let iv = null;
+      // ─── v2 encryption ONLY for files ────────────────────
+      // NO v1 fallback — block the upload if ratchet not ready.
+      if (!secureSessionReady) {
+        setError('🔒 Secure session not ready — cannot encrypt file.');
+        setIsUploading(false);
+        return;
+      }
 
-      if (roomKey) {
+      let v2Payload;
+      try {
+        v2Payload = await encryptMessageSecure(content, roomCode);
+      } catch (e) {
+        console.error('v2 file encrypt failed — file NOT sent:', e.message);
+        setError('File encryption failed. Please rejoin the room.');
+        setIsUploading(false);
+        return;
+      }
+
+      // ─── Try P2P transport first for large files ─────────
+      const encryptedBlob = new Blob([JSON.stringify(v2Payload)], { type: 'application/octet-stream' });
+      let sentViaP2P = false;
+
+      if (transportManagerRef.current && selectedRecipients.length > 0 && file.size > 64 * 1024) {
+        // For large files, attempt P2P/relay for each direct recipient
         try {
-          const result = await encryptMessage(content, roomKey);
-          content = result.encrypted;
-          iv = result.iv;
-          isEncrypted = true;
-        } catch (error) {
-          console.error('Encryption failed for file:', error);
-          setError('Failed to encrypt file');
-          setIsUploading(false);
-          return;
+          const results = await Promise.all(
+            selectedRecipients.map(peerId =>
+              transportManagerRef.current.sendFile(peerId, encryptedBlob, {
+                messageType: isImage ? 'image' : 'file',
+                fileName: file.name,
+                mimeType: file.type,
+                fileSize: file.size,
+                isViewOnce,
+                isEncrypted: true
+              })
+            )
+          );
+          sentViaP2P = results.every(r => r.success);
+          if (sentViaP2P) {
+            console.log(`📡 File sent via P2P to ${selectedRecipients.length} peer(s)`);
+          }
+        } catch (p2pErr) {
+          console.warn('P2P file transfer failed, using socket fallback:', p2pErr.message);
         }
       }
 
-      socketManager.emit('send-message', {
-        messageType: isImage ? 'image' : 'file',
-        content: content,
-        imageData: isImage ? content : undefined, // Include imageData for server compatibility
-        isEncrypted,
-        iv,
-        isViewOnce,
-        fileName: file.name,
-        mimeType: file.type,
-        fileSize: file.size,
-        recipients: selectedRecipients
-      });
+      // ─── Socket.IO fallback (broadcast or P2P failed) ────
+      if (!sentViaP2P) {
+        await withJitter(() => {
+          socketManager.emit('send-message', {
+            ...v2Payload,
+            messageType: isImage ? 'image' : 'file',
+            imageData: isImage ? v2Payload.ciphertext : undefined,
+            isEncrypted: true,
+            isViewOnce,
+            fileName: file.name,
+            mimeType: file.type,
+            fileSize: file.size,
+            recipients: selectedRecipients
+          });
+        });
+      }
       setIsUploading(false);
     };
     reader.readAsDataURL(file);
@@ -1767,12 +2200,23 @@ const ChatRoom = () => {
     setEditingMessage(message);
   };
 
-  const handleSaveEdit = (newContent) => {
+  const handleSaveEdit = async (newContent) => {
     if (editingMessage) {
-      socketManager.emit('edit-message', {
-        messageId: editingMessage.id,
-        newContent
-      });
+      if (!secureSessionReady) {
+        setError('🔒 Secure session not ready — cannot edit message.');
+        return;
+      }
+      try {
+        const v2Payload = await encryptMessageSecure(newContent, roomCode);
+        socketManager.emit('edit-message', {
+          messageId: editingMessage.id,
+          ...v2Payload,
+          isEncrypted: true
+        });
+      } catch (e) {
+        console.error('Edit encryption failed:', e.message);
+        setError('Failed to encrypt edit.');
+      }
       setEditingMessage(null);
     }
   };
@@ -1879,15 +2323,37 @@ const ChatRoom = () => {
     clearInterval(recordingTimerRef.current);
   };
 
-  const sendAudioMessage = (audioBlob) => {
+  const sendAudioMessage = async (audioBlob) => {
     if (audioBlob.size > 5 * 1024 * 1024) {
       setError('Voice note is too large (max 5MB).');
       return;
     }
     const reader = new FileReader();
-    reader.onloadend = () => {
+    reader.onloadend = async () => {
       const base64Audio = reader.result.split(',')[1];
-      socketManager.emit('send-message', { messageType: 'audio', content: base64Audio, isViewOnce: audioViewOnce, recipients: selectedRecipients });
+
+      // ─── v2 encryption ONLY for audio ───────────────────
+      // NO v1 fallback, NO unencrypted fallback.
+      if (!secureSessionReady) {
+        setError('🔒 Secure session not ready — cannot send voice note.');
+        return;
+      }
+
+      try {
+        const v2Payload = await encryptMessageSecure(base64Audio, roomCode);
+        await withJitter(() => {
+          socketManager.emit('send-message', {
+            ...v2Payload,
+            messageType: 'audio',
+            isEncrypted: true,
+            isViewOnce: audioViewOnce,
+            recipients: selectedRecipients
+          });
+        });
+      } catch (e) {
+        console.error('v2 audio encrypt failed — voice note NOT sent:', e.message);
+        setError('Voice note encryption failed. Please rejoin the room.');
+      }
     };
     reader.readAsDataURL(audioBlob);
   };
@@ -2062,6 +2528,27 @@ const ChatRoom = () => {
             <AmbientPlayer moodSound={getVibeById(roomVibe).moodSound} isActive={true} />
           </div>
         )}
+        {/* Watch Party / Shared Media Player */}
+        {showMediaPlayer && (
+          <div className="pointer-events-auto animate-in slide-in-from-top-2">
+            <SharedMediaPlayer
+              roomCode={roomCode}
+              currentUser={currentUser}
+              isHost={isHost}
+              roomVibe={roomVibe}
+              secureSessionReady={secureSessionReady}
+              initialMedia={initialMedia}
+              onNowPlayingChange={(np) => {
+                const myId = currentUser?.socketId || currentUser?.id;
+                if (myId && np) {
+                  setNowPlayingMap(prev => ({ ...prev, [myId]: np }));
+                } else if (myId) {
+                  setNowPlayingMap(prev => { const copy = { ...prev }; delete copy[myId]; return copy; });
+                }
+              }}
+            />
+          </div>
+        )}
         {/* Topic Pill */}
         {roomTopic && (
           <div
@@ -2139,6 +2626,9 @@ const ChatRoom = () => {
               onTicTacToeMove={handleTicTacToeMove}
               onRPSAction={handleRPSAction}
               onLaunchChess={handleLaunchChess}
+              onJoinTournament={handleJoinTournament}
+              onStartTournament={handleStartTournament}
+              onStartMatch={handleStartMatch}
               onDelete={handleDeleteMessage}
               roomVibe={roomVibe}
               onOpenEmojiPicker={(messageId) => {
@@ -2238,148 +2728,108 @@ const ChatRoom = () => {
                       </button>
 
                       {showFeatureMenu && (
-                        <div className="absolute bottom-full mb-3 left-0 z-50 bg-white/30 dark:bg-black/20 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] border border-white/20 p-2 sm:p-3 flex flex-col space-y-2 w-[85vw] max-w-[280px] sm:max-w-[320px] animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-2xl ring-1 ring-white/10 dark:ring-white/5">
-                          {/* Floating Reaction Pill */}
-                          <div className="flex items-center gap-1 bg-white/40 dark:bg-white/5 rounded-2xl p-1 px-1.5 border border-white/20 shadow-inner">
-                            <div className="flex items-center flex-1 overflow-x-auto scrollbar-none gap-1 py-0.5 no-scrollbar">
-                              {['❤️', '🔥', '👏', '😂', '😮', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👍', '🙏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀'].map(emoji => (
+                        <div className="absolute bottom-full mb-2 sm:mb-3 left-0 z-50 bg-white/30 dark:bg-black/20 rounded-2xl sm:rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] border border-white/20 p-1.5 sm:p-3 flex flex-col space-y-1 sm:space-y-2 w-[70vw] max-w-[220px] sm:w-[85vw] sm:max-w-[320px] animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-2xl ring-1 ring-white/10 dark:ring-white/5">
+                          {/* Reaction Row */}
+                          <div className="flex items-center gap-0.5 sm:gap-1 bg-white/40 dark:bg-white/5 rounded-xl sm:rounded-2xl p-0.5 sm:p-1 px-1 sm:px-1.5 border border-white/20 shadow-inner">
+                            <div className="flex items-center flex-1 overflow-x-auto scrollbar-none gap-0.5 sm:gap-1 sm:py-0.5 no-scrollbar">
+                              {['❤️', '🔥', '👏', '😂', '😮', '💯', '😍', '😘', '✨', '⚡', '🎉', '👍', '🙏', '👀', '🤔', '😎', '🥳', '🤯', '💎', '🎨'].map(emoji => (
                                 <button
                                   key={emoji}
                                   type="button"
                                   onClick={() => sendRoomReaction(emoji)}
-                                  className="p-1 hover:bg-white dark:hover:bg-gray-700 rounded-lg transition-all hover:scale-125 active:scale-95 flex-shrink-0"
+                                  className="p-0.5 sm:p-1 hover:bg-white dark:hover:bg-gray-700 rounded sm:rounded-lg transition-all hover:scale-110 sm:hover:scale-125 active:scale-95 flex-shrink-0"
                                 >
-                                  <span className="text-xl leading-none">{emoji}</span>
+                                  <span className="text-base sm:text-xl leading-none">{emoji}</span>
                                 </button>
                               ))}
                             </div>
-                            <div className="w-px h-6 bg-gray-200 dark:bg-gray-700/50 mx-0.5 flex-shrink-0" />
+                            <div className="w-px h-5 sm:h-6 bg-gray-200 dark:bg-gray-700/50 mx-0.5 flex-shrink-0" />
                             <button
                               type="button"
                               onClick={handleSendPulse}
                               disabled={!isConnected}
-                              className={`w-8 h-8 flex items-center justify-center ${getVibeById(roomVibe).accentClass} rounded-lg transition-all hover:scale-110 active:scale-95 shadow-sm group flex-shrink-0`}
-                              title="Send Pulse Alert"
+                              className={`w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center ${getVibeById(roomVibe).accentClass} rounded sm:rounded-lg transition-all hover:scale-110 active:scale-95 shadow-sm group flex-shrink-0`}
+                              title="Pulse"
                             >
-                              <Zap className="w-4 h-4 fill-current" />
+                              <Zap className="w-3 h-3 sm:w-4 sm:h-4 fill-current" />
                             </button>
                           </div>
 
-                          <div className="h-px bg-gray-100 dark:bg-gray-700/50 mx-1" />
+                          <div className="h-px bg-gray-100 dark:bg-gray-700/50 sm:mx-1 hidden sm:block" />
 
-                          <div className="grid grid-cols-3 gap-1.5">
-                            {/* Files Button */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowFileModal(true);
-                                setShowFeatureMenu(false);
-                                // Add to activity log for the sender
-                                const recipientNames = selectedRecipients.length > 0
-                                  ? `targeting ${selectedRecipients.map(id => users.find(u => u.socketId === id)?.nickname || id).join(', ')}`
-                                  : 'as a broadcast';
-
-                                const log = {
-                                  id: `log_ft_init_${Date.now()}`,
-                                  type: 'system',
-                                  content: `You initiated a secure file transfer intent ${recipientNames}`,
-                                  timestamp: new Date().toISOString()
-                                };
-                                setActivityLogs(prev => [log, ...prev].slice(0, 50));
-                              }}
-                              disabled={!isConnected}
-                              className={`flex flex-col items-center justify-center p-2 rounded-xl bg-white/20 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`}
-                            >
-                              <div className={`w-8 h-8 rounded-lg bg-white/40 dark:bg-white/10 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-sm`}>
+                          {/* Actions Grid — mobile: 4-col icon-only, desktop: 3-col with labels */}
+                          <div className="grid grid-cols-4 sm:grid-cols-3 gap-1 sm:gap-1.5">
+                            <button type="button" onClick={() => { setShowFileModal(true); setShowFeatureMenu(false); const recipientNames = selectedRecipients.length > 0 ? `targeting ${selectedRecipients.map(id => users.find(u => u.socketId === id)?.nickname || id).join(', ')}` : 'as a broadcast'; setActivityLogs(prev => [{ id: `log_ft_init_${Date.now()}`, type: 'system', content: `You initiated a secure file transfer intent ${recipientNames}`, timestamp: new Date().toISOString() }, ...prev].slice(0, 50)); }} disabled={!isConnected} className={`flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/20 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`} title="Files">
+                              <div className={`sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/40 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm`}>
                                 <FileText className={`w-4 h-4 text-${vibeAccent}-500`} />
                               </div>
-                              <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">Files</span>
+                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Files</span>
                             </button>
-                            {/* Main Actions Grid */}
-                            <button
-                              type="button"
-                              onClick={() => { setShowCameraModal(true); setShowFeatureMenu(false); }}
-                              disabled={!isConnected}
-                              className={`flex flex-col items-center justify-center p-2 rounded-xl bg-white/20 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`}
-                            >
-                              <div className={`w-8 h-8 rounded-lg bg-white/40 dark:bg-white/10 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-sm`}>
+                            <button type="button" onClick={() => { setShowCameraModal(true); setShowFeatureMenu(false); }} disabled={!isConnected} className={`flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/20 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`} title="Camera">
+                              <div className={`sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/40 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm`}>
                                 <Camera className={`w-4 h-4 text-${vibeAccent}-500`} />
                               </div>
-                              <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">Camera</span>
+                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Camera</span>
                             </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (users.length > 7) {
-                                  setError('Voice calls are limited to 7 users for stability.');
-                                } else {
-                                  handleStartCall();
-                                  setShowFeatureMenu(false);
-                                }
-                              }}
-                              disabled={!isConnected || users.length < 2 || users.length > 7}
-                              className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all border border-white/10 group ${users.length > 7
-                                ? 'bg-white/5 opacity-40 cursor-not-allowed'
-                                : 'bg-white/5 dark:bg-white/5 hover:bg-white/20 shadow-sm'
-                                }`}
-                              title={users.length > 7 ? "Disabled: Max 7 users for voice calls" : "Start Voice Call"}
-                            >
-                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-1 transition-transform shadow-sm ${users.length > 7
-                                ? 'bg-white/5'
-                                : 'bg-white/10 dark:bg-white/10 group-hover:scale-110'
-                                }`}>
+                            <button type="button" onClick={() => { if (users.length > 7) { setError('Voice calls are limited to 7 users.'); } else { handleStartCall(); setShowFeatureMenu(false); } }} disabled={!isConnected || users.length < 2 || users.length > 7} className={`flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl transition-all border border-white/10 group ${users.length > 7 ? 'bg-white/5 opacity-40 cursor-not-allowed' : 'bg-white/5 dark:bg-white/5 hover:bg-white/20 sm:shadow-sm'}`} title={users.length > 7 ? "Disabled: Max 7 users" : "Voice Call"}>
+                              <div className={`sm:w-8 sm:h-8 sm:rounded-lg flex items-center justify-center sm:mb-1 transition-transform sm:shadow-sm ${users.length > 7 ? 'sm:bg-white/5' : 'sm:bg-white/10 dark:sm:bg-white/10 group-hover:scale-110'}`}>
                                 <Phone className={`w-4 h-4 ${users.length > 7 ? 'text-gray-400' : 'text-green-500'}`} />
                               </div>
-                              <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">
-                                {users.length > 7 ? 'Disabled' : 'Voice Call'}
-                              </span>
+                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">{users.length > 7 ? 'Disabled' : 'Call'}</span>
                             </button>
-
-                            <button
-                              type="button"
-                              onClick={() => { setShowPollModal(true); setShowFeatureMenu(false); }}
-                              disabled={!isConnected}
-                              className={`flex flex-col items-center justify-center p-2 rounded-xl bg-white/20 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`}
-                            >
-                              <div className={`w-8 h-8 rounded-lg bg-white/40 dark:bg-white/10 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-sm`}>
+                            <button type="button" onClick={() => { setShowPollModal(true); setShowFeatureMenu(false); }} disabled={!isConnected} className={`flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/20 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`} title="Poll">
+                              <div className={`sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/40 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm`}>
                                 <BarChart2 className={`w-4 h-4 text-${vibeAccent}-500`} />
                               </div>
-                              <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">Poll</span>
+                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Poll</span>
                             </button>
-
-                            <button
-                              type="button"
-                              onClick={() => { startRecording(); setShowFeatureMenu(false); }}
-                              disabled={!isConnected}
-                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group"
-                            >
-                              <div className="w-8 h-8 rounded-lg bg-white/10 dark:bg-white/10 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-sm">
+                            <button type="button" onClick={() => { setShowTournamentModal(true); setShowFeatureMenu(false); }} disabled={!isConnected} className={`flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/20 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`} title="Tournament">
+                              <div className={`sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/40 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm`}>
+                                <Trophy className={`w-4 h-4 text-amber-500`} />
+                              </div>
+                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Tournament</span>
+                            </button>
+                            <button type="button" onClick={() => { startRecording(); setShowFeatureMenu(false); }} disabled={!isConnected} className="flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group" title="Voice Note">
+                              <div className="sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/10 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm">
                                 <Mic className="w-4 h-4 text-red-500" />
                               </div>
-                              <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">Voice Note</span>
+                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Voice Note</span>
                             </button>
-
-                            <button
-                              type="button"
-                              onClick={handleSendIcebreaker}
-                              disabled={!isConnected}
-                              className="flex flex-col items-center justify-center p-2 rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group"
-                            >
-                              <div className="w-8 h-8 rounded-lg bg-white/10 dark:bg-white/10 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-sm">
+                            <button type="button" onClick={handleSendIcebreaker} disabled={!isConnected} className="flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group" title="Icebreaker">
+                              <div className="sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/10 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm">
                                 <Smile className="w-4 h-4 text-cyan-500" />
                               </div>
-                              <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">Icebreaker</span>
+                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Icebreaker</span>
                             </button>
-
-
                           </div>
 
-                          {/* Admin Section */}
+                          {/* Admin Section — mobile: compact row, desktop: full with labels */}
                           {canManageRoom(currentUserRole) && (
                             <>
-                              <div className="h-px bg-gray-100 dark:bg-gray-700/50 mx-1" />
-                              <div className="space-y-2">
+                              <div className="h-px bg-gray-100 dark:bg-gray-700/50 sm:mx-1" />
+                              {/* Mobile: single compact row */}
+                              <div className="flex sm:hidden items-center gap-1 px-0.5">
+                                <div className="flex gap-0.5 flex-1">
+                                  {getAllVibes().map(vibe => (
+                                    <button
+                                      key={vibe.id}
+                                      onClick={() => handleUpdateVibe(vibe.id)}
+                                      className={`w-5 h-5 rounded flex items-center justify-center text-[10px] transition-all ${roomVibe === vibe.id ? 'bg-primary-500 text-white shadow-lg' : 'bg-white/10 dark:bg-white/5 hover:bg-white/20'}`}
+                                      title={vibe.name}
+                                    >
+                                      {vibe.emoji}
+                                    </button>
+                                  ))}
+                                </div>
+                                <button type="button" onClick={() => { setShowTopicEditor(true); setShowFeatureMenu(false); }} className="p-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10" title="Topic">
+                                  <Edit2 className="w-3.5 h-3.5 text-orange-500" />
+                                </button>
+                                <button type="button" onClick={() => { if (activeTimer) handleStopTimer(); else setShowTimerModal(true); setShowFeatureMenu(false); }} className={`p-1 rounded-lg border border-white/10 transition-all ${activeTimer ? 'bg-red-500/10 hover:bg-red-500/20' : 'bg-white/5 hover:bg-white/10'}`} title={activeTimer ? 'Stop Timer' : 'Timer'}>
+                                  {activeTimer ? <X className="w-3.5 h-3.5 text-red-500" /> : <Clock className={`w-3.5 h-3.5 text-${vibeAccent}-500`} />}
+                                </button>
+                              </div>
+                              {/* Desktop: full admin section with labels */}
+                              <div className="hidden sm:block space-y-2">
                                 <div className="flex items-center justify-between px-1">
                                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Admin</p>
                                   <div className="flex gap-1">
@@ -2406,7 +2856,6 @@ const ChatRoom = () => {
                                     </div>
                                     <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Topic</span>
                                   </button>
-
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -2448,26 +2897,30 @@ const ChatRoom = () => {
                       </button>
                       {showEmojiPicker && (
                         <div
-                          className="absolute bottom-full mb-2 left-0 sm:left-auto z-50 animate-in fade-in zoom-in slide-in-from-bottom-2 duration-200 themed-emoji-picker w-[85vw] max-w-[320px]"
+                          className="absolute bottom-full mb-2 left-0 sm:left-auto z-50 animate-in fade-in zoom-in slide-in-from-bottom-2 duration-200 themed-emoji-picker w-[72vw] max-w-[280px] sm:max-w-[320px]"
                           style={{
                             '--epr-highlight-color': vibeHex,
                             '--epr-focus-bg-color': `${vibeHex}20`,
                             '--epr-hover-bg-color': `${vibeHex}10`,
                             '--epr-bg-color': 'transparent',
                             '--epr-category-label-bg-color': 'transparent',
-                            '--epr-picker-border-radius': '1.5rem',
+                            '--epr-picker-border-radius': '1.25rem',
+                            '--epr-search-input-bg-color': 'rgba(128,128,128,0.15)',
+                            '--epr-category-navigation-button-size': '18px',
+                            '--epr-emoji-size': '22px',
+                            '--epr-header-padding': '8px 8px 4px',
                           }}
                         >
-                          <div className="absolute inset-0 bg-white/60 dark:bg-black/40 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/10 -z-10" />
+                          <div className="absolute inset-0 bg-white/40 dark:bg-white/[0.06] backdrop-blur-2xl rounded-[1.25rem] shadow-2xl border border-white/20 dark:border-white/10 -z-10" />
                           <EmojiPicker
                             onEmojiClick={onEmojiClick}
                             theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
                             lazyLoadEmojis={true}
                             skinTonesDisabled
                             autoFocusSearch={false}
-                            searchPlaceholder="Search emojis..."
+                            searchPlaceholder="Search..."
                             width="100%"
-                            height={window.innerWidth < 640 ? 300 : 400}
+                            height={window.innerWidth < 640 ? 260 : 350}
                             previewConfig={{ showPreview: false }}
                           />
                         </div>
@@ -2543,13 +2996,15 @@ const ChatRoom = () => {
                     </div>
                     <button
                       type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onTouchStart={(e) => { e.preventDefault(); setIsAnonymousMode(!isAnonymousMode); }}
                       onClick={() => setIsAnonymousMode(!isAnonymousMode)}
                       className={`p-1.5 sm:p-2 rounded-full transition-all text-base sm:text-lg flex-shrink-0 ${isAnonymousMode ? `${getVibeById(roomVibe).accentClass} ring-2 ring-white/20` : 'text-gray-400 hover:text-primary-500 hover:bg-black/5 dark:hover:bg-white/5'}`}
                       title={isAnonymousMode ? 'Anonymous mode ON' : 'Send anonymously'}
                     >
                       👻
                     </button>
-                    <button type="submit" disabled={!newMessage.trim() || !isConnected || isSending} className={`flex-shrink-0 ml-1 sm:ml-2 ${getVibeById(roomVibe).accentClass} h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}><Send className="w-4 h-4 sm:w-5 sm:h-5 -ml-0.5" /></button>
+                    <button type="submit" onTouchStart={(e) => { e.preventDefault(); if (!(!newMessage.trim() || !isConnected || isSending)) { const form = messageInputRef.current?.closest('form'); if (form) form.requestSubmit(); } }} onMouseDown={(e) => e.preventDefault()} disabled={!newMessage.trim() || !isConnected || isSending} className={`flex-shrink-0 ml-1 sm:ml-2 ${getVibeById(roomVibe).accentClass} h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}><Send className="w-4 h-4 sm:w-5 sm:h-5 -ml-0.5" /></button>
                   </div>
                 )}
               </form>
@@ -2588,6 +3043,7 @@ const ChatRoom = () => {
               hasNewLogs={hasNewLogs}
               verbalCode={verbalCode}
               roomVibe={roomVibe}
+              nowPlayingMap={nowPlayingMap}
             />
           </div>
         )}
@@ -2616,6 +3072,7 @@ const ChatRoom = () => {
                   hasNewLogs={hasNewLogs}
                   verbalCode={verbalCode}
                   roomVibe={roomVibe}
+                  nowPlayingMap={nowPlayingMap}
                 />
               </div>
             </div>
@@ -2654,6 +3111,14 @@ const ChatRoom = () => {
         roomVibe={roomVibe}
         initialGameType={initialGameType}
         roomTTL={room?.settings?.messageTTL || 60}
+      />
+
+      <TournamentModal
+        isOpen={showTournamentModal}
+        onClose={() => setShowTournamentModal(false)}
+        onCreateTournament={handleCreateTournament}
+        roomVibe={roomVibe}
+        users={users}
       />
 
       <ChessModal

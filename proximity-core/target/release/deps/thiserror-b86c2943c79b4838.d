@@ -1,0 +1,14 @@
+C:\Users\kyere\Documents\codes\ephemeral-chat\proximity-core\target\release\deps\thiserror-b86c2943c79b4838.d: C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\lib.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\aserror.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\display.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\var.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\private.rs C:\Users\kyere\Documents\codes\ephemeral-chat\proximity-core\target\release\build\thiserror-2ed7b49d04eadadd\out/private.rs
+
+C:\Users\kyere\Documents\codes\ephemeral-chat\proximity-core\target\release\deps\libthiserror-b86c2943c79b4838.rlib: C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\lib.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\aserror.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\display.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\var.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\private.rs C:\Users\kyere\Documents\codes\ephemeral-chat\proximity-core\target\release\build\thiserror-2ed7b49d04eadadd\out/private.rs
+
+C:\Users\kyere\Documents\codes\ephemeral-chat\proximity-core\target\release\deps\libthiserror-b86c2943c79b4838.rmeta: C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\lib.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\aserror.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\display.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\var.rs C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\private.rs C:\Users\kyere\Documents\codes\ephemeral-chat\proximity-core\target\release\build\thiserror-2ed7b49d04eadadd\out/private.rs
+
+C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\lib.rs:
+C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\aserror.rs:
+C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\display.rs:
+C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\var.rs:
+C:\Users\kyere\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-2.0.18\src\private.rs:
+C:\Users\kyere\Documents\codes\ephemeral-chat\proximity-core\target\release\build\thiserror-2ed7b49d04eadadd\out/private.rs:
+
+# env-dep:OUT_DIR=C:\\Users\\kyere\\Documents\\codes\\ephemeral-chat\\proximity-core\\target\\release\\build\\thiserror-2ed7b49d04eadadd\\out
