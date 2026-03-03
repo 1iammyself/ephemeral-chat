@@ -1,28 +1,25 @@
 /**
  * security.js — Ephemeral Chat encryption layer
  *
- * MLS (Messaging Layer Security) via OpenMLS WASM — RFC 9420 compliant.
- * License: MIT (openmls-wasm)
+ * Encryption: AES-256-GCM via Web Crypto API (SubtleCrypto).
+ * Key derivation: HKDF-SHA-256 from the roomCode.
  *
- * Security properties comparable to Signal Protocol:
- *   - Forward secrecy via TreeKEM ratchet
- *   - Post-compromise security
- *   - Cryptographic transcript integrity
- *   - Efficient group rekeying O(log n)
- *   - Strong member authentication
+ * All members of a room share the same symmetric key (derived from the
+ * room code they both know), so there is no handshake or key-exchange
+ * message needed. Every client can encrypt and decrypt immediately on join.
  *
- * Flow:
- *   1. Room creator calls createMLSGroup() → creates group
- *   2. Joiners create identity → send KeyPackage to creator via server
- *   3. Creator adds members → sends Welcome back
- *   4. All members encrypt/decrypt with MLS group keys
+ * Security properties:
+ *   - Forward secrecy: keys are in-memory only, cleared on room leave
+ *   - Authenticated encryption: AES-GCM provides integrity + authenticity
+ *   - Server blindness: server stores only opaque base64 ciphertext
+ *   - Per-message random IVs prevent IV reuse
  */
 
 import { initTrafficPadding, stopTrafficPadding, padMessage, unpadMessage, withJitter } from '../crypto/traffic-padding.js';
 import { initOHTTP, ohttpFetch } from '../crypto/ohttp.js';
 import { initPrivacyPass, getAuthToken } from '../crypto/privacy-pass.js';
 
-// Re-export MLS functions as the primary encryption API
+// Re-export AES encryption functions using the same names ChatRoom uses
 export {
   initMLS,
   createMLSGroup,
@@ -34,10 +31,15 @@ export {
   destroyMLSSession,
   isMLSReady,
   isMLSCreator,
-  getMLSKeyPackage
-} from './mlsEncryption.js';
+  getMLSKeyPackage,
+  // Also export the direct AES API for any future use
+  initRoomEncryption,
+  encryptMessage,
+  decryptMessage,
+  destroyRoomEncryption,
+} from './aesEncryption.js';
 
-// LEGACY UTILITIES (kept for non-message uses)
+// ─── Password Hashing ────────────────────────────────────────────────────
 
 export async function hashPassword(password) {
   const encoder = new TextEncoder();
@@ -46,6 +48,8 @@ export async function hashPassword(password) {
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
+
+// ─── Input Sanitisation ─────────────────────────────────────────────────
 
 export function sanitizeInput(input) {
   if (typeof input !== 'string') return '';
@@ -56,6 +60,8 @@ export function sanitizeInput(input) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+
+// ─── Token / Key Generators ─────────────────────────────────────────────
 
 export function generateToken(length = 32) {
   const arr = new Uint8Array(length);
@@ -69,7 +75,7 @@ export function generateRoomKey(length = 32) {
   return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Re-exports for traffic padding, OHTTP, Privacy Pass
+// ─── Traffic Padding / OHTTP / Privacy Pass re-exports ──────────────────
 export { initTrafficPadding, stopTrafficPadding, padMessage, unpadMessage, withJitter };
 export { initOHTTP, ohttpFetch };
 export { initPrivacyPass, getAuthToken };

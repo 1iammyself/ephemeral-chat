@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { generateInviteLink } from '../utils/api'; // Import API utility
 import CapacitorNowPlaying, { sanitizeNowPlaying } from '../plugins/nowPlaying';
@@ -51,7 +51,8 @@ import {
   destroyMLSSession,
   isMLSReady,
   isMLSCreator,
-  getMLSKeyPackage
+  getMLSKeyPackage,
+  initRoomEncryption,
 } from '../utils/security';
 import { initTrafficPadding, stopTrafficPadding, withJitter } from '../crypto/traffic-padding';
 import { initOHTTP } from '../crypto/ohttp';
@@ -527,14 +528,14 @@ const ChatRoom = () => {
   // ─── Sync MLS ref with state ───────────────────────────
   useEffect(() => { mlsReadyRef.current = mlsReady; }, [mlsReady]);
 
-  // ─── Initialize MLS WASM on mount ─────────────────────
+  // ─── Initialize AES room-key on mount (no WASM needed) ───
   useEffect(() => {
-    initMLS().then(() => {
-      console.log('[ChatRoom] MLS WASM ready');
-    }).catch(e => {
-      console.error('[ChatRoom] MLS WASM init failed:', e);
+    // Pre-derive the room key so the first encrypt/decrypt is instant.
+    // This is a no-op if the key is already cached.
+    initRoomEncryption(roomCode).catch(e => {
+      console.error('[ChatRoom] AES key init failed:', e);
     });
-  }, []);
+  }, [roomCode]);
 
   const messageInputRef = useRef(null);
 
@@ -659,18 +660,18 @@ const ChatRoom = () => {
         let msgs = response.messages || [];
         // Decrypt history messages — MLS v3 or legacy
         msgs = await Promise.all(msgs.map(async (msg) => {
-          if (msg.isEncrypted && msg.v === 3 && msg.mls) {
+          if (msg.isEncrypted && (msg.v === 4 || (msg.v === 3 && msg.mls))) {
             try {
-              const decrypted = decryptMLSMessage(msg, roomCode);
+              const decrypted = await decryptMLSMessage(msg, roomCode);
               const result = { ...msg, content: decrypted, isEncrypted: false };
               if (msg.messageType === 'poll' && !msg.pollData) {
-                try { result.pollData = JSON.parse(decrypted); } catch {}
+                try { result.pollData = JSON.parse(decrypted); } catch { }
               }
               if (msg.messageType === 'game' && !msg.gameData) {
-                try { result.gameData = JSON.parse(decrypted); } catch {}
+                try { result.gameData = JSON.parse(decrypted); } catch { }
               }
               if (msg.messageType === 'tournament' && !msg.tournamentData) {
-                try { result.tournamentData = JSON.parse(decrypted); } catch {}
+                try { result.tournamentData = JSON.parse(decrypted); } catch { }
               }
               return result;
             } catch (e) {
@@ -702,22 +703,15 @@ const ChatRoom = () => {
         setIsReconnecting(false);
         setError(null);
 
-        // ─── MLS Session Setup ────────────────────────────
-        const isHost = myRole === 'host' || (response.room?.users?.length || 0) <= 1;
+        // ─── AES-GCM Room Key Setup ───────────────────────
+        // All members derive the same key from the roomCode via HKDF.
+        // No handshake needed — ready immediately.
         try {
-          if (isHost) {
-            // Room creator: create MLS group
-            createMLSGroup(roomCode, response.nickname);
-            setMlsReady(true);
-            console.log('[ChatRoom] 🔐 MLS group created (host)');
-          } else {
-            // Joiner: create identity and send key package to host
-            const { keyPackage } = createMLSIdentity(roomCode, response.nickname);
-            socketManager.emit('mls-key-package', { roomCode, keyPackage });
-            console.log('[ChatRoom] 🔐 MLS key package sent, waiting for welcome...');
-          }
+          await initRoomEncryption(roomCode);
+          setMlsReady(true);
+          console.log('[ChatRoom] 🔐 AES-GCM room key ready');
         } catch (e) {
-          console.warn('[ChatRoom] MLS session setup failed:', e.message);
+          console.warn('[ChatRoom] AES key setup failed:', e.message);
         }
 
         // TransportManager init
@@ -874,18 +868,18 @@ const ChatRoom = () => {
       let msgs = data.messages || [];
       // Decrypt history — MLS v3 or show as-is
       msgs = await Promise.all(msgs.map(async (msg) => {
-        if (msg.isEncrypted && msg.v === 3 && msg.mls) {
+        if (msg.isEncrypted && (msg.v === 4 || (msg.v === 3 && msg.mls))) {
           try {
-            const decrypted = decryptMLSMessage(msg, roomCode);
+            const decrypted = await decryptMLSMessage(msg, roomCode);
             const result = { ...msg, content: decrypted, isEncrypted: false };
             if (msg.messageType === 'poll' && !msg.pollData) {
-              try { result.pollData = JSON.parse(decrypted); } catch {}
+              try { result.pollData = JSON.parse(decrypted); } catch { }
             }
             if (msg.messageType === 'game' && !msg.gameData) {
-              try { result.gameData = JSON.parse(decrypted); } catch {}
+              try { result.gameData = JSON.parse(decrypted); } catch { }
             }
             if (msg.messageType === 'tournament' && !msg.tournamentData) {
-              try { result.tournamentData = JSON.parse(decrypted); } catch {}
+              try { result.tournamentData = JSON.parse(decrypted); } catch { }
             }
             return result;
           } catch (e) {
@@ -944,30 +938,31 @@ const ChatRoom = () => {
       }
     };
 
-    // ─── MLS-Aware Message Handler ─────────────────────────
+    // ─── AES-GCM Message Handler ────────────────────────────
     const handleNewMessage = async (message) => {
-      // MLS v3 encrypted messages
-      if (message.v === 3 && message.mls) {
+      // AES-GCM v4 or legacy MLS v3 encrypted messages
+      if (message.isEncrypted && (message.v === 4 || (message.v === 3 && message.mls))) {
         try {
-          const decrypted = decryptMLSMessage(message, roomCode);
+          const decrypted = await decryptMLSMessage(message, roomCode);
           message.content = decrypted;
           message.isEncrypted = false;
           if (message.messageType === 'poll' && !message.pollData) {
-            try { message.pollData = JSON.parse(decrypted); } catch {}
+            try { message.pollData = JSON.parse(decrypted); } catch { }
           }
           if (message.messageType === 'game' && !message.gameData) {
-            try { message.gameData = JSON.parse(decrypted); } catch {}
+            try { message.gameData = JSON.parse(decrypted); } catch { }
           }
           if (message.messageType === 'tournament' && !message.tournamentData) {
-            try { message.tournamentData = JSON.parse(decrypted); } catch {}
+            try { message.tournamentData = JSON.parse(decrypted); } catch { }
           }
         } catch (e) {
+          console.warn('[ChatRoom] Decrypt error:', e.message);
           message.content = '⚠️ Decryption failed';
         }
         setMessages(prev => [...prev, message]);
         return;
       }
-      // Unencrypted or legacy — show as-is
+      // Unencrypted — show as-is
       setMessages(prev => [...prev, message]);
     };
 
@@ -985,7 +980,7 @@ const ChatRoom = () => {
 
       // Attempt P2P transport to the new peer (non-blocking)
       if (user?.socketId && transportManagerRef.current) {
-        transportManagerRef.current.connect(user.socketId, roomCode).catch(() => {});
+        transportManagerRef.current.connect(user.socketId, roomCode).catch(() => { });
       }
 
       const displayName = user?.nickname || 'Someone';
@@ -1349,7 +1344,7 @@ const ChatRoom = () => {
 
       // ─── P2P Transport: Tear down ICE connections ───
       if (transportManagerRef.current) {
-        try { transportManagerRef.current.destroy?.(); } catch (_) {}
+        try { transportManagerRef.current.destroy?.(); } catch (_) { }
         transportManagerRef.current = null;
       }
 
@@ -1724,13 +1719,13 @@ const ChatRoom = () => {
       // If mentions exist, they take precedence
       const finalRecipients = mentionedSocketIds.length > 0 ? mentionedSocketIds : selectedRecipients;
 
-      // ─── MLS encryption ─────────────────────────────────
+      // ─── AES-GCM encryption ──────────────────────────────
 
       let v2Payload;
       try {
-        v2Payload = encryptMLSMessage(content, roomCode);
+        v2Payload = await encryptMLSMessage(content, roomCode);
       } catch (e) {
-        console.error('MLS encrypt failed — message NOT sent:', e.message);
+        console.error('AES encrypt failed — message NOT sent:', e.message);
         setError('Encryption failed. Please rejoin the room.');
         return;
       }
@@ -1771,7 +1766,7 @@ const ChatRoom = () => {
   const handleSendPoll = async (pollData) => {
     if (!isConnected) return;
     try {
-      const v2Payload = encryptMLSMessage(JSON.stringify(pollData), roomCode);
+      const v2Payload = await encryptMLSMessage(JSON.stringify(pollData), roomCode);
       socketManager.emit('send-message', {
         ...v2Payload,
         messageType: 'poll',
@@ -1794,7 +1789,7 @@ const ChatRoom = () => {
     }
 
     try {
-      const v2Payload = encryptMLSMessage(JSON.stringify(gameData), roomCode);
+      const v2Payload = await encryptMLSMessage(JSON.stringify(gameData), roomCode);
       socketManager.emit('send-message', {
         ...v2Payload,
         messageType: 'game',
@@ -1812,7 +1807,7 @@ const ChatRoom = () => {
   const handleCreateTournament = async (tournamentConfig) => {
     if (!isConnected) return;
     try {
-      const v2Payload = encryptMLSMessage(JSON.stringify(tournamentConfig), roomCode);
+      const v2Payload = await encryptMLSMessage(JSON.stringify(tournamentConfig), roomCode);
       socketManager.emit('send-message', {
         ...v2Payload,
         content: `🏆 ${tournamentConfig.name}`,
@@ -2058,18 +2053,12 @@ const ChatRoom = () => {
       // For other files, we send raw base64 as before
       let content = isImage ? e.target.result : e.target.result.split(',')[1];
 
-      // ─── MLS encryption for files ────────────────────
-      if (!isMLSReady(roomCode)) {
-        setError('🔒 MLS session not ready — cannot encrypt file.');
-        setIsUploading(false);
-        return;
-      }
-
+      // AES-GCM encryption for files/images
       let v2Payload;
       try {
-        v2Payload = encryptMLSMessage(content, roomCode);
+        v2Payload = await encryptMLSMessage(content, roomCode);
       } catch (e) {
-        console.error('MLS file encrypt failed — file NOT sent:', e.message);
+        console.error('AES file encrypt failed — file NOT sent:', e.message);
         setError('File encryption failed. Please rejoin the room.');
         setIsUploading(false);
         return;
@@ -2109,7 +2098,7 @@ const ChatRoom = () => {
           socketManager.emit('send-message', {
             ...v2Payload,
             messageType: isImage ? 'image' : 'file',
-            imageData: isImage ? v2Payload.ciphertext : undefined,
+            imageData: isImage ? v2Payload.ct : undefined,
             isEncrypted: true,
             isViewOnce,
             fileName: file.name,
@@ -2148,7 +2137,7 @@ const ChatRoom = () => {
   const handleSaveEdit = async (newContent) => {
     if (editingMessage) {
       try {
-        const v2Payload = encryptMLSMessage(newContent, roomCode);
+        const v2Payload = await encryptMLSMessage(newContent, roomCode);
         socketManager.emit('edit-message', {
           messageId: editingMessage.id,
           ...v2Payload,
@@ -2273,9 +2262,9 @@ const ChatRoom = () => {
     reader.onloadend = async () => {
       const base64Audio = reader.result.split(',')[1];
 
-      // ─── MLS encryption for audio ───────────────────────
+      // ─── AES-GCM encryption for audio ───────────────────────
       try {
-        const v2Payload = encryptMLSMessage(base64Audio, roomCode);
+        const v2Payload = await encryptMLSMessage(base64Audio, roomCode);
         await withJitter(() => {
           socketManager.emit('send-message', {
             ...v2Payload,

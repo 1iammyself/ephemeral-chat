@@ -1841,8 +1841,18 @@ io.on('connection', (socket) => {
       // Support for text, image, audio, and file messages
       // ─── v2 ratchet fields (PQXDH + Double Ratchet encrypted payloads) ───
       // ─── v3 MLS fields (RFC 9420 MLS group encryption) ───
+      // ─── v4 AES-GCM fields (room-key symmetric encryption) ───
       let { content, messageType = 'text', isViewOnce = false, imageData, pollData, recipients = [], replyTo, isEncrypted, iv, fileName, mimeType, fileSize, isAnonymous, overrideTtl,
-            v: payloadVersion, header: ratchetHeader, ciphertext: ratchetCiphertext, ratchet: isRatchet, mls: mlsCiphertext } = data;
+        v: payloadVersion, header: ratchetHeader, ciphertext: ratchetCiphertext, ratchet: isRatchet, mls: mlsCiphertext,
+        ct: aesCiphertext } = data;
+
+      // ─── v4 normalization: map AES-GCM ciphertext → content ─────────────────
+      const isV4 = payloadVersion === 4 && aesCiphertext;
+      if (isV4) {
+        // v4 AES-GCM messages carry their encrypted data in `ct`, not `content`.
+        if (!content) content = aesCiphertext;
+        if (messageType === 'image' && !imageData) imageData = aesCiphertext;
+      }
 
       // ─── v3 normalization: map v3 MLS ciphertext → content so server pipeline works ─
       const isV3 = payloadVersion === 3 && mlsCiphertext;
@@ -1940,8 +1950,8 @@ io.on('connection', (socket) => {
         }
       } else if (messageType === 'audio' && isEncrypted) {
         messageContent = content; // Keep encrypted string as is
-      } else if (messageType === 'poll' && (isV2 || isV3)) {
-        // v2/v3-encrypted poll: server cannot inspect poll structure.
+      } else if (messageType === 'poll' && (isV2 || isV3 || isV4)) {
+        // v2/v3/v4-encrypted poll: server cannot inspect poll structure.
         // The decrypted JSON is reconstructed by the receiving client.
         messageContent = content; // encrypted ciphertext string
       } else if (messageType === 'poll') {
@@ -1972,8 +1982,8 @@ io.on('connection', (socket) => {
           allowMultiple: !!pollData.allowMultiple,
           allowCustomAnswers: !!pollData.allowCustomAnswers
         };
-      } else if (messageType === 'game' && (isV2 || isV3)) {
-        // v2/v3-encrypted game: server cannot inspect game structure.
+      } else if (messageType === 'game' && (isV2 || isV3 || isV4)) {
+        // v2/v3/v4-encrypted game: server cannot inspect game structure.
         // The decrypted JSON is reconstructed by the receiving client.
         messageContent = content; // encrypted ciphertext string
       } else if (messageType === 'game') {
@@ -2120,6 +2130,14 @@ io.on('connection', (socket) => {
         recipients, // Store recipients
         isEncrypted: !!isEncrypted, // Store encryption flag
         iv: iv || null, // Store IV if encrypted
+        // ─── v4 AES-GCM fields (room-key symmetric encryption) ───
+        // These MUST be forwarded verbatim so the receiving client can
+        // recognise and decrypt v4 AES-GCM payloads. The server NEVER decrypts.
+        ...(isV4 ? {
+          v: 4,
+          ct: aesCiphertext,
+          iv: data.iv || null,
+        } : {}),
         // ─── v3 MLS fields (RFC 9420 MLS group encryption) ────────
         // These MUST be forwarded verbatim so the receiving client can
         // recognize and decrypt v3 MLS payloads.  The server NEVER decrypts.
