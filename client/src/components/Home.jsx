@@ -32,7 +32,6 @@ const Home = ({ children }) => {
   // Auto-open create room modal if ?action=create is in URL (from Chrome extension)
   // Auto-join with verbal code if ?join= is in URL (from Chrome extension)
   useEffect(() => {
-    // Only process URL params once
     if (urlParamsProcessed) return;
 
     const action = searchParams.get('action');
@@ -40,9 +39,7 @@ const Home = ({ children }) => {
 
     if (action === 'create') {
       setUrlParamsProcessed(true);
-      // Clear the URL params first by replacing history
       window.history.replaceState({}, '', window.location.pathname);
-      // Then open the modal
       setShowCreateModal(true);
     } else if (action === 'create-drop') {
       setUrlParamsProcessed(true);
@@ -50,31 +47,30 @@ const Home = ({ children }) => {
       setShowCreateDropModal(true);
     } else if (joinCode) {
       setUrlParamsProcessed(true);
-      // Decode the verbal code (handles %20 -> spaces)
       const decodedCode = decodeURIComponent(joinCode).trim().toLowerCase();
-      // Clear the URL params first
       window.history.replaceState({}, '', window.location.pathname);
 
-      // Validate and auto-join
       const words = decodedCode.split(/\s+/).filter(w => w.length > 0);
       if (words.length === 4) {
         setIsJoiningVerbal(true);
         setVerbalCode(decodedCode);
-
-        // Trigger the verbal join
         joinWithVerbalCode(decodedCode)
           .then(result => {
             if (result.success && result.roomCode) {
               navigate(`/room/${result.roomCode}`, {
                 state: {
                   inviteToken: result.token,
-                  requiresPassword: result.requiresPassword
+                  requiresPassword: !!result.requiresPassword
                 }
               });
+            } else {
+              setVerbalError('Invalid or expired verbal code.');
+              hapticError();
             }
           })
           .catch(error => {
-            setVerbalError(typeof error === 'string' ? error : 'Invalid or expired code');
+            const msg = typeof error === 'string' ? error : (error?.response?.data?.error || error?.message || 'Invalid or expired verbal code.');
+            setVerbalError(msg);
             hapticError();
           })
           .finally(() => {
