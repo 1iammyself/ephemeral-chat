@@ -4308,27 +4308,50 @@ io.on('connection', (socket) => {
     }
   };
 
-  // ─── v2 Security: PQXDH Key-Bundle Relay ─────────────────
-  // The server does NOT inspect key bundles — it merely forwards them
-  // between room members so both peers can complete the PQXDH handshake.
-  socket.on('key-bundle-offer', ({ roomCode: rc, keyBundle }) => {
-    if (!rc || !keyBundle) return;
-    // Broadcast to all OTHER members in the room (not back to sender)
-    socket.to(rc).emit('key-bundle-offer', {
-      keyBundle,
+  // ─── MLS Key-Package & Welcome Relay ──────────────────────
+  // The server does NOT inspect MLS payloads — it merely forwards them
+  // between room members so the MLS handshake can complete (RFC 9420).
+  socket.on('mls-key-package', ({ roomCode: rc, keyPackage }) => {
+    if (!rc || !keyPackage) return;
+    // Forward key package to all OTHER members (the group creator will add them)
+    socket.to(rc).emit('mls-key-package', {
+      keyPackage,
       from: socket.id
     });
-    logger.info(`🔑 Key-bundle offer relayed in room ${rc} from ${socket.id}`);
+    logger.info(`🔑 MLS key-package relayed in room ${rc} from ${socket.id}`);
   });
 
+  socket.on('mls-welcome', ({ roomCode: rc, welcome, commit, proposal, ratchetTree, target }) => {
+    if (!rc || !welcome) return;
+    // If target is specified, send only to that socket; otherwise broadcast
+    if (target) {
+      io.to(target).emit('mls-welcome', {
+        welcome,
+        commit: commit || null,
+        proposal: proposal || null,
+        ratchetTree: ratchetTree || null,
+        from: socket.id
+      });
+    } else {
+      socket.to(rc).emit('mls-welcome', {
+        welcome,
+        commit: commit || null,
+        proposal: proposal || null,
+        ratchetTree: ratchetTree || null,
+        from: socket.id
+      });
+    }
+    logger.info(`🔑 MLS welcome relayed in room ${rc} from ${socket.id}${target ? ` to ${target}` : ''}`);
+  });
+
+  // Legacy key-bundle relay (kept for backward compat during rollout)
+  socket.on('key-bundle-offer', ({ roomCode: rc, keyBundle }) => {
+    if (!rc || !keyBundle) return;
+    socket.to(rc).emit('key-bundle-offer', { keyBundle, from: socket.id });
+  });
   socket.on('key-bundle-answer', ({ roomCode: rc, keyBundle, pqCiphertext }) => {
     if (!rc || !keyBundle) return;
-    socket.to(rc).emit('key-bundle-answer', {
-      keyBundle,
-      pqCiphertext: pqCiphertext || null,
-      from: socket.id
-    });
-    logger.info(`🔑 Key-bundle answer relayed in room ${rc} from ${socket.id}`);
+    socket.to(rc).emit('key-bundle-answer', { keyBundle, pqCiphertext: pqCiphertext || null, from: socket.id });
   });
 
   // ─── v2 Security: Padded/chaff message passthrough ────────

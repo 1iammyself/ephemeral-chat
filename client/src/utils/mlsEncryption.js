@@ -19,7 +19,7 @@
  *   6. On leave, destroyMLSSession() cleans up
  */
 
-import initWasm, { Provider, Identity, Group } from 'openmls-wasm';
+import { Provider, Identity, Group } from 'openmls-wasm';
 
 // ═══════════════════════════════════════════════════════════
 // MODULE STATE
@@ -59,7 +59,10 @@ export async function initMLS() {
 
   wasmInitPromise = (async () => {
     try {
-      await initWasm();
+      // openmls-wasm self-initializes when imported (via __wbindgen_start).
+      // The static import above already triggers WASM init with vite-plugin-wasm.
+      // We just verify it loaded by testing a constructor.
+      new Provider().free();
       wasmReady = true;
       console.log('[MLS] ✅ OpenMLS WASM initialized');
     } catch (e) {
