@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getProximityService, formatBytes, formatSpeed } from '../utils/proximity';
+import { downloadFileOnDevice } from '../utils/downloadHelper';
 
 /**
  * @typedef {Object} TransferState
@@ -224,35 +225,11 @@ export function useProximityTransfer() {
     const fileName = transfer.metadata?.name || 'download';
     const mimeType = transfer.metadata?.type || transfer.blob.type || 'application/octet-stream';
 
-    // Try navigator.share (works on mobile Safari, Chrome Android, Capacitor)
-    if (navigator.share && navigator.canShare) {
-      try {
-        const file = new File([transfer.blob], fileName, { type: mimeType });
-        if (navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: fileName });
-          return;
-        }
-      } catch (e) {
-        // User cancelled or share failed — fall through to download
-        if (e.name === 'AbortError') return; // user cancelled, don't fallback
-        console.warn('Share API failed, falling back to download:', e);
-      }
+    try {
+      await downloadFileOnDevice(transfer.blob, fileName, mimeType);
+    } catch (e) {
+      console.error('[useProximityTransfer] Download failed:', e);
     }
-
-    // Fallback: create a blob URL and trigger download via <a> click
-    const url = URL.createObjectURL(transfer.blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-
-    // Delay cleanup so the browser has time to start the download
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 5000);
   }, []);
 
   // Clear completed/cancelled transfers

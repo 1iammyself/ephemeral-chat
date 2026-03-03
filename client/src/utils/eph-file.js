@@ -9,6 +9,7 @@
  */
 
 import { validateEphAPI } from './drops';
+import { downloadFileOnDevice } from './downloadHelper';
 
 // ─── Constants ──────────────────────────────────────────────
 
@@ -71,25 +72,12 @@ export async function validateEphFile(ephPacket) {
  * @param {Object} ephPacket - The .eph packet object (from server response)
  * @param {string} [filename] - Optional custom filename
  */
-export function downloadEphFile(ephPacket, filename) {
+export async function downloadEphFile(ephPacket, filename) {
   const content = JSON.stringify(ephPacket, null, 2);
   const blob = new Blob([content], { type: EPH_MIME_TYPE });
-  const url = URL.createObjectURL(blob);
-
   const suggestedName = filename || generateEphFilename(ephPacket);
 
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = suggestedName;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-
-  // Cleanup
-  setTimeout(() => {
-    URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-  }, 100);
+  await downloadFileOnDevice(blob, suggestedName, EPH_MIME_TYPE);
 }
 
 /**

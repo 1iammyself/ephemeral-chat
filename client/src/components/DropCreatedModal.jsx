@@ -9,6 +9,7 @@ import ShareSheet from './ShareSheet';
 import { hapticSuccess } from '../utils/platform';
 import { downloadEphFile, shareEphFile, buildDropUrl, formatTimeRemaining, supportsNativeFileShare } from '../utils/eph-file';
 import { downloadEphFileAPI } from '../utils/drops';
+import { downloadFileOnDevice } from '../utils/downloadHelper';
 
 const DropCreatedModal = ({ onClose, dropData }) => {
   const [isCopied, setIsCopied] = useState({
@@ -43,20 +44,12 @@ const DropCreatedModal = ({ onClose, dropData }) => {
     try {
       // If we already have the ephPacket from creation response, use it directly
       if (ephPacket) {
-        downloadEphFile(ephPacket);
+        await downloadEphFile(ephPacket);
       } else {
         // Otherwise fetch the .eph file from server as a Blob and trigger download
         const blob = await downloadEphFileAPI(dropId);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `drop-${dropId.substring(0, 8)}.eph`;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-          URL.revokeObjectURL(url);
-          document.body.removeChild(a);
-        }, 100);
+        const fileName = `drop-${dropId.substring(0, 8)}.eph`;
+        await downloadFileOnDevice(blob, fileName, 'application/x-ephemeral-drop');
       }
       setEphDownloaded(true);
       hapticSuccess();

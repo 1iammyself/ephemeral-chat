@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { decryptDrop, arrayBufferToText, arrayBufferToDataUrl, arrayBufferToObjectUrl } from '../utils/drops';
 import { formatTimeRemaining } from '../utils/eph-file';
+import { downloadDataUrlOnDevice, downloadObjectUrlOnDevice } from '../utils/downloadHelper';
 
 // ─── Component ────────────────────────────────────────────
 
@@ -124,14 +125,22 @@ const DropViewer = ({ onClose, claimData }) => {
 
   // ─── File Download ──────────────────────────────────────
 
-  const handleDownload = useCallback(() => {
+  const handleDownload = useCallback(async () => {
     if (!decryptedContent?.data) return;
-    const a = document.createElement('a');
-    a.href = decryptedContent.data;
-    a.download = contentMeta?.fileName || 'drop-file';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const fileName = contentMeta?.fileName || 'drop-file';
+    const mimeType = contentMeta?.mimeType || 'application/octet-stream';
+
+    try {
+      if (decryptedContent.type === 'image') {
+        // data URL (data:image/png;base64,...)
+        await downloadDataUrlOnDevice(decryptedContent.data, fileName);
+      } else {
+        // object URL (blob:http://...) for file/audio
+        await downloadObjectUrlOnDevice(decryptedContent.data, fileName, mimeType);
+      }
+    } catch (e) {
+      console.error('[DropViewer] Download failed:', e);
+    }
   }, [decryptedContent, contentMeta]);
 
   // ─── Content Type Icon ──────────────────────────────────
@@ -247,27 +256,45 @@ const DropViewer = ({ onClose, claimData }) => {
                     alt="Decrypted drop"
                     className="max-w-full max-h-[50vh] mx-auto object-contain bg-gray-900"
                   />
-                  {contentMeta?.fileName && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-2">
-                      {contentMeta.fileName}
-                    </p>
-                  )}
+                  <div className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700/50">
+                    {contentMeta?.fileName && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {contentMeta.fileName}
+                      </p>
+                    )}
+                    <button
+                      onClick={handleDownload}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white font-medium rounded-lg transition-colors text-xs ml-auto"
+                    >
+                      <FileDown className="w-3.5 h-3.5" />
+                      Save Image
+                    </button>
+                  </div>
                 </div>
               )}
 
               {/* Audio Content */}
               {decryptedContent.type === 'audio' && (
-                <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+                <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 space-y-2">
                   <audio
                     controls
                     src={decryptedContent.data}
                     className="w-full"
                   />
-                  {contentMeta?.fileName && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">
-                      {contentMeta.fileName}
-                    </p>
-                  )}
+                  <div className="flex items-center justify-between">
+                    {contentMeta?.fileName && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {contentMeta.fileName}
+                      </p>
+                    )}
+                    <button
+                      onClick={handleDownload}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white font-medium rounded-lg transition-colors text-xs ml-auto"
+                    >
+                      <FileDown className="w-3.5 h-3.5" />
+                      Save Audio
+                    </button>
+                  </div>
                 </div>
               )}
 
