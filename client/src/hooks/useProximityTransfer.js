@@ -217,17 +217,42 @@ export function useProximityTransfer() {
     }]);
   }, [getService]);
 
-  // Download received file
-  const downloadFile = useCallback((transfer) => {
+  // Download received file — works on desktop, mobile browsers, and Capacitor
+  const downloadFile = useCallback(async (transfer) => {
     if (!transfer?.blob) return;
+
+    const fileName = transfer.metadata?.name || 'download';
+    const mimeType = transfer.metadata?.type || transfer.blob.type || 'application/octet-stream';
+
+    // Try navigator.share (works on mobile Safari, Chrome Android, Capacitor)
+    if (navigator.share && navigator.canShare) {
+      try {
+        const file = new File([transfer.blob], fileName, { type: mimeType });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: fileName });
+          return;
+        }
+      } catch (e) {
+        // User cancelled or share failed — fall through to download
+        if (e.name === 'AbortError') return; // user cancelled, don't fallback
+        console.warn('Share API failed, falling back to download:', e);
+      }
+    }
+
+    // Fallback: create a blob URL and trigger download via <a> click
     const url = URL.createObjectURL(transfer.blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = transfer.metadata?.name || 'download';
+    a.download = fileName;
+    a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+
+    // Delay cleanup so the browser has time to start the download
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 5000);
   }, []);
 
   // Clear completed/cancelled transfers

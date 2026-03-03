@@ -271,8 +271,18 @@ export class ProximityService {
       this.emit('connected');
     });
 
-    s.on('disconnect', () => {
-      console.log('[Proximity] Signaling disconnected');
+    s.on('reconnect', () => {
+      console.log('[Proximity] Signaling reconnected — re-announcing');
+      s.emit('announce', {
+        deviceId: this.deviceId,
+        nickname: this.nickname,
+        platform: getDevicePlatform(),
+        deviceType: getDeviceType(),
+      });
+    });
+
+    s.on('disconnect', (reason) => {
+      console.log('[Proximity] Signaling disconnected:', reason);
       this.emit('disconnected');
     });
 
@@ -437,18 +447,68 @@ export class ProximityService {
       }
     };
 
+    // Track ICE restart attempts to prevent infinite loops
+    const iceRestartState = { attempts: 0, maxAttempts: 3, timer: null };
+
     pc.onconnectionstatechange = () => {
       const s = pc.connectionState;
       console.log('[Proximity] PeerConnection', peerId, '->', s);
-      if (s === 'disconnected' || s === 'failed' || s === 'closed') {
+
+      if (s === 'connected') {
+        // Reset restart counter on successful connection
+        iceRestartState.attempts = 0;
+        if (iceRestartState.timer) {
+          clearTimeout(iceRestartState.timer);
+          iceRestartState.timer = null;
+        }
+      } else if (s === 'disconnected') {
+        // "disconnected" is often temporary (mobile network switch, brief drop)
+        // Wait 3 seconds before attempting ICE restart
+        if (iceRestartState.timer) clearTimeout(iceRestartState.timer);
+        iceRestartState.timer = setTimeout(() => {
+          if (pc.connectionState === 'disconnected' && iceRestartState.attempts < iceRestartState.maxAttempts) {
+            iceRestartState.attempts++;
+            console.log('[Proximity] Attempting ICE restart for', peerId, '(attempt', iceRestartState.attempts + ')');
+            this._attemptIceRestart(peerId, pc);
+          } else if (pc.connectionState === 'disconnected') {
+            console.log('[Proximity] Max ICE restart attempts reached for', peerId);
+            this._closeConnection(peerId);
+            this.emit('peer-disconnected', { id: peerId, reason: 'max-restarts' });
+          }
+        }, 3000);
+      } else if (s === 'failed') {
+        // "failed" is more serious — try one ICE restart, then give up
+        if (iceRestartState.attempts < 1) {
+          iceRestartState.attempts++;
+          console.log('[Proximity] Connection failed, attempting ICE restart for', peerId);
+          this._attemptIceRestart(peerId, pc);
+        } else {
+          this._closeConnection(peerId);
+          this.emit('peer-disconnected', { id: peerId, reason: 'failed' });
+        }
+      } else if (s === 'closed') {
         this._closeConnection(peerId);
-        this.emit('peer-disconnected', { id: peerId });
+        this.emit('peer-disconnected', { id: peerId, reason: 'closed' });
       }
     };
 
     pc.oniceconnectionstatechange = () => {
       console.log('[Proximity] ICE state', peerId, '->', pc.iceConnectionState);
     };
+  }
+
+  async _attemptIceRestart(peerId, pc) {
+    try {
+      const conn = this.connections.get(peerId);
+      if (!conn || pc.signalingState === 'closed') return;
+
+      const offer = await pc.createOffer({ iceRestart: true });
+      await pc.setLocalDescription(offer);
+      this.discoverySocket?.emit('rtc-offer', { to: peerId, offer: pc.localDescription });
+      console.log('[Proximity] ICE restart offer sent to', peerId);
+    } catch (e) {
+      console.warn('[Proximity] ICE restart failed for', peerId, ':', e.message);
+    }
   }
 
   _setupDataChannel(peerId, channel) {
