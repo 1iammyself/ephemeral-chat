@@ -41,9 +41,17 @@ import GameModal from './GameModal';
 import TournamentModal from './TournamentModal';
 import webRTCService, { CallState } from '../webrtc';
 import {
-  encryptMessageSecure, decryptMessageSecure, // v2 Double Ratchet
-  initSecureSession, completeKeyExchange,
-  destroySecureSession, getKeyBundle, isSessionReady
+  initMLS,
+  createMLSGroup,
+  createMLSIdentity,
+  joinMLSGroup,
+  addMemberToGroup,
+  encryptMLSMessage,
+  decryptMLSMessage,
+  destroyMLSSession,
+  isMLSReady,
+  isMLSCreator,
+  getMLSKeyPackage
 } from '../utils/security';
 import { initTrafficPadding, stopTrafficPadding, withJitter } from '../crypto/traffic-padding';
 import { initOHTTP } from '../crypto/ohttp';
@@ -498,13 +506,10 @@ const ChatRoom = () => {
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [verbalCode, setVerbalCode] = useState(null); // State for verbal code display
 
-  // ─── v2 Security Session State ───────────────────────────
-  const [secureSessionReady, setSecureSessionReady] = useState(false);
-  const [isInitiator, setIsInitiator] = useState(false);
+  // ─── MLS Session State ──────────────────────────────────
+  const [mlsReady, setMlsReady] = useState(false);
+  const mlsReadyRef = useRef(false);
   const transportManagerRef = useRef(null);
-  // Refs that mirror state so socket event closures always see latest values
-  const secureSessionReadyRef = useRef(false);
-  const isInitiatorRef = useRef(false);
 
   // Suggestions State
   const [suggestions, setSuggestions] = useState({ show: false, type: null, items: [], index: 0, query: '' });
@@ -519,9 +524,17 @@ const ChatRoom = () => {
   const [audioViewOnce, setAudioViewOnce] = useState(true);
   const [isAnonymousMode, setIsAnonymousMode] = useState(false);
 
-  // ─── Sync security refs with state (avoids stale closures in socket handlers) ──
-  useEffect(() => { secureSessionReadyRef.current = secureSessionReady; }, [secureSessionReady]);
-  useEffect(() => { isInitiatorRef.current = isInitiator; }, [isInitiator]);
+  // ─── Sync MLS ref with state ───────────────────────────
+  useEffect(() => { mlsReadyRef.current = mlsReady; }, [mlsReady]);
+
+  // ─── Initialize MLS WASM on mount ─────────────────────
+  useEffect(() => {
+    initMLS().then(() => {
+      console.log('[ChatRoom] MLS WASM ready');
+    }).catch(e => {
+      console.error('[ChatRoom] MLS WASM init failed:', e);
+    });
+  }, []);
 
   const messageInputRef = useRef(null);
 
@@ -644,11 +657,11 @@ const ChatRoom = () => {
         setIsConnected(true);
         setRoom(response.room);
         let msgs = response.messages || [];
-        // Decrypt history messages — v2 ratchet first; v1 only if no v2 session
+        // Decrypt history messages — MLS v3 or legacy
         msgs = await Promise.all(msgs.map(async (msg) => {
-          if (msg.v === 2 && msg.ratchet) {
+          if (msg.isEncrypted && msg.v === 3 && msg.mls) {
             try {
-              const decrypted = await decryptMessageSecure(msg, roomCode);
+              const decrypted = decryptMLSMessage(msg, roomCode);
               const result = { ...msg, content: decrypted, isEncrypted: false };
               if (msg.messageType === 'poll' && !msg.pollData) {
                 try { result.pollData = JSON.parse(decrypted); } catch {}
@@ -656,19 +669,10 @@ const ChatRoom = () => {
               if (msg.messageType === 'game' && !msg.gameData) {
                 try { result.gameData = JSON.parse(decrypted); } catch {}
               }
+              if (msg.messageType === 'tournament' && !msg.tournamentData) {
+                try { result.tournamentData = JSON.parse(decrypted); } catch {}
+              }
               return result;
-            } catch (e) {
-              return { ...msg, content: '⚠️ v2 Decryption failed' };
-            }
-          }
-          if (msg.isEncrypted && msg.iv) {
-            // Legacy v1 message in history — only attempt if no v2 session
-            // (otherwise this is a stored downgrade-attack payload)
-            try {
-              const decrypted = await decryptMessageSecure(
-                { encrypted: msg.content, iv: msg.iv }, roomCode
-              );
-              return { ...msg, content: decrypted };
             } catch (e) {
               return { ...msg, content: '⚠️ Decryption failed' };
             }
@@ -698,81 +702,43 @@ const ChatRoom = () => {
         setIsReconnecting(false);
         setError(null);
 
-        // ─── v2 Security: Initialize PQXDH + Double Ratchet ───
-        // The first user in the room is the initiator; they publish their
-        // key bundle and wait for the peer to answer.
-        const amInitiator = myRole === 'host' || (response.room?.users?.length || 0) <= 1;
-        setIsInitiator(amInitiator);
-
+        // ─── MLS Session Setup ────────────────────────────
+        const isHost = myRole === 'host' || (response.room?.users?.length || 0) <= 1;
         try {
-          const { keyBundle, ratchetReady } = await initSecureSession(roomCode, amInitiator, null);
-          // Broadcast our key bundle to the room
-          socketManager.emit('key-bundle-offer', { roomCode, keyBundle });
-          if (ratchetReady) setSecureSessionReady(true);
-          console.log('🔐 v2 key bundle published, waiting for peer…');
-
-          // ─── RETRY: re-emit key-bundle-offer every 3s until session is ready ───
-          // This handles the case where the first offer is lost because no peer
-          // was in the room yet, or the peer hadn't registered its handlers yet.
-          const retryInterval = setInterval(() => {
-            if (isSessionReady(roomCode)) {
-              console.log('[ChatRoom] Key exchange completed, stopping retry interval');
-              clearInterval(retryInterval);
-              return;
-            }
-            const freshBundle = getKeyBundle(roomCode);
-            if (freshBundle) {
-              console.log('[ChatRoom] Re-emitting key-bundle-offer (retry)…');
-              socketManager.emit('key-bundle-offer', { roomCode, keyBundle: freshBundle });
-            }
-          }, 3000);
-          // Safety: stop retrying after 60 seconds no matter what
-          setTimeout(() => clearInterval(retryInterval), 60000);
-
-          // Initialize traffic padding with chaff sending over real socket
-          initTrafficPadding('medium', (paddedMsg, isChaff) => {
-            socketManager.emit('padded-message', {
-              payload: btoa(String.fromCharCode(...paddedMsg)),
-              isChaff
-            });
-          });
-
-          // Initialize Privacy Pass tokens (non-blocking)
-          const serverUrl = socketManager.getServerUrl();
-          initPrivacyPass(serverUrl).catch(() => {});
-
-          // Initialize OHTTP client — routes all HTTP through the oblivious relay
-          // so the server never sees the client's IP address.
-          initOHTTP({
-            enabled: true,
-            relayUrl: `${serverUrl}/ohttp/request`,  // OHTTP relay endpoint
-            gatewayUrl: serverUrl,                     // Gateway is same server
-            configUrl: `${serverUrl}/ohttp/config`     // Gateway HPKE key config
-          });
-
-          // ─── Initialize TransportManager (P2P + MASQUE fallback) ──
-          try {
-            const tm = new TransportManager({
-              socketManager,
-              relayUrl: serverUrl,
-              iceConfig: {
-                iceServers: [
-                  { urls: 'stun:stun.l.google.com:19302' },
-                  { urls: 'stun:stun1.l.google.com:19302' }
-                ]
-              }
-            });
-            tm.onTransportSelected = (peerId, type) => {
-              console.log(`🔗 P2P transport for ${peerId}: ${type}`);
-            };
-            transportManagerRef.current = tm;
-          } catch (tmErr) {
-            console.warn('⚠️ TransportManager init failed (socket fallback):', tmErr.message);
+          if (isHost) {
+            // Room creator: create MLS group
+            createMLSGroup(roomCode, response.nickname);
+            setMlsReady(true);
+            console.log('[ChatRoom] 🔐 MLS group created (host)');
+          } else {
+            // Joiner: create identity and send key package to host
+            const { keyPackage } = createMLSIdentity(roomCode, response.nickname);
+            socketManager.emit('mls-key-package', { roomCode, keyPackage });
+            console.log('[ChatRoom] 🔐 MLS key package sent, waiting for welcome...');
           }
         } catch (e) {
-          console.warn('⚠️ v2 secure session init failed (falling back to v1):', e.message);
+          console.warn('[ChatRoom] MLS session setup failed:', e.message);
         }
 
+        // TransportManager init
+        try {
+          const tm = new TransportManager({
+            socketManager,
+            relayUrl: socketManager.getServerUrl(),
+            iceConfig: {
+              iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+              ]
+            }
+          });
+          tm.onTransportSelected = (peerId, type) => {
+            console.log(`🔗 P2P transport for ${peerId}: ${type}`);
+          };
+          transportManagerRef.current = tm;
+        } catch (tmErr) {
+          console.warn('⚠️ TransportManager init failed (socket fallback):', tmErr.message);
+        }
         return;
       }
       setError(response.error || 'Failed to join room');
@@ -906,11 +872,11 @@ const ChatRoom = () => {
       setRoom(data.room);
       setUsers(data.users || []);
       let msgs = data.messages || [];
-      // Decrypt history — v2 ratchet first; v1 only if no v2 session
+      // Decrypt history — MLS v3 or show as-is
       msgs = await Promise.all(msgs.map(async (msg) => {
-        if (msg.v === 2 && msg.ratchet) {
+        if (msg.isEncrypted && msg.v === 3 && msg.mls) {
           try {
-            const decrypted = await decryptMessageSecure(msg, roomCode);
+            const decrypted = decryptMLSMessage(msg, roomCode);
             const result = { ...msg, content: decrypted, isEncrypted: false };
             if (msg.messageType === 'poll' && !msg.pollData) {
               try { result.pollData = JSON.parse(decrypted); } catch {}
@@ -918,17 +884,10 @@ const ChatRoom = () => {
             if (msg.messageType === 'game' && !msg.gameData) {
               try { result.gameData = JSON.parse(decrypted); } catch {}
             }
+            if (msg.messageType === 'tournament' && !msg.tournamentData) {
+              try { result.tournamentData = JSON.parse(decrypted); } catch {}
+            }
             return result;
-          } catch (e) {
-            return { ...msg, content: '⚠️ v2 Decryption failed' };
-          }
-        }
-        if (msg.isEncrypted && msg.iv) {
-          try {
-            const decrypted = await decryptMessageSecure(
-              { encrypted: msg.content, iv: msg.iv }, roomCode
-            );
-            return { ...msg, content: decrypted };
           } catch (e) {
             return { ...msg, content: '⚠️ Decryption failed' };
           }
@@ -957,91 +916,58 @@ const ChatRoom = () => {
       }
     };
 
-    // ─── v2 Key Exchange Handlers ──────────────────────────
-    const handleKeyBundleOffer = async ({ keyBundle, from }) => {
-      // A peer published their key bundle — complete the ECDH handshake
-      if (!roomCode) return;
-      console.log('[ChatRoom] handleKeyBundleOffer from:', from, 'roomCode:', roomCode);
+    // ─── MLS Key Exchange Handlers ───────────────────────────
+    const handleMLSKeyPackage = ({ keyPackage, from }) => {
+      // Host receives a joiner's key package — add them to the group
+      if (!roomCode || !isMLSCreator(roomCode)) return;
+      console.log('[ChatRoom] MLS key package received from:', from);
       try {
-        const result = await completeKeyExchange(roomCode, keyBundle, isInitiatorRef.current);
-        // Only mark session ready if the exchange ACTUALLY produced a shared key
-        if (isSessionReady(roomCode)) {
-          setSecureSessionReady(true);
-          console.log('🔐 Key exchange complete (received offer from', from, ')');
-        } else {
-          console.warn('[ChatRoom] completeKeyExchange returned but session NOT ready');
-        }
-        // Send our bundle back so the peer can also complete
-        const myBundle = getKeyBundle(roomCode);
-        if (myBundle) {
-          socketManager.emit('key-bundle-answer', { roomCode, keyBundle: myBundle, pqCiphertext: (result && result.pqCiphertext) || null });
-        }
+        const { welcome, commit } = addMemberToGroup(roomCode, keyPackage);
+        // Send welcome + commit back to the joiner
+        socketManager.emit('mls-welcome', { roomCode, welcome, commit, to: from });
+        console.log('[ChatRoom] 🔐 MLS welcome sent to:', from);
       } catch (e) {
-        console.warn('⚠️ Key exchange from offer failed:', e.message);
+        console.warn('[ChatRoom] MLS add member failed:', e.message);
       }
     };
 
-    const handleKeyBundleAnswer = async ({ keyBundle, from, pqCiphertext }) => {
-      // The peer answered our key bundle — complete our side
-      if (!roomCode) return;
-      console.log('[ChatRoom] handleKeyBundleAnswer from:', from, 'roomCode:', roomCode);
+    const handleMLSWelcome = ({ welcome, commit }) => {
+      // Joiner receives welcome message — join the group
+      if (!roomCode || isMLSReady(roomCode)) return;
+      console.log('[ChatRoom] MLS welcome received');
       try {
-        await completeKeyExchange(roomCode, keyBundle, isInitiatorRef.current, pqCiphertext || null);
-        // Only mark session ready if the exchange ACTUALLY produced a shared key
-        if (isSessionReady(roomCode)) {
-          setSecureSessionReady(true);
-          console.log('🔐 Key exchange complete (received answer from', from, ')');
-        } else {
-          console.warn('[ChatRoom] completeKeyExchange (answer) returned but session NOT ready');
-        }
+        joinMLSGroup(roomCode, welcome, null, null);
+        setMlsReady(true);
+        console.log('[ChatRoom] 🔐 MLS session ready (joined via welcome)');
       } catch (e) {
-        console.warn('⚠️ Key exchange from answer failed:', e.message);
+        console.warn('[ChatRoom] MLS join failed:', e.message);
       }
     };
 
-    // ─── v2-Aware Message Handler ──────────────────────────
+    // ─── MLS-Aware Message Handler ─────────────────────────
     const handleNewMessage = async (message) => {
-      // v2 ratchet-encrypted messages (Double Ratchet + traffic padding)
-      if (message.v === 2 && message.ratchet) {
+      // MLS v3 encrypted messages
+      if (message.v === 3 && message.mls) {
         try {
-          const decrypted = await decryptMessageSecure(message, roomCode);
+          const decrypted = decryptMLSMessage(message, roomCode);
           message.content = decrypted;
-          message.isEncrypted = false; // Mark as decrypted for rendering
-
-          // ── Reconstruct structured data for polls/games ──
-          // The server cannot inspect encrypted payloads, so pollData / gameData
-          // are absent. The decrypted content is the JSON-stringified structure.
+          message.isEncrypted = false;
           if (message.messageType === 'poll' && !message.pollData) {
             try { message.pollData = JSON.parse(decrypted); } catch {}
           }
           if (message.messageType === 'game' && !message.gameData) {
             try { message.gameData = JSON.parse(decrypted); } catch {}
           }
+          if (message.messageType === 'tournament' && !message.tournamentData) {
+            try { message.tournamentData = JSON.parse(decrypted); } catch {}
+          }
         } catch (e) {
-          message.content = '⚠️ v2 Decryption failed';
+          message.content = '⚠️ Decryption failed';
         }
         setMessages(prev => [...prev, message]);
         return;
       }
-      // v1 legacy messages — REJECT in v2 rooms, only allow in pre-upgrade rooms
-      if (message.isEncrypted && message.iv) {
-        if (secureSessionReadyRef.current) {
-          // v2 session active — reject v1 payloads (downgrade attack protection)
-          console.error('🛑 DOWNGRADE BLOCKED: v1 payload received in v2-secured room.');
-          message.content = '⚠️ Message rejected: legacy encryption not accepted in this room.';
-        } else {
-          // No v2 session (genuinely old clients on both sides)
-          try {
-            const decrypted = await decryptMessageSecure(
-              { encrypted: message.content, iv: message.iv },
-              roomCode
-            );
-            message.content = decrypted;
-          } catch (e) {
-            message.content = '⚠️ Decryption failed';
-          }
-        }
-      }
+      // Unencrypted or legacy — show as-is
       setMessages(prev => [...prev, message]);
     };
 
@@ -1055,15 +981,7 @@ const ChatRoom = () => {
         return [...filtered, user];
       });
 
-      // ─── Re-emit our key bundle when a new user joins ───
-      // If the session isn't ready yet, the new peer needs our public key.
-      if (!isSessionReady(roomCode)) {
-        const myBundle = getKeyBundle(roomCode);
-        if (myBundle) {
-          console.log('[ChatRoom] New user joined — re-emitting key-bundle-offer');
-          socketManager.emit('key-bundle-offer', { roomCode, keyBundle: myBundle });
-        }
-      }
+      // ─── MLS: no action needed here — joiners send key package on join ───
 
       // Attempt P2P transport to the new peer (non-blocking)
       if (user?.socketId && transportManagerRef.current) {
@@ -1252,8 +1170,8 @@ const ChatRoom = () => {
     socketManager.on('user-left', handleUserLeft);
     socketManager.on('room-error', handleError);
     socketManager.on('latency-pong', handlePong);
-    socketManager.on('key-bundle-offer', handleKeyBundleOffer);
-    socketManager.on('key-bundle-answer', handleKeyBundleAnswer);
+    socketManager.on('mls-key-package', handleMLSKeyPackage);
+    socketManager.on('mls-welcome', handleMLSWelcome);
     socketManager.on('knock-approved', handleKnockApproved);
     socketManager.on('knock-denied', handleKnockDenied);
     socketManager.on('user-knocking', handleUserKnocking);
@@ -1291,10 +1209,10 @@ const ChatRoom = () => {
 
     // Now Playing status from other users
     const handleNowPlayingUpdate = async (data) => {
-      // ── Encrypted v2 payload: decrypt first ──
-      if (data && data.v === 2 && data.ratchet === true && data.ciphertext) {
+      // ── MLS v3 encrypted payload: decrypt first ──
+      if (data && data.v === 3 && data.mls) {
         try {
-          const decrypted = await decryptMessageSecure(data, roomCode);
+          const decrypted = decryptMLSMessage(data, roomCode);
           const parsed = JSON.parse(decrypted);
           // parsed = { nowPlaying: { title, artist, source } | null }
           const safe = parsed.nowPlaying ? sanitizeNowPlaying(parsed.nowPlaying) : null;
@@ -1331,17 +1249,17 @@ const ChatRoom = () => {
       window.electronAPI.nowPlaying.onUpdate(async (rawStatus) => {
         // Sanitize native system media data before broadcasting
         const status = sanitizeNowPlaying(rawStatus);
-        // Encrypt + jitter if secure session is ready; cleartext fallback otherwise
-        if (secureSessionReadyRef.current) {
-          try {
-            const payload = await encryptMessageSecure(JSON.stringify({ nowPlaying: status }), roomCode);
-            await withJitter(() => socketManager.emit('now-playing-update', payload));
-          } catch (e) {
-            console.warn('Electron now-playing encrypt failed, sending cleartext:', e);
+        // Encrypt + jitter if MLS ready
+        try {
+          if (mlsReadyRef.current) {
+            const payload = encryptMLSMessage(JSON.stringify({ nowPlaying: status }), roomCode);
+            await withJitter(() => socketManager.emit('now-playing-update', { ...payload, messageType: 'now-playing' }));
+          } else {
             await withJitter(() => socketManager.emit('now-playing-update', { nowPlaying: status }));
           }
-        } else {
-          socketManager.emit('now-playing-update', { nowPlaying: status });
+        } catch (e) {
+          console.warn('Now-playing encrypt failed, sending cleartext:', e);
+          await withJitter(() => socketManager.emit('now-playing-update', { nowPlaying: status }));
         }
         // Also update local map so our own badge shows
         const myId = socketManager.id;
@@ -1357,17 +1275,17 @@ const ChatRoom = () => {
     // (NowPlaying bridge already sanitizes internally before calling callbacks)
     if (CapacitorNowPlaying.isAvailable() && !window.electronAPI?.nowPlaying) {
       CapacitorNowPlaying.startPolling(4000, async (status) => {
-        // Encrypt + jitter if secure session is ready; cleartext fallback otherwise
-        if (secureSessionReadyRef.current) {
-          try {
-            const payload = await encryptMessageSecure(JSON.stringify({ nowPlaying: status }), roomCode);
-            await withJitter(() => socketManager.emit('now-playing-update', payload));
-          } catch (e) {
-            console.warn('Capacitor now-playing encrypt failed, sending cleartext:', e);
+        // Encrypt + jitter if MLS ready
+        try {
+          if (mlsReadyRef.current) {
+            const payload = encryptMLSMessage(JSON.stringify({ nowPlaying: status }), roomCode);
+            await withJitter(() => socketManager.emit('now-playing-update', { ...payload, messageType: 'now-playing' }));
+          } else {
             await withJitter(() => socketManager.emit('now-playing-update', { nowPlaying: status }));
           }
-        } else {
-          socketManager.emit('now-playing-update', { nowPlaying: status });
+        } catch (e) {
+          console.warn('Now-playing encrypt failed, sending cleartext:', e);
+          await withJitter(() => socketManager.emit('now-playing-update', { nowPlaying: status }));
         }
         const myId = socketManager.id;
         if (myId && status) {
@@ -1389,8 +1307,8 @@ const ChatRoom = () => {
       socketManager.off('user-left', handleUserLeft);
       socketManager.off('room-error', handleError);
       socketManager.off('latency-pong', handlePong);
-      socketManager.off('key-bundle-offer', handleKeyBundleOffer);
-      socketManager.off('key-bundle-answer', handleKeyBundleAnswer);
+      socketManager.off('mls-key-package', handleMLSKeyPackage);
+      socketManager.off('mls-welcome', handleMLSWelcome);
       socketManager.off('knock-approved', handleKnockApproved);
       socketManager.off('knock-denied', handleKnockDenied);
       socketManager.off('user-knocking', handleUserKnocking);
@@ -1424,10 +1342,10 @@ const ChatRoom = () => {
       }
       CapacitorNowPlaying.stopPolling();
 
-      // ─── v2 Security: Clean up ratchet state + padding ───
-      destroySecureSession(roomCode);
+      // ─── MLS Security: Clean up session + padding ───
+      destroyMLSSession(roomCode);
       stopTrafficPadding();
-      setSecureSessionReady(false);
+      setMlsReady(false);
 
       // ─── P2P Transport: Tear down ICE connections ───
       if (transportManagerRef.current) {
@@ -1806,19 +1724,13 @@ const ChatRoom = () => {
       // If mentions exist, they take precedence
       const finalRecipients = mentionedSocketIds.length > 0 ? mentionedSocketIds : selectedRecipients;
 
-      // ─── v2 encryption ONLY (Double Ratchet + PQXDH) ─────
-      // NO v1 fallback: if the ratchet session is not ready, block the send.
-      // Falling back to basic AES-GCM is a downgrade attack surface.
-      if (!secureSessionReady) {
-        setError('🔒 Secure session not ready — please wait for the key exchange to complete.');
-        return;
-      }
+      // ─── MLS encryption ─────────────────────────────────
 
       let v2Payload;
       try {
-        v2Payload = await encryptMessageSecure(content, roomCode);
+        v2Payload = encryptMLSMessage(content, roomCode);
       } catch (e) {
-        console.error('v2 encrypt failed — message NOT sent:', e.message);
+        console.error('MLS encrypt failed — message NOT sent:', e.message);
         setError('Encryption failed. Please rejoin the room.');
         return;
       }
@@ -1858,12 +1770,8 @@ const ChatRoom = () => {
 
   const handleSendPoll = async (pollData) => {
     if (!isConnected) return;
-    if (!secureSessionReady) {
-      setError('🔒 Secure session not ready — cannot send poll.');
-      return;
-    }
     try {
-      const v2Payload = await encryptMessageSecure(JSON.stringify(pollData), roomCode);
+      const v2Payload = encryptMLSMessage(JSON.stringify(pollData), roomCode);
       socketManager.emit('send-message', {
         ...v2Payload,
         messageType: 'poll',
@@ -1885,12 +1793,8 @@ const ChatRoom = () => {
       return;
     }
 
-    if (!secureSessionReady) {
-      setError('🔒 Secure session not ready — cannot send game.');
-      return;
-    }
     try {
-      const v2Payload = await encryptMessageSecure(JSON.stringify(gameData), roomCode);
+      const v2Payload = encryptMLSMessage(JSON.stringify(gameData), roomCode);
       socketManager.emit('send-message', {
         ...v2Payload,
         messageType: 'game',
@@ -1900,7 +1804,7 @@ const ChatRoom = () => {
       });
     } catch (e) {
       console.error('Game encryption failed:', e.message);
-      setError('Failed to encrypt game data.');
+      setError('Failed to encrypt game.');
     }
   };
 
@@ -1908,10 +1812,12 @@ const ChatRoom = () => {
   const handleCreateTournament = async (tournamentConfig) => {
     if (!isConnected) return;
     try {
+      const v2Payload = encryptMLSMessage(JSON.stringify(tournamentConfig), roomCode);
       socketManager.emit('send-message', {
+        ...v2Payload,
         content: `🏆 ${tournamentConfig.name}`,
         messageType: 'tournament',
-        tournamentData: tournamentConfig,
+        isEncrypted: true,
         userId: persistentUserId
       });
     } catch (e) {
@@ -2152,19 +2058,18 @@ const ChatRoom = () => {
       // For other files, we send raw base64 as before
       let content = isImage ? e.target.result : e.target.result.split(',')[1];
 
-      // ─── v2 encryption ONLY for files ────────────────────
-      // NO v1 fallback — block the upload if ratchet not ready.
-      if (!secureSessionReady) {
-        setError('🔒 Secure session not ready — cannot encrypt file.');
+      // ─── MLS encryption for files ────────────────────
+      if (!isMLSReady(roomCode)) {
+        setError('🔒 MLS session not ready — cannot encrypt file.');
         setIsUploading(false);
         return;
       }
 
       let v2Payload;
       try {
-        v2Payload = await encryptMessageSecure(content, roomCode);
+        v2Payload = encryptMLSMessage(content, roomCode);
       } catch (e) {
-        console.error('v2 file encrypt failed — file NOT sent:', e.message);
+        console.error('MLS file encrypt failed — file NOT sent:', e.message);
         setError('File encryption failed. Please rejoin the room.');
         setIsUploading(false);
         return;
@@ -2242,12 +2147,8 @@ const ChatRoom = () => {
 
   const handleSaveEdit = async (newContent) => {
     if (editingMessage) {
-      if (!secureSessionReady) {
-        setError('🔒 Secure session not ready — cannot edit message.');
-        return;
-      }
       try {
-        const v2Payload = await encryptMessageSecure(newContent, roomCode);
+        const v2Payload = encryptMLSMessage(newContent, roomCode);
         socketManager.emit('edit-message', {
           messageId: editingMessage.id,
           ...v2Payload,
@@ -2372,15 +2273,9 @@ const ChatRoom = () => {
     reader.onloadend = async () => {
       const base64Audio = reader.result.split(',')[1];
 
-      // ─── v2 encryption ONLY for audio ───────────────────
-      // NO v1 fallback, NO unencrypted fallback.
-      if (!secureSessionReady) {
-        setError('🔒 Secure session not ready — cannot send voice note.');
-        return;
-      }
-
+      // ─── MLS encryption for audio ───────────────────────
       try {
-        const v2Payload = await encryptMessageSecure(base64Audio, roomCode);
+        const v2Payload = encryptMLSMessage(base64Audio, roomCode);
         await withJitter(() => {
           socketManager.emit('send-message', {
             ...v2Payload,
@@ -2391,8 +2286,8 @@ const ChatRoom = () => {
           });
         });
       } catch (e) {
-        console.error('v2 audio encrypt failed — voice note NOT sent:', e.message);
-        setError('Voice note encryption failed. Please rejoin the room.');
+        console.error('Audio encryption failed:', e.message);
+        setError('Failed to encrypt audio.');
       }
     };
     reader.readAsDataURL(audioBlob);
@@ -2576,7 +2471,7 @@ const ChatRoom = () => {
               currentUser={currentUser}
               isHost={isHost}
               roomVibe={roomVibe}
-              secureSessionReady={secureSessionReady}
+              mlsReady={mlsReady}
               initialMedia={initialMedia}
               onNowPlayingChange={(np) => {
                 const myId = currentUser?.socketId || currentUser?.id;
@@ -2626,12 +2521,13 @@ const ChatRoom = () => {
             {canManageRoom(currentUserRole) && (
               <button
                 onClick={(e) => { e.stopPropagation(); handleStopTimer(); }}
-                className="ml-1 p-0.5 hover:bg-white/20 rounded-full transition-colors"
+                className={`ml-1 p-0.5 hover:bg-white/20 rounded-full transition-colors`
+                }
                 title="Stop Timer"
                 onMouseDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
               >
-                <X className="w-3 h-3" />
+                <X className="w-3 h-3 text-red-500" />
               </button>
             )}
           </div>
@@ -2761,16 +2657,16 @@ const ChatRoom = () => {
                         type="button"
                         onClick={() => setShowFeatureMenu(!showFeatureMenu)}
                         disabled={!isConnected}
-                        className={`p-1.5 sm:p-2.5 rounded-full transition-all duration-200 ${showFeatureMenu ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 text-${vibeAccent}-600 scale-110` : `hover:bg-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 text-gray-500 dark:text-gray-400`}`}
+                        className={`p-1.5 sm:p-2.5 rounded-full transition-all duration-200 ${showFeatureMenu ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 text-${vibeAccent}-500` : `hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400`}`}
                         title="Features"
                       >
                         <Plus className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300 ${showFeatureMenu ? 'rotate-45' : ''}`} />
                       </button>
 
                       {showFeatureMenu && (
-                        <div className="absolute bottom-full mb-2 sm:mb-3 left-0 z-50 bg-white/30 dark:bg-black/20 rounded-2xl sm:rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] border border-white/20 p-1.5 sm:p-3 flex flex-col space-y-1 sm:space-y-2 w-[70vw] max-w-[220px] sm:w-[85vw] sm:max-w-[320px] animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-2xl ring-1 ring-white/10 dark:ring-white/5">
+                        <div className="absolute bottom-full mb-2 sm:mb-3 left-0 z-50 bg-white/30 dark:bg-black/20 rounded-2xl sm:rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] border border-white/20 dark:border-white/10 p-1.5 sm:p-3 flex flex-col space-y-1 sm:space-y-2 w-[70vw] max-w-[220px] sm:w-[85vw] sm:max-w-[320px] animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-2xl ring-1 ring-white/10 dark:ring-white/5">
                           {/* Reaction Row */}
-                          <div className="flex items-center gap-0.5 sm:gap-1 bg-white/40 dark:bg-white/5 rounded-xl sm:rounded-2xl p-0.5 sm:p-1 px-1 sm:px-1.5 border border-white/20 shadow-inner">
+                          <div className="flex items-center gap-0.5 sm:gap-1 bg-white/40 dark:bg-white/5 rounded-xl sm:rounded-2xl p-0.5 sm:p-1 px-1 sm:px-1.5 border border-white/10 shadow-inner">
                             <div className="flex items-center flex-1 overflow-x-auto scrollbar-none gap-0.5 sm:gap-1 sm:py-0.5 no-scrollbar">
                               {['❤️', '🔥', '👏', '😂', '😮', '💯', '😍', '😘', '✨', '⚡', '🎉', '👍', '🙏', '👀', '🤔', '😎', '🥳', '🤯', '💎', '🎨'].map(emoji => (
                                 <button
@@ -2903,7 +2799,7 @@ const ChatRoom = () => {
                                       else setShowTimerModal(true);
                                       setShowFeatureMenu(false);
                                     }}
-                                    className={`flex items-center space-x-2 p-2 rounded-xl border border-white/10 transition-all ${activeTimer ? 'bg-red-500/10 hover:bg-red-500/20 shadow-sm' : 'bg-white/5 dark:bg-white/5 hover:bg-white/10 dark:hover:bg-white/10 shadow-sm'}`}
+                                    className={`flex items-center space-x-2 p-2 rounded-xl border border-white/10 transition-all ${activeTimer ? 'bg-red-500/10 hover:bg-red-500/20' : 'bg-white/5 dark:bg-white/5 hover:bg-white/10 dark:hover:bg-white/10'}`}
                                   >
                                     <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${activeTimer ? 'bg-red-500/20' : 'bg-white/10 dark:bg-white/10'}`}>
                                       {activeTimer ? <X className="w-3.5 h-3.5 text-red-500" /> : <Clock className={`w-3.5 h-3.5 text-${vibeAccent}-500`} />}

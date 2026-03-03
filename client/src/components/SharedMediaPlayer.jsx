@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import socketManager from '../socket';
 import {
-  encryptMessageSecure, decryptMessageSecure,
+  encryptMLSMessage, decryptMLSMessage, isMLSReady,
 } from '../utils/security';
 import { withJitter } from '../crypto/traffic-padding';
 
@@ -112,7 +112,7 @@ function formatTime(seconds) {
 }
 
 // ─── Component ─────────────────────────────────────────────────────────
-const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default', onNowPlayingChange, secureSessionReady = false, initialMedia = null }) => {
+const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default', onNowPlayingChange, mlsReady = false, initialMedia = null }) => {
   const [mediaInfo, setMediaInfo] = useState(null);       // { type, id, url, sharedBy }
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -139,10 +139,10 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
   useEffect(() => {
     const handleMediaShare = async (data) => {
       let parsed;
-      // ─── v2 Double Ratchet: decrypt if encrypted ──────────────────
-      if (data.v === 2 && data.ratchet && data.ciphertext) {
+      // ─── MLS v3: decrypt if encrypted ──────────────────
+      if (data.v === 3 && data.mls) {
         try {
-          const json = await decryptMessageSecure(data, roomCode);
+          const json = decryptMLSMessage(data, roomCode);
           parsed = JSON.parse(json);
         } catch (e) {
           console.error('media-share decrypt failed:', e);
@@ -177,10 +177,10 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
       }
 
       let parsed;
-      // ─── v2 Double Ratchet: decrypt if encrypted ──────────────────
-      if (data.v === 2 && data.ratchet && data.ciphertext) {
+      // ─── MLS v3: decrypt if encrypted ──────────────────
+      if (data.v === 3 && data.mls) {
         try {
-          const json = await decryptMessageSecure(data, roomCode);
+          const json = decryptMLSMessage(data, roomCode);
           parsed = JSON.parse(json);
         } catch (e) {
           console.error('media-sync decrypt failed:', e);
@@ -237,10 +237,10 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
 
     const restoreMedia = async () => {
       let parsed;
-      // Handle v2 encrypted media state
-      if (initialMedia.v === 2 && initialMedia.ratchet && initialMedia.ciphertext) {
+      // Handle MLS v3 encrypted media state
+      if (initialMedia.v === 3 && initialMedia.mls) {
         try {
-          const json = await decryptMessageSecure(initialMedia, roomCode);
+          const json = decryptMLSMessage(initialMedia, roomCode);
           parsed = JSON.parse(json);
         } catch (e) {
           console.warn('Could not decrypt persisted media state:', e);
@@ -363,10 +363,10 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
   // the UserList — not just Electron users with system media detection.
   useEffect(() => {
     const emitNowPlaying = async (nowPlaying) => {
-      // Encrypt now-playing data with Double Ratchet when session is ready
-      if (secureSessionReady && nowPlaying) {
+      // Encrypt now-playing data with MLS when session is ready
+      if (isMLSReady(roomCode) && nowPlaying) {
         try {
-          const payload = await encryptMessageSecure(JSON.stringify({ nowPlaying }), roomCode);
+          const payload = encryptMLSMessage(JSON.stringify({ nowPlaying }), roomCode);
           await withJitter(() => socketManager.emit('now-playing-update', payload));
           return;
         } catch (e) {
@@ -393,7 +393,7 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
       emitNowPlaying(null);
       onNowPlayingChange?.(null);
     }
-  }, [isPlaying, mediaInfo?.type, mediaInfo?.id, mediaInfo?.url, secureSessionReady]);
+  }, [isPlaying, mediaInfo?.type, mediaInfo?.id, mediaInfo?.url, roomCode]);
 
   // ─── Playback controls ───────────────────────────────────────────
   const playMedia = useCallback(() => {
@@ -424,9 +424,9 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
   // Encrypts media control payloads with Double Ratchet + timing jitter.
   // Falls back to cleartext if ratchet not ready (shouldn't happen in v2).
   const emitEncrypted = useCallback(async (event, data) => {
-    if (secureSessionReady) {
+    if (isMLSReady(roomCode)) {
       try {
-        const payload = await encryptMessageSecure(JSON.stringify(data), roomCode);
+        const payload = encryptMLSMessage(JSON.stringify(data), roomCode);
         await withJitter(() => socketManager.emit(event, payload));
         return;
       } catch (e) {
@@ -435,7 +435,7 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
     }
     // Fallback: still wrap with jitter for timing analysis protection
     await withJitter(() => socketManager.emit(event, data));
-  }, [secureSessionReady, roomCode]);
+  }, [roomCode]);
 
   // ─── Sync actions (emit to room) ─────────────────────────────────
   const handlePlayPause = () => {
