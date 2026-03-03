@@ -45,18 +45,18 @@ export async function initSecureSession(roomCode, isInitiator, peerKeyBundle = n
   if (peerKeyBundle && isInitiator) {
     // We have the peer's bundle — run PQXDH as initiator
     const peerDeserialized = deserializeKeyBundle(peerKeyBundle);
-    const { sharedSecret, ephemeralPublic, pqCiphertext } = await pqxdhInitiator(myBundle, peerDeserialized);
+    const { sharedSecret, peerEphemeralKey } = await pqxdhInitiator(myBundle, peerDeserialized);
     
-    // Initialize Double Ratchet with the shared secret
-    session.ratchetState = await initRatchetInitiator(sharedSecret, myBundle.identityKeyPair);
+    // Initialize Double Ratchet with the shared secret + peer's ephemeral DH key
+    session.ratchetState = await initRatchetInitiator(sharedSecret, peerEphemeralKey);
     session.ready = true;
   } else if (peerKeyBundle && !isInitiator) {
     // We have the peer's bundle — run PQXDH as responder
     const peerDeserialized = deserializeKeyBundle(peerKeyBundle);
-    // For responder, the peerKeyBundle contains initiator's ephemeral + pq ciphertext
-    const sharedSecret = await pqxdhResponder(myBundle, peerDeserialized);
+    const { sharedSecret } = await pqxdhResponder(myBundle, peerDeserialized);
     
-    session.ratchetState = await initRatchetResponder(sharedSecret, myBundle.identityKeyPair);
+    // Responder uses our own ephemeral keypair as the initial DH self key
+    session.ratchetState = await initRatchetResponder(sharedSecret, myBundle.ephemeralKey);
     session.ready = true;
   }
   
@@ -73,22 +73,27 @@ export async function initSecureSession(roomCode, isInitiator, peerKeyBundle = n
  * @param {string} roomCode 
  * @param {Object} peerKeyBundle - Serialized peer key bundle
  * @param {boolean} isInitiator
+ * @param {string|null} pqCiphertext - ML-KEM ciphertext from initiator (only used by responder)
+ * @returns {Promise<{pqCiphertext: string|null}>} - Returns pqCiphertext when running as initiator
  */
-export async function completeKeyExchange(roomCode, peerKeyBundle, isInitiator) {
+export async function completeKeyExchange(roomCode, peerKeyBundle, isInitiator, pqCiphertext = null) {
   const session = ratchetSessions.get(roomCode);
-  if (!session || session.ready) return;
+  if (!session || session.ready) return { pqCiphertext: null };
   
   const peerDeserialized = deserializeKeyBundle(peerKeyBundle);
+  let initiatorPqCt = null;
   
   if (isInitiator) {
-    const { sharedSecret } = await pqxdhInitiator(session.myBundle, peerDeserialized);
-    session.ratchetState = await initRatchetInitiator(sharedSecret, session.myBundle.identityKeyPair);
+    const result = await pqxdhInitiator(session.myBundle, peerDeserialized);
+    session.ratchetState = await initRatchetInitiator(result.sharedSecret, result.peerEphemeralKey);
+    initiatorPqCt = result.pqCiphertext; // Pass back so caller can send it to the peer
   } else {
-    const sharedSecret = await pqxdhResponder(session.myBundle, peerDeserialized);
-    session.ratchetState = await initRatchetResponder(sharedSecret, session.myBundle.identityKeyPair);
+    const result = await pqxdhResponder(session.myBundle, peerDeserialized, pqCiphertext);
+    session.ratchetState = await initRatchetResponder(result.sharedSecret, session.myBundle.ephemeralKey);
   }
   
   session.ready = true;
+  return { pqCiphertext: initiatorPqCt };
 }
 
 /**

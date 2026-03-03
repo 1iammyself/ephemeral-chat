@@ -4321,10 +4321,11 @@ io.on('connection', (socket) => {
     logger.info(`🔑 Key-bundle offer relayed in room ${rc} from ${socket.id}`);
   });
 
-  socket.on('key-bundle-answer', ({ roomCode: rc, keyBundle }) => {
+  socket.on('key-bundle-answer', ({ roomCode: rc, keyBundle, pqCiphertext }) => {
     if (!rc || !keyBundle) return;
     socket.to(rc).emit('key-bundle-answer', {
       keyBundle,
+      pqCiphertext: pqCiphertext || null,
       from: socket.id
     });
     logger.info(`🔑 Key-bundle answer relayed in room ${rc} from ${socket.id}`);

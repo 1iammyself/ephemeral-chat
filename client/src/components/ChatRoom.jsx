@@ -944,24 +944,24 @@ const ChatRoom = () => {
       // A peer published their key bundle — complete the PQXDH handshake
       if (!roomCode) return;
       try {
-        await completeKeyExchange(roomCode, keyBundle, isInitiatorRef.current);
+        const { pqCiphertext } = await completeKeyExchange(roomCode, keyBundle, isInitiatorRef.current) || {};
         setSecureSessionReady(true);
         console.log('🔐 PQXDH handshake complete (received offer from', from, ')');
         // Send our bundle back so the peer can also complete
         const myBundle = getKeyBundle(roomCode);
         if (myBundle) {
-          socketManager.emit('key-bundle-answer', { roomCode, keyBundle: myBundle });
+          socketManager.emit('key-bundle-answer', { roomCode, keyBundle: myBundle, pqCiphertext: pqCiphertext || null });
         }
       } catch (e) {
         console.warn('⚠️ Key exchange from offer failed:', e.message);
       }
     };
 
-    const handleKeyBundleAnswer = async ({ keyBundle, from }) => {
+    const handleKeyBundleAnswer = async ({ keyBundle, from, pqCiphertext }) => {
       // The peer answered our key bundle — complete our side
       if (!roomCode) return;
       try {
-        await completeKeyExchange(roomCode, keyBundle, isInitiatorRef.current);
+        await completeKeyExchange(roomCode, keyBundle, isInitiatorRef.current, pqCiphertext || null);
         setSecureSessionReady(true);
         console.log('🔐 PQXDH handshake complete (received answer from', from, ')');
       } catch (e) {

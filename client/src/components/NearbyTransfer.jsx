@@ -238,9 +238,9 @@ const NearbyTransfer = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-blue-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-cyan-50 to-blue-100 dark:from-gray-900 dark:to-gray-800">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+      <header className="flex-shrink-0 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
@@ -275,7 +275,8 @@ const NearbyTransfer = () => {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+      <main className="flex-1 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="max-w-2xl mx-auto px-4 py-6 space-y-4 pb-safe">
         {/* Setup Screen */}
         {!isSetup ? (
           <div className="space-y-4">
@@ -698,6 +699,7 @@ const NearbyTransfer = () => {
             )}
           </>
         )}
+        </div>
       </main>
 
       {/* Pairing Code Modal */}
