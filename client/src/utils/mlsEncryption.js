@@ -203,6 +203,24 @@ export function isMLSReady(roomCode) {
 // ═══════════════════════════════════════════════════════════
 
 /**
+ * Cache of recently sent plaintexts keyed by MLS ciphertext (base64).
+ * MLS `process_message` cannot decrypt your own `create_message` output
+ * because the sender's ratchet advances after encryption. When the server
+ * echoes our own message back, we look it up here instead of decrypting.
+ */
+const sentPlaintextCache = new Map();
+const SENT_CACHE_MAX = 200;
+
+function cacheSentPlaintext(mlsB64, plaintext) {
+  sentPlaintextCache.set(mlsB64, plaintext);
+  // Evict oldest entries if cache grows too large
+  if (sentPlaintextCache.size > SENT_CACHE_MAX) {
+    const first = sentPlaintextCache.keys().next().value;
+    sentPlaintextCache.delete(first);
+  }
+}
+
+/**
  * Encrypt a message using MLS group encryption.
  * Returns { v: 3, mls: base64EncodedCiphertext }
  */
@@ -215,16 +233,24 @@ export function encryptMLSMessage(text, roomCode) {
 
   const plaintext = new TextEncoder().encode(text);
   const ciphertext = session.group.create_message(session.provider, session.identity, plaintext);
+  const mlsB64 = uint8ToBase64(ciphertext);
+
+  // Cache the plaintext so we can resolve our own message when the server echoes it back
+  cacheSentPlaintext(mlsB64, text);
 
   return {
     v: 3,
-    mls: uint8ToBase64(ciphertext),
+    mls: mlsB64,
     isEncrypted: true
   };
 }
 
 /**
  * Decrypt an MLS-encrypted message.
+ * If we are the sender (ciphertext is in our sent cache), return the
+ * cached plaintext instead of calling process_message (which would fail
+ * because MLS senders cannot decrypt their own create_message output).
+ *
  * @param {{ v: 3, mls: string }} payload
  * @param {string} roomCode
  * @returns {string} Decrypted plaintext
@@ -242,6 +268,15 @@ export function decryptMLSMessage(payload, roomCode) {
     return '⚠️ Unknown message format';
   }
 
+  // ── Own-message shortcut: look up from sent cache ──────────
+  const cached = sentPlaintextCache.get(payload.mls);
+  if (cached !== undefined) {
+    // Remove from cache (one-shot)
+    sentPlaintextCache.delete(payload.mls);
+    return cached;
+  }
+
+  // ── Normal decryption for other members' messages ──────────
   try {
     const ciphertext = base64ToUint8(payload.mls);
     const plaintext = session.group.process_message(session.provider, ciphertext);
@@ -266,6 +301,8 @@ export function destroyMLSSession(roomCode) {
     try { session.identity?.free(); } catch (e) { /* ignore */ }
     try { session.provider?.free(); } catch (e) { /* ignore */ }
     mlsSessions.delete(roomCode);
+    // Clear sent-plaintext cache
+    sentPlaintextCache.clear();
     console.log('[MLS] Session destroyed for room:', roomCode);
   }
 }
