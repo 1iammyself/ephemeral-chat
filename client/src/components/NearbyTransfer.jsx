@@ -183,6 +183,20 @@ const NearbyTransfer = () => {
     try {
       const info = JSON.parse(data);
       if (info.deviceId) {
+        // If the scanned peer isn't in our discovered list yet, add it
+        // so the UI can display them and the connection can proceed
+        const existingPeer = peers.find(p => p.id === info.deviceId);
+        if (!existingPeer && service) {
+          const peerInfo = {
+            id: info.deviceId,
+            nickname: info.nickname || 'QR Device',
+            platform: info.platform || 'unknown',
+            deviceType: info.platform === 'electron' ? 'desktop' : 'phone',
+            lastSeen: Date.now()
+          };
+          service.peers.set(info.deviceId, peerInfo);
+          service.emit('peer-discovered', peerInfo);
+        }
         handleConnectPeer(info.deviceId);
       }
     } catch {
@@ -488,11 +502,12 @@ const NearbyTransfer = () => {
                 </div>
 
                 {/* QR Code Display */}
-                {showQR && (
+                {showQR && service && (
                   <div className="mt-3 flex justify-center">
                     <ConnectionQR
                       connectionInfo={{
-                        deviceId: nickname,
+                        deviceId: service.deviceId,
+                        nickname: nickname,
                         platform: isElectron ? 'electron' : isCapacitor ? 'android' : 'web',
                         version: '1.0'
                       }}

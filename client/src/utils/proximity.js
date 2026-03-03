@@ -29,8 +29,31 @@ const MAX_BUFFERED = 1024 * 1024; // 1MB buffer threshold
 const DISCOVERY_SERVICE = '_ephchat._udp.local';
 const PAIRING_CODE_LENGTH = 6;
 const HEARTBEAT_INTERVAL = 3000; // ms
-const PEER_TIMEOUT = 10000; // ms - consider peer lost after this
+const PEER_TIMEOUT = 15000; // ms - consider peer lost after this (5 missed heartbeats)
 const DATA_CHANNEL_LABEL = 'ephemeral-transfer';
+
+// ─── ICE Servers (STUN + TURN) ──────────────────────────────
+// Parse TURN servers from env, falling back to public STUN only
+function getIceServers() {
+  const defaultServers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' }
+  ];
+  try {
+    const envServers = import.meta.env.VITE_ICE_SERVERS;
+    if (envServers) {
+      const parsed = JSON.parse(envServers);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('[Proximity] Failed to parse VITE_ICE_SERVERS, using defaults:', e);
+  }
+  return defaultServers;
+}
+
+const ICE_SERVERS = getIceServers();
 
 // ─── Peer Info ──────────────────────────────────────────────
 
@@ -457,10 +480,7 @@ export class ProximityService {
     }
 
     const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
+      iceServers: ICE_SERVERS
     });
 
     const dataChannel = pc.createDataChannel(DATA_CHANNEL_LABEL, {
@@ -504,10 +524,7 @@ export class ProximityService {
    */
   async _handleOffer(fromPeerId, offer) {
     const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
+      iceServers: ICE_SERVERS
     });
 
     const connState = {

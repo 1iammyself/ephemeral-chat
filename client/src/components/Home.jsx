@@ -64,8 +64,13 @@ const Home = ({ children }) => {
         // Trigger the verbal join
         joinWithVerbalCode(decodedCode)
           .then(result => {
-            if (result.success) {
-              navigate(`/invite/${result.token}`);
+            if (result.success && result.roomCode) {
+              navigate(`/room/${result.roomCode}`, {
+                state: {
+                  inviteToken: result.token,
+                  requiresPassword: result.requiresPassword
+                }
+              });
             }
           })
           .catch(error => {
@@ -130,8 +135,13 @@ const Home = ({ children }) => {
     setIsJoiningVerbal(true);
     try {
       const result = await joinWithVerbalCode(trimmedCode);
-      if (result.success) {
-        navigate(`/invite/${result.token}`);
+      if (result.success && result.roomCode) {
+        navigate(`/room/${result.roomCode}`, {
+          state: {
+            inviteToken: result.token,
+            requiresPassword: result.requiresPassword
+          }
+        });
       }
     } catch (error) {
       setVerbalError(typeof error === 'string' ? error : 'Invalid or expired code');

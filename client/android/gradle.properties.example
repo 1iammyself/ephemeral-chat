@@ -23,7 +23,7 @@ android.useAndroidX=true
 
 # Signing config - COPY THIS FILE TO gradle.properties AND FILL IN YOUR VALUES
 # DO NOT COMMIT gradle.properties WITH REAL CREDENTIALS
-RELEASE_STORE_FILE=../../../android/signingKey.keystore
+RELEASE_STORE_FILE=../../../keystore_path/keystore.jks
 RELEASE_STORE_PASSWORD=YOUR_KEYSTORE_PASSWORD
 RELEASE_KEY_ALIAS=YOUR_KEY_ALIAS
 RELEASE_KEY_PASSWORD=YOUR_KEY_PASSWORD

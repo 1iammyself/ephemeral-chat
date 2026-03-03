@@ -76,8 +76,6 @@ function InviteHandler() {
       return;
     }
 
-    if (!isApp) return; // Stop here if in browser
-
     const processInvite = async () => {
       try {
         setStatus('Validating invite token...');
@@ -85,6 +83,7 @@ function InviteHandler() {
 
         if (data.roomCode) {
           navigate(`/room/${data.roomCode}`, {
+            replace: true,
             state: {
               inviteToken: token,
               requiresPassword: data.requiresPassword
@@ -101,7 +100,7 @@ function InviteHandler() {
     };
 
     processInvite();
-  }, [token, navigate, isApp]);
+  }, [token, navigate]);
 
   const getDownloadUrl = () => {
     const userAgent = navigator.userAgent.toLowerCase();

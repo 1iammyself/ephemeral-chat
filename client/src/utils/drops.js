@@ -96,7 +96,7 @@ export async function deriveWrappingKey(username, salt) {
     hash,
     { name: 'AES-GCM', length: 256 },
     false,
-    ['wrapKey', 'unwrapKey']
+    ['encrypt', 'decrypt']
   );
 }
 
