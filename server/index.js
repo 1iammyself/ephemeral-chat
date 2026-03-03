@@ -217,8 +217,8 @@ setupNearbyNamespace(io);
 
 const PORT = process.env.PORT || 3001
 
-// Apply JSON middleware
-app.use(express.json());
+// Apply JSON middleware (50MB limit for encrypted file drops sent as base64 in JSON)
+app.use(express.json({ limit: '50mb' }));
 
 // ─── Traffic Padding Middleware (RFC-compliant traffic analysis resistance) ──
 // Pads all JSON API responses to fixed bucket sizes so network observers
