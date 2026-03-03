@@ -43,7 +43,7 @@ import webRTCService, { CallState } from '../webrtc';
 import {
   encryptMessageSecure, decryptMessageSecure, // v2 Double Ratchet
   initSecureSession, completeKeyExchange,
-  destroySecureSession, getKeyBundle
+  destroySecureSession, getKeyBundle, isSessionReady
 } from '../utils/security';
 import { initTrafficPadding, stopTrafficPadding, withJitter } from '../crypto/traffic-padding';
 import { initOHTTP } from '../crypto/ohttp';
@@ -711,6 +711,24 @@ const ChatRoom = () => {
           if (ratchetReady) setSecureSessionReady(true);
           console.log('🔐 v2 key bundle published, waiting for peer…');
 
+          // ─── RETRY: re-emit key-bundle-offer every 3s until session is ready ───
+          // This handles the case where the first offer is lost because no peer
+          // was in the room yet, or the peer hadn't registered its handlers yet.
+          const retryInterval = setInterval(() => {
+            if (isSessionReady(roomCode)) {
+              console.log('[ChatRoom] Key exchange completed, stopping retry interval');
+              clearInterval(retryInterval);
+              return;
+            }
+            const freshBundle = getKeyBundle(roomCode);
+            if (freshBundle) {
+              console.log('[ChatRoom] Re-emitting key-bundle-offer (retry)…');
+              socketManager.emit('key-bundle-offer', { roomCode, keyBundle: freshBundle });
+            }
+          }, 3000);
+          // Safety: stop retrying after 60 seconds no matter what
+          setTimeout(() => clearInterval(retryInterval), 60000);
+
           // Initialize traffic padding with chaff sending over real socket
           initTrafficPadding('medium', (paddedMsg, isChaff) => {
             socketManager.emit('padded-message', {
@@ -941,16 +959,22 @@ const ChatRoom = () => {
 
     // ─── v2 Key Exchange Handlers ──────────────────────────
     const handleKeyBundleOffer = async ({ keyBundle, from }) => {
-      // A peer published their key bundle — complete the PQXDH handshake
+      // A peer published their key bundle — complete the ECDH handshake
       if (!roomCode) return;
+      console.log('[ChatRoom] handleKeyBundleOffer from:', from, 'roomCode:', roomCode);
       try {
-        const { pqCiphertext } = await completeKeyExchange(roomCode, keyBundle, isInitiatorRef.current) || {};
-        setSecureSessionReady(true);
-        console.log('🔐 PQXDH handshake complete (received offer from', from, ')');
+        const result = await completeKeyExchange(roomCode, keyBundle, isInitiatorRef.current);
+        // Only mark session ready if the exchange ACTUALLY produced a shared key
+        if (isSessionReady(roomCode)) {
+          setSecureSessionReady(true);
+          console.log('🔐 Key exchange complete (received offer from', from, ')');
+        } else {
+          console.warn('[ChatRoom] completeKeyExchange returned but session NOT ready');
+        }
         // Send our bundle back so the peer can also complete
         const myBundle = getKeyBundle(roomCode);
         if (myBundle) {
-          socketManager.emit('key-bundle-answer', { roomCode, keyBundle: myBundle, pqCiphertext: pqCiphertext || null });
+          socketManager.emit('key-bundle-answer', { roomCode, keyBundle: myBundle, pqCiphertext: (result && result.pqCiphertext) || null });
         }
       } catch (e) {
         console.warn('⚠️ Key exchange from offer failed:', e.message);
@@ -960,10 +984,16 @@ const ChatRoom = () => {
     const handleKeyBundleAnswer = async ({ keyBundle, from, pqCiphertext }) => {
       // The peer answered our key bundle — complete our side
       if (!roomCode) return;
+      console.log('[ChatRoom] handleKeyBundleAnswer from:', from, 'roomCode:', roomCode);
       try {
         await completeKeyExchange(roomCode, keyBundle, isInitiatorRef.current, pqCiphertext || null);
-        setSecureSessionReady(true);
-        console.log('🔐 PQXDH handshake complete (received answer from', from, ')');
+        // Only mark session ready if the exchange ACTUALLY produced a shared key
+        if (isSessionReady(roomCode)) {
+          setSecureSessionReady(true);
+          console.log('🔐 Key exchange complete (received answer from', from, ')');
+        } else {
+          console.warn('[ChatRoom] completeKeyExchange (answer) returned but session NOT ready');
+        }
       } catch (e) {
         console.warn('⚠️ Key exchange from answer failed:', e.message);
       }
@@ -1024,6 +1054,16 @@ const ChatRoom = () => {
         const filtered = prev.filter(u => u.socketId === user.socketId ? false : u.nickname !== user.nickname);
         return [...filtered, user];
       });
+
+      // ─── Re-emit our key bundle when a new user joins ───
+      // If the session isn't ready yet, the new peer needs our public key.
+      if (!isSessionReady(roomCode)) {
+        const myBundle = getKeyBundle(roomCode);
+        if (myBundle) {
+          console.log('[ChatRoom] New user joined — re-emitting key-bundle-offer');
+          socketManager.emit('key-bundle-offer', { roomCode, keyBundle: myBundle });
+        }
+      }
 
       // Attempt P2P transport to the new peer (non-blocking)
       if (user?.socketId && transportManagerRef.current) {
