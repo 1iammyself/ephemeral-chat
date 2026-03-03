@@ -1741,10 +1741,10 @@ const ChatRoom = () => {
         sender: replyingTo.sender.nickname
       } : null;
 
-      // ─── Send v2 ratchet-encrypted payload ────────────────
+      // ─── Send MLS v3 encrypted payload ────────────────
       await withJitter(() => {
         socketManager.emit('send-message', {
-          ...v2Payload,   // { v: 2, header, ciphertext, ratchet: true }
+          ...v2Payload,   // { v: 3, mls: base64Ciphertext, isEncrypted: true }
           messageType: 'text',
           recipients: finalRecipients,
           replyTo: replyData,
