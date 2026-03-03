@@ -94,6 +94,17 @@ api.interceptors.response.use((response) => {
 
   // Fallback — couldn't unpad, return raw
   return response;
+}, (error) => {
+  // Error interceptor: parse arraybuffer error responses into JSON
+  if (error.response?.data instanceof ArrayBuffer) {
+    try {
+      const text = new TextDecoder().decode(error.response.data);
+      error.response.data = JSON.parse(text);
+    } catch (_) {
+      // Not JSON, leave as-is
+    }
+  }
+  return Promise.reject(error);
 });
 
 /**

@@ -412,7 +412,8 @@ export class ProximityService {
         const conn = this.connections.get(from);
         if (conn?.pc) {
           await conn.pc.setRemoteDescription(new RTCSessionDescription(answer));
-          conn.state = 'connected';
+          // Flush any ICE candidates that arrived before the remote description was set
+          this._flushIceCandidates(from);
         }
       } catch (e) {
         console.error('[Proximity] Error handling answer:', e);
@@ -423,9 +424,17 @@ export class ProximityService {
     socket.on('rtc-ice-candidate', async ({ from, candidate }) => {
       try {
         const conn = this.connections.get(from);
-        if (conn?.pc && candidate) {
-          await conn.pc.addIceCandidate(new RTCIceCandidate(candidate));
+        if (!conn || !candidate) return;
+
+        // Buffer candidates if remote description isn't set yet
+        if (!conn.pc.remoteDescription) {
+          if (!conn._pendingCandidates) conn._pendingCandidates = [];
+          conn._pendingCandidates.push(candidate);
+          console.log(`[Proximity] Buffered ICE candidate from ${from} (no remote desc yet)`);
+          return;
         }
+
+        await conn.pc.addIceCandidate(new RTCIceCandidate(candidate));
       } catch (e) {
         console.error('[Proximity] Error adding ICE candidate:', e);
       }
@@ -500,12 +509,9 @@ export class ProximityService {
     this._setupDataChannel(peerId, dataChannel);
     this._setupPeerConnection(peerId, pc);
 
-    // Create and send offer
+    // Create and send offer immediately (trickle ICE — candidates sent via onicecandidate)
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-
-    // Wait for ICE gathering to complete (or timeout)
-    await this._waitForIceGathering(pc);
 
     this.discoverySocket?.emit('rtc-offer', {
       to: peerId,
@@ -546,11 +552,14 @@ export class ProximityService {
     };
 
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
+
+    // Flush any ICE candidates that arrived before we set the remote description
+    this._flushIceCandidates(fromPeerId);
+
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
 
-    await this._waitForIceGathering(pc);
-
+    // Send answer immediately (trickle ICE — candidates sent via onicecandidate)
     this.discoverySocket?.emit('rtc-answer', {
       to: fromPeerId,
       answer: pc.localDescription
@@ -632,41 +641,43 @@ export class ProximityService {
     }
   }
 
-  async _waitForIceGathering(pc, timeout = 5000) {
-    if (pc.iceGatheringState === 'complete') return;
-    return new Promise((resolve) => {
-      const timer = setTimeout(resolve, timeout);
-      pc.onicegatheringstatechange = () => {
-        if (pc.iceGatheringState === 'complete') {
-          clearTimeout(timer);
-          resolve();
-        }
-      };
-    });
+  /**
+   * Flush buffered ICE candidates after remote description is set
+   */
+  async _flushIceCandidates(peerId) {
+    const conn = this.connections.get(peerId);
+    if (!conn?._pendingCandidates?.length) return;
+
+    console.log(`[Proximity] Flushing ${conn._pendingCandidates.length} buffered ICE candidates for ${peerId}`);
+    for (const candidate of conn._pendingCandidates) {
+      try {
+        await conn.pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (e) {
+        console.warn('[Proximity] Error flushing ICE candidate:', e);
+      }
+    }
+    conn._pendingCandidates = [];
   }
 
-  async _waitForConnection(peerId, timeout = 15000) {
+  async _waitForConnection(peerId, timeout = 30000) {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
+        unsub();
         reject(new Error('Connection timeout'));
       }, timeout);
 
-      const checkConnection = () => {
+      const checkDataChannel = () => {
         const conn = this.connections.get(peerId);
         if (conn?.dataChannel?.readyState === 'open') {
           clearTimeout(timer);
+          unsub();
           resolve(conn.pairingCode || '------');
-          return;
+          return true;
         }
-        if (conn?.state === 'connected') {
-          clearTimeout(timer);
-          resolve(conn.pairingCode || '------');
-          return;
-        }
-        setTimeout(checkConnection, 200);
+        return false;
       };
 
-      // Also listen for channel-open event
+      // Listen for channel-open event (most reliable signal)
       const unsub = this.on('channel-open', ({ peerId: id }) => {
         if (id === peerId) {
           clearTimeout(timer);
@@ -676,7 +687,17 @@ export class ProximityService {
         }
       });
 
-      checkConnection();
+      // Also poll in case event was already fired
+      if (!checkDataChannel()) {
+        const poll = setInterval(() => {
+          if (checkDataChannel()) {
+            clearInterval(poll);
+          }
+        }, 200);
+        // Clean up poll on timeout
+        const origReject = reject;
+        reject = (err) => { clearInterval(poll); origReject(err); };
+      }
     });
   }
 

@@ -22,13 +22,12 @@ const CONTENT_TYPES = [
 ];
 
 const TTL_OPTIONS = [
-  { value: 300000, label: '5 Minutes', short: '5m' },
-  { value: 900000, label: '15 Minutes', short: '15m' },
-  { value: 1800000, label: '30 Minutes', short: '30m' },
-  { value: 3600000, label: '1 Hour', short: '1h' },
-  { value: 21600000, label: '6 Hours', short: '6h' },
-  { value: 43200000, label: '12 Hours', short: '12h' },
-  { value: 86400000, label: '24 Hours', short: '24h' },
+  { value: '5min', label: '5 Minutes', short: '5m' },
+  { value: '15min', label: '15 Minutes', short: '15m' },
+  { value: '30min', label: '30 Minutes', short: '30m' },
+  { value: '1hour', label: '1 Hour', short: '1h' },
+  { value: '6hour', label: '6 Hours', short: '6h' },
+  { value: '24hour', label: '24 Hours', short: '24h' },
 ];
 
 // ─── Component ────────────────────────────────────────────
@@ -48,7 +47,7 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
   const [recipientErrors, setRecipientErrors] = useState({});
 
   // Settings
-  const [ttl, setTtl] = useState(3600000); // 1 hour default
+  const [ttl, setTtl] = useState('1hour'); // 1 hour default
   const [viewOnce, setViewOnce] = useState(false);
   const [hint, setHint] = useState('');
 

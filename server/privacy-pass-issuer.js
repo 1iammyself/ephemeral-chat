@@ -417,7 +417,7 @@ function privacyPassAuth(req, res, next) {
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('PrivacyPass ')) {
-    return next();  // No token — proceed to session auth
+    return next();  // No token — proceed without Privacy Pass
   }
   
   try {
@@ -427,20 +427,28 @@ function privacyPassAuth(req, res, next) {
     const sigMatch   = authMatch || authHeader.match(/signature="([^"]+)"/);
     
     if (!tokenMatch || !sigMatch) {
-      return res.status(401).json({ error: 'Malformed Privacy Pass header' });
+      // Malformed header — log and continue without Privacy Pass
+      // Don't reject the request; Privacy Pass is for anonymity, not access control
+      console.warn('[Privacy Pass] Malformed auth header — ignoring');
+      return next();
     }
     
     const result = verifyToken(tokenMatch[1], sigMatch[1]);
     
     if (!result.valid) {
-      return res.status(401).json({ error: result.reason });
+      // Token invalid (key rotated, already spent, etc.) — log and continue
+      // The client will eventually refresh tokens from the new key
+      console.warn(`[Privacy Pass] Token verification failed: ${result.reason} — proceeding without PP`);
+      return next();
     }
     
     req.privacyPassVerified = true;
     next();
     
   } catch (e) {
-    return res.status(401).json({ error: 'Token verification failed' });
+    // Verification error — proceed without Privacy Pass instead of blocking
+    console.warn('[Privacy Pass] Auth error:', e.message, '— proceeding without PP');
+    return next();
   }
 }
 
