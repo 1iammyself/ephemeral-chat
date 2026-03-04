@@ -61,6 +61,7 @@ import java.util.List;
         )
     }
 )
+@SuppressWarnings("deprecation")
 public class ProximityPlugin extends Plugin {
 
     private static final String TAG = "ProximityPlugin";

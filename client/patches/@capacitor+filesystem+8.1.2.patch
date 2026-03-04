@@ -1,0 +1,25 @@
+diff --git a/node_modules/@capacitor/filesystem/android/src/main/kotlin/com/capacitorjs/plugins/filesystem/FilesystemPlugin.kt b/node_modules/@capacitor/filesystem/android/src/main/kotlin/com/capacitorjs/plugins/filesystem/FilesystemPlugin.kt
+index fed6e14..46c0f3b 100644
+--- a/node_modules/@capacitor/filesystem/android/src/main/kotlin/com/capacitorjs/plugins/filesystem/FilesystemPlugin.kt
++++ b/node_modules/@capacitor/filesystem/android/src/main/kotlin/com/capacitorjs/plugins/filesystem/FilesystemPlugin.kt
+@@ -309,6 +309,7 @@ class FilesystemPlugin : Plugin() {
+         }
+     }
+ 
++    @Suppress("DEPRECATION")
+     @PermissionCallback
+     private fun permissionCallback(call: PluginCall) {
+         if (!isStoragePermissionGranted(true)) {
+diff --git a/node_modules/@capacitor/filesystem/android/src/main/kotlin/com/capacitorjs/plugins/filesystem/LegacyFilesystemImplementation.kt b/node_modules/@capacitor/filesystem/android/src/main/kotlin/com/capacitorjs/plugins/filesystem/LegacyFilesystemImplementation.kt
+index cfe09ec..7d57f8e 100644
+--- a/node_modules/@capacitor/filesystem/android/src/main/kotlin/com/capacitorjs/plugins/filesystem/LegacyFilesystemImplementation.kt
++++ b/node_modules/@capacitor/filesystem/android/src/main/kotlin/com/capacitorjs/plugins/filesystem/LegacyFilesystemImplementation.kt
+@@ -63,7 +63,7 @@ class LegacyFilesystemImplementation internal constructor(private val context: C
+         if (directory == null) {
+             val u = Uri.parse(path)
+             if (u.scheme == null || u.scheme == "file") {
+-                return File(u.path)
++                return File(u.path ?: "")
+             }
+         }
+ 

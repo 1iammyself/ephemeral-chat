@@ -52,6 +52,7 @@
     "vite-plugin-wasm": "^3.5.0"
   },
   "devDependencies": {
+    "patch-package": "^8.0.1",
     "workbox-core": "^7.0.0",
     "workbox-expiration": "^7.0.0",
     "workbox-precaching": "^7.0.0",
