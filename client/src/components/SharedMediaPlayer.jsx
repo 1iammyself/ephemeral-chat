@@ -499,6 +499,7 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleShareUrl()}
+              onPaste={(e) => e.stopPropagation()} // Allow paste here even if parent blocks it
               placeholder="Paste YouTube or SoundCloud URL..."
               className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 outline-none min-w-0"
               autoFocus

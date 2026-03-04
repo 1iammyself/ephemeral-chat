@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Ephemeral Chat',
   webDir: 'dist',
   server: {
-    // Use the production URL
+    // Use the production URL — also enables Android App Links verification
     url: 'https://chat.kyere.me',
     cleartext: false,
     // Allow YouTube and SoundCloud embeds for Watch Party feature
@@ -17,22 +17,19 @@ const config: CapacitorConfig = {
     ]
   },
   android: {
-    // Enable mixed content for WebSocket connections
     allowMixedContent: false,
-    // Use Chrome WebView
-    useLegacyBridge: false
+    useLegacyBridge: false,
+    // Deep Link / App Links: intercept chat.kyere.me URLs in the installed app.
+    // The server must serve /.well-known/assetlinks.json with the app's fingerprint.
+    appendUserAgent: 'EphemeralChatApp',
   },
   ios: {
-    // iOS-specific configuration
     contentInset: 'automatic',
-    // Allow inline media playback (required for Watch Party sync)
     allowsLinkPreview: false,
-    // Scroll to input to prevent keyboard covering input fields
     scrollEnabled: true,
-    // IMPORTANT: Must be false when using allowNavigation for embeds.
-    // If true, WKWebView blocks all navigations outside the app domain,
-    // which kills YouTube/SoundCloud iframe embeds.
-    limitsNavigationsToAppBoundDomains: false
+    limitsNavigationsToAppBoundDomains: false,
+    // Universal Links: add your app domains — requires apple-app-site-association on server.
+    appendUserAgent: 'EphemeralChatApp',
   },
   plugins: {
     SplashScreen: {
@@ -40,7 +37,10 @@ const config: CapacitorConfig = {
       launchAutoHide: true,
       backgroundColor: '#4F46E5',
       showSpinner: false
-    }
+    },
+    // Deep-link handling via @capacitor/app
+    // When the OS opens chat.kyere.me links, Capacitor routes them here.
+    // The App plugin's 'appUrlOpen' event fires in App.tsx / main.tsx with the full URL.
   }
 };
 

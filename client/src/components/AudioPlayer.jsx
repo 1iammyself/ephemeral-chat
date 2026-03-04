@@ -160,18 +160,18 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
   };
 
   return (
-    <div className="flex items-center space-x-3 min-w-[200px] py-1">
+    <div className="flex items-center gap-2 w-full min-w-[120px] py-1">
       <button
         onClick={togglePlay}
-        className={`p-2 rounded-full transition-colors ${isOwnMessage
+        className={`p-2 rounded-full flex-shrink-0 transition-colors ${isOwnMessage
           ? 'bg-white/20 hover:bg-white/30 text-white'
           : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200'
           }`}
       >
         {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
       </button>
-      <div className="flex-1 flex flex-col justify-center">
-        <div className={`h-1 rounded-full overflow-hidden ${isOwnMessage ? 'bg-white/30' : 'bg-gray-200 dark:bg-gray-700'
+      <div className="flex-1 flex flex-col justify-center min-w-0">
+        <div className={`h-1.5 rounded-full overflow-hidden ${isOwnMessage ? 'bg-white/30' : 'bg-gray-200 dark:bg-gray-700'
           }`}>
           <div
             className={`h-full transition-all duration-100 ${isOwnMessage ? 'bg-white' : 'bg-primary-500 dark:bg-primary-400'
@@ -179,10 +179,10 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
             style={{ width: `${progress}%` }}
           />
         </div>
-        <div className={`flex justify-between text-[10px] mt-1 ${isOwnMessage ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'
+        <div className={`flex justify-between text-[10px] mt-0.5 ${isOwnMessage ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'
           }`}>
           <span>{formatTime(audioRef.current?.currentTime || 0)}</span>
-          <span>{duration ? formatTime(duration) : '--:--'}</span>
+          <span>{duration > 0 ? formatTime(duration) : '--:--'}</span>
         </div>
       </div>
       <audio

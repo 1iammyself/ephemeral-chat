@@ -96,9 +96,16 @@ const SubPollCreator = ({ messageId, optionId, accentColor, onDone }) => {
 
 const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
     const { pollData } = message;
+    if (!pollData) return null; // Safety guard if pollData is missing
     const { question, options, allowMultiple, allowCustomAnswers } = pollData;
     const currentUserId = currentUser?.id || currentUser?.socketId;
     const vibe = getVibeById(roomVibe);
+
+    // Only the poll sender or a Tier1 admin/host can add follow-up sub-polls
+    const isSender = message.sender?.socketId === currentUserId || message.sender?.id === currentUserId ||
+        (currentUser?.nickname && message.sender?.nickname === currentUser.nickname);
+    const isAdmin = currentUser?.role === 'host' || currentUser?.role === 'admin' || currentUser?.isAdmin;
+    const canAddFollowUp = isSender || isAdmin;
 
     const [showDetails, setShowDetails] = useState(false);
     const [showCustomInput, setShowCustomInput] = useState(false);
@@ -210,7 +217,7 @@ const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
                                         onDone={() => setCreatingSubPollFor(null)}
                                     />
                                 )}
-                                {!option.subPoll && creatingSubPollFor !== option.id && (
+                                {!option.subPoll && creatingSubPollFor !== option.id && canAddFollowUp && (
                                     <button
                                         onClick={(e) => { e.stopPropagation(); setCreatingSubPollFor(option.id); }}
                                         className="ml-5 mt-0.5 flex items-center text-[10px] text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors opacity-0 group-hover:opacity-100"

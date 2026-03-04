@@ -28,6 +28,7 @@ import {
   Ghost,
   EyeOff,
   Trophy,
+  Snowflake,
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -88,7 +89,7 @@ const SLASH_COMMANDS = [
   { icon: Phone, label: 'Voice Call', value: '/call', desc: 'Start a voice call' },
   { icon: ImageIcon, label: 'Photo', value: '/photo', desc: 'Upload an image' },
   { icon: Mic, label: 'Voice Note', value: '/voice', desc: 'Record a voice note' },
-  { icon: Smile, label: 'Icebreaker', value: '/ice', desc: 'Send a random question' },
+  { icon: Snowflake, label: 'Icebreaker', value: '/ice', desc: 'Send a random question' },
   { icon: Zap, label: 'Pulse', value: '/pulse', desc: 'Shake the room' },
   { icon: Edit2, label: 'Topic', value: '/topic', desc: 'Set room topic', adminOnly: true },
   { icon: Clock, label: 'Timer', value: '/timer', desc: 'Start a countdown', adminOnly: true },
@@ -1756,6 +1757,8 @@ const ChatRoom = () => {
       hapticLight(); // Haptic feedback on message send
       setNewMessage('');
       setReplyingTo(null);
+      // Re-focus the input so the mobile keyboard stays visible
+      setTimeout(() => messageInputRef.current?.focus(), 30);
     } catch (error) {
       setError('Failed to send message');
     } finally {
@@ -1763,61 +1766,44 @@ const ChatRoom = () => {
     }
   };
 
-  const handleSendPoll = async (pollData) => {
+  const handleSendPoll = (pollData) => {
+    // Polls are NOT encrypted — the server needs pollData to manage votes.
     if (!isConnected) return;
-    try {
-      const v2Payload = await encryptMLSMessage(JSON.stringify(pollData), roomCode);
-      socketManager.emit('send-message', {
-        ...v2Payload,
-        messageType: 'poll',
-        isEncrypted: true,
-        recipients: selectedRecipients
-      });
-    } catch (e) {
-      console.error('Poll encryption failed:', e.message);
-      setError('Failed to encrypt poll.');
-    }
+    socketManager.emit('send-message', {
+      messageType: 'poll',
+      pollData,
+      recipients: selectedRecipients
+    });
   };
 
-  const handleSendGame = async (gameData) => {
+  const handleSendGame = (gameData) => {
+    // Games are NOT encrypted — server must create and track game state (board, players, moves).
     if (!isConnected) return;
 
-    // Match games (TTT, RPS, Chess) only allow 1 recipient in targeted messages
+    // Match games (TTT, RPS, Chess) only allow 1 recipient
     if (selectedRecipients.length > 1 && (gameData.gameType === 'tic-tac-toe' || gameData.gameType === 'rock-paper-scissors' || gameData.gameType === 'chess')) {
       setError('Match games can only be sent to one person at a time.');
       return;
     }
 
-    try {
-      const v2Payload = await encryptMLSMessage(JSON.stringify(gameData), roomCode);
-      socketManager.emit('send-message', {
-        ...v2Payload,
-        messageType: 'game',
-        isEncrypted: true,
-        recipients: selectedRecipients,
-        userId: persistentUserId
-      });
-    } catch (e) {
-      console.error('Game encryption failed:', e.message);
-      setError('Failed to encrypt game.');
-    }
+    socketManager.emit('send-message', {
+      messageType: 'game',
+      gameData,
+      recipients: selectedRecipients,
+      userId: persistentUserId
+    });
   };
 
   // ─── Tournament Handlers ──────────────────────────────────────────
-  const handleCreateTournament = async (tournamentConfig) => {
+  const handleCreateTournament = (tournamentConfig) => {
+    // Tournaments are NOT encrypted — server must manage bracket/results.
     if (!isConnected) return;
-    try {
-      const v2Payload = await encryptMLSMessage(JSON.stringify(tournamentConfig), roomCode);
-      socketManager.emit('send-message', {
-        ...v2Payload,
-        content: `🏆 ${tournamentConfig.name}`,
-        messageType: 'tournament',
-        isEncrypted: true,
-        userId: persistentUserId
-      });
-    } catch (e) {
-      console.error('Tournament creation failed:', e);
-    }
+    socketManager.emit('send-message', {
+      content: `🏆 ${tournamentConfig.name}`,
+      messageType: 'tournament',
+      tournamentData: tournamentConfig,
+      userId: persistentUserId
+    });
   };
 
   const handleJoinTournament = (messageId) => {
@@ -1960,7 +1946,7 @@ const ChatRoom = () => {
   };
 
   const handleTyping = () => {
-    if (isStealthMode) return; // Block typing indicator if in stealth mode
+    if (isStealthMode || isAnonymousMode) return; // Block typing indicator in stealth/anon mode
     socketManager.emit('typing', { roomCode });
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
@@ -2053,7 +2039,21 @@ const ChatRoom = () => {
       // For other files, we send raw base64 as before
       let content = isImage ? e.target.result : e.target.result.split(',')[1];
 
-      // AES-GCM encryption for files/images
+      // View-once images MUST stay unencrypted — the server stores raw bytes for the
+      // /api/reveal-image endpoint. AES encrypting them makes the reveal permanently fail.
+      if (isViewOnce && isImage) {
+        socketManager.emit('send-message', {
+          messageType: 'image',
+          imageData: content,
+          isEncrypted: false,
+          isViewOnce: true,
+          recipients: selectedRecipients
+        });
+        setIsUploading(false);
+        return;
+      }
+
+      // AES-GCM encrypt all non-view-once images and files
       let v2Payload;
       try {
         v2Payload = await encryptMLSMessage(content, roomCode);
@@ -2064,7 +2064,7 @@ const ChatRoom = () => {
         return;
       }
 
-      // ─── Try P2P transport first for large files ─────────
+      // Try P2P transport first for large files
       const encryptedBlob = new Blob([JSON.stringify(v2Payload)], { type: 'application/octet-stream' });
       let sentViaP2P = false;
 
@@ -2929,7 +2929,24 @@ const ChatRoom = () => {
                     >
                       👻
                     </button>
-                    <button type="submit" onTouchStart={(e) => { e.preventDefault(); if (!(!newMessage.trim() || !isConnected || isSending)) { const form = messageInputRef.current?.closest('form'); if (form) form.requestSubmit(); } }} onMouseDown={(e) => e.preventDefault()} disabled={!newMessage.trim() || !isConnected || isSending} className={`flex-shrink-0 ml-1 sm:ml-2 ${getVibeById(roomVibe).accentClass} h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}><Send className="w-4 h-4 sm:w-5 sm:h-5 -ml-0.5" /></button>
+                    <button
+                      type="submit"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onTouchStart={(e) => {
+                        e.preventDefault();
+                        if (!newMessage.trim() || !isConnected || isSending) return;
+                        const form = messageInputRef.current?.closest('form');
+                        if (form) {
+                          form.requestSubmit();
+                          // Re-focus input so keyboard stays open on mobile
+                          setTimeout(() => messageInputRef.current?.focus(), 50);
+                        }
+                      }}
+                      disabled={!newMessage.trim() || !isConnected || isSending}
+                      className={`flex-shrink-0 ml-1 sm:ml-2 ${getVibeById(roomVibe).accentClass} h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      <Send className="w-4 h-4 sm:w-5 sm:h-5 -ml-0.5" />
+                    </button>
                   </div>
                 )}
               </form>

@@ -344,7 +344,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         )}
                       </div>
                     ) : isAudio ? (
-                      <div className="min-w-[200px]">
+                      <div className="w-full min-w-[140px] max-w-xs">
                         {isOwnMessage ? (
                           <div className="flex items-center space-x-3 p-2 bg-black/5 dark:bg-white/5 rounded-xl border border-dashed border-black/10 dark:border-white/10 opacity-70">
                             <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white/50"><Mic className="w-5 h-5" /></div>
@@ -385,10 +385,19 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         roomVibe={roomVibe}
                       />
                     ) : message.messageType === 'file' ? (
-                      <div className="flex items-center space-x-2 sm:space-x-3 min-w-[160px] sm:min-w-[220px]">
-                        <div className="p-1.5 sm:p-2 bg-black/10 dark:bg-white/10 rounded-lg"><FileText className="w-5 h-5 sm:w-6 sm:h-6" /></div>
-                        <div className="flex-1 min-w-0 pr-2 space-y-0.5"><p className="text-[11px] sm:text-sm font-bold truncate leading-none">{message.fileName}</p><p className="text-[9px] sm:text-[10px] opacity-70 leading-none">{formatFileSize(message.fileSize)}</p></div>
-                        <a href={`data:${message.mimeType};base64,${message.content}`} download={message.fileName} className="p-1.5 sm:p-2 hover:bg-black/10 dark:hover:bg-white/10 rounded-full transition-colors flex-shrink-0"><Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" /></a>
+                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 w-full max-w-[260px]">
+                        <div className="p-1.5 sm:p-2 bg-black/10 dark:bg-white/10 rounded-lg shrink-0"><FileText className="w-4 h-4 sm:w-5 sm:h-5" /></div>
+                        <div className="flex-1 min-w-0 space-y-0.5">
+                          <p className="text-[11px] sm:text-sm font-bold truncate leading-none">{message.fileName}</p>
+                          <p className="text-[9px] sm:text-[10px] opacity-70 leading-none">{formatFileSize(message.fileSize)}</p>
+                        </div>
+                        <button
+                          onClick={() => downloadFile(message.content, message.mimeType, message.fileName)}
+                          className="p-1.5 sm:p-2 hover:bg-black/10 dark:hover:bg-white/10 rounded-full transition-colors shrink-0"
+                          title="Download"
+                        >
+                          <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        </button>
                       </div>
                     ) : (
                       <div className="text-[15px] leading-relaxed select-text">
@@ -577,6 +586,33 @@ function formatFileSize(bytes) {
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+/**
+ * Mobile-compatible file download.
+ * data: URI anchors are silently ignored in Capacitor Android WebView and iOS Safari.
+ * Creating a Blob URL instead works universally across platforms.
+ */
+function downloadFile(base64Content, mimeType, fileName) {
+  try {
+    const byteChars = atob(base64Content);
+    const byteNums = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) byteNums[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([byteNums], { type: mimeType || 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName || 'download';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch (err) {
+    console.error('Download failed:', err);
+    // Fallback: open in new tab so user can long-press save
+    window.open(`data:${mimeType};base64,${base64Content}`, '_blank');
+  }
 }
 
 function renderMessageContent(content, currentUser, onLinkClick) {
