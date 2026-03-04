@@ -2722,7 +2722,7 @@ const ChatRoom = () => {
                             </button>
                             <button type="button" onClick={handleSendIcebreaker} disabled={!isConnected} className="flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group" title="Icebreaker">
                               <div className="sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/10 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm">
-                                <Smile className="w-4 h-4 text-cyan-500" />
+                                <Snowflake className="w-4 h-4 text-cyan-500" />
                               </div>
                               <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Icebreaker</span>
                             </button>
