@@ -590,28 +590,53 @@ function formatFileSize(bytes) {
 
 /**
  * Mobile-compatible file download.
- * data: URI anchors are silently ignored in Capacitor Android WebView and iOS Safari.
- * Creating a Blob URL instead works universally across platforms.
+ *
+ * Priority order:
+ * 1. Web Share API with File object  → triggers Android/iOS native share-sheet (Save to Downloads works here)
+ * 2. Blob URL + programmatic anchor  → works in desktop Electron and modern browsers
+ * 3. data: URI fallback              → last resort (opens in new tab; user can long-press save)
  */
-function downloadFile(base64Content, mimeType, fileName) {
+async function downloadFile(base64Content, mimeType, fileName) {
   try {
+    const safeType = mimeType || 'application/octet-stream';
     const byteChars = atob(base64Content);
     const byteNums = new Uint8Array(byteChars.length);
     for (let i = 0; i < byteChars.length; i++) byteNums[i] = byteChars.charCodeAt(i);
-    const blob = new Blob([byteNums], { type: mimeType || 'application/octet-stream' });
+    const blob = new Blob([byteNums], { type: safeType });
+    const safeFileName = fileName || 'download';
+
+    // 1️⃣ Web Share API — works on Android Chrome & iOS Safari (including Capacitor WebView)
+    if (navigator.canShare) {
+      try {
+        const file = new File([blob], safeFileName, { type: safeType });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: safeFileName });
+          return;
+        }
+      } catch (shareErr) {
+        // AbortError means user cancelled — don't fall through
+        if (shareErr?.name === 'AbortError') return;
+        // Otherwise fall through to Blob URL method
+      }
+    }
+
+    // 2️⃣ Blob URL + hidden anchor — works in Electron and desktop browsers
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = fileName || 'download';
+    a.download = safeFileName;
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 5000);
+
   } catch (err) {
     console.error('Download failed:', err);
-    // Fallback: open in new tab so user can long-press save
-    window.open(`data:${mimeType};base64,${base64Content}`, '_blank');
+    // 3️⃣ data: URI fallback — user can long-press→Save in mobile browser
+    try {
+      window.open(`data:${mimeType || 'application/octet-stream'};base64,${base64Content}`, '_blank');
+    } catch (_) { /* silent */ }
   }
 }
 

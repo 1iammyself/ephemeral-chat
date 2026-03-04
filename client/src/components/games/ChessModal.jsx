@@ -77,34 +77,34 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, currentNickname, 
                 onClick={onClose}
             />
 
-            {/* Modal Container */}
-            <div className={`relative w-full max-w-2xl bg-white dark:bg-gray-950 rounded-3xl shadow-2xl overflow-hidden border border-white/10 flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300`}>
+            {/* Modal Container — full-height scroll on mobile */}
+            <div className={`relative w-full max-w-2xl bg-white dark:bg-gray-950 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-white/10 flex flex-col max-h-[95vh] sm:max-h-[90vh] animate-in zoom-in-95 duration-300`}>
 
                 {/* Header */}
-                <div className={`p-4 ${headerClass} flex items-center justify-between`}>
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-white/20 rounded-xl">
-                            <Trophy className="w-6 h-6 text-white" />
+                <div className={`p-3 sm:p-4 ${headerClass} flex items-center justify-between shrink-0`}>
+                    <div className="flex items-center gap-2">
+                        <div className="p-1.5 sm:p-2 bg-white/20 rounded-xl">
+                            <Trophy className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
                         </div>
                         <div>
-                            <h3 className="text-white font-black text-lg tracking-tight">Chess Match</h3>
-                            <p className="text-white/70 text-[10px] uppercase font-bold tracking-widest leading-none">
+                            <h3 className="text-white font-black text-sm sm:text-lg tracking-tight">Chess Match</h3>
+                            <p className="text-white/70 text-[9px] sm:text-[10px] uppercase font-bold tracking-widest leading-none">
                                 {gameData.winner ? 'Match Ended' : 'Live Battle'}
                             </p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-white/20 rounded-full text-white transition-colors"
+                        className="p-1.5 sm:p-2 hover:bg-white/20 rounded-full text-white transition-colors"
                     >
-                        <X className="w-6 h-6" />
+                        <X className="w-5 h-5 sm:w-6 sm:h-6" />
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 flex flex-col md:flex-row gap-8 items-center md:items-start justify-center">
+                <div className="flex-1 overflow-y-auto p-3 sm:p-6 flex flex-col md:flex-row gap-4 sm:gap-6 items-center md:items-start justify-center">
 
                     {/* Left: The Board */}
-                    <div className="w-full max-w-[450px] shrink-0">
+                    <div className="w-full max-w-[300px] sm:max-w-[380px] md:max-w-[420px] shrink-0">
                         <ChessGame
                             gameData={gameData}
                             currentUserId={currentUserId}
@@ -114,48 +114,48 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, currentNickname, 
                         />
                     </div>
 
-                    {/* Right: Game Info Panel */}
-                    <div className="flex-1 w-full space-y-6">
+                    {/* Right: Game Info Panel — compact on mobile */}
+                    <div className="flex-1 w-full space-y-3 sm:space-y-6">
                         {/* Status Card */}
-                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl p-4 border border-gray-100 dark:border-gray-800">
-                            <div className="flex items-center gap-2 mb-4 text-gray-400">
-                                <Info className="w-4 h-4" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">Match Status</span>
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-gray-100 dark:border-gray-800">
+                            <div className="flex items-center gap-2 mb-3 text-gray-400">
+                                <Info className="w-3.5 h-3.5" />
+                                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">Match Status</span>
                             </div>
 
-                            <div className="space-y-4">
-                                <div className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all ${gameData.turn === 'w' ? `border-${accentColor}-500 bg-${accentColor}-50 dark:bg-${accentColor}-900/20` : 'border-transparent opacity-60'}`}>
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center text-xl shadow-sm">♔</div>
+                            <div className="space-y-2 sm:space-y-4">
+                                <div className={`flex items-center justify-between p-2 sm:p-3 rounded-lg sm:rounded-xl border-2 transition-all ${gameData.turn === 'w' ? `border-${accentColor}-500 bg-${accentColor}-50 dark:bg-${accentColor}-900/20` : 'border-transparent opacity-60'}`}>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center text-base sm:text-xl shadow-sm">♔</div>
                                         <div>
-                                            <p className="text-xs font-bold text-gray-900 dark:text-white">{gameData.players.white?.name || 'Waiting...'}</p>
-                                            <div className="flex gap-0.5 mt-0.5 min-h-[12px]">
+                                            <p className="text-[10px] sm:text-xs font-bold text-gray-900 dark:text-white">{gameData.players.white?.name || 'Waiting...'}</p>
+                                            <div className="flex gap-0.5 mt-0.5 min-h-[10px]">
                                                 {capturedByWhite.map((p, idx) => (
-                                                    <span key={idx} className="text-[10px] text-gray-400">{getPieceIcon(p.type, 'b')}</span>
+                                                    <span key={idx} className="text-[9px] text-gray-400">{getPieceIcon(p.type, 'b')}</span>
                                                 ))}
                                             </div>
                                         </div>
                                     </div>
-                                    {isWhite && <Shield className={`w-4 h-4 text-${accentColor}-500`} />}
+                                    {isWhite && <Shield className={`w-3.5 h-3.5 sm:w-4 sm:h-4 text-${accentColor}-500`} />}
                                 </div>
 
-                                <div className="flex justify-center -my-2 opacity-30">
-                                    <Swords className="w-5 h-5 text-gray-400" />
+                                <div className="flex justify-center -my-1 opacity-30">
+                                    <Swords className="w-4 h-4 text-gray-400" />
                                 </div>
 
-                                <div className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all ${gameData.turn === 'b' ? `border-${accentColor}-500 bg-${accentColor}-50 dark:bg-${accentColor}-900/20` : 'border-transparent opacity-60'}`}>
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-gray-900 border-2 border-gray-700 flex items-center justify-center text-xl text-white shadow-sm font-light">♚</div>
+                                <div className={`flex items-center justify-between p-2 sm:p-3 rounded-lg sm:rounded-xl border-2 transition-all ${gameData.turn === 'b' ? `border-${accentColor}-500 bg-${accentColor}-50 dark:bg-${accentColor}-900/20` : 'border-transparent opacity-60'}`}>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-gray-900 border-2 border-gray-700 flex items-center justify-center text-base sm:text-xl text-white shadow-sm font-light">♚</div>
                                         <div>
-                                            <p className="text-xs font-bold text-gray-900 dark:text-white">{gameData.players.black?.name || 'Waiting...'}</p>
-                                            <div className="flex gap-0.5 mt-0.5 min-h-[12px]">
+                                            <p className="text-[10px] sm:text-xs font-bold text-gray-900 dark:text-white">{gameData.players.black?.name || 'Waiting...'}</p>
+                                            <div className="flex gap-0.5 mt-0.5 min-h-[10px]">
                                                 {capturedByBlack.map((p, idx) => (
-                                                    <span key={idx} className="text-[10px] text-gray-400">{getPieceIcon(p.type, 'w')}</span>
+                                                    <span key={idx} className="text-[9px] text-gray-400">{getPieceIcon(p.type, 'w')}</span>
                                                 ))}
                                             </div>
                                         </div>
                                     </div>
-                                    {isBlack && <Shield className={`w-4 h-4 text-${accentColor}-500`} />}
+                                    {isBlack && <Shield className={`w-3.5 h-3.5 sm:w-4 sm:h-4 text-${accentColor}-500`} />}
                                 </div>
                             </div>
                         </div>

@@ -2905,12 +2905,8 @@ const ChatRoom = () => {
                               if (inputContainer) {
                                 inputContainer.scrollIntoView({ block: 'end', behavior: 'smooth' });
                               }
-                              window.scrollTo(0, 0);
                             }, 100);
                           }
-                        }}
-                        onBlur={() => {
-                          window.scrollTo(0, 0);
                         }}
                         placeholder={isAnonymousMode ? "Confess anonymously..." : "Type message..."}
                         className="w-full bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white text-[15px] sm:text-base px-2 py-2.5 min-w-0 placeholder:text-gray-400"
