@@ -1962,11 +1962,20 @@ io.on('connection', (socket) => {
         // Sanitize poll data
         const sanitizedQuestion = sanitizeInput(pollData.question.trim());
         const sanitizedOptions = pollData.options
-          .filter(opt => opt && typeof opt === 'string' && opt.trim().length > 0)
+          .map(opt => {
+            // Support both plain strings and { text, followUps } objects from PollModal
+            if (typeof opt === 'string') return { text: opt.trim(), followUps: [] };
+            if (opt && typeof opt === 'object' && typeof opt.text === 'string') {
+              return { text: opt.text.trim(), followUps: Array.isArray(opt.followUps) ? opt.followUps.filter(f => typeof f === 'string' && f.trim()) : [] };
+            }
+            return null;
+          })
+          .filter(opt => opt && opt.text.length > 0)
           .slice(0, 5) // Max 5 options
           .map((opt, idx) => ({
             id: `opt_${Date.now()}_${idx}`,
-            text: sanitizeInput(opt.trim()),
+            text: sanitizeInput(opt.text),
+            followUps: opt.followUps.map(f => sanitizeInput(f)),
             votes: []
           }));
 

@@ -123,6 +123,12 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
         vibe.id === 'chill' ? 'teal' :
             vibe.id === 'focus' ? 'orange' : 'primary';
 
+    // Explicit hex colors for buttons — prevents Tailwind JIT purge in Focus light mode
+    const vibeColorMap = {
+        party: '#6366f1', chill: '#14b8a6', focus: '#f97316', default: '#3b82f6'
+    };
+    const vibeBtnColor = vibeColorMap[vibe.id] || vibeColorMap.default;
+
     const headerClass = vibe.accentClass;
     const cardBorderClass = `border-${accentColor}-200 dark:border-${accentColor}-800`;
     const footerBorderClass = `border-${accentColor}-100 dark:border-${accentColor}-800/50`;
@@ -187,7 +193,8 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                         </div>
                         <button
                             onClick={() => setIsExpanded(true)}
-                            className={`w-full py-2 rounded-xl bg-${accentColor}-500 hover:bg-${accentColor}-600 text-white text-[11px] font-bold transition-all shadow-md active:scale-95`}
+                            style={{ backgroundColor: vibeBtnColor }}
+                            className="w-full py-2 rounded-xl text-white text-[11px] font-bold transition-all shadow-md active:scale-95"
                         >
                             {gameData.winner ? 'View Result' : (amPlaying ? 'Continue Playing' : 'View Game')}
                         </button>
@@ -266,7 +273,8 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                         </p>
                         <button
                             onClick={() => setIsExpanded(true)}
-                            className={`w-full py-2 rounded-xl bg-${accentColor}-500 hover:bg-${accentColor}-600 text-white text-[11px] font-bold transition-all shadow-md active:scale-95`}
+                            style={{ backgroundColor: vibeBtnColor }}
+                            className="w-full py-2 rounded-xl text-white text-[11px] font-bold transition-all shadow-md active:scale-95"
                         >
                             View Choices
                         </button>
@@ -401,7 +409,8 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                         </p>
                         <button
                             onClick={() => setIsExpanded(true)}
-                            className={`w-full py-2 rounded-xl bg-${accentColor}-500 hover:bg-${accentColor}-600 text-white text-[11px] font-bold transition-all shadow-md active:scale-95`}
+                            style={{ backgroundColor: vibeBtnColor }}
+                            className="w-full py-2 rounded-xl text-white text-[11px] font-bold transition-all shadow-md active:scale-95"
                         >
                             Open Question
                         </button>

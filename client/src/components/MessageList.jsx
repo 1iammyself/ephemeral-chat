@@ -592,20 +592,45 @@ function formatFileSize(bytes) {
  * Mobile-compatible file download.
  *
  * Priority order:
- * 1. Web Share API with File object  → triggers Android/iOS native share-sheet (Save to Downloads works here)
- * 2. Blob URL + programmatic anchor  → works in desktop Electron and modern browsers
- * 3. data: URI fallback              → last resort (opens in new tab; user can long-press save)
+ * 1. Capacitor Filesystem + Share API  → saves to device on Android/iOS (most reliable in WebView)
+ * 2. Web Share API with File object    → triggers Android/iOS native share-sheet as fallback
+ * 3. Blob URL + programmatic anchor   → works in desktop Electron and modern browsers
+ * 4. data: URI fallback               → last resort (opens in new tab; user can long-press save)
  */
 async function downloadFile(base64Content, mimeType, fileName) {
   try {
     const safeType = mimeType || 'application/octet-stream';
+    const safeFileName = fileName || 'download';
+
+    // 1️⃣ Capacitor Filesystem — most reliable on Android WebView
+    try {
+      const { Filesystem, Directory } = await import('@capacitor/filesystem');
+      const { Share } = await import('@capacitor/share');
+      await Filesystem.writeFile({
+        path: safeFileName,
+        data: base64Content,
+        directory: Directory.Cache,
+      });
+      const fileUri = await Filesystem.getUri({ path: safeFileName, directory: Directory.Cache });
+      await Share.share({
+        title: safeFileName,
+        url: fileUri.uri,
+        dialogTitle: 'Save or share file',
+      });
+      return;
+    } catch (capErr) {
+      // Not in Capacitor or Share cancelled — fall through
+      if (capErr?.name === 'AbortError' || capErr?.message?.includes('cancelled')) return;
+      console.warn('[downloadFile] Capacitor path failed, trying Web Share:', capErr.message);
+    }
+
+    // Convert base64 → Blob for remaining methods
     const byteChars = atob(base64Content);
     const byteNums = new Uint8Array(byteChars.length);
     for (let i = 0; i < byteChars.length; i++) byteNums[i] = byteChars.charCodeAt(i);
     const blob = new Blob([byteNums], { type: safeType });
-    const safeFileName = fileName || 'download';
 
-    // 1️⃣ Web Share API — works on Android Chrome & iOS Safari (including Capacitor WebView)
+    // 2️⃣ Web Share API — works on Android Chrome & iOS Safari (non-Capacitor browser)
     if (navigator.canShare) {
       try {
         const file = new File([blob], safeFileName, { type: safeType });
@@ -614,13 +639,12 @@ async function downloadFile(base64Content, mimeType, fileName) {
           return;
         }
       } catch (shareErr) {
-        // AbortError means user cancelled — don't fall through
         if (shareErr?.name === 'AbortError') return;
-        // Otherwise fall through to Blob URL method
+        console.warn('[downloadFile] Web Share failed, trying Blob URL:', shareErr.message);
       }
     }
 
-    // 2️⃣ Blob URL + hidden anchor — works in Electron and desktop browsers
+    // 3️⃣ Blob URL + hidden anchor — works in Electron and desktop browsers
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -633,7 +657,7 @@ async function downloadFile(base64Content, mimeType, fileName) {
 
   } catch (err) {
     console.error('Download failed:', err);
-    // 3️⃣ data: URI fallback — user can long-press→Save in mobile browser
+    // 4️⃣ data: URI fallback — user can long-press→Save in mobile browser
     try {
       window.open(`data:${mimeType || 'application/octet-stream'};base64,${base64Content}`, '_blank');
     } catch (_) { /* silent */ }

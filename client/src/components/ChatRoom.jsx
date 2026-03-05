@@ -2926,17 +2926,21 @@ const ChatRoom = () => {
                       👻
                     </button>
                     <button
-                      type="submit"
+                      type="button"
                       onMouseDown={(e) => e.preventDefault()}
                       onTouchStart={(e) => {
                         e.preventDefault();
                         if (!newMessage.trim() || !isConnected || isSending) return;
+                        // Focus BEFORE submitting so keyboard never sees a blur
+                        messageInputRef.current?.focus();
                         const form = messageInputRef.current?.closest('form');
-                        if (form) {
-                          form.requestSubmit();
-                          // Re-focus input so keyboard stays open on mobile
-                          setTimeout(() => messageInputRef.current?.focus(), 50);
-                        }
+                        if (form) form.requestSubmit();
+                      }}
+                      onClick={() => {
+                        if (!newMessage.trim() || !isConnected || isSending) return;
+                        messageInputRef.current?.focus();
+                        const form = messageInputRef.current?.closest('form');
+                        if (form) form.requestSubmit();
                       }}
                       disabled={!newMessage.trim() || !isConnected || isSending}
                       className={`flex-shrink-0 ml-1 sm:ml-2 ${getVibeById(roomVibe).accentClass} h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}

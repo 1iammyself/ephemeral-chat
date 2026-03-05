@@ -117,6 +117,20 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
         roomVibe === 'chill' ? 'teal' :
             roomVibe === 'focus' ? 'orange' : 'primary';
 
+    // Explicit colors for vibe send buttons — avoids Tailwind JIT purge issues in Focus light mode
+    const vibeColor = {
+        party: '#6366f1',
+        chill: '#14b8a6',
+        focus: '#f97316',
+        default: '#3b82f6'
+    }[roomVibe] || '#3b82f6';
+    const vibeColorHover = {
+        party: '#4f46e5',
+        chill: '#0d9488',
+        focus: '#ea580c',
+        default: '#2563eb'
+    }[roomVibe] || '#2563eb';
+
     const currentTopicList = gameType === GAME_TYPES.WYR ? WYR_TOPIC_LIST : TRIVIA_TOPIC_LIST;
 
     return (
@@ -230,7 +244,7 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                                 <button onClick={handleShuffle} className="flex-1 py-2 sm:py-2.5 px-2 sm:px-4 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold text-[10px] sm:text-xs hover:bg-gray-200 dark:hover:bg-gray-600 transition-all flex items-center justify-center gap-1 sm:gap-2 active:scale-95">
                                     <Dices className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Shuffle
                                 </button>
-                                <button onClick={handleSend} className={`flex-1 py-2 sm:py-2.5 rounded-xl font-bold flex items-center justify-center gap-1 sm:gap-2 text-white shadow-sm active:scale-95 text-[10px] sm:text-xs bg-${vibeAccent}-500 hover:bg-${vibeAccent}-600 transition-all`}>
+                                <button onClick={handleSend} style={{ backgroundColor: vibeColor }} onMouseOver={e => e.currentTarget.style.backgroundColor = vibeColorHover} onMouseOut={e => e.currentTarget.style.backgroundColor = vibeColor} className="flex-1 py-2 sm:py-2.5 rounded-xl font-bold flex items-center justify-center gap-1 sm:gap-2 text-white shadow-sm active:scale-95 text-[10px] sm:text-xs transition-all">
                                     <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Send
                                 </button>
                             </div>
@@ -288,7 +302,7 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                                 <button onClick={handleShuffle} className="flex-1 py-2 sm:py-3 px-2 sm:px-4 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold text-[10px] sm:text-xs uppercase tracking-widest hover:bg-gray-200 dark:hover:bg-gray-700 transition-all flex items-center justify-center gap-1 sm:gap-2">
                                     <Dices className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Shuffle
                                 </button>
-                                <button onClick={handleSend} className={`flex-[1.5] py-2 sm:py-3 rounded-xl bg-${vibeAccent}-500 hover:bg-${vibeAccent}-600 text-white font-black text-[10px] sm:text-xs uppercase tracking-widest shadow-lg shadow-${vibeAccent}-500/20 transition-all active:scale-95 flex items-center justify-center gap-1 sm:gap-2`}>
+                                <button onClick={handleSend} style={{ backgroundColor: vibeColor }} onMouseOver={e => e.currentTarget.style.backgroundColor = vibeColorHover} onMouseOut={e => e.currentTarget.style.backgroundColor = vibeColor} className="flex-[1.5] py-2 sm:py-3 rounded-xl text-white font-black text-[10px] sm:text-xs uppercase tracking-widest shadow-lg transition-all active:scale-95 flex items-center justify-center gap-1 sm:gap-2">
                                     <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Send
                                 </button>
                             </div>

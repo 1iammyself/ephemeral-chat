@@ -298,7 +298,7 @@ const ChessGame = ({ gameData, currentUserId, currentNickname, onMove, vibe: vib
     });
 
     return (
-        <div style={{ width: '100%', maxWidth: 'min(450px, calc(100vh - 350px))', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ width: '100%', maxWidth: 'min(90vw, 380px)', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {/* Captured Pieces White (Top) */}
             <div style={{ display: 'flex', gap: '2px', height: '24px', opacity: 0.7, padding: '0 4px' }}>
                 {capturedByBlack.map((p, idx) => (
