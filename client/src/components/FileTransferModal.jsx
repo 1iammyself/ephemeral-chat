@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, ExternalLink, Loader2 } from 'lucide-react';
 import socketManager from '../socket';
 import { downloadFileOnDevice } from '../utils/downloadHelper';
-import { isCapacitor } from '../utils/platform';
 
 const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNickname = '' }) => {
     const [isLoading, setIsLoading] = useState(true);
@@ -81,12 +80,36 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNick
         // Only handle our specific message type
         if (!event.data || event.data.type !== 'e2ecp-download-request') return;
 
+        console.log('[FileTransferModal] Received download request from iframe');
+
         const { requestId, fileName, mimeType, base64Data } = event.data;
 
         if (!base64Data || !requestId) {
             console.warn('[FileTransferModal] Invalid download request from iframe');
             return;
         }
+
+        // Helper to send response back to iframe — use iframeRef (more reliable
+        // than event.source which can be null for cross-origin iframes in WebView)
+        const sendResponse = (payload) => {
+            try {
+                // Try event.source first (standard approach)
+                if (event.source && typeof event.source.postMessage === 'function') {
+                    event.source.postMessage(payload, '*');
+                    return;
+                }
+            } catch (e) { /* event.source may throw in some WebViews */ }
+
+            try {
+                // Fallback: use the iframe ref
+                if (iframeRef.current?.contentWindow) {
+                    iframeRef.current.contentWindow.postMessage(payload, '*');
+                    return;
+                }
+            } catch (e) { /* iframe contentWindow may be blocked cross-origin */ }
+
+            console.warn('[FileTransferModal] Could not send response back to iframe');
+        };
 
         try {
             // Convert base64 back to Blob
@@ -101,29 +124,28 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNick
             // Use the working download helper (has Capacitor native bridge access)
             await downloadFileOnDevice(blob, fileName, mimeType);
 
-            // Send success response back to the iframe
-            event.source?.postMessage({
+            console.log('[FileTransferModal] Download succeeded, sending response');
+            sendResponse({
                 type: 'e2ecp-download-response',
                 requestId,
                 success: true,
-            }, '*');
+            });
         } catch (err) {
             console.error('[FileTransferModal] Download bridge error:', err);
-
-            // Send error response back to the iframe
-            event.source?.postMessage({
+            sendResponse({
                 type: 'e2ecp-download-response',
                 requestId,
                 success: false,
                 error: err.message || 'Download failed',
-            }, '*');
+            });
         }
     }, []);
 
     useEffect(() => {
-        // Only set up the bridge when running in Capacitor (native app)
-        if (!isCapacitor) return;
-
+        // Always set up the download bridge listener — the handler only responds
+        // to 'e2ecp-download-request' messages so it's safe on all platforms.
+        // The isCapacitor check inside downloadFileOnDevice determines the actual
+        // download strategy (native Filesystem vs <a download>).
         window.addEventListener('message', handleIframeDownloadRequest);
         return () => {
             window.removeEventListener('message', handleIframeDownloadRequest);

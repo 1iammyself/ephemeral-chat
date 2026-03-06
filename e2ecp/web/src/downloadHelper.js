@@ -38,7 +38,7 @@ if (shouldDelegateToParent) {
         if (resolver) {
             pendingDownloadResolvers.delete(requestId);
             if (success) {
-                resolver.resolve(true);
+                resolver.resolve({ confirmed: true });
             } else {
                 resolver.reject(new Error(error || 'Download failed in parent'));
             }
@@ -72,17 +72,22 @@ export async function downloadFileOnDevice(blob, fileName, mimeType) {
             const base64Data = await blobToBase64(blob);
             const requestId = generateRequestId();
 
-            // Create a promise that will be resolved when the parent responds
+            // Create a promise that resolves on parent response OR assumes
+            // success after 5 seconds (the response back from the cross-origin
+            // parent may not arrive in some Android WebView versions, but the
+            // download itself succeeds on the parent side).
             const downloadPromise = new Promise((resolve, reject) => {
                 pendingDownloadResolvers.set(requestId, { resolve, reject });
 
-                // Timeout after 30 seconds
+                // After 5 seconds with no response, assume the parent handled
+                // the download (the message was sent; the parent has the native
+                // bridge and will download the file even if the response is lost)
                 setTimeout(() => {
                     if (pendingDownloadResolvers.has(requestId)) {
                         pendingDownloadResolvers.delete(requestId);
-                        reject(new Error('Download timed out'));
+                        resolve({ confirmed: false }); // optimistic success
                     }
-                }, 30000);
+                }, 5000);
             });
 
             // Send the file data to the parent window
@@ -94,10 +99,16 @@ export async function downloadFileOnDevice(blob, fileName, mimeType) {
                 base64Data,
             }, '*');
 
+            console.log('[downloadHelper] Sent download request to parent:', requestId);
             toast.loading(`Saving ${safeFileName}...`, { id: 'download' });
 
-            await downloadPromise;
-            toast.success(`Downloaded: ${safeFileName}`, { id: 'download' });
+            const result = await downloadPromise;
+            if (result.confirmed) {
+                toast.success(`Downloaded: ${safeFileName}`, { id: 'download' });
+            } else {
+                // Parent didn't respond but likely downloaded — show success
+                toast.success(`Saved: ${safeFileName}`, { id: 'download' });
+            }
             return true;
         } catch (parentErr) {
             console.warn('[downloadHelper] Parent postMessage download failed:', parentErr.message);

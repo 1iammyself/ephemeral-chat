@@ -444,8 +444,20 @@ const ChatRoom = () => {
         });
       };
 
+      const handleWillHide = () => {
+        // If we're in the middle of sending a message, the keyboard dismiss
+        // was triggered by React's controlled-input re-render (setNewMessage('')).
+        // Force it back open at the native level before Android can resize the body.
+        if (sendingGuardRef.current) {
+          Keyboard.show();                           // native Android-only API
+          messageInputRef.current?.focus();           // re-focus the input
+          return;                                    // skip scroll — keyboard stays open
+        }
+        scrollToBottom();
+      };
+
       const showListener = Keyboard.addListener('keyboardWillShow', scrollToBottom);
-      const hideListener = Keyboard.addListener('keyboardWillHide', scrollToBottom);
+      const hideListener = Keyboard.addListener('keyboardWillHide', handleWillHide);
 
       return () => {
         showListener.then(l => l.remove());
@@ -484,32 +496,10 @@ const ChatRoom = () => {
   }, [roomCode]);
 
   const messageInputRef = useRef(null);
-  // Guard flag: while true, prevent focusout from dismissing the keyboard.
-  // This is set during doSendMessage so the controlled-input re-render
-  // (setNewMessage('')) doesn't trigger a keyboard dismiss→reopen flash.
+  // Guard flag: while true we're inside doSendMessage.
+  // The keyboardWillHide listener uses this to call Keyboard.show() and
+  // prevent the keyboard from actually dismissing during the send cycle.
   const sendingGuardRef = useRef(false);
-
-  // Attach a capturing focusout blocker on the message input.
-  // When sendingGuardRef is true (we're in the middle of doSendMessage),
-  // the input's blur is intercepted: we cancel the event and immediately
-  // re-focus so Android never sees the blur and never dismisses the keyboard.
-  useEffect(() => {
-    const input = messageInputRef.current;
-    if (!input) return;
-
-    const blockBlurDuringSend = (e) => {
-      if (sendingGuardRef.current) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        // Synchronously re-focus before Android can react
-        input.focus();
-      }
-    };
-
-    // Use capturing phase so we intercept before anything else
-    input.addEventListener('blur', blockBlurDuringSend, true);
-    return () => input.removeEventListener('blur', blockBlurDuringSend, true);
-  });
 
   useEffect(() => {
     if (!activeTimer) {
@@ -1684,9 +1674,11 @@ const ChatRoom = () => {
       // Android briefly blurs it → keyboard dismisses → body expands (white flash)
       // → focus() re-opens keyboard → body shrinks again.
       //
-      // Solution: enable sendingGuardRef so our blur-interceptor (attached in
-      // useEffect above) blocks the blur event before Android sees it.
-      sendingGuardRef.current = true;
+      // Solution: set sendingGuardRef so the keyboardWillHide listener calls
+      // Keyboard.show() (native Android API) to force the keyboard back open
+      // before Android can resize the body.
+      const isNative = Capacitor.getPlatform() !== 'web';
+      if (isNative) sendingGuardRef.current = true;
 
       if (messageInputRef.current) {
         messageInputRef.current.value = '';          // instant visual clear
@@ -1694,12 +1686,19 @@ const ChatRoom = () => {
       setNewMessage('');
       setReplyingTo(null);
 
-      // Re-focus synchronously, then drop the guard after one frame
-      // (once React has finished the re-render and the input is stable).
+      // Re-focus the input and, on native, force keyboard open at the OS level.
       messageInputRef.current?.focus();
+      if (isNative) {
+        Keyboard.show();
+      }
+
+      // Drop the guard after two rAF ticks — give React time to reconcile
+      // the controlled input and give the native keyboard time to re-open.
       requestAnimationFrame(() => {
-        messageInputRef.current?.focus();            // belt-and-suspenders
-        sendingGuardRef.current = false;
+        messageInputRef.current?.focus();
+        requestAnimationFrame(() => {
+          sendingGuardRef.current = false;
+        });
       });
     } catch (error) {
       setError('Failed to send message');
