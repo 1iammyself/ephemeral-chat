@@ -2369,6 +2369,16 @@ io.on('connection', (socket) => {
     if (!socket.roomCode) return;
     if (!checkRateLimit(socket.id, 10, 60000)) return;
 
+    // ── Encrypted v4 AES-GCM payload: relay opaquely (E2E encrypted) ──
+    if (data && data.v === 4 && data.ct) {
+      if (typeof data.ct !== 'string' || data.ct.length > 131072) return;
+      if (typeof data.iv !== 'string' || data.iv.length > 256) return;
+      io.to(socket.roomCode).emit('media-share', data);
+      io._activeMedia[socket.roomCode] = { v: 4, ct: data.ct, iv: data.iv, isEncrypted: true, sharedAt: Date.now() };
+      logger.info(`AES-GCM encrypted media shared in room ${socket.roomCode}`);
+      return;
+    }
+
     // ── Encrypted v3 MLS payload: relay opaquely (E2E encrypted by MLS) ──
     if (data && data.v === 3 && data.mls) {
       if (typeof data.mls !== 'string' || data.mls.length > 131072) return;
@@ -2429,6 +2439,14 @@ io.on('connection', (socket) => {
     if (!socket.roomCode) return;
     // Rate limit sync events (generous for seek but prevents abuse)
     if (!checkRateLimit(socket.id, 40, 60000)) return;
+
+    // ── Encrypted v4 AES-GCM payload: relay opaquely ──
+    if (data && data.v === 4 && data.ct) {
+      if (typeof data.ct !== 'string' || data.ct.length > 65536) return;
+      if (typeof data.iv !== 'string' || data.iv.length > 256) return;
+      socket.to(socket.roomCode).emit('media-sync', data);
+      return;
+    }
 
     // ── Encrypted v3 MLS payload: relay opaquely ──
     if (data && data.v === 3 && data.mls) {

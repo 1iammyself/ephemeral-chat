@@ -35,19 +35,20 @@ const TournamentModal = ({ isOpen, onClose, onCreateTournament, roomVibe, users 
   // 1v1 games only (trivia is group-based, only allowed in round-robin rounds for mixed)
   const BRACKET_GAME_TYPES = ['tic-tac-toe', 'rock-paper-scissors', 'chess'];
 
-  if (!isOpen) return null;
-
-  const vibeAccent = roomVibe === 'party' ? 'indigo' :
-    roomVibe === 'chill' ? 'teal' :
-      roomVibe === 'focus' ? 'orange' : 'blue';
-
   // Compute estimated rounds based on format and player count
+  // NOTE: Hooks must be called unconditionally (before any early return)
   const estimatedRounds = useMemo(() => {
     if (format === TOURNAMENT_FORMATS.ROUND_ROBIN) return maxPlayers - 1;
     const bracketSize = Math.pow(2, Math.ceil(Math.log2(maxPlayers)));
     if (format === TOURNAMENT_FORMATS.DOUBLE_ELIMINATION) return Math.log2(bracketSize) * 2 + 1;
     return Math.log2(bracketSize); // single elimination
   }, [format, maxPlayers]);
+
+  if (!isOpen) return null;
+
+  const vibeAccent = roomVibe === 'party' ? 'indigo' :
+    roomVibe === 'chill' ? 'teal' :
+      roomVibe === 'focus' ? 'orange' : 'blue';
 
   const handleCreate = () => {
     if (!isMixed && !gameType) return;

@@ -139,17 +139,26 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
   useEffect(() => {
     const handleMediaShare = async (data) => {
       let parsed;
-      // ─── MLS v3: decrypt if encrypted ──────────────────
-      if (data.v === 3 && data.mls) {
+      // ─── v4 AES-GCM: decrypt if encrypted ──────────────────
+      if (data.v === 4 && data.ct) {
         try {
-          const json = decryptMLSMessage(data, roomCode);
+          const json = await decryptMLSMessage(data, roomCode);
           parsed = JSON.parse(json);
         } catch (e) {
-          console.error('media-share decrypt failed:', e);
+          console.error('media-share v4 decrypt failed:', e);
+          return;
+        }
+      // ─── MLS v3: decrypt if encrypted ──────────────────
+      } else if (data.v === 3 && data.mls) {
+        try {
+          const json = await decryptMLSMessage(data, roomCode);
+          parsed = JSON.parse(json);
+        } catch (e) {
+          console.error('media-share v3 decrypt failed:', e);
           return;
         }
       } else {
-        parsed = data; // Fallback for pre-upgrade clients
+        parsed = data; // Fallback for cleartext / pre-upgrade clients
       }
 
       // Defense-in-depth: validate incoming media before rendering
@@ -177,13 +186,22 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
       }
 
       let parsed;
-      // ─── MLS v3: decrypt if encrypted ──────────────────
-      if (data.v === 3 && data.mls) {
+      // ─── v4 AES-GCM: decrypt if encrypted ──────────────────
+      if (data.v === 4 && data.ct) {
         try {
-          const json = decryptMLSMessage(data, roomCode);
+          const json = await decryptMLSMessage(data, roomCode);
           parsed = JSON.parse(json);
         } catch (e) {
-          console.error('media-sync decrypt failed:', e);
+          console.error('media-sync v4 decrypt failed:', e);
+          return;
+        }
+      // ─── MLS v3: decrypt if encrypted ──────────────────
+      } else if (data.v === 3 && data.mls) {
+        try {
+          const json = await decryptMLSMessage(data, roomCode);
+          parsed = JSON.parse(json);
+        } catch (e) {
+          console.error('media-sync v3 decrypt failed:', e);
           return;
         }
       } else {
@@ -237,13 +255,22 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
 
     const restoreMedia = async () => {
       let parsed;
-      // Handle MLS v3 encrypted media state
-      if (initialMedia.v === 3 && initialMedia.mls) {
+      // Handle v4 AES-GCM encrypted media state
+      if (initialMedia.v === 4 && initialMedia.ct) {
         try {
-          const json = decryptMLSMessage(initialMedia, roomCode);
+          const json = await decryptMLSMessage(initialMedia, roomCode);
           parsed = JSON.parse(json);
         } catch (e) {
-          console.warn('Could not decrypt persisted media state:', e);
+          console.warn('Could not decrypt v4 persisted media state:', e);
+          return;
+        }
+      // Handle MLS v3 encrypted media state
+      } else if (initialMedia.v === 3 && initialMedia.mls) {
+        try {
+          const json = await decryptMLSMessage(initialMedia, roomCode);
+          parsed = JSON.parse(json);
+        } catch (e) {
+          console.warn('Could not decrypt v3 persisted media state:', e);
           return;
         }
       } else {
@@ -426,7 +453,7 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
   const emitEncrypted = useCallback(async (event, data) => {
     if (isMLSReady(roomCode)) {
       try {
-        const payload = encryptMLSMessage(JSON.stringify(data), roomCode);
+        const payload = await encryptMLSMessage(JSON.stringify(data), roomCode);
         await withJitter(() => socketManager.emit(event, payload));
         return;
       } catch (e) {
@@ -465,6 +492,18 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
   const handleShareUrl = () => {
     const detected = detectMediaUrl(urlInput.trim());
     if (!detected) return;
+
+    // Optimistic local update so sender sees player immediately
+    setMediaInfo({
+      type: detected.type,
+      id: detected.id || null,
+      url: detected.url,
+      sharedBy: currentUser?.nickname || 'Someone',
+    });
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    setIsMinimized(false);
 
     emitEncrypted('media-share', {
       roomCode,
