@@ -34,6 +34,7 @@ const { startRelayServer, registerTransfer, unregisterTransfer } = require('./re
 const { DropManager } = require('./drops');
 const { createDropRoutes } = require('./drops-routes');
 const { setupNearbyNamespace } = require('./nearby');
+const { generateTriviaQuestions } = require('./trivia-bank');
 
 // ─── Security Hardening Modules ────────────────────────────
 const { initGatewayKeys, ohttpGatewayMiddleware, startKeyRotation: startOHTTPKeyRotation, stopKeyRotation: stopOHTTPKeyRotation } = require('./ohttp-gateway');
@@ -2373,12 +2374,38 @@ io.on('connection', (socket) => {
     if (!socket.roomCode) return;
     if (!checkRateLimit(socket.id, 10, 60000)) return;
 
+    // Helper: extract cleartext media hint for rejoin (type, id, url, sharedBy)
+    const extractMediaHint = (payload) => {
+      if (payload._mediaHint && typeof payload._mediaHint === 'object') {
+        const h = payload._mediaHint;
+        const type = typeof h.type === 'string' ? h.type.toLowerCase().trim() : '';
+        if (type !== 'youtube' && type !== 'soundcloud') return null;
+        const url = typeof h.url === 'string' ? h.url.trim() : '';
+        if (!url || url.length > 2048) return null;
+        if (type === 'youtube' && !SAFE_YT_URL.test(url)) return null;
+        if (type === 'soundcloud' && !SAFE_SC_URL.test(url)) return null;
+        const id = typeof h.id === 'string' ? h.id.trim() : null;
+        if (type === 'youtube' && (!id || !/^[a-zA-Z0-9_-]{11}$/.test(id))) return null;
+        const sharedBy = typeof h.sharedBy === 'string' ? h.sharedBy.substring(0, 30) : 'Someone';
+        return { type, id, url, sharedBy };
+      }
+      return null;
+    };
+
     // ── Encrypted v4 AES-GCM payload: relay opaquely (E2E encrypted) ──
     if (data && data.v === 4 && data.ct) {
       if (typeof data.ct !== 'string' || data.ct.length > 131072) return;
       if (typeof data.iv !== 'string' || data.iv.length > 256) return;
       io.to(socket.roomCode).emit('media-share', data);
-      io._activeMedia[socket.roomCode] = { v: 4, ct: data.ct, iv: data.iv, isEncrypted: true, sharedAt: Date.now() };
+      // Store cleartext media metadata for rejoin (from _mediaHint)
+      const hint = extractMediaHint(data);
+      if (hint) {
+        io._activeMedia[socket.roomCode] = { ...hint, sharedAt: Date.now() };
+        io._mediaPlaybackState[socket.roomCode] = { isPlaying: false, currentTime: 0, updatedAt: Date.now() };
+      } else {
+        // Fallback: store encrypted blob (old clients without _mediaHint)
+        io._activeMedia[socket.roomCode] = { v: 4, ct: data.ct, iv: data.iv, isEncrypted: true, sharedAt: Date.now() };
+      }
       logger.info(`AES-GCM encrypted media shared in room ${socket.roomCode}`);
       return;
     }
@@ -2387,7 +2414,13 @@ io.on('connection', (socket) => {
     if (data && data.v === 3 && data.mls) {
       if (typeof data.mls !== 'string' || data.mls.length > 131072) return;
       io.to(socket.roomCode).emit('media-share', data);
-      io._activeMedia[socket.roomCode] = { v: 3, mls: data.mls, sharedAt: Date.now() };
+      const hint = extractMediaHint(data);
+      if (hint) {
+        io._activeMedia[socket.roomCode] = { ...hint, sharedAt: Date.now() };
+        io._mediaPlaybackState[socket.roomCode] = { isPlaying: false, currentTime: 0, updatedAt: Date.now() };
+      } else {
+        io._activeMedia[socket.roomCode] = { v: 3, mls: data.mls, sharedAt: Date.now() };
+      }
       logger.info(`MLS-encrypted media shared in room ${socket.roomCode}`);
       return;
     }
@@ -2944,9 +2977,16 @@ io.on('connection', (socket) => {
         td.bracket = { rounds, totalRounds };
       }
 
-      // For trivia tournaments, initialize trivia-specific data
+      // For trivia tournaments, initialize trivia-specific data with auto-generated questions
       if (td.gameType === 'trivia') {
         const totalTriviaRounds = Math.min(Math.max(parseInt(td.triviaRounds) || 5, 3), 15);
+        const questions = generateTriviaQuestions(totalTriviaRounds);
+        const timerSecs = 15; // Default timer per question
+
+        // Store questions in server-side memory (NOT in the message — prevents cheating)
+        if (!io._triviaQuestions) io._triviaQuestions = {};
+        io._triviaQuestions[message.id] = { questions, timerSecs };
+
         td.triviaData = {
           totalRounds: totalTriviaRounds,
           currentRound: 0,
@@ -2954,7 +2994,7 @@ io.on('connection', (socket) => {
             acc[p.id] = { nickname: p.nickname, score: 0, streak: 0, bestStreak: 0 };
             return acc;
           }, {}),
-          rounds: [], // Will be populated as questions are submitted
+          rounds: [],
           status: 'waiting-question' // waiting-question, answering, round-complete
         };
         // Override bracket for trivia — trivia uses triviaData scores, not 1v1 matches
@@ -2967,13 +3007,127 @@ io.on('connection', (socket) => {
       await roomManager.saveMessage(socket.roomCode, message);
       io.to(socket.roomCode).emit('message-updated', message);
 
+      // Auto-start first trivia round after a short delay (let UI render first)
+      if (td.gameType === 'trivia' && td.triviaData) {
+        setTimeout(() => {
+          autoStartTriviaRound(socket.roomCode, message.id);
+        }, 2000);
+      }
+
       logger.info(`🏆 Tournament started in room ${socket.roomCode} with ${td.players.length} players (${td.format})`);
     } catch (error) {
       logger.error('Error starting tournament:', error);
     }
   });
 
-  // Submit a trivia question for the current tournament round (creator only)
+  // ─── Auto-start trivia round helper ────────────────────────────────
+  // Pulls the next pre-generated question and starts the round automatically.
+  async function autoStartTriviaRound(roomCode, messageId) {
+    try {
+      const message = await roomManager.getMessage(roomCode, messageId);
+      if (!message || message.messageType !== 'tournament' || !message.tournamentData) return;
+
+      const td = message.tournamentData;
+      if (td.status !== 'in-progress' || td.gameType !== 'trivia' || !td.triviaData) return;
+      if (td.triviaData.status !== 'waiting-question') return;
+      if (td.triviaData.currentRound >= td.triviaData.totalRounds) return;
+
+      // Pull question from server-side memory (not in message to prevent cheating)
+      const bank = io._triviaQuestions?.[messageId];
+      if (!bank || !bank.questions) return;
+
+      const roundIdx = td.triviaData.currentRound; // 0-based index into questions array
+      const questionData = bank.questions[roundIdx];
+      if (!questionData) return;
+
+      const roundNum = roundIdx + 1;
+      const timerSecs = bank.timerSecs || 15;
+
+      td.triviaData.rounds.push({
+        roundNumber: roundNum,
+        question: questionData.question,
+        options: questionData.options,
+        answer: questionData.answer,
+        timer: timerSecs,
+        answers: {},
+        startedAt: Date.now(),
+        status: 'active'
+      });
+
+      td.triviaData.currentRound = roundNum;
+      td.triviaData.status = 'answering';
+
+      await roomManager.saveMessage(roomCode, message);
+      io.to(roomCode).emit('message-updated', message);
+
+      // Auto-close round after timer + 2s buffer, then auto-start next
+      setTimeout(async () => {
+        try {
+          const latestMessage = await roomManager.getMessage(roomCode, messageId);
+          if (!latestMessage?.tournamentData?.triviaData) return;
+          const ltd = latestMessage.tournamentData.triviaData;
+          const currentRound = ltd.rounds[ltd.rounds.length - 1];
+          if (!currentRound || currentRound.status !== 'active' || currentRound.roundNumber !== roundNum) return;
+
+          currentRound.status = 'complete';
+
+          // Score this round
+          const correctAnswer = currentRound.answer;
+          for (const [playerId, ans] of Object.entries(currentRound.answers)) {
+            if (ans.choice === correctAnswer) {
+              const elapsed = (ans.answeredAt - currentRound.startedAt) / 1000;
+              const speedBonus = Math.max(0, Math.round((1 - elapsed / currentRound.timer) * 50));
+              const points = 100 + speedBonus;
+              if (ltd.scores[playerId]) {
+                ltd.scores[playerId].score += points;
+                ltd.scores[playerId].streak++;
+                if (ltd.scores[playerId].streak > ltd.scores[playerId].bestStreak) {
+                  ltd.scores[playerId].bestStreak = ltd.scores[playerId].streak;
+                }
+              }
+            } else {
+              if (ltd.scores[playerId]) ltd.scores[playerId].streak = 0;
+            }
+          }
+
+          // Players who didn't answer get streak reset
+          for (const playerId of Object.keys(ltd.scores)) {
+            if (!currentRound.answers[playerId]) {
+              ltd.scores[playerId].streak = 0;
+            }
+          }
+
+          // Check if tournament is complete
+          if (ltd.currentRound >= ltd.totalRounds) {
+            ltd.status = 'complete';
+            latestMessage.tournamentData.status = 'completed';
+            // Clean up server-side question bank
+            if (io._triviaQuestions) delete io._triviaQuestions[messageId];
+          } else {
+            ltd.status = 'waiting-question';
+          }
+
+          await roomManager.saveMessage(roomCode, latestMessage);
+          io.to(roomCode).emit('message-updated', latestMessage);
+
+          // Auto-start next round after 3s delay (let players see results)
+          if (ltd.status === 'waiting-question') {
+            setTimeout(() => {
+              autoStartTriviaRound(roomCode, messageId);
+            }, 3000);
+          }
+        } catch (err) {
+          logger.error('Error auto-closing trivia round:', err);
+        }
+      }, (timerSecs + 2) * 1000);
+
+      logger.info(`🧠 Trivia round ${roundNum}/${td.triviaData.totalRounds} auto-started in tournament (room ${roomCode})`);
+    } catch (error) {
+      logger.error('Error auto-starting trivia round:', error);
+    }
+  }
+
+  // Legacy: Submit a trivia question manually (kept for backward compat, but auto-generation is now preferred)
   socket.on('tournament-trivia-question', async ({ messageId, question, options, answer, timer }) => {
     try {
       if (!socket.roomCode || !messageId) return;

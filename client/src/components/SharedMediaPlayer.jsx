@@ -517,6 +517,8 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
   // Media-sync (play/pause/seek) is time-critical — NO jitter delay.
   // For media-sync, attaches a cleartext _hint so the server can track
   // playback position for rejoin sync (not sensitive — just action + timestamp).
+  // For media-share, attaches a cleartext _mediaHint so the server stores
+  // the URL for rejoin without requiring decryption.
   const emitEncrypted = useCallback(async (event, data) => {
     if (isMLSReady(roomCode)) {
       try {
@@ -524,6 +526,10 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
         // Attach cleartext hint for server-side playback tracking
         if (event === 'media-sync') {
           payload._hint = { action: data.action, currentTime: data.currentTime };
+        }
+        // Attach cleartext media metadata so server can restore for rejoining users
+        if (event === 'media-share') {
+          payload._mediaHint = { type: data.type, id: data.id, url: data.url, sharedBy: data.sharedBy };
         }
         socketManager.emit(event, payload);
         return;

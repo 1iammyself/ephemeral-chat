@@ -47,6 +47,8 @@ const TriviaScoreboard = ({ scores, currentUserId, accentColor }) => {
 };
 
 // ─── Question Creator (for tournament host) ─────────────────
+// DEPRECATED: Questions are now auto-generated from the trivia bank.
+// Kept as a fallback for legacy manual trivia question submission.
 const QuestionCreator = ({ messageId, roundNumber, totalRounds, onSubmit }) => {
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState(['', '']);
@@ -307,21 +309,11 @@ const TournamentTrivia = ({ message, currentUser, accentColor }) => {
         <RoundResults round={lastRound} scores={scores} />
       )}
 
-      {/* Creator: submit next question */}
-      {isWaitingQuestion && isCreator && !isComplete && (
-        <QuestionCreator
-          messageId={message.id}
-          roundNumber={currentRound + 1}
-          totalRounds={totalRounds}
-          onSubmit={handleSubmitQuestion}
-        />
-      )}
-
-      {/* Waiting for host */}
-      {isWaitingQuestion && !isCreator && !isComplete && (
+      {/* Waiting for next auto-generated question */}
+      {isWaitingQuestion && !isComplete && (
         <div className="p-2 text-center text-xs text-gray-400 dark:text-gray-500">
-          <Clock className="w-4 h-4 inline mr-1" />
-          Waiting for host to submit question {currentRound + 1}/{totalRounds}...
+          <Zap className="w-4 h-4 inline mr-1 animate-pulse text-amber-500" />
+          {currentRound === 0 ? 'Starting trivia...' : `Next question coming up... (${currentRound + 1}/${totalRounds})`}
         </div>
       )}
 
