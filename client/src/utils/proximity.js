@@ -20,8 +20,8 @@ const API_BASE =
 
 // ─── Constants ──────────────────────────────────────────────
 
-const CHUNK_SIZE = 64 * 1024;           // 64 KB — safe for all browsers
-const MAX_BUFFERED = 2 * 1024 * 1024;   // 2 MB buffer threshold for gigabit speeds
+const CHUNK_SIZE = 256 * 1024;           // 256 KB — dramatically fewer chunks, higher speeds
+const MAX_BUFFERED = 4 * 1024 * 1024;    // 4 MB buffer threshold keeps the pipe saturated
 const HEARTBEAT_INTERVAL = 3000;
 const PEER_TIMEOUT = 15000;
 const DATA_CHANNEL_LABEL = 'ephemeral-transfer';
@@ -858,23 +858,27 @@ export class ProximityService {
     let offset = 0;
     let lastEmitTime = 0;
 
-    // Set the low watermark to notify us proactively
-    dc.bufferedAmountLowThreshold = Math.max(0, MAX_BUFFERED - (CHUNK_SIZE * 2));
+    // Set the low watermark to notify us proactively (Wait to reach half of max buffer)
+    dc.bufferedAmountLowThreshold = 2 * 1024 * 1024;
 
     while (offset < file.size) {
       // Back-pressure: wait if the buffer is getting full
-      if (dc.bufferedAmount >= MAX_BUFFERED) {
+      // Extremely important: This MUST be a 'while' loop! 
+      // An 'if' statement will bypass strict backpressure when the safety timeout triggers, flooding the queue.
+      while (dc.bufferedAmount >= MAX_BUFFERED) {
         await new Promise(resolve => {
+          let timeoutId;
           const onLow = () => {
+            clearTimeout(timeoutId);
             dc.removeEventListener('bufferedamountlow', onLow);
             resolve();
           };
           dc.addEventListener('bufferedamountlow', onLow);
           // Safety fallback timeout in case the event is swallowed or we disconnect
-          setTimeout(() => {
+          timeoutId = setTimeout(() => {
             dc.removeEventListener('bufferedamountlow', onLow);
             resolve();
-          }, 50);
+          }, 100);
         });
       }
 
@@ -884,7 +888,18 @@ export class ProximityService {
       const blobChunk = file.slice(offset, end);
       const arrayBufferChunk = await readChunkAsArrayBuffer(blobChunk);
 
-      dc.send(arrayBufferChunk);
+      try {
+        dc.send(arrayBufferChunk);
+      } catch (err) {
+        // Chromium throws OperationError if `send queue is full` natively
+        if (err.name === 'OperationError' || err.message.includes('queue is full') || err.message.includes('Queue full')) {
+          console.warn('[Proximity] Data channel queue full Native Error. Forcing stall.');
+          await new Promise(r => setTimeout(r, 200));
+          continue; // Retry this exact same offset
+        }
+        throw err;
+      }
+
       offset = end;
       transfer.bytesSent = offset;
 
