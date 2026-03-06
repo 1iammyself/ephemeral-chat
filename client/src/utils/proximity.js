@@ -21,7 +21,7 @@ const API_BASE =
 // ─── Constants ──────────────────────────────────────────────
 
 const CHUNK_SIZE = 64 * 1024;           // 64 KB — safe for all browsers
-const MAX_BUFFERED = 512 * 1024;        // 512 KB buffer threshold
+const MAX_BUFFERED = 2 * 1024 * 1024;   // 2 MB buffer threshold for gigabit speeds
 const HEARTBEAT_INTERVAL = 3000;
 const PEER_TIMEOUT = 15000;
 const DATA_CHANNEL_LABEL = 'ephemeral-transfer';
@@ -138,14 +138,14 @@ export function formatSpeed(bps) {
 }
 
 /**
- * Read a File/Blob as ArrayBuffer (works everywhere, unlike File.stream())
+ * Read a File/Blob chunk as ArrayBuffer
  */
-function readFileAsArrayBuffer(file) {
+function readChunkAsArrayBuffer(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
     reader.onerror = () => reject(reader.error || new Error('FileReader failed'));
-    reader.readAsArrayBuffer(file);
+    reader.readAsArrayBuffer(blob);
   });
 }
 
@@ -738,12 +738,14 @@ export class ProximityService {
     transfer.receivedChunks.push(new Uint8Array(data));
     transfer.bytesReceived += data.byteLength;
 
+    if (!transfer.lastEmitTime) transfer.lastEmitTime = 0;
+    const now = Date.now();
     const progress = transfer.metadata.size > 0 ? transfer.bytesReceived / transfer.metadata.size : 0;
-    const elapsed = (Date.now() - transfer.startTime) / 1000;
+    const elapsed = (now - transfer.startTime) / 1000;
     const speed = elapsed > 0 ? transfer.bytesReceived / elapsed : 0;
 
-    // Send periodic ACK (every 10th chunk to reduce overhead)
-    if (transfer.receivedChunks.length % 10 === 0) {
+    // Send periodic ACK (every 32nd chunk, approx ~2MB, to reduce control overhead)
+    if (transfer.receivedChunks.length % 32 === 0) {
       this._sendControl(peerId, {
         type: 'transfer-progress',
         transferId: transfer.id,
@@ -752,19 +754,29 @@ export class ProximityService {
       });
     }
 
-    this.emit('receive-progress', {
-      transferId: transfer.id,
-      bytesReceived: transfer.bytesReceived,
-      totalBytes: transfer.metadata.size,
-      progress,
-      speed,
-      state: 'transferring',
-    });
+    // Throttle UI updates to roughly 100-150ms to prevent React re-render queue from freezing the WebRTC event loop!
+    if (now - transfer.lastEmitTime > 150 || transfer.bytesReceived >= transfer.metadata.size) {
+      transfer.lastEmitTime = now;
+      this.emit('receive-progress', {
+        transferId: transfer.id,
+        bytesReceived: transfer.bytesReceived,
+        totalBytes: transfer.metadata.size,
+        progress,
+        speed,
+        state: 'transferring',
+      });
+    }
 
     // Complete?
     if (transfer.bytesReceived >= transfer.metadata.size) {
       transfer.state = 'complete';
+
+      // We combine the Uint8Array chunks into a single Blob.
+      // Doing this via Blob rather than a giant array avoids contiguous memory allocation failures.
       const blob = new Blob(transfer.receivedChunks, { type: transfer.metadata.type || 'application/octet-stream' });
+
+      // Critically: Clear the receivedChunks array from memory as soon as the Blob is created!
+      transfer.receivedChunks = [];
 
       this._sendControl(peerId, { type: 'transfer-complete', transferId: transfer.id });
 
@@ -837,40 +849,62 @@ export class ProximityService {
     // 2. Wait for acceptance (via data channel control message)
     await this._waitForTransferAcceptance(transferId, TRANSFER_ACCEPT_TIMEOUT);
 
-    // 3. Read file into memory (works on every browser, unlike File.stream())
-    console.log('[Proximity] Reading file into memory:', file.name, formatBytes(file.size));
-    const arrayBuffer = await readFileAsArrayBuffer(file);
-    const fileBytes = new Uint8Array(arrayBuffer);
+    console.log('[Proximity] Starting streaming transfer:', file.name, formatBytes(file.size));
 
-    // 4. Send chunks with back-pressure
+    // 4. Send chunks with back-pressure, streaming directly from the File object
+    // DO NOT load the entire file into memory at once!
     transfer.state = 'sending';
     transfer.startTime = Date.now();
     let offset = 0;
+    let lastEmitTime = 0;
 
-    while (offset < fileBytes.length) {
+    // Set the low watermark to notify us proactively
+    dc.bufferedAmountLowThreshold = Math.max(0, MAX_BUFFERED - (CHUNK_SIZE * 2));
+
+    while (offset < file.size) {
       // Back-pressure: wait if the buffer is getting full
-      while (dc.bufferedAmount > MAX_BUFFERED) {
-        await new Promise(r => setTimeout(r, 10));
+      if (dc.bufferedAmount >= MAX_BUFFERED) {
+        await new Promise(resolve => {
+          const onLow = () => {
+            dc.removeEventListener('bufferedamountlow', onLow);
+            resolve();
+          };
+          dc.addEventListener('bufferedamountlow', onLow);
+          // Safety fallback timeout in case the event is swallowed or we disconnect
+          setTimeout(() => {
+            dc.removeEventListener('bufferedamountlow', onLow);
+            resolve();
+          }, 50);
+        });
       }
 
-      const end = Math.min(offset + CHUNK_SIZE, fileBytes.length);
-      const chunk = fileBytes.slice(offset, end);
-      dc.send(chunk.buffer);
+      const end = Math.min(offset + CHUNK_SIZE, file.size);
+
+      // Read only the specific chunk from the file system / memory map
+      const blobChunk = file.slice(offset, end);
+      const arrayBufferChunk = await readChunkAsArrayBuffer(blobChunk);
+
+      dc.send(arrayBufferChunk);
       offset = end;
       transfer.bytesSent = offset;
 
-      const progress = file.size > 0 ? offset / file.size : 1;
-      const elapsed = (Date.now() - transfer.startTime) / 1000;
-      const speed = elapsed > 0 ? offset / elapsed : 0;
+      const now = Date.now();
+      // Throttle rapid UI updates
+      if (now - lastEmitTime > 150 || offset === file.size) {
+        lastEmitTime = now;
+        const progress = file.size > 0 ? offset / file.size : 1;
+        const elapsed = (now - transfer.startTime) / 1000;
+        const speed = elapsed > 0 ? offset / elapsed : 0;
 
-      this.emit('send-progress', {
-        transferId,
-        bytesSent: offset,
-        totalBytes: file.size,
-        progress,
-        speed,
-        state: 'transferring',
-      });
+        this.emit('send-progress', {
+          transferId,
+          bytesSent: offset,
+          totalBytes: file.size,
+          progress,
+          speed,
+          state: 'transferring',
+        });
+      }
     }
 
     // 5. Wait for completion ACK (with generous timeout)
