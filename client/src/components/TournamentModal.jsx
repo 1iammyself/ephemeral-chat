@@ -1,13 +1,6 @@
-import React, { useState } from 'react';
-import { X, Trophy, Swords, Users, ChevronRight, Gamepad2 } from 'lucide-react';
-import { TOURNAMENT_FORMATS, TOURNAMENT_GAME_TYPES } from '../utils/tournament';
-
-const GAME_LABELS = {
-  'tic-tac-toe': { label: 'Tic-Tac-Toe', emoji: '⭕', desc: 'Classic 3×3 grid' },
-  'rock-paper-scissors': { label: 'Rock Paper Scissors', emoji: '✊', desc: 'Best of 3 rounds' },
-  'chess': { label: 'Chess', emoji: '♟️', desc: 'Full chess match' },
-  'trivia': { label: 'Trivia', emoji: '🧠', desc: 'Knowledge challenge' }
-};
+import React, { useState, useMemo } from 'react';
+import { X, Trophy, Swords, Users, ChevronRight, Gamepad2, Shuffle, Plus, Minus } from 'lucide-react';
+import { TOURNAMENT_FORMATS, TOURNAMENT_GAME_TYPES, GAME_LABELS } from '../utils/tournament';
 
 const FORMAT_INFO = {
   [TOURNAMENT_FORMATS.SINGLE_ELIMINATION]: {
@@ -30,11 +23,17 @@ const FORMAT_INFO = {
 const TournamentModal = ({ isOpen, onClose, onCreateTournament, roomVibe, users = [] }) => {
   const [step, setStep] = useState(1); // 1: Game Type, 2: Format, 3: Settings
   const [gameType, setGameType] = useState(null);
+  const [isMixed, setIsMixed] = useState(false); // Mixed-game tournament
   const [format, setFormat] = useState(TOURNAMENT_FORMATS.SINGLE_ELIMINATION);
   const [name, setName] = useState('');
   const [maxPlayers, setMaxPlayers] = useState(8);
   const [bestOf, setBestOf] = useState(1); // Best of N for RPS
   const [triviaRounds, setTriviaRounds] = useState(5);
+  // For mixed tournaments: array of game types per round
+  const [roundGameTypes, setRoundGameTypes] = useState(['chess', 'trivia', 'rock-paper-scissors']);
+
+  // 1v1 games only (trivia is group-based, only allowed in round-robin rounds for mixed)
+  const BRACKET_GAME_TYPES = ['tic-tac-toe', 'rock-paper-scissors', 'chess'];
 
   if (!isOpen) return null;
 
@@ -42,25 +41,52 @@ const TournamentModal = ({ isOpen, onClose, onCreateTournament, roomVibe, users 
     roomVibe === 'chill' ? 'teal' :
       roomVibe === 'focus' ? 'orange' : 'blue';
 
+  // Compute estimated rounds based on format and player count
+  const estimatedRounds = useMemo(() => {
+    if (format === TOURNAMENT_FORMATS.ROUND_ROBIN) return maxPlayers - 1;
+    const bracketSize = Math.pow(2, Math.ceil(Math.log2(maxPlayers)));
+    if (format === TOURNAMENT_FORMATS.DOUBLE_ELIMINATION) return Math.log2(bracketSize) * 2 + 1;
+    return Math.log2(bracketSize); // single elimination
+  }, [format, maxPlayers]);
+
   const handleCreate = () => {
-    if (!gameType) return;
-    onCreateTournament({
-      name: name.trim() || `${GAME_LABELS[gameType]?.label || gameType} Tournament`,
-      gameType,
-      format: gameType === 'trivia' ? TOURNAMENT_FORMATS.ROUND_ROBIN : format,
-      maxPlayers,
-      bestOf: gameType === 'rock-paper-scissors' ? bestOf : 1,
-      triviaRounds: gameType === 'trivia' ? triviaRounds : undefined
-    });
+    if (!isMixed && !gameType) return;
+    if (isMixed && roundGameTypes.length === 0) return;
+
+    if (isMixed) {
+      // Build roundGameTypes map: { 1: 'chess', 2: 'trivia', ... }
+      const roundMap = {};
+      roundGameTypes.forEach((gt, i) => { roundMap[i + 1] = gt; });
+      onCreateTournament({
+        name: name.trim() || 'Mixed Tournament',
+        gameType: 'mixed',
+        gameTypes: roundGameTypes,
+        roundGameTypes: roundMap,
+        format,
+        maxPlayers,
+        bestOf: 1,
+      });
+    } else {
+      onCreateTournament({
+        name: name.trim() || `${GAME_LABELS[gameType]?.label || gameType} Tournament`,
+        gameType,
+        format: gameType === 'trivia' ? TOURNAMENT_FORMATS.ROUND_ROBIN : format,
+        maxPlayers,
+        bestOf: gameType === 'rock-paper-scissors' ? bestOf : 1,
+        triviaRounds: gameType === 'trivia' ? triviaRounds : undefined
+      });
+    }
     onClose();
     // Reset
     setStep(1);
     setGameType(null);
+    setIsMixed(false);
     setFormat(TOURNAMENT_FORMATS.SINGLE_ELIMINATION);
     setName('');
     setMaxPlayers(8);
     setBestOf(1);
     setTriviaRounds(5);
+    setRoundGameTypes(['chess', 'trivia', 'rock-paper-scissors']);
   };
 
   return (
@@ -89,40 +115,102 @@ const TournamentModal = ({ isOpen, onClose, onCreateTournament, roomVibe, users 
           {step === 1 && (
             <>
               <p className="text-sm font-bold text-gray-700 dark:text-gray-300">Choose Game</p>
-              <div className="grid grid-cols-2 gap-2">
-                {TOURNAMENT_GAME_TYPES.map(gt => {
-                  const info = GAME_LABELS[gt];
-                  const selected = gameType === gt;
-                  return (
+
+              {/* Mixed-game toggle */}
+              <button
+                onClick={() => { setIsMixed(!isMixed); setGameType(null); }}
+                className={`w-full p-2.5 rounded-xl border-2 transition-all text-left flex items-center gap-2 ${isMixed
+                  ? `border-${vibeAccent}-500 bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20 ring-2 ring-${vibeAccent}-500/20`
+                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                }`}
+              >
+                <Shuffle className={`w-5 h-5 ${isMixed ? `text-${vibeAccent}-500` : 'text-gray-400'}`} />
+                <div>
+                  <p className={`text-sm font-bold ${isMixed ? `text-${vibeAccent}-700 dark:text-${vibeAccent}-300` : 'text-gray-800 dark:text-gray-200'}`}>
+                    Mixed Tournament
+                  </p>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400">Different game each round</p>
+                </div>
+              </button>
+
+              {!isMixed ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {TOURNAMENT_GAME_TYPES.map(gt => {
+                    const info = GAME_LABELS[gt];
+                    const selected = gameType === gt;
+                    return (
+                      <button
+                        key={gt}
+                        onClick={() => setGameType(gt)}
+                        className={`p-3 rounded-xl border-2 transition-all text-left ${selected
+                          ? `border-${vibeAccent}-500 bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20 ring-2 ring-${vibeAccent}-500/20`
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                        }`}
+                      >
+                        <span className="text-2xl">{info.emoji}</span>
+                        <p className={`text-sm font-bold mt-1 ${selected ? `text-${vibeAccent}-700 dark:text-${vibeAccent}-300` : 'text-gray-800 dark:text-gray-200'}`}>
+                          {info.label}
+                        </p>
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400">{info.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* Mixed: configure game per round */
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Assign a game to each round:</p>
+                  {roundGameTypes.map((gt, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-gray-600 dark:text-gray-400 w-12 shrink-0">R{idx + 1}</span>
+                      <select
+                        value={gt}
+                        onChange={(e) => {
+                          const updated = [...roundGameTypes];
+                          updated[idx] = e.target.value;
+                          setRoundGameTypes(updated);
+                        }}
+                        className={`flex-1 text-sm px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 dark:text-white focus:ring-1 focus:ring-${vibeAccent}-500 outline-none`}
+                      >
+                        {TOURNAMENT_GAME_TYPES.map(g => (
+                          <option key={g} value={g}>{GAME_LABELS[g]?.emoji} {GAME_LABELS[g]?.label}</option>
+                        ))}
+                      </select>
+                      {roundGameTypes.length > 1 && (
+                        <button
+                          onClick={() => setRoundGameTypes(roundGameTypes.filter((_, i) => i !== idx))}
+                          className="p-1 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-full text-red-500"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {roundGameTypes.length < 10 && (
                     <button
-                      key={gt}
-                      onClick={() => setGameType(gt)}
-                      className={`p-3 rounded-xl border-2 transition-all text-left ${selected
-                        ? `border-${vibeAccent}-500 bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20 ring-2 ring-${vibeAccent}-500/20`
-                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                      }`}
+                      onClick={() => setRoundGameTypes([...roundGameTypes, 'chess'])}
+                      className={`w-full py-1.5 rounded-lg text-xs font-bold text-${vibeAccent}-600 dark:text-${vibeAccent}-400 border border-dashed border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:bg-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/10 flex items-center justify-center gap-1`}
                     >
-                      <span className="text-2xl">{info.emoji}</span>
-                      <p className={`text-sm font-bold mt-1 ${selected ? `text-${vibeAccent}-700 dark:text-${vibeAccent}-300` : 'text-gray-800 dark:text-gray-200'}`}>
-                        {info.label}
-                      </p>
-                      <p className="text-[10px] text-gray-500 dark:text-gray-400">{info.desc}</p>
+                      <Plus className="w-3.5 h-3.5" /> Add Round
                     </button>
-                  );
-                })}
-              </div>
+                  )}
+                </div>
+              )}
+
               <button
                 onClick={() => {
-                  if (!gameType) return;
-                  // Trivia only supports round-robin, skip format selection
-                  if (gameType === 'trivia') {
+                  if (!isMixed && !gameType) return;
+                  if (isMixed) {
+                    // Mixed: skip to format selection, trivia-only not applicable
+                    setStep(2);
+                  } else if (gameType === 'trivia') {
                     setFormat(TOURNAMENT_FORMATS.ROUND_ROBIN);
                     setStep(3);
                   } else {
                     setStep(2);
                   }
                 }}
-                disabled={!gameType}
+                disabled={!isMixed && !gameType}
                 className={`w-full py-2.5 rounded-xl font-bold flex items-center justify-center space-x-2 btn-${vibeAccent} disabled:opacity-40 active:scale-95 transition-transform`}
               >
                 <span>Next</span>
@@ -186,7 +274,7 @@ const TournamentModal = ({ isOpen, onClose, onCreateTournament, roomVibe, users 
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder={`${GAME_LABELS[gameType]?.label || ''} Tournament`}
+                  placeholder={isMixed ? 'Mixed Tournament' : `${GAME_LABELS[gameType]?.label || ''} Tournament`}
                   className={`w-full text-sm px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 dark:text-white focus:ring-1 focus:ring-${vibeAccent}-500 outline-none`}
                   maxLength={60}
                 />
@@ -212,7 +300,7 @@ const TournamentModal = ({ isOpen, onClose, onCreateTournament, roomVibe, users 
               </div>
 
               {/* Best-of for RPS */}
-              {gameType === 'rock-paper-scissors' && (
+              {!isMixed && gameType === 'rock-paper-scissors' && (
                 <div>
                   <label className="text-xs font-bold text-gray-600 dark:text-gray-400 mb-1 block">
                     Best of: {bestOf}
@@ -235,7 +323,7 @@ const TournamentModal = ({ isOpen, onClose, onCreateTournament, roomVibe, users 
               )}
 
               {/* Trivia Rounds */}
-              {gameType === 'trivia' && (
+              {!isMixed && gameType === 'trivia' && (
                 <div>
                   <label className="text-xs font-bold text-gray-600 dark:text-gray-400 mb-1 block">
                     Rounds: {triviaRounds}
@@ -257,17 +345,30 @@ const TournamentModal = ({ isOpen, onClose, onCreateTournament, roomVibe, users 
 
               {/* Summary */}
               <div className={`p-3 rounded-lg bg-${vibeAccent}-50/50 dark:bg-${vibeAccent}-900/10 border border-${vibeAccent}-200/30 dark:border-${vibeAccent}-800/30`}>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  <span className="font-bold">{GAME_LABELS[gameType]?.emoji} {GAME_LABELS[gameType]?.label}</span>
-                  {' · '}
-                  <span>{FORMAT_INFO[format]?.label}</span>
-                  {' · '}
-                  <span>Up to {maxPlayers} players</span>
-                </p>
+                {isMixed ? (
+                  <div className="space-y-1">
+                    <p className="text-xs font-bold text-gray-700 dark:text-gray-300">🎮 Mixed Tournament · {FORMAT_INFO[format]?.label} · Up to {maxPlayers} players</p>
+                    <div className="flex flex-wrap gap-1">
+                      {roundGameTypes.map((gt, i) => (
+                        <span key={i} className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/30 text-${vibeAccent}-700 dark:text-${vibeAccent}-300`}>
+                          R{i+1}: {GAME_LABELS[gt]?.emoji} {GAME_LABELS[gt]?.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    <span className="font-bold">{GAME_LABELS[gameType]?.emoji} {GAME_LABELS[gameType]?.label}</span>
+                    {' · '}
+                    <span>{FORMAT_INFO[format]?.label}</span>
+                    {' · '}
+                    <span>Up to {maxPlayers} players</span>
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-2">
-                <button onClick={() => setStep(gameType === 'trivia' ? 1 : 2)} className="flex-1 py-2.5 rounded-xl font-bold border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                <button onClick={() => setStep((!isMixed && gameType === 'trivia') ? 1 : 2)} className="flex-1 py-2.5 rounded-xl font-bold border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
                   Back
                 </button>
                 <button

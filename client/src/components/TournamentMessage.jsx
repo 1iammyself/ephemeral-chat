@@ -3,7 +3,7 @@ import { Trophy, Users, Swords, Play, ChevronDown, ChevronUp, Crown, Clock, Chec
 import TournamentBracket from './TournamentBracket';
 import TournamentLeaderboard from './TournamentLeaderboard';
 import TournamentTrivia from './TournamentTrivia';
-import { TOURNAMENT_STATUS, TOURNAMENT_FORMATS, getReadyMatches, isTournamentComplete, getTournamentWinner } from '../utils/tournament';
+import { TOURNAMENT_STATUS, TOURNAMENT_FORMATS, GAME_LABELS, getReadyMatches, isTournamentComplete, getTournamentWinner } from '../utils/tournament';
 import { getVibeById } from '../utils/vibes';
 
 const TournamentMessage = ({ message, currentUser, onJoinTournament, onStartTournament, onStartMatch, roomVibe }) => {
@@ -17,13 +17,14 @@ const TournamentMessage = ({ message, currentUser, onJoinTournament, onStartTour
 
   if (!tournamentData) return null;
 
-  const { name, gameType, format, status, players = [], maxPlayers, bracket, createdBy } = tournamentData;
+  const { name, gameType, format, status, players = [], maxPlayers, bracket, createdBy, roundGameTypes, gameTypes } = tournamentData;
   const currentUserId = currentUser?.id || currentUser?.socketId;
   const isJoined = players.some(p => p.id === currentUserId);
   const isCreator = createdBy === currentUserId;
   const canStart = isCreator && status === TOURNAMENT_STATUS.WAITING && players.length >= 2;
   const isComplete = status === TOURNAMENT_STATUS.COMPLETED;
   const isInProgress = status === TOURNAMENT_STATUS.IN_PROGRESS;
+  const isMixed = gameType === 'mixed';
 
   const readyMatches = useMemo(() => {
     if (!bracket) return [];
@@ -44,8 +45,8 @@ const TournamentMessage = ({ message, currentUser, onJoinTournament, onStartTour
     return getTournamentWinner(bracket.rounds, bracket);
   }, [bracket, gameType, tournamentData]);
 
-  const GAME_EMOJI = { 'tic-tac-toe': '⭕', 'rock-paper-scissors': '✊', 'chess': '♟️', 'trivia': '🧠' };
-  const GAME_LABEL = { 'tic-tac-toe': 'Tic-Tac-Toe', 'rock-paper-scissors': 'RPS', 'chess': 'Chess', 'trivia': 'Trivia' };
+  const GAME_EMOJI = { 'tic-tac-toe': '⭕', 'rock-paper-scissors': '✊', 'chess': '♟️', 'trivia': '🧠', 'mixed': '🎮' };
+  const GAME_LABEL = { 'tic-tac-toe': 'Tic-Tac-Toe', 'rock-paper-scissors': 'RPS', 'chess': 'Chess', 'trivia': 'Trivia', 'mixed': 'Mixed' };
   const FORMAT_LABEL = {
     [TOURNAMENT_FORMATS.SINGLE_ELIMINATION]: 'Single Elim',
     [TOURNAMENT_FORMATS.DOUBLE_ELIMINATION]: 'Double Elim',
@@ -78,6 +79,21 @@ const TournamentMessage = ({ message, currentUser, onJoinTournament, onStartTour
 
       {/* Players */}
       <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
+        {/* Mixed tournament: show round-game schedule */}
+        {isMixed && gameTypes && gameTypes.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-1">
+            {gameTypes.map((gt, i) => {
+              const info = GAME_LABELS[gt] || {};
+              return (
+                <span key={i} className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] ${
+                  'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                }`}>
+                  R{i+1}: {info.emoji || '🎮'} {info.label || gt}
+                </span>
+              );
+            })}
+          </div>
+        )}
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs font-bold text-gray-600 dark:text-gray-400 flex items-center">
             <Users className="w-3.5 h-3.5 mr-1" />
@@ -166,6 +182,9 @@ const TournamentMessage = ({ message, currentUser, onJoinTournament, onStartTour
               .filter(m => !m.gameMessageId)
               .map(m => {
                 const opponent = m.player1?.id === currentUserId ? m.player2 : m.player1;
+                // For mixed tournaments, show the game type for this round
+                const matchGameType = isMixed && roundGameTypes ? (roundGameTypes[m.round] || roundGameTypes[String(m.round)]) : null;
+                const matchGameInfo = matchGameType ? (GAME_LABELS[matchGameType] || {}) : null;
                 return (
                   <button
                     key={m.id}
@@ -173,7 +192,7 @@ const TournamentMessage = ({ message, currentUser, onJoinTournament, onStartTour
                     className={`w-full py-1.5 rounded-lg text-xs font-bold text-${accentColor}-600 dark:text-${accentColor}-400 bg-${accentColor}-50 dark:bg-${accentColor}-900/10 hover:bg-${accentColor}-100 dark:hover:bg-${accentColor}-900/20 active:scale-95 transition-transform flex items-center justify-center gap-1`}
                   >
                     <Swords className="w-3.5 h-3.5" />
-                    Play vs {opponent?.nickname || 'TBD'}
+                    Play vs {opponent?.nickname || 'TBD'}{matchGameInfo ? ` (${matchGameInfo.emoji} ${matchGameInfo.label})` : ''}
                   </button>
                 );
               })}

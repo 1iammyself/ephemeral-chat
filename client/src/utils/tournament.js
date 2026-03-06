@@ -28,6 +28,23 @@ export const MATCH_STATUS = {
 export const TOURNAMENT_GAME_TYPES = ['tic-tac-toe', 'rock-paper-scissors', 'chess', 'trivia'];
 
 /**
+ * Multi-game tournament: each round can feature a different game type.
+ * `roundGameTypes` maps round number → game type.
+ * e.g. { 1: 'chess', 2: 'trivia', 3: 'rock-paper-scissors' }
+ *
+ * For a "mixed" tournament the creator picks a game for each round at
+ * creation time. The bracket generator stores this map on the tournament
+ * data so the server can spawn the correct game when a match starts.
+ */
+
+export const GAME_LABELS = {
+  'tic-tac-toe': { label: 'Tic-Tac-Toe', emoji: '⭕', desc: 'Classic 3×3 grid' },
+  'rock-paper-scissors': { label: 'Rock Paper Scissors', emoji: '✊', desc: 'Best of 3 rounds' },
+  'chess': { label: 'Chess', emoji: '♟️', desc: 'Full chess match' },
+  'trivia': { label: 'Trivia', emoji: '🧠', desc: 'Knowledge challenge' }
+};
+
+/**
  * Generate a single-elimination bracket
  * @param {Array<{id: string, nickname: string}>} players - Seeded player list
  * @returns {{ rounds: Array<Array<Match>>, totalRounds: number }}

@@ -2110,15 +2110,40 @@ io.on('connection', (socket) => {
           socket.emit('error', { message: 'Invalid tournament data' });
           return;
         }
-        const validGameTypes = ['tic-tac-toe', 'rock-paper-scissors', 'chess', 'trivia'];
+        const validGameTypes = ['tic-tac-toe', 'rock-paper-scissors', 'chess', 'trivia', 'mixed'];
         const validFormats = ['single-elimination', 'double-elimination', 'round-robin'];
         if (!validGameTypes.includes(td.gameType)) return;
         if (!validFormats.includes(td.format)) return;
+
+        // Validate mixed tournament: roundGameTypes must be an object mapping round→gameType
+        let roundGameTypesClean = null;
+        let gameTypesClean = null;
+        if (td.gameType === 'mixed') {
+          const allGameTypes = ['tic-tac-toe', 'rock-paper-scissors', 'chess', 'trivia'];
+          if (td.roundGameTypes && typeof td.roundGameTypes === 'object') {
+            roundGameTypesClean = {};
+            for (const [k, v] of Object.entries(td.roundGameTypes)) {
+              const rNum = parseInt(k);
+              if (isNaN(rNum) || rNum < 1 || rNum > 20) continue;
+              if (!allGameTypes.includes(v)) continue;
+              roundGameTypesClean[rNum] = v;
+            }
+            if (Object.keys(roundGameTypesClean).length === 0) return;
+          }
+          if (Array.isArray(td.gameTypes)) {
+            gameTypesClean = td.gameTypes.filter(g => allGameTypes.includes(g)).slice(0, 20);
+            if (gameTypesClean.length === 0) return;
+          }
+        }
 
         const creatorId = socket.persistentUserId || socket.id;
         data.tournamentData = {
           name: sanitizeInput(td.name.trim()).substring(0, 60),
           gameType: td.gameType,
+          ...(td.gameType === 'mixed' ? {
+            gameTypes: gameTypesClean,
+            roundGameTypes: roundGameTypesClean,
+          } : {}),
           format: td.format,
           status: 'waiting',
           maxPlayers: Math.min(Math.max(parseInt(td.maxPlayers) || 8, 2), 16),
@@ -2179,7 +2204,8 @@ io.on('connection', (socket) => {
         reactions: {}, // Initialize reactions
         hasBeenViewed: false,
         isAnonymous: !!isAnonymous, // Anonymous confession flag
-        overrideTtl: overrideTtl || null, // Per-message TTL override
+        // Tournament messages never expire — only cleaned up when completed
+        overrideTtl: messageType === 'tournament' ? 0 : (overrideTtl || null),
         sender: isAnonymous ? {
           socketId: `anon_${Date.now()}`,
           nickname: 'Anonymous \uD83D\uDC7B',
@@ -2343,6 +2369,15 @@ io.on('connection', (socket) => {
     if (!socket.roomCode) return;
     if (!checkRateLimit(socket.id, 10, 60000)) return;
 
+    // ── Encrypted v3 MLS payload: relay opaquely (E2E encrypted by MLS) ──
+    if (data && data.v === 3 && data.mls) {
+      if (typeof data.mls !== 'string' || data.mls.length > 131072) return;
+      io.to(socket.roomCode).emit('media-share', data);
+      io._activeMedia[socket.roomCode] = { v: 3, mls: data.mls, sharedAt: Date.now() };
+      logger.info(`MLS-encrypted media shared in room ${socket.roomCode}`);
+      return;
+    }
+
     // ── Encrypted v2 payload: relay opaquely (E2E encrypted by Double Ratchet) ──
     if (data && data.v === 2 && data.ratchet === true && data.ciphertext) {
       // Size-limit the opaque blob to prevent abuse (~128KB generous ceiling)
@@ -2394,6 +2429,13 @@ io.on('connection', (socket) => {
     if (!socket.roomCode) return;
     // Rate limit sync events (generous for seek but prevents abuse)
     if (!checkRateLimit(socket.id, 40, 60000)) return;
+
+    // ── Encrypted v3 MLS payload: relay opaquely ──
+    if (data && data.v === 3 && data.mls) {
+      if (typeof data.mls !== 'string' || data.mls.length > 65536) return;
+      socket.to(socket.roomCode).emit('media-sync', data);
+      return;
+    }
 
     // ── Encrypted v2 payload: relay opaquely ──
     if (data && data.v === 2 && data.ratchet === true && data.ciphertext) {
@@ -3244,7 +3286,13 @@ io.on('connection', (socket) => {
       if (playerId !== targetMatch.player1.id && playerId !== targetMatch.player2.id) return;
 
       // Determine game data based on tournament game type
-      const gameType = td.gameType;
+      // For mixed tournaments, resolve the game type from the round's assignment
+      let gameType = td.gameType;
+      if (gameType === 'mixed' && td.roundGameTypes) {
+        // Find which round this match is in
+        const matchRound = targetMatch.round || 1;
+        gameType = td.roundGameTypes[matchRound] || td.roundGameTypes[String(matchRound)] || 'chess';
+      }
       const p1 = targetMatch.player1;
       const p2 = targetMatch.player2;
       let gameData;
@@ -3310,19 +3358,15 @@ io.on('connection', (socket) => {
         gameData,
         sender: { id: 'system', nickname: '🏆 Tournament', socketId: 'system' },
         timestamp: new Date().toISOString(),
-        reactions: {}
+        reactions: {},
+        overrideTtl: 0 // Tournament matches never expire
       };
 
       // Save the game message
       const room = await roomManager.getRoom(socket.roomCode);
       if (!room) return;
 
-      // Apply TTL if needed
-      if (room.settings?.messageTTL) {
-        gameMessage.expiresAt = Date.now() + room.settings.messageTTL;
-      }
-      // But active games are exempt from TTL
-      delete gameMessage.expiresAt;
+      // Tournament games are exempt from TTL — never expire until completed
 
       room.messages = room.messages || [];
       room.messages.push(gameMessage);

@@ -59,7 +59,9 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   useEffect(() => {
     messages.forEach(message => {
       const isChess = (message.messageType === 'game' && message.gameData?.gameType === 'chess') || (message.gameData?.type === 'chess');
-      const ttl = isChess ? (message.overrideTtl || 0) : (message.overrideTtl || messageTTL);
+      const isTournament = message.messageType === 'tournament';
+      // Chess and tournament messages never expire (TTL = 0) — only deleted when completed
+      const ttl = (isChess || isTournament) ? (message.overrideTtl || 0) : (message.overrideTtl || messageTTL);
 
       if (ttl && ttl > 0 && message.type !== 'system' && !messageTimers.has(message.id)) {
         const messageTime = new Date(message.timestamp).getTime();

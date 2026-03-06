@@ -1615,6 +1615,23 @@ const ChatRoom = () => {
       }
     }
 
+    // Auto-detect YouTube/SoundCloud URLs and trigger Watch Party
+    {
+      const detected = detectMediaUrl(newMessage.trim());
+      if (detected) {
+        socketManager.emit('media-share', {
+          roomCode,
+          type: detected.type,
+          id: detected.id || null,
+          url: detected.url,
+          sharedBy: currentUser?.nickname || 'Someone'
+        });
+        setShowMediaPlayer(true);
+        setNewMessage('');
+        return;
+      }
+    }
+
     setIsSending(true);
     try {
       let content = newMessage.trim();
