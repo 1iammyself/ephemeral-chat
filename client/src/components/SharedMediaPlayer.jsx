@@ -242,7 +242,7 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
     // Handle rejoin sync response from server
     const handleMediaSyncRestore = (data) => {
       if (!data || typeof data.currentTime !== 'number') return;
-      // Retry until the player is actually ready (YT player needs time to load)
+      // Retry until the player is actually ready (YT player needs time to load after re-init)
       let attempts = 0;
       const trySync = () => {
         attempts++;
@@ -251,8 +251,8 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
         if (yt?.seekTo || sc?.seekTo) {
           seekTo(data.currentTime);
           if (data.isPlaying) playMedia();
-        } else if (attempts < 10) {
-          // Player not ready yet — retry in 500ms (up to 5s total)
+        } else if (attempts < 20) {
+          // Player not ready yet — retry in 500ms (up to 10s total)
           setTimeout(trySync, 500);
         }
       };
@@ -312,25 +312,50 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
       if (!isSafeMediaUrl(parsed.url, type)) return;
       if (type === 'youtube' && (!parsed.id || !/^[a-zA-Z0-9_-]{11}$/.test(parsed.id))) return;
 
-      // If already showing the same media, just request sync for playback position
+      // If already showing the same media, check if player is still alive
+      let needsReinit = false;
       if (mediaInfo && mediaInfo.type === type && mediaInfo.url === parsed.url) {
-        socketManager.emit('media-request-sync');
-        return;
+        const playerAlive = type === 'youtube'
+          ? (ytPlayerRef.current && typeof ytPlayerRef.current.getPlayerState === 'function')
+          : (scWidgetRef.current && typeof scWidgetRef.current.play === 'function');
+
+        if (playerAlive) {
+          // Player is still functional — just sync playback position
+          socketManager.emit('media-request-sync');
+          return;
+        }
+        // Player is dead (e.g. after reconnect) — destroy stale refs and force full re-init
+        console.log('[SharedMediaPlayer] Player dead on reconnect, forcing re-init');
+        destroyPlayer();
+        // Clear mediaInfo so the embed effect re-triggers with a fresh player
+        setMediaInfo(null);
+        needsReinit = true;
       }
 
-      setMediaInfo({
-        type,
-        id: parsed.id || null,
-        url: parsed.url,
-        sharedBy: typeof parsed.sharedBy === 'string' ? parsed.sharedBy.substring(0, 30) : 'Room'
-      });
-      setIsPlaying(false);
-      setCurrentTime(0);
-      setDuration(0);
-      setIsMinimized(false);
+      const applyMedia = () => {
+        setMediaInfo({
+          type,
+          id: parsed.id || null,
+          url: parsed.url,
+          sharedBy: typeof parsed.sharedBy === 'string' ? parsed.sharedBy.substring(0, 30) : 'Room'
+        });
+        setIsPlaying(false);
+        setCurrentTime(0);
+        setDuration(0);
+        setIsMinimized(false);
 
-      // Request current playback position from server so we sync to where others are
-      setTimeout(() => socketManager.emit('media-request-sync'), 500);
+        // Request current playback position from server so we sync to where others are
+        setTimeout(() => socketManager.emit('media-request-sync'), 500);
+      };
+
+      if (needsReinit) {
+        // Delay so React flushes the null mediaInfo before we set it again (same URL)
+        // This ensures the embed effect deps [mediaInfo?.type, mediaInfo?.id, mediaInfo?.url]
+        // transition null → value, causing a re-run and fresh player creation
+        setTimeout(applyMedia, 100);
+      } else {
+        applyMedia();
+      }
     };
 
     restoreMedia();

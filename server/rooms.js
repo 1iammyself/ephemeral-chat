@@ -443,6 +443,10 @@ class RoomManager {
     const isChess = (message.messageType === 'game' && message.gameData?.gameType === 'chess') ||
       (message.gameData?.type === 'chess'); // Compatibility check
     const isFinished = !!message.gameData?.winner || !!message.gameData?.endedAt;
+    const isTournament = message.messageType === 'tournament';
+    const isTournamentGame = message.messageType === 'game' && !!message.gameData?.tournamentRef;
+    // Messages that should NEVER expire (overrideTtl === 0 means "no expiry")
+    const neverExpire = (isChess && !isFinished) || (isTournament && !isFinished) || isTournamentGame || message.overrideTtl === 0;
 
     // Active Chess games NEVER have an expiry
     if (isChess && !isFinished) {
@@ -453,17 +457,14 @@ class RoomManager {
     if (this.redis && room.settings.messageTTL > 0) {
       const messageKey = `message:${roomCode}:${message.id}`;
 
-      // Calculate TTL:
-      // 1. If message has override (e.g. 120s for finished chess)
-      // 2. Otherwise use room default
-      // 3. EXCEPT if it is an active Chess game, then NO TTL (survives until room deletion)
-      let ttl = message.overrideTtl || room.settings.messageTTL;
-
-      if (isChess && !isFinished) {
-        // Active Chess persists until room ends. 
-        // We set to 0 (no expiry) so Redis doesn't auto-delete it. 
+      if (neverExpire) {
+        // Persist without TTL — tournaments, active chess, and tournament games never expire
         await this.redis.set(messageKey, JSON.stringify(message));
       } else {
+        // Calculate TTL:
+        // 1. If message has positive override (e.g. 120s for finished chess), use it
+        // 2. Otherwise use room default
+        let ttl = (message.overrideTtl && message.overrideTtl > 0) ? message.overrideTtl : room.settings.messageTTL;
         await this.redis.setex(messageKey, ttl, JSON.stringify(message));
       }
     } else if (!this.redis) {
@@ -759,6 +760,12 @@ class RoomManager {
         if (isChess && !msg.gameData?.winner && !msg.gameData?.endedAt) {
           return true; // Keep active chess games forever
         }
+
+        // Tournament messages and tournament game messages NEVER expire via pruning
+        if (msg.messageType === 'tournament') return true;
+        if (msg.messageType === 'game' && msg.gameData?.tournamentRef) return true;
+        // Messages with overrideTtl === 0 are "never expire"
+        if (msg.overrideTtl === 0) return true;
 
         // 1. Check if message has its own expiry override
         if (msg.expiresAt) {

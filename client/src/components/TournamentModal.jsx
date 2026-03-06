@@ -30,7 +30,7 @@ const TournamentModal = ({ isOpen, onClose, onCreateTournament, roomVibe, users 
   const [bestOf, setBestOf] = useState(1); // Best of N for RPS
   const [triviaRounds, setTriviaRounds] = useState(5);
   // For mixed tournaments: array of game types per round
-  const [roundGameTypes, setRoundGameTypes] = useState(['chess', 'trivia', 'rock-paper-scissors']);
+  const [roundGameTypes, setRoundGameTypes] = useState(['chess', 'tic-tac-toe', 'rock-paper-scissors']);
 
   // 1v1 games only (trivia is group-based, only allowed in round-robin rounds for mixed)
   const BRACKET_GAME_TYPES = ['tic-tac-toe', 'rock-paper-scissors', 'chess'];
@@ -87,7 +87,7 @@ const TournamentModal = ({ isOpen, onClose, onCreateTournament, roomVibe, users 
     setMaxPlayers(8);
     setBestOf(1);
     setTriviaRounds(5);
-    setRoundGameTypes(['chess', 'trivia', 'rock-paper-scissors']);
+    setRoundGameTypes(['chess', 'tic-tac-toe', 'rock-paper-scissors']);
   };
 
   return (
@@ -173,7 +173,7 @@ const TournamentModal = ({ isOpen, onClose, onCreateTournament, roomVibe, users 
                         }}
                         className={`flex-1 text-sm px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 dark:text-white focus:ring-1 focus:ring-${vibeAccent}-500 outline-none`}
                       >
-                        {TOURNAMENT_GAME_TYPES.map(g => (
+                        {BRACKET_GAME_TYPES.map(g => (
                           <option key={g} value={g}>{GAME_LABELS[g]?.emoji} {GAME_LABELS[g]?.label}</option>
                         ))}
                       </select>

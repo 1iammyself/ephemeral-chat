@@ -2120,19 +2120,20 @@ io.on('connection', (socket) => {
         let roundGameTypesClean = null;
         let gameTypesClean = null;
         if (td.gameType === 'mixed') {
-          const allGameTypes = ['tic-tac-toe', 'rock-paper-scissors', 'chess', 'trivia'];
+          // Mixed tournaments only support 1v1 games (trivia is a group game)
+          const mixedGameTypes = ['tic-tac-toe', 'rock-paper-scissors', 'chess'];
           if (td.roundGameTypes && typeof td.roundGameTypes === 'object') {
             roundGameTypesClean = {};
             for (const [k, v] of Object.entries(td.roundGameTypes)) {
               const rNum = parseInt(k);
               if (isNaN(rNum) || rNum < 1 || rNum > 20) continue;
-              if (!allGameTypes.includes(v)) continue;
+              if (!mixedGameTypes.includes(v)) continue;
               roundGameTypesClean[rNum] = v;
             }
             if (Object.keys(roundGameTypesClean).length === 0) return;
           }
           if (Array.isArray(td.gameTypes)) {
-            gameTypesClean = td.gameTypes.filter(g => allGameTypes.includes(g)).slice(0, 20);
+            gameTypesClean = td.gameTypes.filter(g => mixedGameTypes.includes(g)).slice(0, 20);
             if (gameTypesClean.length === 0) return;
           }
         }
@@ -3214,15 +3215,30 @@ io.on('connection', (socket) => {
           const match = round[matchIdx];
           if (match.status === 'completed') return;
 
-          match.status = 'completed';
           if (isDraw) {
-            match.winner = 'draw';
-          } else {
-            match.winner = winnerId;
+            // In elimination tournaments, draws reset the match for a rematch
+            match.winner = null;
+            match.status = 'pending';
+            match.gameMessageId = null;
+            if (!td.matchHistory) td.matchHistory = [];
+            td.matchHistory.push({
+              matchId,
+              winnerId: null,
+              isDraw: true,
+              summary: `${match.player1?.nickname || 'P1'} vs ${match.player2?.nickname || 'P2'} — Draw 🤝 (Rematch!)`,
+              timestamp: Date.now()
+            });
+            await roomManager.saveMessage(roomCode, message);
+            io.to(roomCode).emit('message-updated', message);
+            logger.info(`🏆 Tournament match ${matchId} was a draw — rematch scheduled (double-elim)`);
+            return;
           }
+
+          match.status = 'completed';
+          match.winner = winnerId;
           matchFound = true;
 
-          if (!isDraw) {
+          {
             const winnerPlayer = match.player1?.id === winnerId ? match.player1 : match.player2;
             const loserPlayer = match.player1?.id === winnerId ? match.player2 : match.player1;
 
@@ -3278,9 +3294,29 @@ io.on('connection', (socket) => {
           matchFound = true;
 
           if (isDraw) {
-            match.winner = 'draw';
+            // In elimination tournaments, draws reset the match for a rematch
+            match.winner = null;
+            match.status = 'pending';
+            match.gameMessageId = null; // Allow a new game to be created
+            matchFound = true;
+
+            // Record the draw in history but don't block advancement
+            if (!td.matchHistory) td.matchHistory = [];
+            td.matchHistory.push({
+              matchId,
+              winnerId: null,
+              isDraw: true,
+              summary: `${match.player1?.nickname || 'P1'} vs ${match.player2?.nickname || 'P2'} — Draw 🤝 (Rematch!)`,
+              timestamp: Date.now()
+            });
+
+            await roomManager.saveMessage(roomCode, message);
+            io.to(roomCode).emit('message-updated', message);
+            logger.info(`🏆 Tournament match ${matchId} was a draw — rematch scheduled`);
+            return; // Skip the normal flow — match resets for rematch
           } else {
             match.winner = winnerId;
+            match.status = 'completed';
             const winnerPlayer = match.player1?.id === winnerId ? match.player1 : match.player2;
             if (r < rounds.length - 1) {
               const nextMatch = rounds[r + 1][Math.floor(matchIdx / 2)];
@@ -3379,21 +3415,43 @@ io.on('connection', (socket) => {
       // and is still pending should be auto-created as a game message.
       if (td.status === 'in-progress' && td.gameType !== 'trivia') {
         const readyMatches = [];
-        const allR = [];
-        if (td.bracket.rounds) allR.push(...td.bracket.rounds);
-        if (td.bracket.winnersRounds) allR.push(...td.bracket.winnersRounds);
-        if (td.bracket.losersRounds) allR.push(...td.bracket.losersRounds);
-        if (td.bracket.grandFinals) allR.push(td.bracket.grandFinals);
-        for (const round of allR) {
-          if (!Array.isArray(round)) continue;
-          for (const m of round) {
-            if (m.player1 && m.player2 && m.status === 'pending' && !m.gameMessageId) {
-              readyMatches.push(m);
+
+        if (td.format === 'round-robin' && td.bracket.rounds) {
+          // Round-robin: only auto-start matches in the EARLIEST incomplete round
+          for (const round of td.bracket.rounds) {
+            if (!Array.isArray(round)) continue;
+            const roundDone = round.every(m => m.status === 'completed' || m.status === 'bye');
+            if (!roundDone) {
+              // This is the current round — find ready matches in it
+              for (const m of round) {
+                if (m.player1 && m.player2 && m.status === 'pending' && !m.gameMessageId) {
+                  readyMatches.push(m);
+                }
+              }
+              break; // Only process one round at a time
+            }
+          }
+        } else {
+          // Elimination: find any ready match across all rounds
+          const allR = [];
+          if (td.bracket.rounds) allR.push(...td.bracket.rounds);
+          if (td.bracket.winnersRounds) allR.push(...td.bracket.winnersRounds);
+          if (td.bracket.losersRounds) allR.push(...td.bracket.losersRounds);
+          if (td.bracket.grandFinals) allR.push(td.bracket.grandFinals);
+          for (const round of allR) {
+            if (!Array.isArray(round)) continue;
+            for (const m of round) {
+              if (m.player1 && m.player2 && m.status === 'pending' && !m.gameMessageId) {
+                readyMatches.push(m);
+              }
             }
           }
         }
 
-        for (const readyMatch of readyMatches) {
+        logger.info(`🏆 Auto-advance scan: ${readyMatches.length} ready match(es) found in room ${roomCode}`);
+
+        for (let ri = 0; ri < readyMatches.length; ri++) {
+          const readyMatch = readyMatches[ri];
           try {
             // Determine game type for this match (mixed tournaments have per-round types)
             let gt = td.gameType;
@@ -3444,7 +3502,7 @@ io.on('connection', (socket) => {
               ? ` (Round ${readyMatch.round || '?'})` : '';
 
             const gameMessage = {
-              id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              id: `msg_${Date.now()}_${ri}_${Math.random().toString(36).substr(2, 9)}`,
               content: `🏆 Tournament${roundLabel}: ${p1.nickname} vs ${p2.nickname} — ${gameTypeName}`,
               messageType: 'game',
               gameData,
