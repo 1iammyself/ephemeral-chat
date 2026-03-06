@@ -257,11 +257,20 @@ const TournamentMessage = ({ message, currentUser, onJoinTournament, onStartTour
         )}
 
         {/* Ready matches for current user (round-robin or bracket) */}
-        {isInProgress && readyMatches.length > 0 && (
+        {/* Ready match action buttons — skip for pure trivia tournaments (trivia uses question/answer UI instead) */}
+        {isInProgress && readyMatches.length > 0 && gameType !== 'trivia' && (
           <div className="space-y-1">
             {readyMatches
               .filter(m => m.player1?.id === currentUserId || m.player2?.id === currentUserId)
               .filter(m => !m.gameMessageId)
+              .filter(m => {
+                // For mixed tournaments, skip matches whose round is trivia
+                if (isMixed && roundGameTypes) {
+                  const rgt = roundGameTypes[m.round] || roundGameTypes[String(m.round)];
+                  if (rgt === 'trivia') return false;
+                }
+                return true;
+              })
               .map(m => {
                 const opponent = m.player1?.id === currentUserId ? m.player2 : m.player1;
                 // For mixed tournaments, show the game type for this round

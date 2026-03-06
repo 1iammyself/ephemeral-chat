@@ -2956,8 +2956,8 @@ io.on('connection', (socket) => {
           rounds: [], // Will be populated as questions are submitted
           status: 'waiting-question' // waiting-question, answering, round-complete
         };
-        // Override bracket for trivia (bracket is unused, trivia uses triviaData)
-        td.bracket = td.bracket || { rounds: [], standings: [] };
+        // Override bracket for trivia — trivia uses triviaData scores, not 1v1 matches
+        td.bracket = { rounds: [], standings: [] };
       }
 
       td.status = 'in-progress';
@@ -3299,7 +3299,7 @@ io.on('connection', (socket) => {
         if (!matchFound) return;
       }
 
-      // Build result summary for the notification
+      // Build result summary for match history (no longer sent as a separate chat message)
       let matchSummary = '';
       let winnerNickname = '';
       let loserNickname = '';
@@ -3342,30 +3342,9 @@ io.on('connection', (socket) => {
 
       logger.info(`🏆 Tournament match ${matchId} result recorded in room ${roomCode} — ${matchSummary}`);
 
-      // ── Send a system notification about the match result ──
-      if (matchSummary) {
-        const resultNotification = {
-          id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          content: `🏆 ${td.name}: ${matchSummary}`,
-          messageType: 'notification',
-          sender: { id: 'system', nickname: 'Tournament', socketId: 'system' },
-          timestamp: new Date().toISOString(),
-          reactions: {},
-          overrideTtl: 300 // 5 min TTL for notifications
-        };
-        const room = await roomManager.getRoom(roomCode);
-        if (room) {
-          room.messages = room.messages || [];
-          room.messages.push(resultNotification);
-          await roomManager.saveRoom(roomCode, room);
-          io.to(roomCode).emit('new-message', resultNotification);
-        }
-      }
-
-      // ── If tournament is complete, announce the champion ──
+      // ── If tournament is complete, announce the champion + apply TTL ──
       if (td.status === 'completed') {
         logger.info(`🏆 Tournament COMPLETED in room ${roomCode}!`);
-        // Send champion announcement
         let championName = winnerNickname;
         if (!championName && td.format === 'round-robin' && td.bracket.standings) {
           const sorted = [...td.bracket.standings].sort((a, b) => b.points - a.points || b.wins - a.wins);
@@ -3387,6 +3366,111 @@ io.on('connection', (socket) => {
             room2.messages.push(champMsg);
             await roomManager.saveRoom(roomCode, room2);
             io.to(roomCode).emit('new-message', champMsg);
+          }
+        }
+        // Tournament message itself can now use room's default TTL
+        // (remove the overrideTtl: 0 by not setting one — the room's
+        //  normal message TTL will be applied on the next cleanup cycle)
+        return; // No auto-advance needed — tournament is done
+      }
+
+      // ── Auto-advance: find newly ready matches and auto-start them ──
+      // After the bracket has been updated, any match that now has both players
+      // and is still pending should be auto-created as a game message.
+      if (td.status === 'in-progress' && td.gameType !== 'trivia') {
+        const readyMatches = [];
+        const allR = [];
+        if (td.bracket.rounds) allR.push(...td.bracket.rounds);
+        if (td.bracket.winnersRounds) allR.push(...td.bracket.winnersRounds);
+        if (td.bracket.losersRounds) allR.push(...td.bracket.losersRounds);
+        if (td.bracket.grandFinals) allR.push(td.bracket.grandFinals);
+        for (const round of allR) {
+          if (!Array.isArray(round)) continue;
+          for (const m of round) {
+            if (m.player1 && m.player2 && m.status === 'pending' && !m.gameMessageId) {
+              readyMatches.push(m);
+            }
+          }
+        }
+
+        for (const readyMatch of readyMatches) {
+          try {
+            // Determine game type for this match (mixed tournaments have per-round types)
+            let gt = td.gameType;
+            if (gt === 'mixed' && td.roundGameTypes) {
+              const mr = readyMatch.round || 1;
+              gt = td.roundGameTypes[mr] || td.roundGameTypes[String(mr)] || 'chess';
+            }
+            if (gt === 'trivia') continue; // Trivia is handled differently
+
+            const p1 = readyMatch.player1;
+            const p2 = readyMatch.player2;
+            let gameData;
+            if (gt === 'tic-tac-toe') {
+              gameData = {
+                gameType: 'tic-tac-toe',
+                board: Array(9).fill(null),
+                players: { X: { id: p1.id, socketId: null, name: p1.nickname }, O: { id: p2.id, socketId: null, name: p2.nickname } },
+                turn: 'X', winner: null, winningLine: null, lastActivity: Date.now()
+              };
+            } else if (gt === 'rock-paper-scissors') {
+              gameData = {
+                gameType: 'rock-paper-scissors',
+                players: { P1: { id: p1.id, socketId: null, name: p1.nickname, move: null }, P2: { id: p2.id, socketId: null, name: p2.nickname, move: null } },
+                scores: { P1: 0, P2: 0 }, rounds: [], winner: null, bestOf: td.bestOf || 3, lastActivity: Date.now()
+              };
+            } else if (gt === 'chess') {
+              gameData = {
+                gameType: 'chess',
+                fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+                players: { white: { id: p1.id, socketId: null, name: p1.nickname }, black: { id: p2.id, socketId: null, name: p2.nickname } },
+                turn: 'w', history: [], winner: null, lastActivity: Date.now()
+              };
+            } else {
+              continue;
+            }
+
+            gameData.tournamentRef = {
+              tournamentMessageId: messageId,
+              matchId: readyMatch.id,
+              matchRound: readyMatch.round || 1,
+              player1Id: p1.id,
+              player2Id: p2.id
+            };
+
+            const gameTypeName = gt === 'tic-tac-toe' ? 'Tic-Tac-Toe' :
+              gt === 'rock-paper-scissors' ? 'Rock Paper Scissors' : 'Chess';
+            const roundLabel = (td.gameType === 'mixed' && td.roundGameTypes)
+              ? ` (Round ${readyMatch.round || '?'})` : '';
+
+            const gameMessage = {
+              id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              content: `🏆 Tournament${roundLabel}: ${p1.nickname} vs ${p2.nickname} — ${gameTypeName}`,
+              messageType: 'game',
+              gameData,
+              sender: { id: 'system', nickname: 'Tournament', socketId: 'system' },
+              timestamp: new Date().toISOString(),
+              reactions: {},
+              overrideTtl: 0
+            };
+
+            const room = await roomManager.getRoom(roomCode);
+            if (room) {
+              room.messages = room.messages || [];
+              room.messages.push(gameMessage);
+              await roomManager.saveRoom(roomCode, room);
+
+              readyMatch.gameMessageId = gameMessage.id;
+              readyMatch.status = 'in-progress';
+              await roomManager.saveMessage(roomCode, message);
+
+              io.to(roomCode).emit('new-message', gameMessage);
+              io.to(roomCode).emit('message-updated', message);
+
+              logger.info(`🏆 Auto-started next match: ${p1.nickname} vs ${p2.nickname} (${gameTypeName}) in room ${roomCode}`);
+            }
+          } catch (autoErr) {
+            logger.error('Error auto-starting tournament match:', autoErr);
           }
         }
       }

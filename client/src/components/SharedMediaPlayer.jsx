@@ -242,13 +242,22 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
     // Handle rejoin sync response from server
     const handleMediaSyncRestore = (data) => {
       if (!data || typeof data.currentTime !== 'number') return;
-      // Delay slightly to allow the player to initialize first
-      setTimeout(() => {
-        seekTo(data.currentTime);
-        if (data.isPlaying) {
-          playMedia();
+      // Retry until the player is actually ready (YT player needs time to load)
+      let attempts = 0;
+      const trySync = () => {
+        attempts++;
+        const yt = ytPlayerRef.current;
+        const sc = scWidgetRef.current;
+        if (yt?.seekTo || sc?.seekTo) {
+          seekTo(data.currentTime);
+          if (data.isPlaying) playMedia();
+        } else if (attempts < 10) {
+          // Player not ready yet — retry in 500ms (up to 5s total)
+          setTimeout(trySync, 500);
         }
-      }, 1500);
+      };
+      // First attempt after 1s to give embed time to initialize
+      setTimeout(trySync, 1000);
     };
 
     socketManager.on('media-share', handleMediaShare);
@@ -269,6 +278,10 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
   // ─── Restore persisted media state on reconnect ────────────────────
   useEffect(() => {
     if (!initialMedia) return;
+
+    // If the media blob is encrypted, wait until the AES/MLS key is ready
+    const isEncrypted = (initialMedia.v === 4 && initialMedia.ct) || (initialMedia.v === 3 && initialMedia.mls);
+    if (isEncrypted && !mlsReady) return; // will re-run when mlsReady flips to true
 
     const restoreMedia = async () => {
       let parsed;
@@ -321,7 +334,7 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
     };
 
     restoreMedia();
-  }, [initialMedia]);
+  }, [initialMedia, mlsReady]);
 
   // ─── Embed player when media changes ──────────────────────────────
   useEffect(() => {
@@ -679,12 +692,6 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
             if (controlsHideTimerRef.current) clearTimeout(controlsHideTimerRef.current);
             controlsHideTimerRef.current = setTimeout(() => setShowControls(false), 3000);
           }}
-          onClick={(e) => {
-            // Click on video area (not controls) toggles play/pause
-            if (e.target === playerContainerRef.current || e.target.id === 'shared-media-embed' || e.target.tagName === 'IFRAME') {
-              handlePlayPause();
-            }
-          }}
         >
           {mediaInfo.type === 'youtube' ? (
             <div id="shared-media-embed" className="w-full h-full" />
@@ -700,18 +707,27 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
             />
           )}
 
-          {/* Overlay: big play/pause button center */}
+          {/* Overlay: transparent click-catcher + big play/pause button center.
+              The iframe captures clicks in its own browsing context, so we need
+              a div on top of it to intercept taps/clicks and route them through
+              our synced handlePlayPause instead of YouTube's local toggle. */}
           <div
-            className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}
+            className="absolute inset-0 z-10 cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePlayPause();
+            }}
           >
-            <div className={`p-3 rounded-full bg-black/50 backdrop-blur-sm ${isPlaying ? 'opacity-0' : 'opacity-80'} transition-opacity`}>
-              <Play className="w-8 h-8 text-white ml-1" />
+            <div className={`w-full h-full flex items-center justify-center transition-opacity duration-300 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}>
+              <div className={`p-3 rounded-full bg-black/50 backdrop-blur-sm ${isPlaying ? 'opacity-0' : 'opacity-80'} transition-opacity`}>
+                {isPlaying ? <Pause className="w-8 h-8 text-white" /> : <Play className="w-8 h-8 text-white ml-1" />}
+              </div>
             </div>
           </div>
 
-          {/* Overlay: bottom controls bar */}
+          {/* Overlay: bottom controls bar — z-20 to sit above click-catcher (z-10) */}
           <div
-            className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 pt-6 pb-2 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}
+            className={`absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 pt-6 pb-2 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Progress bar */}
