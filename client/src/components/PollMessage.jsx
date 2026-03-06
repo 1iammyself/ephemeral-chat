@@ -241,7 +241,7 @@ const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
                                         onChange={(e) => setCustomText(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && handleCustomAnswer()}
                                         placeholder="Type your answer..."
-                                        className={`flex-1 text-xs sm:text-sm px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 dark:text-white focus:ring-1 focus:ring-${accentColor}-500 focus:border-${accentColor}-500 outline-none`}
+                                        className={`flex-1 text-xs sm:text-sm text-gray-900 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 dark:text-white focus:ring-1 focus:ring-${accentColor}-500 focus:border-${accentColor}-500 outline-none`}
                                         maxLength={100}
                                         autoFocus
                                     />

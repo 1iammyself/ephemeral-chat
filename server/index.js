@@ -1963,7 +1963,6 @@ io.on('connection', (socket) => {
         const sanitizedQuestion = sanitizeInput(pollData.question.trim());
         const sanitizedOptions = pollData.options
           .map(opt => {
-            // Support both plain strings and { text, followUps } objects from PollModal
             if (typeof opt === 'string') return { text: opt.trim(), followUps: [] };
             if (opt && typeof opt === 'object' && typeof opt.text === 'string') {
               return { text: opt.text.trim(), followUps: Array.isArray(opt.followUps) ? opt.followUps.filter(f => typeof f === 'string' && f.trim()) : [] };
@@ -1972,12 +1971,25 @@ io.on('connection', (socket) => {
           })
           .filter(opt => opt && opt.text.length > 0)
           .slice(0, 5) // Max 5 options
-          .map((opt, idx) => ({
-            id: `opt_${Date.now()}_${idx}`,
-            text: sanitizeInput(opt.text),
-            followUps: opt.followUps.map(f => sanitizeInput(f)),
-            votes: []
-          }));
+          .map((opt, idx) => {
+            const followUpOpts = opt.followUps.map(f => sanitizeInput(f)).filter(Boolean);
+            const subPoll = followUpOpts.length > 0 ? {
+              question: `Follow-up choice`,
+              allowMultiple: false,
+              options: followUpOpts.slice(0, 5).map((fu, fIdx) => ({
+                id: `sub_${Date.now()}_${idx}_${fIdx}`,
+                text: fu,
+                votes: []
+              }))
+            } : undefined;
+
+            return {
+              id: `opt_${Date.now()}_${idx}`,
+              text: sanitizeInput(opt.text),
+              subPoll,
+              votes: []
+            };
+          });
 
         if (!sanitizedQuestion || sanitizedOptions.length < 2) {
           socket.emit('error', { message: 'Poll must have a question and at least 2 options' });

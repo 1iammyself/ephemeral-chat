@@ -1562,8 +1562,9 @@ const ChatRoom = () => {
     socketManager.emit('kick-user', { targetUserId, roomCode });
   };
 
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
+  // Core send logic — called directly (no event needed)
+  // This avoids the form submission pipeline that causes Android keyboard blur flash
+  const doSendMessage = async () => {
     if (!newMessage.trim() || isSending || !isConnected) return;
 
     // 1. Handle Slash Commands
@@ -1581,49 +1582,27 @@ const ChatRoom = () => {
           let initialGame = null;
 
           if (['ttt', 'tic-tac-toe', 'tictactoe'].includes(gameArg)) {
-            if (selectedRecipients.length > 1) {
-              setError('Tic Tac Toe can only be sent to one person.');
-              return;
-            }
-            handleSendGame({ gameType: 'tic-tac-toe' });
-            setNewMessage('');
-            return;
+            if (selectedRecipients.length > 1) { setError('Tic Tac Toe can only be sent to one person.'); return; }
+            handleSendGame({ gameType: 'tic-tac-toe' }); setNewMessage(''); return;
           } else if (['chess'].includes(gameArg)) {
-            if (selectedRecipients.length > 1) {
-              setError('Chess can only be sent to one person.');
-              return;
-            }
-            handleSendGame({ gameType: 'chess' });
-            setNewMessage('');
-            return;
+            if (selectedRecipients.length > 1) { setError('Chess can only be sent to one person.'); return; }
+            handleSendGame({ gameType: 'chess' }); setNewMessage(''); return;
           } else if (['wyr', 'would-you-rather', 'wouldyourather'].includes(gameArg)) {
             initialGame = 'would-you-rather';
           } else if (['trivia', 'quiz'].includes(gameArg)) {
             initialGame = 'trivia';
           } else if (['rps', 'rock-paper-scissors'].includes(gameArg)) {
-            if (selectedRecipients.length > 1) {
-              setError('Rock Paper Scissors can only be sent to one person.');
-              return;
-            }
-            handleSendGame({ gameType: 'rock-paper-scissors' });
-            setNewMessage('');
-            return;
+            if (selectedRecipients.length > 1) { setError('Rock Paper Scissors can only be sent to one person.'); return; }
+            handleSendGame({ gameType: 'rock-paper-scissors' }); setNewMessage(''); return;
           }
 
           setInitialGameType(initialGame);
           setShowGameModal(true);
-
-          if (cmd === '/games') {
-            setNewMessage('');
-            return;
-          }
+          if (cmd === '/games') { setNewMessage(''); return; }
           break;
         case '/call':
-          if (users.length > 7) {
-            setError('Voice calls are disabled in rooms with more than 7 users for stability.');
-          } else {
-            handleStartCall();
-          }
+          if (users.length > 7) setError('Voice calls are disabled in rooms with more than 7 users for stability.');
+          else handleStartCall();
           break;
         case '/photo':
         case '/image': fileInputRef.current?.click(); break;
@@ -1653,44 +1632,26 @@ const ChatRoom = () => {
         case '/media':
         case '/watch':
         case '/watchparty':
-          // If user passed a URL, auto-share it; otherwise just show the player
           if (args) {
             const detected = detectMediaUrl(args);
             if (detected) {
-              socketManager.emit('media-share', {
-                roomCode,
-                type: detected.type,
-                id: detected.id || null,
-                url: detected.url,
-                sharedBy: currentUser?.nickname || 'Someone',
-              });
-            } else {
-              setError('Paste a YouTube or SoundCloud URL after /media');
-            }
+              socketManager.emit('media-share', { roomCode, type: detected.type, id: detected.id || null, url: detected.url, sharedBy: currentUser?.nickname || 'Someone' });
+            } else setError('Paste a YouTube or SoundCloud URL after /media');
           }
           setShowMediaPlayer(true);
           break;
-        case '/tournament':
-          setShowTournamentModal(true);
-          break;
-        default:
-          // Just send as regular message if not a valid command
-          break;
+        case '/tournament': setShowTournamentModal(true); break;
+        default: break;
       }
       if (cmd.startsWith('/')) {
         const isValid = SLASH_COMMANDS.some(c => c.value === cmd);
-        if (isValid) {
-          if (cmd !== '/ice') setNewMessage('');
-          return;
-        }
+        if (isValid) { if (cmd !== '/ice') setNewMessage(''); return; }
       }
     }
 
     setIsSending(true);
     try {
       let content = newMessage.trim();
-
-      // Handle Mentions for Targeted Delivery
       const mentionMatches = content.match(/@(\w+)/g) || [];
       const mentionedSocketIds = mentionMatches.map(m => {
         const nick = m.substring(1).toLowerCase();
@@ -1698,29 +1659,18 @@ const ChatRoom = () => {
         return user?.socketId;
       }).filter(Boolean);
 
-      // Strip leading mentions from content before sending
-      // This allows @nick to stay in the middle of a sentence, but clears it as a routing prefix
       if (mentionMatches.length > 0) {
         let strippedContent = content;
         let changed = true;
         while (changed) {
           changed = false;
           const match = strippedContent.match(/^@\w+\s*/);
-          if (match) {
-            strippedContent = strippedContent.substring(match[0].length);
-            changed = true;
-          }
+          if (match) { strippedContent = strippedContent.substring(match[0].length); changed = true; }
         }
-        // Only use stripped content if we didn't wipe everything out
-        if (strippedContent.trim()) {
-          content = strippedContent.trim();
-        }
+        if (strippedContent.trim()) content = strippedContent.trim();
       }
 
-      // If mentions exist, they take precedence
       const finalRecipients = mentionedSocketIds.length > 0 ? mentionedSocketIds : selectedRecipients;
-
-      // ─── AES-GCM encryption ──────────────────────────────
 
       let v2Payload;
       try {
@@ -1737,10 +1687,9 @@ const ChatRoom = () => {
         sender: replyingTo.sender.nickname
       } : null;
 
-      // ─── Send MLS v3 encrypted payload ────────────────
       await withJitter(() => {
         socketManager.emit('send-message', {
-          ...v2Payload,   // { v: 3, mls: base64Ciphertext, isEncrypted: true }
+          ...v2Payload,
           messageType: 'text',
           recipients: finalRecipients,
           replyTo: replyData,
@@ -1750,20 +1699,23 @@ const ChatRoom = () => {
         });
       });
 
-      // Clear override after one use
       if (overrideTtl) setOverrideTtl(false);
-
       if (!isStealthMode) socketManager.emit('user-activity');
-      hapticLight(); // Haptic feedback on message send
+      hapticLight();
       setNewMessage('');
       setReplyingTo(null);
-      // Re-focus the input so the mobile keyboard stays visible
-      setTimeout(() => messageInputRef.current?.focus(), 30);
+      // Do NOT call focus() here — the input never loses focus because we don't go through form submit
     } catch (error) {
       setError('Failed to send message');
     } finally {
       setIsSending(false);
     }
+  };
+
+  // Form onSubmit wrapper (handles Enter key on desktop)
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    doSendMessage();
   };
 
   const handleSendPoll = (pollData) => {
@@ -2445,7 +2397,7 @@ const ChatRoom = () => {
         </div>
       </div>
 
-      <div className="absolute top-[84px] sm:top-[100px] left-0 right-0 z-40 flex flex-col items-center space-y-2 pointer-events-none transition-all duration-300">
+      <div className="absolute top-[84px] sm:top-[100px] right-2 sm:right-6 left-auto z-40 flex flex-col items-end space-y-2 pointer-events-none transition-all duration-300">
         {/* Ambient Player / Mood DJ */}
         {getVibeById(roomVibe)?.moodSound && (
           <div className="pointer-events-auto animate-in slide-in-from-top-2">
@@ -2930,18 +2882,9 @@ const ChatRoom = () => {
                       onMouseDown={(e) => e.preventDefault()}
                       onTouchStart={(e) => {
                         e.preventDefault();
-                        if (!newMessage.trim() || !isConnected || isSending) return;
-                        // Focus BEFORE submitting so keyboard never sees a blur
-                        messageInputRef.current?.focus();
-                        const form = messageInputRef.current?.closest('form');
-                        if (form) form.requestSubmit();
+                        doSendMessage();
                       }}
-                      onClick={() => {
-                        if (!newMessage.trim() || !isConnected || isSending) return;
-                        messageInputRef.current?.focus();
-                        const form = messageInputRef.current?.closest('form');
-                        if (form) form.requestSubmit();
-                      }}
+                      onClick={doSendMessage}
                       disabled={!newMessage.trim() || !isConnected || isSending}
                       className={`flex-shrink-0 ml-1 sm:ml-2 ${getVibeById(roomVibe).accentClass} h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
                     >

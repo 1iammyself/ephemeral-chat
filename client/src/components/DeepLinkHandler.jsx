@@ -33,18 +33,32 @@ const DeepLinkHandler = () => {
         const handleUrl = (urlStr) => {
             try {
                 const url = new URL(urlStr);
-                // Construct the full path: /invite/token...
-                // slug is often just pathname if no query/hash, but we want to be safe
-                const slug = url.pathname + url.search + url.hash;
+
+                // For custom schemes like ephemeral://invite/TOKEN:
+                // new URL() parses 'invite' as the hostname and '/TOKEN' as the pathname.
+                // We must join them to reconstruct the correct React Router slug: /invite/TOKEN
+                //
+                // For https:// links the hostname is the domain and should NOT be included.
+                const isCustomScheme = !['https:', 'http:'].includes(url.protocol);
+
+                let slug;
+                if (isCustomScheme && url.hostname) {
+                    // e.g. ephemeral://invite/TOKEN → hostname='invite', pathname='/TOKEN'
+                    slug = '/' + url.hostname + url.pathname + url.search + url.hash;
+                } else {
+                    // Standard https: link — just use the path portion
+                    slug = url.pathname + url.search + url.hash;
+                }
+
+                // Normalise double slashes just in case
+                slug = slug.replace(/\/\//g, '/');
 
                 if (slug && slug !== '/') {
-                    console.log('Navigating to deep link slug:', slug);
-                    // toast.info(`Deep link received: ${slug}`); // Optional feedback for user
-                    // Use replace to avoid polluting history on initial launch
+                    console.log('[DeepLink] Navigating to:', slug);
                     navigate(slug, { replace: true });
                 }
             } catch (e) {
-                console.error('Error parsing deep link URL:', e);
+                console.error('[DeepLink] Error parsing URL:', e);
             }
         };
 
