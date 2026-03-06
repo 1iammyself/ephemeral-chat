@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, ExternalLink, Loader2 } from 'lucide-react';
 import socketManager from '../socket';
+import { downloadFileOnDevice } from '../utils/downloadHelper';
+import { isCapacitor } from '../utils/platform';
 
 const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNickname = '' }) => {
     const [isLoading, setIsLoading] = useState(true);
@@ -69,6 +71,65 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNick
         };
     }, [roomCode, recipients]);
 
+    // ─── Bridge: Handle download requests from e2ecp iframe ───────────
+    // The e2ecp iframe can't use Capacitor plugins directly (no native bridge in iframes).
+    // Instead, it sends a postMessage with the file data, and we perform the download
+    // using the parent window's working Capacitor Filesystem + FileOpener.
+    const iframeRef = useRef(null);
+
+    const handleIframeDownloadRequest = useCallback(async (event) => {
+        // Only handle our specific message type
+        if (!event.data || event.data.type !== 'e2ecp-download-request') return;
+
+        const { requestId, fileName, mimeType, base64Data } = event.data;
+
+        if (!base64Data || !requestId) {
+            console.warn('[FileTransferModal] Invalid download request from iframe');
+            return;
+        }
+
+        try {
+            // Convert base64 back to Blob
+            const byteCharacters = atob(base64Data);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: mimeType || 'application/octet-stream' });
+
+            // Use the working download helper (has Capacitor native bridge access)
+            await downloadFileOnDevice(blob, fileName, mimeType);
+
+            // Send success response back to the iframe
+            event.source?.postMessage({
+                type: 'e2ecp-download-response',
+                requestId,
+                success: true,
+            }, '*');
+        } catch (err) {
+            console.error('[FileTransferModal] Download bridge error:', err);
+
+            // Send error response back to the iframe
+            event.source?.postMessage({
+                type: 'e2ecp-download-response',
+                requestId,
+                success: false,
+                error: err.message || 'Download failed',
+            }, '*');
+        }
+    }, []);
+
+    useEffect(() => {
+        // Only set up the bridge when running in Capacitor (native app)
+        if (!isCapacitor) return;
+
+        window.addEventListener('message', handleIframeDownloadRequest);
+        return () => {
+            window.removeEventListener('message', handleIframeDownloadRequest);
+        };
+    }, [handleIframeDownloadRequest]);
+
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white dark:bg-gray-900 w-[95vw] max-w-4xl h-[85vh] sm:h-[80vh] rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col border border-gray-200 dark:border-gray-800 animate-in zoom-in-95 duration-200 overflow-hidden">
@@ -110,6 +171,7 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNick
                         </div>
                     )}
                     <iframe
+                        ref={iframeRef}
                         src={url}
                         className="w-full h-full border-0"
                         title="Encrypted File Transfer"

@@ -2095,14 +2095,28 @@ export default function App() {
                                             <span className="text-sm font-bold truncate dark:text-white" title={downloadName}>{downloadName}</span>
                                         </div>
                                     </div>
-                                    <a
-                                        href={downloadUrl}
-                                        download={downloadName}
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            try {
+                                                if (pendingDownload?.blob) {
+                                                    await downloadFileOnDevice(pendingDownload.blob, downloadName, pendingDownload.mimeType);
+                                                } else {
+                                                    // Fallback: re-fetch from the blob URL
+                                                    const resp = await fetch(downloadUrl);
+                                                    const blob = await resp.blob();
+                                                    await downloadFileOnDevice(blob, downloadName, blob.type);
+                                                }
+                                            } catch (err) {
+                                                console.error("Re-download failed:", err);
+                                                toast.error("Download failed");
+                                            }
+                                        }}
                                         className="btn-primary flex items-center gap-2 whitespace-nowrap w-full sm:w-auto justify-center"
                                     >
                                         <i className="fas fa-download"></i>
                                         DOWNLOAD
-                                    </a>
+                                    </button>
                                 </div>
                             )}
                         </div>

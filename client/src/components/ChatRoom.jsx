@@ -484,6 +484,32 @@ const ChatRoom = () => {
   }, [roomCode]);
 
   const messageInputRef = useRef(null);
+  // Guard flag: while true, prevent focusout from dismissing the keyboard.
+  // This is set during doSendMessage so the controlled-input re-render
+  // (setNewMessage('')) doesn't trigger a keyboard dismiss→reopen flash.
+  const sendingGuardRef = useRef(false);
+
+  // Attach a capturing focusout blocker on the message input.
+  // When sendingGuardRef is true (we're in the middle of doSendMessage),
+  // the input's blur is intercepted: we cancel the event and immediately
+  // re-focus so Android never sees the blur and never dismisses the keyboard.
+  useEffect(() => {
+    const input = messageInputRef.current;
+    if (!input) return;
+
+    const blockBlurDuringSend = (e) => {
+      if (sendingGuardRef.current) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        // Synchronously re-focus before Android can react
+        input.focus();
+      }
+    };
+
+    // Use capturing phase so we intercept before anything else
+    input.addEventListener('blur', blockBlurDuringSend, true);
+    return () => input.removeEventListener('blur', blockBlurDuringSend, true);
+  });
 
   useEffect(() => {
     if (!activeTimer) {
@@ -1653,24 +1679,34 @@ const ChatRoom = () => {
       if (!isStealthMode) socketManager.emit('user-activity');
       hapticLight();
 
-      // Clear message and keep keyboard open.
-      // On Android, setNewMessage('') + focus() in the same tick can cause a
-      // brief keyboard dismiss flash because React re-renders the controlled input.
-      // Fix: clear the native input value immediately (prevents visual flash),
-      // then update React state, then re-assert focus after React paints.
+      // ── Clear message while keeping keyboard open ──
+      // Problem: setNewMessage('') re-renders the controlled <input>, which on
+      // Android briefly blurs it → keyboard dismisses → body expands (white flash)
+      // → focus() re-opens keyboard → body shrinks again.
+      //
+      // Solution: enable sendingGuardRef so our blur-interceptor (attached in
+      // useEffect above) blocks the blur event before Android sees it.
+      sendingGuardRef.current = true;
+
       if (messageInputRef.current) {
         messageInputRef.current.value = '';          // instant visual clear
       }
       setNewMessage('');
       setReplyingTo(null);
-      // Re-focus after React finishes re-rendering
+
+      // Re-focus synchronously, then drop the guard after one frame
+      // (once React has finished the re-render and the input is stable).
+      messageInputRef.current?.focus();
       requestAnimationFrame(() => {
-        messageInputRef.current?.focus();
+        messageInputRef.current?.focus();            // belt-and-suspenders
+        sendingGuardRef.current = false;
       });
     } catch (error) {
       setError('Failed to send message');
     } finally {
       setIsSending(false);
+      // Always drop the guard so normal blur behavior is restored
+      sendingGuardRef.current = false;
     }
   };
 

@@ -2,19 +2,56 @@
  * Universal file download helper for E2ECP
  *
  * Handles file downloads across all platforms:
- *   1. Capacitor native app → Filesystem + FileOpener (save to device + open)
+ *   1. Capacitor native app (iframe inside Capacitor WebView)
+ *      → postMessage to parent window, which uses Filesystem + FileOpener
  *   2. Mobile web (Chrome Android / Safari) → navigator.share with File
  *   3. Desktop browser → <a download> click
  *
- * Adapted from the working Claim Drop download logic.
+ * KEY INSIGHT: The e2ecp web app runs inside an iframe in the Capacitor app.
+ * The Capacitor bridge is NOT available inside the iframe. So we detect the
+ * Capacitor WebView via the custom user agent string "EphemeralChatApp" and
+ * use postMessage to delegate the download to the parent window which HAS
+ * the Capacitor bridge and native filesystem access.
  */
 
-import { Capacitor } from '@capacitor/core';
-import { toast } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 
 // ─── Platform detection ───────────────────────────────────
-const isCapacitor = Capacitor.getPlatform() !== 'web';
+// Detect if we're inside the Capacitor app's WebView (works even in iframes)
+const isInsideCapacitorApp = /EphemeralChatApp/i.test(navigator.userAgent);
+const isInIframe = window !== window.parent;
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+// When inside the Capacitor app iframe, we MUST use postMessage to parent
+const shouldDelegateToParent = isInsideCapacitorApp && isInIframe;
+
+// Pending download promise resolvers (keyed by requestId)
+const pendingDownloadResolvers = new Map();
+
+// Listen for download responses from the parent window
+if (shouldDelegateToParent) {
+    window.addEventListener('message', (event) => {
+        if (!event.data || event.data.type !== 'e2ecp-download-response') return;
+
+        const { requestId, success, error } = event.data;
+        const resolver = pendingDownloadResolvers.get(requestId);
+        if (resolver) {
+            pendingDownloadResolvers.delete(requestId);
+            if (success) {
+                resolver.resolve(true);
+            } else {
+                resolver.reject(new Error(error || 'Download failed in parent'));
+            }
+        }
+    });
+}
+
+/**
+ * Generate a unique request ID for postMessage round-trips
+ */
+function generateRequestId() {
+    return `dl_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
 
 /**
  * Download / save a file on any platform.
@@ -25,52 +62,56 @@ const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
  */
 export async function downloadFileOnDevice(blob, fileName, mimeType) {
     const type = mimeType || blob.type || 'application/octet-stream';
+    const safeFileName = fileName || 'download';
 
-    // ── Strategy 1: Capacitor native (Android/iOS) ───────────
-    if (isCapacitor) {
+    // ── Strategy 1: Delegate to parent Capacitor app via postMessage ──
+    // This is the ONLY reliable way to save files when running inside an
+    // iframe in the Capacitor WebView. The parent has the native bridge.
+    if (shouldDelegateToParent) {
         try {
-            const { Filesystem, Directory } = await import('@capacitor/filesystem');
-            const { FileOpener } = await import('@capacitor-community/file-opener');
-
-            // Request filesystem permissions (crucial for modern Android)
-            await Filesystem.requestPermissions();
-
             const base64Data = await blobToBase64(blob);
-            const safeFileName = fileName || 'download';
+            const requestId = generateRequestId();
 
-            // Write file to device's Documents directory
-            const writeResult = await Filesystem.writeFile({
-                path: safeFileName,
-                data: base64Data,
-                directory: Directory.Documents,
+            // Create a promise that will be resolved when the parent responds
+            const downloadPromise = new Promise((resolve, reject) => {
+                pendingDownloadResolvers.set(requestId, { resolve, reject });
+
+                // Timeout after 30 seconds
+                setTimeout(() => {
+                    if (pendingDownloadResolvers.has(requestId)) {
+                        pendingDownloadResolvers.delete(requestId);
+                        reject(new Error('Download timed out'));
+                    }
+                }, 30000);
             });
 
+            // Send the file data to the parent window
+            window.parent.postMessage({
+                type: 'e2ecp-download-request',
+                requestId,
+                fileName: safeFileName,
+                mimeType: type,
+                base64Data,
+            }, '*');
+
+            toast.loading(`Saving ${safeFileName}...`, { id: 'download' });
+
+            await downloadPromise;
             toast.success(`Downloaded: ${safeFileName}`, { id: 'download' });
-
-            // Open the saved file with the native file viewer
-            await FileOpener.open({
-                filePath: writeResult.uri,
-                contentType: type,
-            });
-
             return true;
-        } catch (capErr) {
-            if (capErr?.message?.toLowerCase().includes('cancel')) return true;
-            if (capErr?.message?.toLowerCase().includes('no activity')) {
-                console.warn('[downloadHelper] File saved but no viewer app for this type');
-                return true;
-            }
-            console.warn('[downloadHelper] Capacitor path failed:', capErr.message);
-            // Fall through to navigator.share or <a> fallback
+        } catch (parentErr) {
+            console.warn('[downloadHelper] Parent postMessage download failed:', parentErr.message);
+            toast.error(`Download failed: ${parentErr.message}`, { id: 'download' });
+            // Fall through to other strategies
         }
     }
 
     // ── Strategy 2: Web Share API with file (mobile browsers) ──
     if (isMobile && navigator.share && navigator.canShare) {
         try {
-            const file = new File([blob], fileName, { type });
+            const file = new File([blob], safeFileName, { type });
             if (navigator.canShare({ files: [file] })) {
-                await navigator.share({ files: [file], title: fileName });
+                await navigator.share({ files: [file], title: safeFileName });
                 return true;
             }
         } catch (shareError) {
@@ -85,7 +126,7 @@ export async function downloadFileOnDevice(blob, fileName, mimeType) {
         const url = URL.createObjectURL(new Blob([blob], { type }));
         const a = document.createElement('a');
         a.href = url;
-        a.download = fileName || 'download';
+        a.download = safeFileName;
         a.style.display = 'none';
         document.body.appendChild(a);
         a.click();
