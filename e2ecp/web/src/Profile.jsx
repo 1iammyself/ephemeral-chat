@@ -11,6 +11,7 @@ import {
     encryptString,
     decryptString,
 } from "./encryption";
+import { downloadFileOnDevice } from "./downloadHelper";
 import toast from "react-hot-toast";
 import Navbar from "./Navbar";
 
@@ -395,16 +396,7 @@ export default function Profile() {
             toast.loading("Decrypting file...", { id: "download" });
             const decryptedBlob = await decryptFile(encryptedBlob, fileKey);
 
-            const url = window.URL.createObjectURL(decryptedBlob);
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-
-            toast.success("File downloaded and decrypted!", { id: "download" });
+            await downloadFileOnDevice(decryptedBlob, filename);
         } catch (error) {
             console.error("Download error:", error);
             toast.error("Failed to download or decrypt file", {
@@ -423,13 +415,13 @@ export default function Profile() {
 
     const storagePercentage = storageLimit > 0 ? (totalStorage / storageLimit) * 100 : 0;
 
-        if (loading) {
-            return (
-                <div className="min-h-screen bg-white dark:bg-black text-black dark:text-white flex items-center justify-center">
-                    <div className="text-2xl font-bold">Loading...</div>
-                </div>
-            );
-        }
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-white dark:bg-black text-black dark:text-white flex items-center justify-center">
+                <div className="text-2xl font-bold">Loading...</div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-white dark:bg-black text-black dark:text-white">
@@ -437,164 +429,164 @@ export default function Profile() {
             <div className="p-4 sm:p-8">
                 <div className="max-w-6xl mx-auto">
 
-                {/* Storage Info */}
-                <div className="border-4 border-black dark:border-white p-6 mb-8 bg-white dark:bg-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)]">
-                    <h2 className="text-2xl font-black uppercase mb-3">
-                        How storage works
-                    </h2>
-                    <p className="text-sm sm:text-base leading-relaxed">
-                        <strong>Files and filenames are end-to-end encrypted. The server stores only encrypted data and cannot decrypt it. Sharing links transfer the decryption key directly to recipients.</strong>
-                    </p>
-                </div>
+                    {/* Storage Info */}
+                    <div className="border-4 border-black dark:border-white p-6 mb-8 bg-white dark:bg-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)]">
+                        <h2 className="text-2xl font-black uppercase mb-3">
+                            How storage works
+                        </h2>
+                        <p className="text-sm sm:text-base leading-relaxed">
+                            <strong>Files and filenames are end-to-end encrypted. The server stores only encrypted data and cannot decrypt it. Sharing links transfer the decryption key directly to recipients.</strong>
+                        </p>
+                    </div>
 
-                <div className="border-4 border-black dark:border-white p-6 mb-8 bg-white dark:bg-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)]">
-                    <div className="mb-4">
-                        <div className="flex justify-between text-lg font-bold mb-2">
-                            <span>Storage Used</span>
-                            <span>
-                                {formatBytes(totalStorage)} /{" "}
-                                {formatBytes(storageLimit)} (
-                                {storagePercentage.toFixed(1)}%)
-                            </span>
-                        </div>
-                        <div className="w-full h-4 border-2 border-black dark:border-white bg-white dark:bg-black">
-                            <div
-                                className="h-full bg-black dark:bg-white transition-all"
-                                style={{ width: `${storagePercentage}%` }}
-                            ></div>
+                    <div className="border-4 border-black dark:border-white p-6 mb-8 bg-white dark:bg-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)]">
+                        <div className="mb-4">
+                            <div className="flex justify-between text-lg font-bold mb-2">
+                                <span>Storage Used</span>
+                                <span>
+                                    {formatBytes(totalStorage)} /{" "}
+                                    {formatBytes(storageLimit)} (
+                                    {storagePercentage.toFixed(1)}%)
+                                </span>
+                            </div>
+                            <div className="w-full h-4 border-2 border-black dark:border-white bg-white dark:bg-black">
+                                <div
+                                    className="h-full bg-black dark:bg-white transition-all"
+                                    style={{ width: `${storagePercentage}%` }}
+                                ></div>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Upload Section */}
-                <div className="border-4 border-black dark:border-white p-6 mb-8 bg-white dark:bg-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)]">
-                    <h2 className="text-2xl font-black uppercase mb-4">
-                        Upload File
-                    </h2>
-                    <label className="block w-full border-2 sm:border-4 border-black dark:border-white bg-black dark:bg-white text-white dark:text-black px-4 py-3 sm:py-4 text-base sm:text-lg font-black uppercase hover:bg-gray-900 dark:hover:bg-gray-300 transition-colors cursor-pointer shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none active:translate-x-2 active:translate-y-2 text-center">
-                        {uploading ? "Uploading..." : "Choose File"}
-                        <input
-                            type="file"
-                            onChange={handleFileUpload}
-                            disabled={uploading}
-                            className="hidden"
-                        />
-                    </label>
-                </div>
+                    {/* Upload Section */}
+                    <div className="border-4 border-black dark:border-white p-6 mb-8 bg-white dark:bg-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)]">
+                        <h2 className="text-2xl font-black uppercase mb-4">
+                            Upload File
+                        </h2>
+                        <label className="block w-full border-2 sm:border-4 border-black dark:border-white bg-black dark:bg-white text-white dark:text-black px-4 py-3 sm:py-4 text-base sm:text-lg font-black uppercase hover:bg-gray-900 dark:hover:bg-gray-300 transition-colors cursor-pointer shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none active:translate-x-2 active:translate-y-2 text-center">
+                            {uploading ? "Uploading..." : "Choose File"}
+                            <input
+                                type="file"
+                                onChange={handleFileUpload}
+                                disabled={uploading}
+                                className="hidden"
+                            />
+                        </label>
+                    </div>
 
-                {/* Files List */}
-                <div className="border-4 border-black dark:border-white p-6 bg-white dark:bg-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)]">
-                    <h2 className="text-2xl font-black uppercase mb-4">
-                        Your Files ({files.length})
-                    </h2>
+                    {/* Files List */}
+                    <div className="border-4 border-black dark:border-white p-6 bg-white dark:bg-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)]">
+                        <h2 className="text-2xl font-black uppercase mb-4">
+                            Your Files ({files.length})
+                        </h2>
 
-                    {files.length === 0 ? (
-                        <p className="text-lg text-center py-8">
-                            No files uploaded yet
-                        </p>
-                    ) : (
-                        <div className="space-y-4">
-                            {files.map((file) => (
-                                <div
-                                    key={file.id}
-                                    className="border-2 border-black dark:border-white p-4 bg-white dark:bg-black"
-                                >
-                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                                        <div className="flex-1 min-w-0">
-                                            <h3
-                                                className="text-lg font-bold break-all cursor-pointer hover:underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                                onClick={() => handleOpenShareLink(file.id, file.encrypted_filename)}
-                                                title="Click to open share link in new window"
-                                            >
-                                                {file.filename}
-                                            </h3>
-                                            <p className="text-sm flex flex-wrap items-center gap-2">
-                                                <span>
-                                                    {formatBytes(file.file_size)}
-                                                </span>
-                                                <span>•</span>
-                                                <span>
-                                                    {new Date(
-                                                        file.created_at,
-                                                    ).toLocaleDateString()}
-                                                </span>
-                                                {file.share_token && (
-                                                    <>
-                                                        <span>•</span>
-                                                        <span className="text-green-600 dark:text-green-400 font-semibold">
-                                                            Share link generated
-                                                        </span>
-                                                        <span>•</span>
-                                                        <span className="text-blue-600 dark:text-blue-300">
-                                                            {file.download_count || 0} downloads
-                                                        </span>
-                                                    </>
-                                                )}
-                                            </p>
-                                        </div>
-                                        <div className="flex flex-wrap gap-2">
-                                            <button
-                                                onClick={() =>
-                                                    handleDownload(
-                                                        file.id,
-                                                        file.filename,
-                                                        file.encrypted_key,
-                                                    )
-                                                }
-                                                className="border-2 border-black dark:border-white bg-white dark:bg-black text-black dark:text-white px-3 py-1 font-bold text-sm uppercase hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors cursor-pointer"
-                                                title="Download"
-                                            >
-                                                <i className="fas fa-download"></i>
-                                            </button>
-                                            <button
-                                                onClick={() =>
-                                                    handleGenerateShareLink(
-                                                        file.id,
-                                                        file.encrypted_filename,
-                                                    )
-                                                }
-                                                className="border-2 border-black dark:border-white bg-white dark:bg-black text-black dark:text-white px-3 py-1 font-bold text-sm uppercase hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors cursor-pointer"
-                                                title="Generate share link"
-                                            >
-                                                <i className="fas fa-share"></i>
-                                            </button>
-                                            <button
-                                                onClick={() =>
-                                                    setConfirmState({
-                                                        open: true,
-                                                        fileId: file.id,
-                                                        filename: file.filename,
-                                                    })
-                                                }
-                                                className="border-2 border-black dark:border-white bg-red-600 text-white px-3 py-1 font-bold text-sm uppercase hover:bg-red-700 transition-colors cursor-pointer"
-                                                title="Delete"
-                                            >
-                                                <i className="fas fa-trash"></i>
-                                            </button>
+                        {files.length === 0 ? (
+                            <p className="text-lg text-center py-8">
+                                No files uploaded yet
+                            </p>
+                        ) : (
+                            <div className="space-y-4">
+                                {files.map((file) => (
+                                    <div
+                                        key={file.id}
+                                        className="border-2 border-black dark:border-white p-4 bg-white dark:bg-black"
+                                    >
+                                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                            <div className="flex-1 min-w-0">
+                                                <h3
+                                                    className="text-lg font-bold break-all cursor-pointer hover:underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                                    onClick={() => handleOpenShareLink(file.id, file.encrypted_filename)}
+                                                    title="Click to open share link in new window"
+                                                >
+                                                    {file.filename}
+                                                </h3>
+                                                <p className="text-sm flex flex-wrap items-center gap-2">
+                                                    <span>
+                                                        {formatBytes(file.file_size)}
+                                                    </span>
+                                                    <span>•</span>
+                                                    <span>
+                                                        {new Date(
+                                                            file.created_at,
+                                                        ).toLocaleDateString()}
+                                                    </span>
+                                                    {file.share_token && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <span className="text-green-600 dark:text-green-400 font-semibold">
+                                                                Share link generated
+                                                            </span>
+                                                            <span>•</span>
+                                                            <span className="text-blue-600 dark:text-blue-300">
+                                                                {file.download_count || 0} downloads
+                                                            </span>
+                                                        </>
+                                                    )}
+                                                </p>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                <button
+                                                    onClick={() =>
+                                                        handleDownload(
+                                                            file.id,
+                                                            file.filename,
+                                                            file.encrypted_key,
+                                                        )
+                                                    }
+                                                    className="border-2 border-black dark:border-white bg-white dark:bg-black text-black dark:text-white px-3 py-1 font-bold text-sm uppercase hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors cursor-pointer"
+                                                    title="Download"
+                                                >
+                                                    <i className="fas fa-download"></i>
+                                                </button>
+                                                <button
+                                                    onClick={() =>
+                                                        handleGenerateShareLink(
+                                                            file.id,
+                                                            file.encrypted_filename,
+                                                        )
+                                                    }
+                                                    className="border-2 border-black dark:border-white bg-white dark:bg-black text-black dark:text-white px-3 py-1 font-bold text-sm uppercase hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors cursor-pointer"
+                                                    title="Generate share link"
+                                                >
+                                                    <i className="fas fa-share"></i>
+                                                </button>
+                                                <button
+                                                    onClick={() =>
+                                                        setConfirmState({
+                                                            open: true,
+                                                            fileId: file.id,
+                                                            filename: file.filename,
+                                                        })
+                                                    }
+                                                    className="border-2 border-black dark:border-white bg-red-600 text-white px-3 py-1 font-bold text-sm uppercase hover:bg-red-700 transition-colors cursor-pointer"
+                                                    title="Delete"
+                                                >
+                                                    <i className="fas fa-trash"></i>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
-            <ConfirmModal
-                open={confirmState.open}
-                title="Delete file?"
-                message={`Are you sure you want to delete "${confirmState.filename}"?`}
-                confirmLabel="Delete"
-                cancelLabel="Cancel"
-                onConfirm={() => {
-                    if (confirmState.fileId) {
-                        handleDelete(confirmState.fileId, confirmState.filename);
+                <ConfirmModal
+                    open={confirmState.open}
+                    title="Delete file?"
+                    message={`Are you sure you want to delete "${confirmState.filename}"?`}
+                    confirmLabel="Delete"
+                    cancelLabel="Cancel"
+                    onConfirm={() => {
+                        if (confirmState.fileId) {
+                            handleDelete(confirmState.fileId, confirmState.filename);
+                        }
+                        setConfirmState({ open: false, fileId: null, filename: "" });
+                    }}
+                    onCancel={() =>
+                        setConfirmState({ open: false, fileId: null, filename: "" })
                     }
-                    setConfirmState({ open: false, fileId: null, filename: "" });
-                }}
-                onCancel={() =>
-                    setConfirmState({ open: false, fileId: null, filename: "" })
-                }
-            />
+                />
             </div>
         </div>
     );

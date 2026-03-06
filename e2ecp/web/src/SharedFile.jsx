@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { decryptFile, decryptString, deriveKey } from "./encryption";
+import { downloadFileOnDevice } from "./downloadHelper";
 import toast from "react-hot-toast";
 import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomOneDark, atomOneLight } from 'react-syntax-highlighter/dist/esm/styles/hljs';
@@ -242,20 +243,11 @@ export default function SharedFile() {
             // Use already decrypted filename or fall back to default
             const filename = decryptedFilename || "download";
 
-            // Decrypt the file
+            toast.loading("Decrypting file...", { id: "download" });
             const decryptedBlob = await decryptFile(encryptedBlob, fileKey);
 
-            // Trigger download
-            const url = window.URL.createObjectURL(decryptedBlob);
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-
-            toast.success("File downloaded and decrypted!", { id: "download" });
+            // Trigger actual download (Native or Web)
+            await downloadFileOnDevice(decryptedBlob, filename);
         } catch (error) {
             console.error("Download error:", error);
             toast.error("Failed to download or decrypt file", {
@@ -426,99 +418,99 @@ export default function SharedFile() {
             <div className="p-4 sm:p-8">
                 <div className="max-w-4xl mx-auto">
 
-                {/* Download Section */}
-                <div className="border-4 border-black dark:border-white p-8 bg-white dark:bg-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)]">
+                    {/* Download Section */}
+                    <div className="border-4 border-black dark:border-white p-8 bg-white dark:bg-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)]">
 
-                    {/* Preview */}
-                    {preview && (
-                        <div className="mb-6">
-                            {preview.type === 'code' && (
-                                <div className="overflow-auto max-h-[600px] border-2 border-black dark:border-white">
-                                    <SyntaxHighlighter
-                                        language={preview.language}
-                                        style={darkMode ? atomOneDark : atomOneLight}
-                                        showLineNumbers={true}
-                                        wrapLines={true}
-                                        customStyle={{
-                                            margin: 0,
-                                            padding: '1rem',
-                                            fontSize: '0.875rem',
-                                            lineHeight: '1.5'
-                                        }}
-                                    >
-                                        {preview.content}
-                                    </SyntaxHighlighter>
-                                </div>
-                            )}
+                        {/* Preview */}
+                        {preview && (
+                            <div className="mb-6">
+                                {preview.type === 'code' && (
+                                    <div className="overflow-auto max-h-[600px] border-2 border-black dark:border-white">
+                                        <SyntaxHighlighter
+                                            language={preview.language}
+                                            style={darkMode ? atomOneDark : atomOneLight}
+                                            showLineNumbers={true}
+                                            wrapLines={true}
+                                            customStyle={{
+                                                margin: 0,
+                                                padding: '1rem',
+                                                fontSize: '0.875rem',
+                                                lineHeight: '1.5'
+                                            }}
+                                        >
+                                            {preview.content}
+                                        </SyntaxHighlighter>
+                                    </div>
+                                )}
 
-                            {preview.type === 'image' && (
-                                <div className="flex justify-center items-center border-2 border-black dark:border-white p-4 bg-gray-100 dark:bg-gray-900">
-                                    <img
-                                        src={preview.url}
-                                        alt={preview.filename}
-                                        className="max-w-full h-auto max-h-[600px] object-contain"
-                                    />
-                                </div>
-                            )}
+                                {preview.type === 'image' && (
+                                    <div className="flex justify-center items-center border-2 border-black dark:border-white p-4 bg-gray-100 dark:bg-gray-900">
+                                        <img
+                                            src={preview.url}
+                                            alt={preview.filename}
+                                            className="max-w-full h-auto max-h-[600px] object-contain"
+                                        />
+                                    </div>
+                                )}
 
-                            {preview.type === 'audio' && (
-                                <div className="border-2 border-black dark:border-white p-4 bg-gray-100 dark:bg-gray-900">
-                                    <audio
-                                        controls
-                                        className="w-full"
-                                        style={{ maxWidth: '100%' }}
-                                    >
-                                        <source src={preview.url} type={preview.mimeType} />
-                                        Your browser does not support audio playback.
-                                    </audio>
-                                </div>
-                            )}
+                                {preview.type === 'audio' && (
+                                    <div className="border-2 border-black dark:border-white p-4 bg-gray-100 dark:bg-gray-900">
+                                        <audio
+                                            controls
+                                            className="w-full"
+                                            style={{ maxWidth: '100%' }}
+                                        >
+                                            <source src={preview.url} type={preview.mimeType} />
+                                            Your browser does not support audio playback.
+                                        </audio>
+                                    </div>
+                                )}
 
-                            {preview.type === 'video' && (
-                                <div className="border-2 border-black dark:border-white p-4 bg-gray-100 dark:bg-gray-900">
-                                    <video
-                                        controls
-                                        className="w-full max-h-[600px]"
-                                        style={{ maxWidth: '100%' }}
-                                    >
-                                        <source src={preview.url} type={preview.mimeType} />
-                                        Your browser does not support video playback.
-                                    </video>
-                                </div>
-                            )}
+                                {preview.type === 'video' && (
+                                    <div className="border-2 border-black dark:border-white p-4 bg-gray-100 dark:bg-gray-900">
+                                        <video
+                                            controls
+                                            className="w-full max-h-[600px]"
+                                            style={{ maxWidth: '100%' }}
+                                        >
+                                            <source src={preview.url} type={preview.mimeType} />
+                                            Your browser does not support video playback.
+                                        </video>
+                                    </div>
+                                )}
 
-                            {preview.type === 'pdf' && (
-                                <div className="border-2 border-black dark:border-white bg-gray-100 dark:bg-gray-900">
-                                    <iframe
-                                        src={preview.url}
-                                        type="application/pdf"
-                                        className="w-full h-[600px]"
-                                        style={{ minHeight: '600px', border: 'none' }}
-                                        title={preview.filename}
-                                    >
-                                        <p className="p-4">
-                                            Your browser does not support PDF preview.
-                                            Please use the download button below to view the file.
-                                        </p>
-                                    </iframe>
-                                </div>
-                            )}
+                                {preview.type === 'pdf' && (
+                                    <div className="border-2 border-black dark:border-white bg-gray-100 dark:bg-gray-900">
+                                        <iframe
+                                            src={preview.url}
+                                            type="application/pdf"
+                                            className="w-full h-[600px]"
+                                            style={{ minHeight: '600px', border: 'none' }}
+                                            title={preview.filename}
+                                        >
+                                            <p className="p-4">
+                                                Your browser does not support PDF preview.
+                                                Please use the download button below to view the file.
+                                            </p>
+                                        </iframe>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        <button
+                            onClick={handleDownload}
+                            disabled={downloading}
+                            className="w-full border-2 sm:border-4 border-black dark:border-white bg-black dark:bg-white text-white dark:text-black px-6 py-4 text-lg font-black uppercase hover:bg-gray-900 dark:hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none active:translate-x-2 active:translate-y-2"
+                        >
+                            {downloading ? "Downloading & Decrypting..." : "Download File"}
+                        </button>
+                        <div className="mt-6 p-4 border-2 border-black dark:border-white bg-gray-100 dark:bg-gray-900">
+                            <p className="text-sm">
+                                <strong>Privacy Notice:</strong> This file is end-to-end encrypted. Decryption happens in your browser using the key in this URL. The server cannot access the file contents.
+                            </p>
                         </div>
-                    )}
-
-                    <button
-                        onClick={handleDownload}
-                        disabled={downloading}
-                        className="w-full border-2 sm:border-4 border-black dark:border-white bg-black dark:bg-white text-white dark:text-black px-6 py-4 text-lg font-black uppercase hover:bg-gray-900 dark:hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none active:translate-x-2 active:translate-y-2"
-                    >
-                        {downloading ? "Downloading & Decrypting..." : "Download File"}
-                    </button>
-                    <div className="mt-6 p-4 border-2 border-black dark:border-white bg-gray-100 dark:bg-gray-900">
-                        <p className="text-sm">
-                            <strong>Privacy Notice:</strong> This file is end-to-end encrypted. Decryption happens in your browser using the key in this URL. The server cannot access the file contents.
-                        </p>
                     </div>
-                </div>
                 </div>
             </div>
         </div>

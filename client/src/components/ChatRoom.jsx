@@ -81,6 +81,8 @@ import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess } from '../utils/
 import FileTransferModal from './FileTransferModal';
 import ChessModal from './games/ChessModal';
 import { toast } from 'react-toastify';
+import { Capacitor } from '@capacitor/core';
+import { Keyboard } from '@capacitor/keyboard';
 
 const SLASH_COMMANDS = [
   { icon: Camera, label: 'Camera', value: '/camera', desc: 'Take a photo' },
@@ -508,6 +510,28 @@ const ChatRoom = () => {
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [verbalCode, setVerbalCode] = useState(null); // State for verbal code display
 
+  // ─── Capacitor Keyboard State ────────────────────────────────
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== 'web') {
+      const showListener = Keyboard.addListener('keyboardWillShow', info => {
+        setKeyboardHeight(info.keyboardHeight);
+        // Scroll to bottom immediately when keyboard opens
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+      const hideListener = Keyboard.addListener('keyboardWillHide', () => {
+        setKeyboardHeight(0);
+      });
+
+      return () => {
+        showListener.then(l => l.remove());
+        hideListener.then(l => l.remove());
+      };
+    }
+  }, []);
   // ─── MLS Session State ──────────────────────────────────
   const [mlsReady, setMlsReady] = useState(false);
   const mlsReadyRef = useRef(false);
@@ -2307,6 +2331,7 @@ const ChatRoom = () => {
   return (
     <div
       className={`flex flex-col transition-colors duration-500 chat-container overflow-hidden ${getVibeById(roomVibe).bgClass}`}
+      style={{ paddingBottom: `${keyboardHeight}px` }}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}

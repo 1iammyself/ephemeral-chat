@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import { useConfig } from "./ConfigContext";
+import { downloadFileOnDevice } from "./downloadHelper";
 import Navbar from "./Navbar";
 
 /* ---------- Crypto helpers (ECDH + AES-GCM) ---------- */
@@ -1820,16 +1821,18 @@ export default function App() {
     }
 
     // Handler to confirm and trigger file download
-    function handleConfirmDownload() {
+    async function handleConfirmDownload() {
         if (!pendingDownload) return;
 
-        // Trigger browser download
-        const a = document.createElement("a");
-        a.href = pendingDownload.url;
-        a.download = pendingDownload.name;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        // Try downloading natively with Capacitor or fallback to Web
+        try {
+            const response = await fetch(pendingDownload.url);
+            const blob = await response.blob();
+            await downloadFileOnDevice(blob, pendingDownload.name, pendingDownload.type);
+        } catch (err) {
+            console.error("Failed to fetch pending download blob", err);
+            toast.error("Download failed");
+        }
 
         // Update state
         setDownloadUrl(pendingDownload.url);
