@@ -1704,7 +1704,8 @@ const ChatRoom = () => {
       hapticLight();
       setNewMessage('');
       setReplyingTo(null);
-      // Do NOT call focus() here — the input never loses focus because we don't go through form submit
+      // Re-focus input to keep keyboard open
+      messageInputRef.current?.focus();
     } catch (error) {
       setError('Failed to send message');
     } finally {

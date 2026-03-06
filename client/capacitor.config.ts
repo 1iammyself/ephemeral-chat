@@ -32,6 +32,9 @@ const config: CapacitorConfig = {
     appendUserAgent: 'EphemeralChatApp',
   },
   plugins: {
+    Keyboard: {
+      resize: "none"
+    },
     SplashScreen: {
       launchShowDuration: 2000,
       launchAutoHide: true,
