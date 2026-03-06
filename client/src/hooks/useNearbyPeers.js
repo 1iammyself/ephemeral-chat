@@ -43,10 +43,10 @@ export function useNearbyPeers() {
     setError(null);
     try {
       const service = getService();
-      
+
       // Subscribe to events
       const unsubs = [];
-      
+
       unsubs.push(service.on('peer-discovered', (peer) => {
         setPeers(prev => {
           const exists = prev.find(p => p.id === peer.id);
@@ -116,8 +116,8 @@ export function useNearbyPeers() {
     try {
       const service = getService();
       // Try to find peer in React state first, then fall back to service's map
-      const peer = peers.find(p => p.id === peerId) || 
-                   (service.peers.has(peerId) ? { ...service.peers.get(peerId) } : { id: peerId });
+      const peer = peers.find(p => p.id === peerId) ||
+        (service.peers.has(peerId) ? { ...service.peers.get(peerId) } : { id: peerId });
       const result = await service.connectToPeer(peerId);
       setConnectedPeer({
         ...peer,
@@ -162,6 +162,8 @@ export function useNearbyPeers() {
     stopDiscovery,
     connectToPeer,
     disconnectFromPeer,
+    setConnectedPeer,
+    setPairingCode,
     service: serviceRef.current
   };
 }

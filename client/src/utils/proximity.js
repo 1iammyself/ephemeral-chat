@@ -373,10 +373,11 @@ export class ProximityService {
 
     console.log('[Proximity] Connecting to', peerId);
 
-    // CRITICAL FIX: Empty ICE Servers forces true, offline local hole-punching.
-    // If we passed TURN/STUN here, it would mistakenly bounce traffic to the internet instead of resolving local LAN IPs.
+    // CRITICAL FIX: Restore STUN servers (but reject ALL TURN servers)
+    // Emptying this array completely breaks ICE candidate generation on some Android/Windows networking stacks.
+    const strictStunServers = ICE_SERVERS.filter(server => !server.urls.toString().includes('turn:'));
     const pc = new RTCPeerConnection({
-      iceServers: [],
+      iceServers: strictStunServers,
       iceTransportPolicy: 'all',     // consider all local candidates
       iceCandidatePoolSize: 10       // generate pre-flight local UDP host IPs
     });
@@ -417,9 +418,10 @@ export class ProximityService {
       this._closeConnection(fromPeerId);
     }
 
-    // CRITICAL FIX: Empty ICE Servers for receiving connections.
+    // CRITICAL FIX: Restore STUN servers (but reject ALL TURN servers)
+    const strictStunServers = ICE_SERVERS.filter(server => !server.urls.toString().includes('turn:'));
     const pc = new RTCPeerConnection({
-      iceServers: [],
+      iceServers: strictStunServers,
       iceTransportPolicy: 'all',
       iceCandidatePoolSize: 10
     });
@@ -449,6 +451,137 @@ export class ProximityService {
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     this.discoverySocket?.emit('rtc-answer', { to: fromPeerId, answer: pc.localDescription });
+  }
+
+  // ─── True Offline Connection (QR Based) ─────────────────
+
+  async createOfflineOffer() {
+    console.log('[Proximity] Creating true offline offer...');
+    const strictStunServers = ICE_SERVERS.filter(server => !server.urls.toString().includes('turn:'));
+    const pc = new RTCPeerConnection({
+      iceServers: strictStunServers,
+      iceTransportPolicy: 'all',
+      iceCandidatePoolSize: 10
+    });
+
+    const dc = pc.createDataChannel(DATA_CHANNEL_LABEL, { ordered: true });
+    const peerId = 'offline-' + generateTransferId(); // Unique temp ID
+
+    if (this.connections.has(peerId)) this._closeConnection(peerId);
+
+    const conn = { pc, dataChannel: dc, state: 'connecting', pairingCode: '', receivedChunks: [], _pendingCandidates: [] };
+    this.connections.set(peerId, conn);
+    this._setupPeerConnection(peerId, pc);
+    this._setupDataChannel(peerId, dc);
+
+    const candidates = [];
+    pc.onicecandidate = (e) => {
+      if (e.candidate) candidates.push(e.candidate.candidate);
+    };
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    // Wait for ICE gathering to complete (max 3 seconds)
+    await new Promise(resolve => {
+      if (pc.iceGatheringState === 'complete') { resolve(); return; }
+      const check = () => { if (pc.iceGatheringState === 'complete') { pc.removeEventListener('icegatheringstatechange', check); resolve(); } };
+      pc.addEventListener('icegatheringstatechange', check);
+      setTimeout(resolve, 3000);
+    });
+
+    const payload = JSON.stringify({
+      t: 'offer',
+      deviceId: this.deviceId,
+      nickname: this.nickname,
+      o: offer.sdp,
+      c: candidates
+    });
+
+    return { payload, peerId };
+  }
+
+  async acceptOfflineOffer(offerJson) {
+    const data = JSON.parse(offerJson);
+    console.log('[Proximity] Accepting offline offer from', data.deviceId);
+
+    const strictStunServers = ICE_SERVERS.filter(server => !server.urls.toString().includes('turn:'));
+    const pc = new RTCPeerConnection({
+      iceServers: strictStunServers,
+      iceTransportPolicy: 'all',
+      iceCandidatePoolSize: 10
+    });
+
+    const peerId = data.deviceId || 'offline-host';
+    if (this.connections.has(peerId)) this._closeConnection(peerId);
+
+    const conn = { pc, dataChannel: null, state: 'connecting', pairingCode: '', receivedChunks: [], _pendingCandidates: [] };
+    this.connections.set(peerId, conn);
+    this._setupPeerConnection(peerId, pc);
+
+    pc.ondatachannel = (e) => {
+      conn.dataChannel = e.channel;
+      this._setupDataChannel(peerId, e.channel);
+    };
+
+    const candidates = [];
+    pc.onicecandidate = (e) => {
+      if (e.candidate) candidates.push(e.candidate.candidate);
+    };
+
+    await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: data.o }));
+    for (const c of data.c) {
+      if (c) await pc.addIceCandidate(new RTCIceCandidate({ candidate: c, sdpMid: '0', sdpMLineIndex: 0 })).catch(() => { });
+    }
+
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+
+    await new Promise(resolve => {
+      if (pc.iceGatheringState === 'complete') { resolve(); return; }
+      const check = () => { if (pc.iceGatheringState === 'complete') { pc.removeEventListener('icegatheringstatechange', check); resolve(); } };
+      pc.addEventListener('icegatheringstatechange', check);
+      setTimeout(resolve, 3000);
+    });
+
+    // Emulate discovering them so UI shows them instantly
+    const peerInfo = { id: peerId, nickname: data.nickname || 'Offline Host', platform: 'unknown', deviceType: 'phone', lastSeen: Date.now() };
+    this.peers.set(peerId, peerInfo);
+    this.emit('peer-discovered', peerInfo);
+
+    // Resolve pairing code dynamically without blocking JSON generation
+    this._waitForConnection(peerId, CONNECT_TIMEOUT).then(code => {
+      conn.pairingCode = code;
+    }).catch(e => console.warn('Offline connection failed:', e));
+
+    return JSON.stringify({
+      t: 'answer',
+      nickname: this.nickname,
+      a: answer.sdp,
+      c: candidates
+    });
+  }
+
+  async finalizeOfflineConnection(answerJson, originalPeerId) {
+    const data = JSON.parse(answerJson);
+    const conn = this.connections.get(originalPeerId);
+    if (!conn) throw new Error('No offline offer was created');
+
+    console.log('[Proximity] Finalizing offline connection for', originalPeerId);
+
+    await conn.pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: data.a }));
+    for (const c of data.c) {
+      if (c) await conn.pc.addIceCandidate(new RTCIceCandidate({ candidate: c, sdpMid: '0', sdpMLineIndex: 0 })).catch(() => { });
+    }
+
+    const code = await this._waitForConnection(originalPeerId, CONNECT_TIMEOUT);
+    conn.pairingCode = code;
+
+    const info = { id: originalPeerId, nickname: data.nickname || 'Scanned Peer', platform: 'unknown', deviceType: 'phone', lastSeen: Date.now() };
+    this.peers.set(originalPeerId, info);
+    this.emit('peer-discovered', info);
+
+    return { peerId: originalPeerId, pairingCode: code };
   }
 
   _setupPeerConnection(peerId, pc) {
