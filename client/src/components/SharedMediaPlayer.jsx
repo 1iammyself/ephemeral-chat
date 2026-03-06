@@ -123,13 +123,15 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
   const [syncCount, setSyncCount] = useState(0);           // listeners watching
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlInput, setUrlInput] = useState('');
+  const [showControls, setShowControls] = useState(true);   // overlay controls visibility
 
   const ytPlayerRef = useRef(null);
   const scWidgetRef = useRef(null);
   const playerContainerRef = useRef(null);
   const timeUpdateRef = useRef(null);
-  const ignoreNextSyncRef = useRef(false);                  // prevent echo
+  const ignoreNextSyncRef = useRef(0);                      // timestamp of last self-emit (echo rejection)
   const lastSeekRef = useRef(0);
+  const controlsHideTimerRef = useRef(null);                // auto-hide controls timer
 
   const vibeAccent = roomVibe === 'party' ? 'indigo' :
     roomVibe === 'chill' ? 'teal' :
@@ -180,10 +182,11 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
     };
 
     const handleMediaSync = async (data) => {
-      if (ignoreNextSyncRef.current) {
-        ignoreNextSyncRef.current = false;
+      // Timestamp-based echo rejection: ignore syncs within 1s of our own emit
+      if (ignoreNextSyncRef.current && (Date.now() - ignoreNextSyncRef.current) < 1000) {
         return;
       }
+      ignoreNextSyncRef.current = 0;
 
       let parsed;
       // ─── v4 AES-GCM: decrypt if encrypted ──────────────────
@@ -236,22 +239,36 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
       setCurrentTime(0);
     };
 
+    // Handle rejoin sync response from server
+    const handleMediaSyncRestore = (data) => {
+      if (!data || typeof data.currentTime !== 'number') return;
+      // Delay slightly to allow the player to initialize first
+      setTimeout(() => {
+        seekTo(data.currentTime);
+        if (data.isPlaying) {
+          playMedia();
+        }
+      }, 1500);
+    };
+
     socketManager.on('media-share', handleMediaShare);
     socketManager.on('media-sync', handleMediaSync);
     socketManager.on('media-sync-count', handleMediaSyncCount);
     socketManager.on('media-close', handleMediaClose);
+    socketManager.on('media-sync-restore', handleMediaSyncRestore);
 
     return () => {
       socketManager.off('media-share', handleMediaShare);
       socketManager.off('media-sync', handleMediaSync);
       socketManager.off('media-sync-count', handleMediaSyncCount);
       socketManager.off('media-close', handleMediaClose);
+      socketManager.off('media-sync-restore', handleMediaSyncRestore);
     };
   }, []);
 
   // ─── Restore persisted media state on reconnect ────────────────────
   useEffect(() => {
-    if (!initialMedia || mediaInfo) return; // Only apply if no media is already loaded
+    if (!initialMedia) return;
 
     const restoreMedia = async () => {
       let parsed;
@@ -282,6 +299,12 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
       if (!isSafeMediaUrl(parsed.url, type)) return;
       if (type === 'youtube' && (!parsed.id || !/^[a-zA-Z0-9_-]{11}$/.test(parsed.id))) return;
 
+      // If already showing the same media, just request sync for playback position
+      if (mediaInfo && mediaInfo.type === type && mediaInfo.url === parsed.url) {
+        socketManager.emit('media-request-sync');
+        return;
+      }
+
       setMediaInfo({
         type,
         id: parsed.id || null,
@@ -292,6 +315,9 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
       setCurrentTime(0);
       setDuration(0);
       setIsMinimized(false);
+
+      // Request current playback position from server so we sync to where others are
+      setTimeout(() => socketManager.emit('media-request-sync'), 500);
     };
 
     restoreMedia();
@@ -443,30 +469,37 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
 
   const destroyPlayer = useCallback(() => {
     clearInterval(timeUpdateRef.current);
+    if (controlsHideTimerRef.current) clearTimeout(controlsHideTimerRef.current);
     if (ytPlayerRef.current) { try { ytPlayerRef.current.destroy(); } catch (e) { } ytPlayerRef.current = null; }
     scWidgetRef.current = null;
   }, []);
 
   // ─── Encrypted media emit helper ──────────────────────────────────
-  // Encrypts media control payloads with Double Ratchet + timing jitter.
-  // Falls back to cleartext if ratchet not ready (shouldn't happen in v2).
+  // Encrypts media control payloads with AES-GCM.
+  // Media-sync (play/pause/seek) is time-critical — NO jitter delay.
+  // For media-sync, attaches a cleartext _hint so the server can track
+  // playback position for rejoin sync (not sensitive — just action + timestamp).
   const emitEncrypted = useCallback(async (event, data) => {
     if (isMLSReady(roomCode)) {
       try {
         const payload = await encryptMLSMessage(JSON.stringify(data), roomCode);
-        await withJitter(() => socketManager.emit(event, payload));
+        // Attach cleartext hint for server-side playback tracking
+        if (event === 'media-sync') {
+          payload._hint = { action: data.action, currentTime: data.currentTime };
+        }
+        socketManager.emit(event, payload);
         return;
       } catch (e) {
         console.warn(`${event} encrypt failed, falling back to cleartext:`, e.message);
       }
     }
-    // Fallback: still wrap with jitter for timing analysis protection
-    await withJitter(() => socketManager.emit(event, data));
+    socketManager.emit(event, data);
   }, [roomCode]);
 
   // ─── Sync actions (emit to room) ─────────────────────────────────
   const handlePlayPause = () => {
-    ignoreNextSyncRef.current = true;
+    // Mark that we're about to emit — ignore echoes for 1 second
+    ignoreNextSyncRef.current = Date.now();
     if (isPlaying) {
       pauseMedia();
       emitEncrypted('media-sync', { roomCode, action: 'pause', currentTime });
@@ -484,7 +517,7 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
     if (Math.abs(time - lastSeekRef.current) < 0.5) return;
     lastSeekRef.current = time;
 
-    ignoreNextSyncRef.current = true;
+    ignoreNextSyncRef.current = Date.now();
     seekTo(time);
     emitEncrypted('media-sync', { roomCode, action: 'seek', currentTime: time });
   };
@@ -570,128 +603,164 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
     );
   }
 
-  // ─── Minimized state ─────────────────────────────────────────────
-  if (isMinimized) {
-    return (
-      <div
-        className={`flex items-center gap-2 px-3 py-1.5 bg-black/80 backdrop-blur-md rounded-2xl shadow-lg cursor-pointer border border-white/10`}
-        onClick={() => setIsMinimized(false)}
-      >
-        <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
-        <span className="text-xs font-bold text-white truncate max-w-[120px]">
-          {mediaInfo.type === 'youtube' ? '▶ YouTube' : '🎵 SoundCloud'}
-        </span>
-        <span className="text-[10px] text-gray-400">{formatTime(currentTime)}</span>
-        {syncCount > 0 && (
-          <span className="text-[10px] text-blue-400 flex items-center gap-0.5">
-            <Users className="w-2.5 h-2.5" />{syncCount}
-          </span>
-        )}
-        <Maximize2 className="w-3 h-3 text-gray-400" />
-      </div>
-    );
-  }
-
-  // ─── Full player ─────────────────────────────────────────────────
+  // ─── Player (always rendered when mediaInfo exists — minimized just hides it via CSS) ──
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className={`w-80 max-w-[90vw] bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden`}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isPlaying ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
-          <span className="text-xs font-bold text-white truncate">
+    <div className="relative">
+      {/* Minimized bar — shown when minimized, clicking expands */}
+      {isMinimized && (
+        <div
+          className="flex items-center gap-2 px-3 py-1.5 bg-black/80 backdrop-blur-md rounded-2xl shadow-lg cursor-pointer border border-white/10"
+          onClick={() => setIsMinimized(false)}
+        >
+          <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
+          <span className="text-xs font-bold text-white truncate max-w-[120px]">
             {mediaInfo.type === 'youtube' ? '▶ YouTube' : '🎵 SoundCloud'}
           </span>
+          <span className="text-[10px] text-gray-400">{formatTime(currentTime)}</span>
           {syncCount > 0 && (
-            <span className="text-[10px] text-blue-400 flex items-center gap-0.5 flex-shrink-0">
-              <Users className="w-2.5 h-2.5" />{syncCount} watching
+            <span className="text-[10px] text-blue-400 flex items-center gap-0.5">
+              <Users className="w-2.5 h-2.5" />{syncCount}
             </span>
           )}
+          <Maximize2 className="w-3 h-3 text-gray-400" />
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button onClick={() => setIsMinimized(true)} className="p-1 hover:bg-white/10 rounded-full transition-colors">
-            <Minimize2 className="w-3.5 h-3.5 text-gray-400" />
-          </button>
-          <button
-            onClick={() => window.open(mediaInfo.url, '_blank')}
-            className="p-1 hover:bg-white/10 rounded-full transition-colors"
-            title="Open in browser"
-          >
-            <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
-          </button>
-          <button onClick={handleClose} className="p-1 hover:bg-red-500/20 rounded-full transition-colors">
-            <X className="w-3.5 h-3.5 text-red-400" />
-          </button>
-        </div>
-      </div>
+      )}
 
-      {/* Video / Widget embed */}
-      <div className="relative w-full aspect-video bg-black" ref={playerContainerRef}>
-        {mediaInfo.type === 'youtube' ? (
-          <div id="shared-media-embed" className="w-full h-full" />
-        ) : (
-          <iframe
-            id="shared-media-embed"
-            className="w-full h-full"
-            scrolling="no"
-            frameBorder="no"
-            allow="autoplay"
-            sandbox="allow-scripts allow-same-origin allow-popups"
-            referrerPolicy="no-referrer"
-          />
-        )}
-      </div>
-
-      {/* Controls */}
-      <div className="px-3 py-2 space-y-1.5">
-        {/* Progress bar */}
-        <div
-          className="h-1.5 bg-white/10 rounded-full cursor-pointer group relative"
-          onClick={handleSeek}
-        >
-          <div
-            className={`h-full bg-${vibeAccent}-500 rounded-full transition-[width] duration-200 relative`}
-            style={{ width: `${progress}%` }}
-          >
-            <div className={`absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-${vibeAccent}-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg`} />
+      {/* Full player — kept alive even when minimized (hidden via CSS, not removed from DOM) */}
+      <div
+        className={`w-80 max-w-[90vw] bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden ${isMinimized ? 'absolute -left-[9999px] w-0 h-0 overflow-hidden pointer-events-none' : ''}`}
+        style={isMinimized ? { position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' } : {}}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/5">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isPlaying ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
+            <span className="text-xs font-bold text-white truncate">
+              {mediaInfo.type === 'youtube' ? '▶ YouTube' : '🎵 SoundCloud'}
+            </span>
+            {syncCount > 0 && (
+              <span className="text-[10px] text-blue-400 flex items-center gap-0.5 flex-shrink-0">
+                <Users className="w-2.5 h-2.5" />{syncCount} watching
+              </span>
+            )}
           </div>
-        </div>
-
-        {/* Time + buttons */}
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] text-gray-400 font-mono tabular-nums min-w-[70px]">
-            {formatTime(currentTime)} / {formatTime(duration)}
-          </span>
-
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button onClick={() => setIsMinimized(true)} className="p-1 hover:bg-white/10 rounded-full transition-colors">
+              <Minimize2 className="w-3.5 h-3.5 text-gray-400" />
+            </button>
             <button
-              onClick={handlePlayPause}
-              className={`p-1.5 rounded-full bg-${vibeAccent}-500 hover:bg-${vibeAccent}-600 text-white transition-all active:scale-90 shadow-lg`}
+              onClick={() => window.open(mediaInfo.url, '_blank')}
+              className="p-1 hover:bg-white/10 rounded-full transition-colors"
+              title="Open in browser"
             >
-              {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 ml-0.5" />}
+              <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
             </button>
-          </div>
-
-          <div className="flex items-center gap-1.5 min-w-[70px] justify-end">
-            <button onClick={() => setIsMuted(!isMuted)} className="p-0.5 hover:bg-white/10 rounded-full transition-colors">
-              {isMuted ? <VolumeX className="w-3 h-3 text-gray-400" /> : <Volume2 className="w-3 h-3 text-gray-400" />}
+            <button onClick={handleClose} className="p-1 hover:bg-red-500/20 rounded-full transition-colors">
+              <X className="w-3.5 h-3.5 text-red-400" />
             </button>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={isMuted ? 0 : volume}
-              onChange={(e) => { setVolume(Number(e.target.value)); setIsMuted(false); }}
-              className="w-14 h-1 accent-white cursor-pointer"
-            />
           </div>
         </div>
 
-        {/* Shared by */}
+        {/* Video / Widget embed with overlay controls */}
+        <div
+          className="relative w-full aspect-video bg-black group"
+          ref={playerContainerRef}
+          onMouseEnter={() => {
+            if (controlsHideTimerRef.current) clearTimeout(controlsHideTimerRef.current);
+            setShowControls(true);
+          }}
+          onMouseLeave={() => {
+            controlsHideTimerRef.current = setTimeout(() => setShowControls(false), 2000);
+          }}
+          onMouseMove={() => {
+            setShowControls(true);
+            if (controlsHideTimerRef.current) clearTimeout(controlsHideTimerRef.current);
+            controlsHideTimerRef.current = setTimeout(() => setShowControls(false), 3000);
+          }}
+          onClick={(e) => {
+            // Click on video area (not controls) toggles play/pause
+            if (e.target === playerContainerRef.current || e.target.id === 'shared-media-embed' || e.target.tagName === 'IFRAME') {
+              handlePlayPause();
+            }
+          }}
+        >
+          {mediaInfo.type === 'youtube' ? (
+            <div id="shared-media-embed" className="w-full h-full" />
+          ) : (
+            <iframe
+              id="shared-media-embed"
+              className="w-full h-full"
+              scrolling="no"
+              frameBorder="no"
+              allow="autoplay"
+              sandbox="allow-scripts allow-same-origin allow-popups"
+              referrerPolicy="no-referrer"
+            />
+          )}
+
+          {/* Overlay: big play/pause button center */}
+          <div
+            className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}
+          >
+            <div className={`p-3 rounded-full bg-black/50 backdrop-blur-sm ${isPlaying ? 'opacity-0' : 'opacity-80'} transition-opacity`}>
+              <Play className="w-8 h-8 text-white ml-1" />
+            </div>
+          </div>
+
+          {/* Overlay: bottom controls bar */}
+          <div
+            className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 pt-6 pb-2 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Progress bar */}
+            <div
+              className="h-1 bg-white/20 rounded-full cursor-pointer group/seek mb-2 hover:h-2 transition-all"
+              onClick={handleSeek}
+            >
+              <div
+                className={`h-full bg-${vibeAccent}-500 rounded-full transition-[width] duration-200 relative`}
+                style={{ width: `${progress}%` }}
+              >
+                <div className={`absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-${vibeAccent}-400 rounded-full opacity-0 group-hover/seek:opacity-100 transition-opacity shadow-lg`} />
+              </div>
+            </div>
+
+            {/* Time + play/pause + volume */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handlePlayPause}
+                  className="p-1 hover:bg-white/20 rounded-full transition-colors"
+                >
+                  {isPlaying ? <Pause className="w-4 h-4 text-white" /> : <Play className="w-4 h-4 text-white ml-0.5" />}
+                </button>
+                <span className="text-[10px] text-gray-300 font-mono tabular-nums">
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => setIsMuted(!isMuted)} className="p-0.5 hover:bg-white/20 rounded-full transition-colors">
+                  {isMuted ? <VolumeX className="w-3.5 h-3.5 text-gray-300" /> : <Volume2 className="w-3.5 h-3.5 text-gray-300" />}
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={isMuted ? 0 : volume}
+                  onChange={(e) => { setVolume(Number(e.target.value)); setIsMuted(false); }}
+                  className="w-14 h-1 accent-white cursor-pointer"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Shared by — below the video */}
         {mediaInfo.sharedBy && (
-          <p className="text-[10px] text-gray-500 text-center">
+          <p className="text-[10px] text-gray-500 text-center py-1">
             Shared by <span className="text-gray-400 font-medium">{mediaInfo.sharedBy}</span>
           </p>
         )}

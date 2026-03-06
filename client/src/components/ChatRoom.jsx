@@ -868,7 +868,8 @@ const ChatRoom = () => {
 
       // Restore persisted media state if the room had an active media session
       if (data.activeMedia) {
-        setInitialMedia(data.activeMedia);
+        // Add a unique _ts to force React to re-trigger the effect on reconnect
+        setInitialMedia({ ...data.activeMedia, _ts: Date.now() });
       }
     };
 

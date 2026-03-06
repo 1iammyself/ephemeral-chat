@@ -1,14 +1,21 @@
 import React from 'react';
 import { Trophy, Swords, Clock, Check, Minus } from 'lucide-react';
-import { MATCH_STATUS } from '../utils/tournament';
+import { MATCH_STATUS, GAME_LABELS } from '../utils/tournament';
 
 // ─── Single Match Card ──────────────────────────────────────
-const MatchCard = ({ match, accentColor, onStartMatch, currentUserId }) => {
+const MatchCard = ({ match, accentColor, onStartMatch, currentUserId, gameType, roundGameTypes }) => {
   const { player1, player2, winner, status } = match;
   const isBye = status === MATCH_STATUS.BYE;
   const isCompleted = status === MATCH_STATUS.COMPLETED;
+  const isDraw = winner === 'draw';
   const isPending = status === MATCH_STATUS.PENDING && player1 && player2;
+  const isInProgress = status === 'in-progress';
   const isParticipant = player1?.id === currentUserId || player2?.id === currentUserId;
+
+  // For mixed tournaments, show the game type for this match's round
+  const matchGameType = gameType === 'mixed' && roundGameTypes && match.round
+    ? (roundGameTypes[match.round] || roundGameTypes[String(match.round)]) : null;
+  const matchGameInfo = matchGameType ? (GAME_LABELS[matchGameType] || {}) : null;
 
   const PlayerSlot = ({ player, isWinner }) => (
     <div className={`flex items-center justify-between px-2 py-1 text-xs rounded ${
@@ -25,18 +32,25 @@ const MatchCard = ({ match, accentColor, onStartMatch, currentUserId }) => {
 
   return (
     <div className={`w-[140px] sm:w-[160px] rounded-lg border overflow-hidden shadow-sm ${
-      isCompleted ? 'border-green-300 dark:border-green-800' :
+      isCompleted ? (isDraw ? 'border-gray-400 dark:border-gray-500' : 'border-green-300 dark:border-green-800') :
+      isInProgress ? 'border-amber-400 dark:border-amber-600 animate-pulse' :
       isPending ? `border-${accentColor}-300 dark:border-${accentColor}-700` :
       'border-gray-200 dark:border-gray-700'
     }`}>
-      <PlayerSlot player={player1} isWinner={winner && player1?.id === winner} />
+      {/* Game type badge for mixed tournaments */}
+      {matchGameInfo && (
+        <div className="px-2 py-0.5 bg-gray-50 dark:bg-gray-700/50 text-[9px] text-center text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+          {matchGameInfo.emoji} {matchGameInfo.label}
+        </div>
+      )}
+      <PlayerSlot player={player1} isWinner={winner && player1?.id === winner && !isDraw} />
       <div className="border-t border-gray-200 dark:border-gray-700" />
-      <PlayerSlot player={player2} isWinner={winner && player2?.id === winner} />
+      <PlayerSlot player={player2} isWinner={winner && player2?.id === winner && !isDraw} />
 
       {/* Action row */}
-      {isPending && !isCompleted && (
+      {isPending && !isCompleted && !isInProgress && (
         <div className={`border-t border-gray-200 dark:border-gray-700 px-2 py-1 bg-gray-50 dark:bg-gray-700/50`}>
-          {isParticipant ? (
+          {isParticipant && !match.gameMessageId ? (
             <button
               onClick={() => onStartMatch?.(match)}
               className={`w-full text-[10px] font-bold text-${accentColor}-600 dark:text-${accentColor}-400 flex items-center justify-center gap-1 hover:underline`}
@@ -50,10 +64,17 @@ const MatchCard = ({ match, accentColor, onStartMatch, currentUserId }) => {
           )}
         </div>
       )}
+      {isInProgress && (
+        <div className="border-t border-amber-300 dark:border-amber-700 px-2 py-0.5 bg-amber-50 dark:bg-amber-900/10">
+          <div className="text-[10px] text-amber-600 dark:text-amber-400 text-center flex items-center justify-center gap-1 font-bold">
+            <Swords className="w-3 h-3" /> Playing
+          </div>
+        </div>
+      )}
       {isCompleted && (
-        <div className="border-t border-gray-200 dark:border-gray-700 px-2 py-0.5 bg-green-50 dark:bg-green-900/10">
-          <div className="text-[10px] text-green-600 dark:text-green-400 text-center flex items-center justify-center gap-1">
-            <Check className="w-3 h-3" /> Done
+        <div className={`border-t px-2 py-0.5 ${isDraw ? 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800' : 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/10'}`}>
+          <div className={`text-[10px] text-center flex items-center justify-center gap-1 ${isDraw ? 'text-gray-500 dark:text-gray-400' : 'text-green-600 dark:text-green-400'}`}>
+            {isDraw ? <><Minus className="w-3 h-3" /> Draw</> : <><Check className="w-3 h-3" /> Done</>}
           </div>
         </div>
       )}
@@ -86,6 +107,8 @@ const TournamentBracket = ({ tournament, currentUser, onStartMatch, roomVibe }) 
 
   const { bracket } = tournamentData;
   const currentUserId = currentUser?.id || currentUser?.socketId;
+  const gameType = tournamentData.gameType;
+  const roundGameTypes = tournamentData.roundGameTypes;
 
   const handleMatchStart = (match) => {
     onStartMatch?.(tournament.id, match.id);
@@ -115,6 +138,8 @@ const TournamentBracket = ({ tournament, currentUser, onStartMatch, roomVibe }) 
                     accentColor={accentColor}
                     onStartMatch={handleMatchStart}
                     currentUserId={currentUserId}
+                    gameType={gameType}
+                    roundGameTypes={roundGameTypes}
                   />
                 ))}
               </div>
@@ -159,6 +184,8 @@ const TournamentBracket = ({ tournament, currentUser, onStartMatch, roomVibe }) 
                   accentColor={accentColor}
                   onStartMatch={handleMatchStart}
                   currentUserId={currentUserId}
+                  gameType={gameType}
+                  roundGameTypes={roundGameTypes}
                 />
               ))}
             </div>

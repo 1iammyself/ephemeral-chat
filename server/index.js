@@ -1524,7 +1524,8 @@ io.on('connection', (socket) => {
               users: enrichedUsers,
               messages,
               nickname: socket.nickname,
-              sessionToken
+              sessionToken,
+              activeMedia: io._activeMedia?.[roomCode] || null
             });
           }
         } else if (gracePeriodSession && gracePeriodSession.roomCode === roomCode) {
@@ -2356,6 +2357,8 @@ io.on('connection', (socket) => {
   if (!io._mediaWatchers) io._mediaWatchers = {};  // { roomCode: Set<socketId> }
   // Persist active media state per room so reconnecting users get it back
   if (!io._activeMedia) io._activeMedia = {};      // { roomCode: { type, id, url, sharedBy, sharedAt } }
+  // Track current playback state per room for rejoin sync (cleartext, not E2E)
+  if (!io._mediaPlaybackState) io._mediaPlaybackState = {}; // { roomCode: { isPlaying, currentTime, updatedAt } }
 
   // Allowed media types whitelist
   const ALLOWED_MEDIA_TYPES = ['youtube', 'soundcloud'];
@@ -2432,6 +2435,8 @@ io.on('connection', (socket) => {
     io.to(socket.roomCode).emit('media-share', payload);
     // Persist active media state for reconnecting users
     io._activeMedia[socket.roomCode] = { ...payload, sharedAt: Date.now() };
+    // Reset playback state (new video starts at 0)
+    io._mediaPlaybackState[socket.roomCode] = { isPlaying: false, currentTime: 0, updatedAt: Date.now() };
     logger.info(`Media shared in room ${socket.roomCode}: ${type} by ${sharedBy}`);
   });
 
@@ -2445,6 +2450,14 @@ io.on('connection', (socket) => {
       if (typeof data.ct !== 'string' || data.ct.length > 65536) return;
       if (typeof data.iv !== 'string' || data.iv.length > 256) return;
       socket.to(socket.roomCode).emit('media-sync', data);
+      // Track unencrypted playback hint for rejoin sync
+      if (typeof data._hint === 'object' && data._hint) {
+        io._mediaPlaybackState[socket.roomCode] = {
+          isPlaying: data._hint.action === 'play',
+          currentTime: typeof data._hint.currentTime === 'number' ? data._hint.currentTime : 0,
+          updatedAt: Date.now()
+        };
+      }
       return;
     }
 
@@ -2472,12 +2485,40 @@ io.on('connection', (socket) => {
       ? Math.max(0, Math.min(data.currentTime, 86400))  // Cap at 24h
       : 0;
 
+    // Track playback state for rejoin sync
+    io._mediaPlaybackState[socket.roomCode] = {
+      isPlaying: action === 'play',
+      currentTime,
+      updatedAt: Date.now()
+    };
+
     // Forward play / pause / seek to all *other* participants
     socket.to(socket.roomCode).emit('media-sync', {
       action,
       currentTime,
       userId: socket.id,
     });
+  });
+
+  // ─── Media Request Sync: rejoining user asks for current playback state ──
+  socket.on('media-request-sync', () => {
+    if (!socket.roomCode) return;
+    if (!checkRateLimit(socket.id, 5, 60000)) return;
+
+    const playbackState = io._mediaPlaybackState[socket.roomCode];
+    if (playbackState) {
+      // Estimate current position: if playing, add elapsed time since last update
+      let estimatedTime = playbackState.currentTime;
+      if (playbackState.isPlaying && playbackState.updatedAt) {
+        const elapsed = (Date.now() - playbackState.updatedAt) / 1000;
+        estimatedTime += elapsed;
+      }
+
+      socket.emit('media-sync-restore', {
+        isPlaying: playbackState.isPlaying,
+        currentTime: Math.max(0, estimatedTime)
+      });
+    }
   });
 
   socket.on('media-join', () => {
@@ -2516,6 +2557,7 @@ io.on('connection', (socket) => {
     socket.to(socket.roomCode).emit('media-close');
     delete io._mediaWatchers[socket.roomCode];
     delete io._activeMedia[socket.roomCode];  // Clear persisted media state
+    delete io._mediaPlaybackState[socket.roomCode]; // Clear playback state
   });
 
   // ─── Now Playing Status ─────────────────────────────────────────
@@ -3107,53 +3149,56 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Report match result (after a game completes)
-  socket.on('tournament-match-result', async ({ messageId, matchId, winnerId }) => {
+  // ─── Tournament result recording helper ────────────────────────────────
+  // Called directly by game completion handlers (tic-tac-toe, RPS, chess)
+  // instead of the broken socket.emit approach.
+  async function recordTournamentMatchResult(roomCode, messageId, matchId, winnerId, isDraw = false) {
     try {
-      if (!socket.roomCode || !messageId || !matchId || !winnerId) return;
+      if (!roomCode || !messageId || !matchId) return;
 
-      const message = await roomManager.getMessage(socket.roomCode, messageId);
+      const message = await roomManager.getMessage(roomCode, messageId);
       if (!message || message.messageType !== 'tournament' || !message.tournamentData) return;
 
       const td = message.tournamentData;
       if (td.status !== 'in-progress') return;
 
-      const { rounds, standings } = td.bracket;
-
       if (td.format === 'round-robin') {
-        // Find the match and set winner
         const { rounds, standings } = td.bracket;
         let matchFound = false;
         for (const round of rounds) {
           const match = round.find(m => m.id === matchId);
           if (match && match.status !== 'completed') {
-            match.winner = winnerId;
             match.status = 'completed';
-            matchFound = true;
-
-            // Update standings
-            if (standings) {
-              const winner = standings.find(s => s.playerId === winnerId);
-              const loserId = match.player1.id === winnerId ? match.player2.id : match.player1.id;
-              const loser = standings.find(s => s.playerId === loserId);
-
-              if (winner) { winner.wins++; winner.points += 3; }
-              if (loser) { loser.losses++; }
+            if (isDraw) {
+              match.winner = 'draw';
+              if (standings) {
+                const s1 = standings.find(s => s.playerId === match.player1.id);
+                const s2 = standings.find(s => s.playerId === match.player2.id);
+                if (s1) { s1.draws++; s1.points += 1; }
+                if (s2) { s2.draws++; s2.points += 1; }
+              }
+            } else {
+              match.winner = winnerId;
+              if (standings) {
+                const winner = standings.find(s => s.playerId === winnerId);
+                const loserId = match.player1.id === winnerId ? match.player2.id : match.player1.id;
+                const loser = standings.find(s => s.playerId === loserId);
+                if (winner) { winner.wins++; winner.points += 3; }
+                if (loser) { loser.losses++; }
+              }
             }
+            matchFound = true;
             break;
           }
         }
         if (!matchFound) return;
 
-        // Check if all matches are done
         const allDone = rounds.every(r => r.every(m => m.status === 'completed'));
         if (allDone) td.status = 'completed';
       } else if (td.format === 'double-elimination' && td.bracket.format === 'double-elimination') {
-        // Double elimination: advance winner in winners/losers, loser drops to losers
         const { winnersRounds, losersRounds, grandFinals } = td.bracket;
         let matchFound = false;
 
-        // Search all brackets for the match
         const allBrackets = [
           ...winnersRounds.map((r, idx) => ({ rounds: winnersRounds, roundIdx: idx, bracket: 'winners' })),
           ...losersRounds.map((r, idx) => ({ rounds: losersRounds, roundIdx: idx, bracket: 'losers' })),
@@ -3169,59 +3214,59 @@ io.on('connection', (socket) => {
           const match = round[matchIdx];
           if (match.status === 'completed') return;
 
-          match.winner = winnerId;
           match.status = 'completed';
+          if (isDraw) {
+            match.winner = 'draw';
+          } else {
+            match.winner = winnerId;
+          }
           matchFound = true;
 
-          const winnerPlayer = match.player1?.id === winnerId ? match.player1 : match.player2;
-          const loserPlayer = match.player1?.id === winnerId ? match.player2 : match.player1;
+          if (!isDraw) {
+            const winnerPlayer = match.player1?.id === winnerId ? match.player1 : match.player2;
+            const loserPlayer = match.player1?.id === winnerId ? match.player2 : match.player1;
 
-          if (bracket === 'winners') {
-            // Winner advances in winners bracket
-            if (roundIdx < winnersRounds.length - 1) {
-              const nextMatch = winnersRounds[roundIdx + 1][Math.floor(matchIdx / 2)];
-              if (nextMatch) {
-                if (matchIdx % 2 === 0) nextMatch.player1 = winnerPlayer;
-                else nextMatch.player2 = winnerPlayer;
+            if (bracket === 'winners') {
+              if (roundIdx < winnersRounds.length - 1) {
+                const nextMatch = winnersRounds[roundIdx + 1][Math.floor(matchIdx / 2)];
+                if (nextMatch) {
+                  if (matchIdx % 2 === 0) nextMatch.player1 = winnerPlayer;
+                  else nextMatch.player2 = winnerPlayer;
+                }
+              } else {
+                if (grandFinals[0]) grandFinals[0].player1 = winnerPlayer;
               }
-            } else {
-              // Winners bracket final — winner goes to grand finals
-              if (grandFinals[0]) grandFinals[0].player1 = winnerPlayer;
-            }
-
-            // Loser drops to losers bracket
-            if (loserPlayer && losersRounds.length > 0) {
-              const losersRoundIdx = roundIdx * 2; // Map winners round to losers round
-              if (losersRoundIdx < losersRounds.length) {
-                const losersMatch = losersRounds[losersRoundIdx][matchIdx % losersRounds[losersRoundIdx].length];
-                if (losersMatch) {
-                  if (!losersMatch.player1) losersMatch.player1 = loserPlayer;
-                  else if (!losersMatch.player2) losersMatch.player2 = loserPlayer;
+              if (loserPlayer && losersRounds.length > 0) {
+                const losersRoundIdx = roundIdx * 2;
+                if (losersRoundIdx < losersRounds.length) {
+                  const losersMatch = losersRounds[losersRoundIdx][matchIdx % losersRounds[losersRoundIdx].length];
+                  if (losersMatch) {
+                    if (!losersMatch.player1) losersMatch.player1 = loserPlayer;
+                    else if (!losersMatch.player2) losersMatch.player2 = loserPlayer;
+                  }
                 }
               }
-            }
-          } else if (bracket === 'losers') {
-            // Winner advances in losers bracket
-            if (roundIdx < losersRounds.length - 1) {
-              const nextMatch = losersRounds[roundIdx + 1][Math.floor(matchIdx / 2)];
-              if (nextMatch) {
-                if (matchIdx % 2 === 0) nextMatch.player1 = winnerPlayer;
-                else if (!nextMatch.player2) nextMatch.player2 = winnerPlayer;
+            } else if (bracket === 'losers') {
+              if (roundIdx < losersRounds.length - 1) {
+                const nextMatch = losersRounds[roundIdx + 1][Math.floor(matchIdx / 2)];
+                if (nextMatch) {
+                  if (matchIdx % 2 === 0) nextMatch.player1 = winnerPlayer;
+                  else if (!nextMatch.player2) nextMatch.player2 = winnerPlayer;
+                }
+              } else {
+                if (grandFinals[0]) grandFinals[0].player2 = winnerPlayer;
               }
-            } else {
-              // Losers bracket final — winner goes to grand finals
-              if (grandFinals[0]) grandFinals[0].player2 = winnerPlayer;
+            } else if (bracket === 'grand-finals') {
+              td.status = 'completed';
             }
-          } else if (bracket === 'grand-finals') {
-            td.status = 'completed';
           }
           break;
         }
-
         if (!matchFound) return;
       } else {
-        // Single elimination: advance winner
+        // Single elimination
         const { rounds } = td.bracket;
+        let matchFound = false;
         for (let r = 0; r < rounds.length; r++) {
           const round = rounds[r];
           const matchIdx = round.findIndex(m => m.id === matchId);
@@ -3229,32 +3274,133 @@ io.on('connection', (socket) => {
 
           const match = round[matchIdx];
           if (match.status === 'completed') return;
-          match.winner = winnerId;
           match.status = 'completed';
+          matchFound = true;
 
-          const winnerPlayer = match.player1?.id === winnerId ? match.player1 : match.player2;
-
-          // Advance to next round
-          if (r < rounds.length - 1) {
-            const nextMatch = rounds[r + 1][Math.floor(matchIdx / 2)];
-            if (nextMatch) {
-              if (matchIdx % 2 === 0) nextMatch.player1 = winnerPlayer;
-              else nextMatch.player2 = winnerPlayer;
+          if (isDraw) {
+            match.winner = 'draw';
+          } else {
+            match.winner = winnerId;
+            const winnerPlayer = match.player1?.id === winnerId ? match.player1 : match.player2;
+            if (r < rounds.length - 1) {
+              const nextMatch = rounds[r + 1][Math.floor(matchIdx / 2)];
+              if (nextMatch) {
+                if (matchIdx % 2 === 0) nextMatch.player1 = winnerPlayer;
+                else nextMatch.player2 = winnerPlayer;
+              }
             }
           }
 
-          // Check if finals are done
           if (r === rounds.length - 1) {
             td.status = 'completed';
           }
           break;
         }
+        if (!matchFound) return;
       }
 
-      await roomManager.saveMessage(socket.roomCode, message);
-      io.to(socket.roomCode).emit('message-updated', message);
+      // Build result summary for the notification
+      let matchSummary = '';
+      let winnerNickname = '';
+      let loserNickname = '';
+      {
+        // Find the completed match to get player names
+        const allMatchRounds = [];
+        if (td.bracket.rounds) allMatchRounds.push(...td.bracket.rounds);
+        if (td.bracket.winnersRounds) allMatchRounds.push(...td.bracket.winnersRounds);
+        if (td.bracket.losersRounds) allMatchRounds.push(...td.bracket.losersRounds);
+        if (td.bracket.grandFinals) allMatchRounds.push(td.bracket.grandFinals);
+        for (const round of allMatchRounds) {
+          const m = (Array.isArray(round) ? round : []).find(rm => rm.id === matchId);
+          if (m) {
+            const p1Name = m.player1?.nickname || 'Player 1';
+            const p2Name = m.player2?.nickname || 'Player 2';
+            if (isDraw) {
+              matchSummary = `${p1Name} vs ${p2Name} — Draw 🤝`;
+            } else {
+              winnerNickname = m.player1?.id === winnerId ? p1Name : p2Name;
+              loserNickname = m.player1?.id === winnerId ? p2Name : p1Name;
+              matchSummary = `${winnerNickname} beat ${loserNickname} 🏆`;
+            }
+            break;
+          }
+        }
+      }
 
-      logger.info(`🏆 Tournament match ${matchId} completed in room ${socket.roomCode}, winner: ${winnerId}`);
+      // Save tournament result and add to match history
+      if (!td.matchHistory) td.matchHistory = [];
+      td.matchHistory.push({
+        matchId,
+        winnerId: isDraw ? null : winnerId,
+        isDraw,
+        summary: matchSummary,
+        timestamp: Date.now()
+      });
+
+      await roomManager.saveMessage(roomCode, message);
+      io.to(roomCode).emit('message-updated', message);
+
+      logger.info(`🏆 Tournament match ${matchId} result recorded in room ${roomCode} — ${matchSummary}`);
+
+      // ── Send a system notification about the match result ──
+      if (matchSummary) {
+        const resultNotification = {
+          id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          content: `🏆 ${td.name}: ${matchSummary}`,
+          messageType: 'notification',
+          sender: { id: 'system', nickname: 'Tournament', socketId: 'system' },
+          timestamp: new Date().toISOString(),
+          reactions: {},
+          overrideTtl: 300 // 5 min TTL for notifications
+        };
+        const room = await roomManager.getRoom(roomCode);
+        if (room) {
+          room.messages = room.messages || [];
+          room.messages.push(resultNotification);
+          await roomManager.saveRoom(roomCode, room);
+          io.to(roomCode).emit('new-message', resultNotification);
+        }
+      }
+
+      // ── If tournament is complete, announce the champion ──
+      if (td.status === 'completed') {
+        logger.info(`🏆 Tournament COMPLETED in room ${roomCode}!`);
+        // Send champion announcement
+        let championName = winnerNickname;
+        if (!championName && td.format === 'round-robin' && td.bracket.standings) {
+          const sorted = [...td.bracket.standings].sort((a, b) => b.points - a.points || b.wins - a.wins);
+          if (sorted.length > 0) championName = sorted[0].nickname;
+        }
+        if (championName) {
+          const champMsg = {
+            id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            content: `🏆👑 ${td.name} — ${championName} is the CHAMPION! 👑🏆`,
+            messageType: 'notification',
+            sender: { id: 'system', nickname: 'Tournament', socketId: 'system' },
+            timestamp: new Date().toISOString(),
+            reactions: {},
+            overrideTtl: 0 // Champion announcement never expires
+          };
+          const room2 = await roomManager.getRoom(roomCode);
+          if (room2) {
+            room2.messages = room2.messages || [];
+            room2.messages.push(champMsg);
+            await roomManager.saveRoom(roomCode, room2);
+            io.to(roomCode).emit('new-message', champMsg);
+          }
+        }
+      }
+    } catch (error) {
+      logger.error('Error recording tournament match result:', error);
+    }
+  }
+
+  // Report match result (after a game completes)
+  socket.on('tournament-match-result', async ({ messageId, matchId, winnerId }) => {
+    try {
+      if (!socket.roomCode || !messageId || !matchId || !winnerId) return;
+
+      await recordTournamentMatchResult(socket.roomCode, messageId, matchId, winnerId, false);
     } catch (error) {
       logger.error('Error reporting tournament match result:', error);
     }
@@ -3362,6 +3508,7 @@ io.on('connection', (socket) => {
       gameData.tournamentRef = {
         tournamentMessageId,
         matchId,
+        matchRound: targetMatch.round || 1,
         player1Id: p1.id,
         player2Id: p2.id
       };
@@ -3369,12 +3516,15 @@ io.on('connection', (socket) => {
       const gameTypeName = gameType === 'tic-tac-toe' ? 'Tic-Tac-Toe' :
         gameType === 'rock-paper-scissors' ? 'Rock Paper Scissors' : 'Chess';
 
+      const roundLabel = (td.gameType === 'mixed' && td.roundGameTypes)
+        ? ` (Round ${targetMatch.round || '?'})` : '';
+
       const gameMessage = {
         id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        content: `🏆 Tournament: ${p1.nickname} vs ${p2.nickname} — ${gameTypeName}`,
+        content: `🏆 Tournament${roundLabel}: ${p1.nickname} vs ${p2.nickname} — ${gameTypeName}`,
         messageType: 'game',
         gameData,
-        sender: { id: 'system', nickname: '🏆 Tournament', socketId: 'system' },
+        sender: { id: playerId, nickname: socket.nickname, socketId: socket.id },
         timestamp: new Date().toISOString(),
         reactions: {},
         overrideTtl: 0 // Tournament matches never expire
@@ -3531,14 +3681,13 @@ io.on('connection', (socket) => {
         io.to(socket.roomCode).emit('message-updated', message);
 
         // Auto-report tournament result if this game is part of a tournament
-        if (gameData.winner && gameData.winner !== 'draw' && gameData.tournamentRef) {
+        if (gameData.winner && gameData.tournamentRef) {
           const ref = gameData.tournamentRef;
-          const winnerId = gameData.winner === 'X' ? gameData.players.X.id : gameData.players.O.id;
-          socket.emit('tournament-match-result', {
-            messageId: ref.tournamentMessageId,
-            matchId: ref.matchId,
-            winnerId
-          });
+          const isDraw = gameData.winner === 'draw';
+          const winnerId = isDraw ? null : (gameData.winner === 'X' ? gameData.players.X.id : gameData.players.O.id);
+          await recordTournamentMatchResult(
+            socket.roomCode, ref.tournamentMessageId, ref.matchId, winnerId, isDraw
+          );
         }
       }
     } catch (error) {
@@ -3665,11 +3814,9 @@ io.on('connection', (socket) => {
         if (gameData.winner && gameData.tournamentRef) {
           const ref = gameData.tournamentRef;
           const winnerId = gameData.winner === 'P1' ? gameData.players.P1.id : gameData.players.P2.id;
-          socket.emit('tournament-match-result', {
-            messageId: ref.tournamentMessageId,
-            matchId: ref.matchId,
-            winnerId
-          });
+          await recordTournamentMatchResult(
+            socket.roomCode, ref.tournamentMessageId, ref.matchId, winnerId, false
+          );
         }
       }
     } catch (error) {
@@ -3772,10 +3919,12 @@ io.on('connection', (socket) => {
           }
           gameData.endedAt = Date.now();
 
-          // Apply 2-minute TTL for finished game
-          message.timestamp = new Date().toISOString();
-          message.overrideTtl = 120;
-          message.expiresAt = new Date(Date.now() + 120 * 1000).toISOString();
+          // Tournament games keep overrideTtl=0 (no expiry). Regular games get 2-min TTL.
+          if (!gameData.tournamentRef) {
+            message.timestamp = new Date().toISOString();
+            message.overrideTtl = 120;
+            message.expiresAt = new Date(Date.now() + 120 * 1000).toISOString();
+          }
         }
 
         gameData.history = gameData.history || [];
@@ -3786,14 +3935,13 @@ io.on('connection', (socket) => {
         io.to(socket.roomCode).emit('message-updated', message);
 
         // Auto-report tournament result if this game is part of a tournament
-        if (gameData.winner && gameData.winner !== 'draw' && gameData.tournamentRef) {
+        if (gameData.winner && gameData.tournamentRef) {
           const ref = gameData.tournamentRef;
-          const winnerId = gameData.winnerId || (gameData.winner === 'white' ? gameData.players.white.id : gameData.players.black.id);
-          socket.emit('tournament-match-result', {
-            messageId: ref.tournamentMessageId,
-            matchId: ref.matchId,
-            winnerId
-          });
+          const isDraw = gameData.winner === 'draw';
+          const winnerId = isDraw ? null : (gameData.winnerId || (gameData.winner === 'white' ? gameData.players.white.id : gameData.players.black.id));
+          await recordTournamentMatchResult(
+            socket.roomCode, ref.tournamentMessageId, ref.matchId, winnerId, isDraw
+          );
         }
       }
     } catch (error) {
