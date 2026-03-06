@@ -1173,21 +1173,22 @@ export default function App() {
                         fileName: downloadFileName,
                     });
 
-                    const blob = new Blob([plainBytes], {
-                        type: isFolderRef.current
-                            ? "application/zip"
-                            : "application/octet-stream",
-                    });
+                    const mimeType = isFolderRef.current
+                        ? "application/zip"
+                        : "application/octet-stream";
+                    const blob = new Blob([plainBytes], { type: mimeType });
                     const url = URL.createObjectURL(blob);
 
                     const typeLabel = isFolderRef.current ? "folder" : "file";
 
-                    // Store pending download and show confirmation modal
+                    // Store pending download (with the actual Blob) and show confirmation modal
                     setPendingDownload({
+                        blob: blob,
                         url: url,
                         name: downloadFileName,
                         size: formatBytes(totalLen),
                         type: typeLabel,
+                        mimeType: mimeType,
                     });
                     setShowDownloadConfirmModal(true);
 
@@ -1824,17 +1825,19 @@ export default function App() {
     async function handleConfirmDownload() {
         if (!pendingDownload) return;
 
-        // Try downloading natively with Capacitor or fallback to Web
+        // Download using the Blob directly (no re-fetching)
         try {
-            const response = await fetch(pendingDownload.url);
-            const blob = await response.blob();
-            await downloadFileOnDevice(blob, pendingDownload.name, pendingDownload.type);
+            await downloadFileOnDevice(
+                pendingDownload.blob,
+                pendingDownload.name,
+                pendingDownload.mimeType
+            );
         } catch (err) {
-            console.error("Failed to fetch pending download blob", err);
+            console.error("Download failed:", err);
             toast.error("Download failed");
         }
 
-        // Update state
+        // Update state — keep the blob URL for the fallback <a> download link
         setDownloadUrl(pendingDownload.url);
         setDownloadName(pendingDownload.name);
         setShowDownloadConfirmModal(false);
@@ -1846,7 +1849,9 @@ export default function App() {
     function handleCancelDownload() {
         if (pendingDownload) {
             // Clean up the blob URL to free memory
-            URL.revokeObjectURL(pendingDownload.url);
+            if (pendingDownload.url) {
+                URL.revokeObjectURL(pendingDownload.url);
+            }
             setPendingDownload(null);
         }
         setShowDownloadConfirmModal(false);

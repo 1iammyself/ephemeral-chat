@@ -245,75 +245,60 @@ const ChatRoom = () => {
     };
   }, [isResizingSidebar, sidebarPosition]);
 
-  // Visual Viewport handler for mobile keyboard and browser chrome - IMPROVED FOR ANDROID
-  // This entire useEffect should REPLACE the existing viewport handler (lines 142-205 in ChatRoom.jsx)
+  // Visual Viewport handler for mobile keyboard and browser chrome
+  // On Capacitor native: Keyboard.resize:"body" + adjustResize handles everything —
+  // the WebView body shrinks natively when the keyboard opens, so the flexbox layout
+  // (.chat-container with height:100%) automatically adjusts. We only need to prevent
+  // the page from scrolling on Android.
+  // On web browsers: we still need the manual viewport calculation for iOS Safari.
   useEffect(() => {
-    // Detect mobile OS
+    const isNative = Capacitor.getPlatform() !== 'web';
+
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
     const isAndroid = /Android/.test(navigator.userAgent);
 
-    // Track if an input is currently focused
-    let inputFocused = false;
+    // ── Native Capacitor: minimal handler ──
+    // The body resizes automatically; just prevent unwanted page scroll on Android.
+    if (isNative) {
+      const preventScroll = () => {
+        window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+        document.documentElement.scrollTop = 0;
+      };
 
-    // Store the initial viewport height (before keyboard)
-    let initialHeight = window.innerHeight;
+      // Keep page pinned to top (Android WebView can scroll behind the keyboard)
+      window.addEventListener('scroll', preventScroll, { passive: false });
+      window.addEventListener('resize', preventScroll);
+
+      return () => {
+        window.removeEventListener('scroll', preventScroll);
+        window.removeEventListener('resize', preventScroll);
+      };
+    }
+
+    // ── Web browser: full visualViewport handler (iOS Safari, etc.) ──
+    let inputFocused = false;
     let initialVisualHeight = window.visualViewport?.height || window.innerHeight;
 
     const updateViewportHeight = () => {
       const vv = window.visualViewport;
-
       if (vv) {
-        // On iOS Safari, visualViewport.height includes the keyboard
-        // But it may also include an offset from the top when page scrolls
         const visualHeight = vv.height;
         const visualOffsetTop = vv.offsetTop || 0;
-
-        // Calculate height difference from the initial visual viewport
         const heightDiff = initialVisualHeight - visualHeight;
-
-        // Keyboard detection:
-        // - Android: use a lower threshold (100px)
-        // - iOS: use the height difference plus check if input is focused
         const keyboardThreshold = isAndroid ? 100 : 150;
         const keyboardLikelyOpen = inputFocused && heightDiff > keyboardThreshold;
 
-        let targetHeight;
-        if (keyboardLikelyOpen) {
-          // Keyboard is open - use visual viewport height
-          // On iOS, this should be the height above the keyboard
-          targetHeight = visualHeight;
-        } else {
-          // No keyboard - use window inner height
-          targetHeight = window.innerHeight;
-        }
-
-        // For iOS with keyboard open, also account for any scroll offset
+        let targetHeight = keyboardLikelyOpen ? visualHeight : window.innerHeight;
         if (isIOS && keyboardLikelyOpen && visualOffsetTop > 0) {
-          // Page has scrolled, adjust for this
           targetHeight = visualHeight - visualOffsetTop;
         }
 
-        // Update CSS custom properties
         document.documentElement.style.setProperty('--vh', `${targetHeight * 0.01}px`);
         document.documentElement.style.setProperty('--chat-height', `${targetHeight}px`);
         document.documentElement.style.setProperty('--keyboard-height', keyboardLikelyOpen ? `${heightDiff}px` : '0px');
-
-        // Debug: log values for iOS troubleshooting
-        if (isIOS && inputFocused) {
-          console.log('[iOS Keyboard]', {
-            visualHeight,
-            innerHeight: window.innerHeight,
-            initialVisualHeight,
-            heightDiff,
-            targetHeight,
-            keyboardLikelyOpen,
-            visualOffsetTop
-          });
-        }
       } else {
-        // Fallback for browsers without visualViewport
         const vh = window.innerHeight;
         document.documentElement.style.setProperty('--vh', `${vh * 0.01}px`);
         document.documentElement.style.setProperty('--keyboard-height', '0px');
@@ -322,7 +307,6 @@ const ChatRoom = () => {
     };
 
     const scrollToTop = () => {
-      // Prevent page scroll on Android
       if (isAndroid) {
         window.scrollTo(0, 0);
         document.body.scrollTop = 0;
@@ -330,41 +314,15 @@ const ChatRoom = () => {
       }
     };
 
-    // Input focus handlers to track keyboard state
     const handleFocusIn = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
         inputFocused = true;
-
-        // Android-specific: Force viewport update after a short delay
-        if (isAndroid) {
-          setTimeout(() => {
-            updateViewportHeight();
-            scrollToTop();
-          }, 100);
-
-          // Additional update after keyboard animation completes
-          setTimeout(() => {
-            updateViewportHeight();
-          }, 400);
-        } else if (isIOS) {
-          // iOS-specific: Add class to trigger fixed positioning CSS
+        if (isIOS) {
           document.body.classList.add('ios-keyboard-open');
-
-          // Update viewport height multiple times during keyboard animation
-          setTimeout(() => {
-            updateViewportHeight();
-          }, 50);
-          setTimeout(() => {
-            updateViewportHeight();
-          }, 150);
-          setTimeout(() => {
-            updateViewportHeight();
-          }, 300);
-          setTimeout(() => {
-            updateViewportHeight();
-          }, 500);
+          [50, 150, 300, 500].forEach(ms => setTimeout(updateViewportHeight, ms));
         } else {
-          updateViewportHeight();
+          setTimeout(() => { updateViewportHeight(); scrollToTop(); }, 100);
+          setTimeout(updateViewportHeight, 400);
         }
       }
     };
@@ -372,64 +330,27 @@ const ChatRoom = () => {
     const handleFocusOut = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
         inputFocused = false;
-
-        // Android-specific: Force viewport update after keyboard closes
-        if (isAndroid) {
-          setTimeout(() => {
-            updateViewportHeight();
-            scrollToTop();
-          }, 100);
-        } else if (isIOS) {
-          // iOS-specific: Remove class and reset after keyboard closes
+        if (isIOS) {
           setTimeout(() => {
             document.body.classList.remove('ios-keyboard-open');
             updateViewportHeight();
           }, 100);
         } else {
-          setTimeout(() => {
-            updateViewportHeight();
-          }, 100);
+          setTimeout(() => { updateViewportHeight(); scrollToTop(); }, 100);
         }
       }
     };
 
-    // Initial setup
     updateViewportHeight();
     scrollToTop();
 
-    // Listen for viewport changes
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', updateViewportHeight);
       window.visualViewport.addEventListener('scroll', scrollToTop);
     }
-
-    // Listen for window resize (fallback)
     window.addEventListener('resize', updateViewportHeight);
-
-    // Listen for input focus/blur to track keyboard state
     document.addEventListener('focusin', handleFocusIn);
     document.addEventListener('focusout', handleFocusOut);
-
-    // Android-specific: Prevent scroll when input is focused
-    if (isAndroid) {
-      const preventScroll = (e) => {
-        if (inputFocused) {
-          window.scrollTo(0, 0);
-        }
-      };
-      window.addEventListener('scroll', preventScroll, { passive: false });
-
-      return () => {
-        if (window.visualViewport) {
-          window.visualViewport.removeEventListener('resize', updateViewportHeight);
-          window.visualViewport.removeEventListener('scroll', scrollToTop);
-        }
-        window.removeEventListener('resize', updateViewportHeight);
-        window.removeEventListener('scroll', preventScroll);
-        document.removeEventListener('focusin', handleFocusIn);
-        document.removeEventListener('focusout', handleFocusOut);
-      };
-    }
 
     return () => {
       if (window.visualViewport) {
@@ -511,20 +432,20 @@ const ChatRoom = () => {
   const [verbalCode, setVerbalCode] = useState(null); // State for verbal code display
 
   // ─── Capacitor Keyboard State ────────────────────────────────
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-
+  // With Keyboard.resize: "body" + adjustResize, the WebView resizes natively.
+  // Scroll messages into view when keyboard opens/closes so the latest messages
+  // remain visible and there's no white gap flash.
   useEffect(() => {
     if (Capacitor.getPlatform() !== 'web') {
-      const showListener = Keyboard.addListener('keyboardWillShow', info => {
-        setKeyboardHeight(info.keyboardHeight);
-        // Scroll to bottom immediately when keyboard opens
-        if (messagesEndRef.current) {
-          messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-        }
-      });
-      const hideListener = Keyboard.addListener('keyboardWillHide', () => {
-        setKeyboardHeight(0);
-      });
+      const scrollToBottom = () => {
+        // Wait a frame for the WebView body to finish resizing
+        requestAnimationFrame(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        });
+      };
+
+      const showListener = Keyboard.addListener('keyboardWillShow', scrollToBottom);
+      const hideListener = Keyboard.addListener('keyboardWillHide', scrollToBottom);
 
       return () => {
         showListener.then(l => l.remove());
@@ -1527,6 +1448,11 @@ const ChatRoom = () => {
       } else if (e.key === 'Escape') {
         setSuggestions(prev => ({ ...prev, show: false }));
       }
+    } else if (e.key === 'Enter') {
+      // Intercept Enter directly — bypass form onSubmit to avoid Android keyboard flash.
+      // The form's submit event can cause a brief blur→refocus cycle on mobile.
+      e.preventDefault();
+      doSendMessage();
     }
   };
 
@@ -1726,10 +1652,21 @@ const ChatRoom = () => {
       if (overrideTtl) setOverrideTtl(false);
       if (!isStealthMode) socketManager.emit('user-activity');
       hapticLight();
+
+      // Clear message and keep keyboard open.
+      // On Android, setNewMessage('') + focus() in the same tick can cause a
+      // brief keyboard dismiss flash because React re-renders the controlled input.
+      // Fix: clear the native input value immediately (prevents visual flash),
+      // then update React state, then re-assert focus after React paints.
+      if (messageInputRef.current) {
+        messageInputRef.current.value = '';          // instant visual clear
+      }
       setNewMessage('');
       setReplyingTo(null);
-      // Re-focus input to keep keyboard open
-      messageInputRef.current?.focus();
+      // Re-focus after React finishes re-rendering
+      requestAnimationFrame(() => {
+        messageInputRef.current?.focus();
+      });
     } catch (error) {
       setError('Failed to send message');
     } finally {
@@ -2331,7 +2268,6 @@ const ChatRoom = () => {
   return (
     <div
       className={`flex flex-col transition-colors duration-500 chat-container overflow-hidden ${getVibeById(roomVibe).bgClass}`}
-      style={{ paddingBottom: `${keyboardHeight}px` }}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -2854,17 +2790,6 @@ const ChatRoom = () => {
                         onCopy={(e) => e.preventDefault()}
                         onCut={(e) => e.preventDefault()}
                         onPaste={(e) => e.preventDefault()}
-                        onFocus={() => {
-                          const isAndroid = /Android/.test(navigator.userAgent);
-                          if (isAndroid) {
-                            setTimeout(() => {
-                              const inputContainer = messageInputRef.current?.closest('.chat-input-area');
-                              if (inputContainer) {
-                                inputContainer.scrollIntoView({ block: 'end', behavior: 'smooth' });
-                              }
-                            }, 100);
-                          }
-                        }}
                         placeholder={isAnonymousMode ? "Confess anonymously..." : "Type message..."}
                         className="w-full bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white text-[15px] sm:text-base px-2 py-2.5 min-w-0 placeholder:text-gray-400"
                         disabled={!isConnected || isSending}

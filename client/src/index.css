@@ -31,10 +31,26 @@
     @apply bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 transition-colors duration-200;
   }
 
+  /* Ensure height chain: html → body → #root → .chat-container */
+  #root {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+  }
+
   /* Mobile viewport fix */
   .chat-container {
-    /* Use the dynamic height set by JS (shrinks when keyboard opens) */
-    height: var(--chat-height, 100dvh);
+    /*
+     * On Capacitor Android with Keyboard.resize:"body" + adjustResize,
+     * the WebView <body> itself shrinks when the keyboard opens.
+     * Using height:100% lets the container follow that body resize.
+     * position:fixed is relative to the viewport (ignores body resize)
+     * so we use position:absolute instead.
+     * On web browsers, 100dvh via fallback handles the dynamic viewport.
+     */
+    height: 100%;
+    max-height: 100dvh;
     width: 100%;
     display: flex;
     flex-direction: column;
@@ -42,12 +58,11 @@
     /* Safe area for iPhone notch/home indicator */
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    /* Fixed positioning - but NO bottom constraint so height can change */
-    position: fixed;
+    position: absolute;
     top: 0;
     left: 0;
     right: 0;
-    /* REMOVED: bottom: 0 - this was preventing height changes on iOS */
+    bottom: 0;
   }
 
   /* Ensure the input area never gets hidden */
@@ -535,9 +550,9 @@ cap-widget {
 /* ============================================
    iOS Safari/PWA Keyboard Fix
    
-   The container shrinks when keyboard opens via
-   --chat-height variable set by visualViewport JS.
-   No need for fixed input positioning.
+   On Capacitor native, the WebView body resizes
+   natively (Keyboard.resize:"body" + adjustResize).
+   On iOS Safari web, visualViewport JS sets --chat-height.
    ============================================ */
 
 /* iOS-specific styles (Safari only) */
@@ -555,10 +570,9 @@ cap-widget {
     -webkit-overflow-scrolling: auto !important;
   }
 
-  /* Container should shrink based on --chat-height */
+  /* Container should shrink based on --chat-height (iOS Safari web only) */
   body.ios-keyboard-open .chat-container {
-    /* Force height update */
-    height: var(--chat-height) !important;
+    height: var(--chat-height, 100%) !important;
   }
 }
 
@@ -571,11 +585,9 @@ cap-widget {
   }
 
   .chat-container {
-    /* Dynamic viewport height */
-    height: var(--chat-height, 100dvh) !important;
+    height: 100% !important;
     min-height: 0 !important;
-    /* Allow shrinking */
-    max-height: var(--chat-height, 100dvh) !important;
+    max-height: 100dvh !important;
   }
 }
 
