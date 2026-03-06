@@ -373,7 +373,13 @@ export class ProximityService {
 
     console.log('[Proximity] Connecting to', peerId);
 
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    // CRITICAL FIX: Empty ICE Servers forces true, offline local hole-punching.
+    // If we passed TURN/STUN here, it would mistakenly bounce traffic to the internet instead of resolving local LAN IPs.
+    const pc = new RTCPeerConnection({
+      iceServers: [],
+      iceTransportPolicy: 'all',     // consider all local candidates
+      iceCandidatePoolSize: 10       // generate pre-flight local UDP host IPs
+    });
 
     // Create data channel BEFORE creating the offer
     const dc = pc.createDataChannel(DATA_CHANNEL_LABEL, { ordered: true });
@@ -411,7 +417,12 @@ export class ProximityService {
       this._closeConnection(fromPeerId);
     }
 
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    // CRITICAL FIX: Empty ICE Servers for receiving connections.
+    const pc = new RTCPeerConnection({
+      iceServers: [],
+      iceTransportPolicy: 'all',
+      iceCandidatePoolSize: 10
+    });
 
     const conn = {
       pc,
@@ -492,8 +503,39 @@ export class ProximityService {
       }
     };
 
+    // Diagnostic Analytics Tracker
     pc.oniceconnectionstatechange = () => {
       console.log('[Proximity] ICE state', peerId, '->', pc.iceConnectionState);
+
+      // If we connect, let's aggressively poll to see *how* we connected
+      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        pc.getStats().then(stats => {
+          stats.forEach(report => {
+            if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+              console.log('✓ ACTIVE CONNECTION PAIR:', report);
+
+              // Find the actual candidates to determine if we are indeed using Local IPs
+              stats.forEach(r => {
+                if (r.id === report.localCandidateId) {
+                  console.log('  -> LOCAL ROUTE:', r.candidateType, r.address, r.protocol);
+                }
+                if (r.id === report.remoteCandidateId) {
+                  console.log('  -> REMOTE ROUTE:', r.candidateType, r.address, r.protocol);
+                }
+              });
+
+              if (report.localCandidateId && report.remoteCandidateId) {
+                const isLocal = Array.from(stats.values()).some(r => r.id === report.localCandidateId && r.candidateType === 'host');
+                if (isLocal) {
+                  console.log('🚀 SUCCESS: True Offline Host Connection Confirmed!');
+                } else {
+                  console.log('⚠️ WARNING: Transfer is being relayed over NAT/STUN!');
+                }
+              }
+            }
+          });
+        }).catch(e => console.warn('Stats diag error:', e));
+      }
     };
   }
 
