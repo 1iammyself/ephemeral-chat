@@ -11,9 +11,10 @@ import ThreadView from './ThreadView';
 import socketManager from '../socket';
 import { getVibeById } from '../utils/vibes';
 import LinkPreviewModal, { isDomainTrusted } from './LinkPreviewModal';
+import { toast } from 'react-toastify';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
-import { Share } from '@capacitor/share';
+import { FileOpener } from '@capacitor-community/file-opener';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀', '🍕', '🍔', '🍦', '🍩', '🍺', '🎸', '🎮', '🚀', '🌈', '🍄'];
 
@@ -594,11 +595,8 @@ function formatFileSize(bytes) {
 /**
  * Cross-platform file download.
  *
- * Priority:
- * 1. Capacitor Filesystem + Share  — native Android/iOS (most reliable in WebView)
- * 2. Web Share API with File       — mobile browser fallback
- * 3. Blob URL + hidden anchor      — Electron + desktop browsers
- * 4. data: URI                     — last resort
+ * On Android/iOS (Capacitor): writes file to Documents, then opens it with the native file viewer.
+ * On web/Electron: uses blob URL + hidden anchor for a standard browser download.
  */
 async function downloadFile(base64Content, mimeType, fileName) {
   const safeType = mimeType || 'application/octet-stream';
@@ -608,49 +606,43 @@ async function downloadFile(base64Content, mimeType, fileName) {
     // 1️⃣ Capacitor native path (Android / iOS)
     if (Capacitor.getPlatform() !== 'web') {
       try {
-        await Filesystem.writeFile({
+        // Request filesystem permissions (crucial for modern Android)
+        await Filesystem.requestPermissions();
+
+        // Write file to device's Documents directory
+        const writeResult = await Filesystem.writeFile({
           path: safeFileName,
           data: base64Content,
-          directory: Directory.Cache,
+          directory: Directory.Documents,
         });
-        const { uri } = await Filesystem.getUri({
-          path: safeFileName,
-          directory: Directory.Cache,
-        });
-        await Share.share({
-          title: safeFileName,
-          url: uri,
-          dialogTitle: 'Save or share file',
+
+        toast.success(`Downloaded: ${safeFileName}`);
+
+        // Open the saved file with the native file viewer (so user can view it after downloading)
+        await FileOpener.open({
+          filePath: writeResult.uri,
+          contentType: safeType,
         });
         return;
       } catch (capErr) {
-        if (capErr?.name === 'AbortError' || capErr?.message?.toLowerCase().includes('cancel')) return;
+        // User cancelled the file opener — not an error
+        if (capErr?.message?.toLowerCase().includes('cancel')) return;
+        if (capErr?.message?.toLowerCase().includes('no activity')) {
+          // No app installed to open this file type — still saved successfully
+          console.warn('[downloadFile] File saved but no viewer app for this type');
+          return;
+        }
         console.warn('[downloadFile] Capacitor path failed:', capErr.message);
-        // fall through to blob methods
+        // fall through to web methods
       }
     }
 
-    // Decode base64 → Blob for remaining methods
+    // 2️⃣ Blob URL + hidden anchor — Electron + desktop browsers
     const byteChars = atob(base64Content);
     const byteNums = new Uint8Array(byteChars.length);
     for (let i = 0; i < byteChars.length; i++) byteNums[i] = byteChars.charCodeAt(i);
     const blob = new Blob([byteNums], { type: safeType });
 
-    // 2️⃣ Web Share API — mobile browser (non-Capacitor)
-    if (navigator.canShare) {
-      try {
-        const file = new File([blob], safeFileName, { type: safeType });
-        if (navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: safeFileName });
-          return;
-        }
-      } catch (shareErr) {
-        if (shareErr?.name === 'AbortError') return;
-        console.warn('[downloadFile] Web Share failed:', shareErr.message);
-      }
-    }
-
-    // 3️⃣ Blob URL + hidden anchor — Electron + desktop browsers
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -663,7 +655,6 @@ async function downloadFile(base64Content, mimeType, fileName) {
 
   } catch (err) {
     console.error('[downloadFile] All methods failed:', err);
-    // 4️⃣ data: URI fallback
     try {
       window.open(`data:${safeType};base64,${base64Content}`, '_blank');
     } catch (_) { /* silent */ }

@@ -5,7 +5,7 @@ import { getVibeById } from '../utils/vibes';
 import socketManager from '../socket';
 
 // ─── Inline Sub-Poll Component ──────────────────────────────────
-const SubPollInline = ({ subPoll, parentOptionId, messageId, currentUserId, accentColor }) => {
+const SubPollInline = ({ subPoll, parentOptionId, messageId, currentUserId, accentColor, hasVotedParent }) => {
     const [expanded, setExpanded] = useState(false);
     const subTotalVoters = useMemo(() => {
         const s = new Set();
@@ -14,6 +14,7 @@ const SubPollInline = ({ subPoll, parentOptionId, messageId, currentUserId, acce
     }, [subPoll.options]);
 
     const handleSubVote = (subOptionId) => {
+        if (!hasVotedParent) return;
         socketManager.emit('vote-sub-poll', { messageId, optionId: parentOptionId, subOptionId });
     };
 
@@ -25,13 +26,21 @@ const SubPollInline = ({ subPoll, parentOptionId, messageId, currentUserId, acce
             </button>
             {expanded && (
                 <div className="mt-1 space-y-1">
+                    {!hasVotedParent && (
+                        <p className="text-[10px] text-gray-400 dark:text-gray-500 italic px-2 py-0.5">
+                            Vote for this option first to unlock follow-up choices
+                        </p>
+                    )}
                     {subPoll.options.map(so => {
                         const voted = so.votes?.some(v => v.userId === currentUserId);
                         return (
                             <button key={so.id} onClick={() => handleSubVote(so.id)}
-                                className={`w-full text-left px-2 py-1 rounded text-[11px] sm:text-xs border transition-colors ${voted
-                                    ? `border-${accentColor}-400 bg-${accentColor}-50 dark:bg-${accentColor}-900/20 font-semibold text-${accentColor}-700 dark:text-${accentColor}-300`
-                                    : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/40'
+                                disabled={!hasVotedParent}
+                                className={`w-full text-left px-2 py-1 rounded text-[11px] sm:text-xs border transition-colors ${!hasVotedParent
+                                    ? 'border-gray-100 dark:border-gray-700 text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-50'
+                                    : voted
+                                        ? `border-${accentColor}-400 bg-${accentColor}-50 dark:bg-${accentColor}-900/20 font-semibold text-${accentColor}-700 dark:text-${accentColor}-300`
+                                        : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/40'
                                     }`}
                             >
                                 {voted ? <CheckCircle2 className="w-3 h-3 inline mr-1" /> : <Circle className="w-3 h-3 inline mr-1" />}
@@ -205,6 +214,7 @@ const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
                                         messageId={message.id}
                                         currentUserId={currentUserId}
                                         accentColor={accentColor}
+                                        hasVotedParent={isVoted}
                                     />
                                 )}
 

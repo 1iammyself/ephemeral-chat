@@ -2398,83 +2398,62 @@ const ChatRoom = () => {
         </div>
       </div>
 
-      <div className="absolute top-[84px] sm:top-[100px] right-2 sm:right-6 left-auto z-40 flex flex-col items-end space-y-2 pointer-events-none transition-all duration-300">
-        {/* Ambient Player / Mood DJ */}
-        {getVibeById(roomVibe)?.moodSound && (
-          <div className="pointer-events-auto animate-in slide-in-from-top-2">
-            <AmbientPlayer moodSound={getVibeById(roomVibe).moodSound} isActive={true} />
-          </div>
-        )}
-        {/* Watch Party / Shared Media Player */}
-        {showMediaPlayer && (
-          <div className="pointer-events-auto animate-in slide-in-from-top-2">
-            <SharedMediaPlayer
-              roomCode={roomCode}
-              currentUser={currentUser}
-              isHost={isHost}
-              roomVibe={roomVibe}
-              mlsReady={mlsReady}
-              initialMedia={initialMedia}
-              onNowPlayingChange={(np) => {
-                const myId = currentUser?.socketId || currentUser?.id;
-                if (myId && np) {
-                  setNowPlayingMap(prev => ({ ...prev, [myId]: np }));
-                } else if (myId) {
-                  setNowPlayingMap(prev => { const copy = { ...prev }; delete copy[myId]; return copy; });
-                }
-              }}
-            />
-          </div>
-        )}
-        {/* Topic Pill */}
-        {roomTopic && (
-          <div
-            className={`pointer-events-auto bg-${vibeAccent}-100/20 dark:bg-${vibeAccent}-950/40 backdrop-blur-md border border-${vibeAccent}-200/20 dark:border-${vibeAccent}-500/20 px-4 py-1.5 rounded-full shadow-sm flex items-center space-x-2 animate-in slide-in-from-top-2 max-w-[80%] cursor-move touch-none`}
-            style={{ transform: `translateX(${offsets.topic}px)` }}
-            onMouseDown={(e) => handleStartPillDrag(e, 'topic')}
-            onTouchStart={(e) => handleStartPillDrag(e, 'topic')}
-          >
-            <span className={`text-xs font-semibold text-${vibeAccent}-600 dark:text-${vibeAccent}-400 uppercase tracking-wider select-none`}>Topic</span>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate select-none">{roomTopic}</span>
-            {canManageRoom(currentUserRole) && (
-              <button
-                onClick={(e) => { e.stopPropagation(); setShowTopicEditor(true); }}
-                className={`p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 hover:text-${vibeAccent}-500 transition-colors`}
-                onMouseDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
-              >
-                <Edit2 className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-        )}
-
-
-        {/* Timer Pill */}
-        {activeTimer && (
-          <div
-            className={`pointer-events-auto bg-${vibeAccent}-600/90 backdrop-blur-md px-4 py-1.5 rounded-full shadow-lg flex items-center space-x-3 animate-in slide-in-from-top-2 text-white border border-${vibeAccent}-500/50 cursor-move touch-none`}
-            style={{ transform: `translateX(${offsets.timer}px)` }}
-            onMouseDown={(e) => handleStartPillDrag(e, 'timer')}
-            onTouchStart={(e) => handleStartPillDrag(e, 'timer')}
-          >
-            <Clock className={`w-3.5 h-3.5 select-none ${timeLeft === '00:00' ? 'animate-bounce text-red-300' : 'animate-pulse'}`} />
-            <span className={`font-mono text-sm font-bold tracking-wider select-none ${timeLeft === '00:00' ? 'text-red-100' : ''}`}>{timeLeft || '00:00'}</span>
-            {canManageRoom(currentUserRole) && (
-              <button
-                onClick={(e) => { e.stopPropagation(); handleStopTimer(); }}
-                className={`ml-1 p-0.5 hover:bg-white/20 rounded-full transition-colors`
-                }
-                title="Stop Timer"
-                onMouseDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
-              >
-                <X className="w-3 h-3 text-red-500" />
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+      {/* ── Compact info bar: sits IN document flow, never overlaps messages ── */}
+      {(getVibeById(roomVibe)?.moodSound || showMediaPlayer || roomTopic || activeTimer) && (
+        <div className={`flex items-center gap-2 px-3 py-1.5 border-b border-gray-200/50 dark:border-gray-700/50 ${getVibeById(roomVibe).panelClass} backdrop-blur-md overflow-x-auto scrollbar-none shrink-0`}>
+          {/* Ambient Player / Mood DJ */}
+          {getVibeById(roomVibe)?.moodSound && (
+            <div className="shrink-0">
+              <AmbientPlayer moodSound={getVibeById(roomVibe).moodSound} isActive={true} />
+            </div>
+          )}
+          {/* Watch Party */}
+          {showMediaPlayer && (
+            <div className="shrink-0">
+              <SharedMediaPlayer
+                roomCode={roomCode}
+                currentUser={currentUser}
+                isHost={isHost}
+                roomVibe={roomVibe}
+                mlsReady={mlsReady}
+                initialMedia={initialMedia}
+                onNowPlayingChange={(np) => {
+                  const myId = currentUser?.socketId || currentUser?.id;
+                  if (myId && np) {
+                    setNowPlayingMap(prev => ({ ...prev, [myId]: np }));
+                  } else if (myId) {
+                    setNowPlayingMap(prev => { const copy = { ...prev }; delete copy[myId]; return copy; });
+                  }
+                }}
+              />
+            </div>
+          )}
+          {/* Topic Pill */}
+          {roomTopic && (
+            <div className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full bg-${vibeAccent}-100/30 dark:bg-${vibeAccent}-900/20 border border-${vibeAccent}-200/30 dark:border-${vibeAccent}-500/20`}>
+              <span className={`text-[10px] font-bold text-${vibeAccent}-600 dark:text-${vibeAccent}-400 uppercase tracking-wider`}>Topic</span>
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-200 truncate max-w-[120px] sm:max-w-[200px]">{roomTopic}</span>
+              {canManageRoom(currentUserRole) && (
+                <button onClick={() => setShowTopicEditor(true)} className={`p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 hover:text-${vibeAccent}-500 transition-colors`}>
+                  <Edit2 className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          )}
+          {/* Timer Pill */}
+          {activeTimer && (
+            <div className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full bg-${vibeAccent}-600/90 text-white border border-${vibeAccent}-500/50`}>
+              <Clock className={`w-3 h-3 ${timeLeft === '00:00' ? 'animate-bounce text-red-300' : 'animate-pulse'}`} />
+              <span className={`font-mono text-xs font-bold tracking-wider ${timeLeft === '00:00' ? 'text-red-100' : ''}`}>{timeLeft || '00:00'}</span>
+              {canManageRoom(currentUserRole) && (
+                <button onClick={handleStopTimer} className="p-0.5 hover:bg-white/20 rounded-full transition-colors" title="Stop Timer">
+                  <X className="w-3 h-3 text-red-300" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="mx-4 mt-2 bg-red-100 dark:bg-red-900/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-2 rounded-lg text-sm flex items-center justify-between md:w-fit md:mx-auto shadow-sm animate-in fade-in slide-in-from-top-2 z-[60] relative">

@@ -134,9 +134,22 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Android 13+ scoped media permissions (for file downloads) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+
+    <!-- Compatibility for Android <= 12 -->
+    <uses-permission 
+        android:name="android.permission.READ_EXTERNAL_STORAGE" 
+        android:maxSdkVersion="32" />
+
+    <!-- Compatibility for Android <= 10 -->
+    <uses-permission 
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
+        android:maxSdkVersion="29" />
 
     <!-- Proximity Transfer permissions -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />

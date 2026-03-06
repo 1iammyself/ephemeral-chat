@@ -12,6 +12,7 @@
  */
 
 import { isCapacitor, isMobile } from './platform';
+import { toast } from 'react-toastify';
 
 /**
  * Download / save a file on any platform.
@@ -24,42 +25,41 @@ export async function downloadFileOnDevice(blob, fileName, mimeType) {
   const type = mimeType || blob.type || 'application/octet-stream';
 
   // ── Strategy 1: Capacitor native share ──────────────────
-  // @capacitor/share can share files if we convert the blob to a data URI
-  // or a temporary file URL. The simplest cross-platform approach is
-  // converting to a base64 data URI and using the Share plugin.
+  // On Android/iOS: writes file to Documents, then opens it with the native file viewer.
   if (isCapacitor) {
     try {
-      const { Share } = await import('@capacitor/share');
       const { Filesystem, Directory } = await import('@capacitor/filesystem');
+      const { FileOpener } = await import('@capacitor-community/file-opener');
 
-      // Write blob to a temp file in the cache directory
+      // Request filesystem permissions (crucial for modern Android)
+      await Filesystem.requestPermissions();
+
       const base64Data = await blobToBase64(blob);
-      const tempPath = `download_${Date.now()}_${fileName}`;
+      const safeFileName = fileName || 'download';
 
+      // Write file to device's Documents directory
       const writeResult = await Filesystem.writeFile({
-        path: tempPath,
+        path: safeFileName,
         data: base64Data,
-        directory: Directory.Cache,
+        directory: Directory.Documents,
       });
 
-      // Share the file URI — this opens the Android/iOS share sheet
-      // where the user can pick "Save to Files", "Save Image", etc.
-      await Share.share({
-        title: fileName,
-        url: writeResult.uri,
-        dialogTitle: `Save ${fileName}`,
-      });
+      toast.success(`Downloaded: ${safeFileName}`);
 
-      // Clean up temp file after a delay
-      setTimeout(async () => {
-        try {
-          await Filesystem.deleteFile({ path: tempPath, directory: Directory.Cache });
-        } catch (_) { /* ignore cleanup errors */ }
-      }, 30000);
+      // Open the saved file with the native file viewer
+      await FileOpener.open({
+        filePath: writeResult.uri,
+        contentType: type,
+      });
 
       return true;
-    } catch (capError) {
-      console.warn('[downloadHelper] Capacitor share/filesystem failed:', capError.message);
+    } catch (capErr) {
+      if (capErr?.message?.toLowerCase().includes('cancel')) return true;
+      if (capErr?.message?.toLowerCase().includes('no activity')) {
+        console.warn('[downloadHelper] File saved but no viewer app for this type');
+        return true;
+      }
+      console.warn('[downloadHelper] Capacitor path failed:', capErr.message);
       // Fall through to navigator.share or <a> fallback
     }
   }
