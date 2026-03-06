@@ -149,6 +149,40 @@ function readChunkAsArrayBuffer(blob) {
   });
 }
 
+/**
+ * Compress JSON payload to reduce QR code density for fast scanning natively.
+ */
+export async function compressPayload(obj) {
+  const str = JSON.stringify(obj);
+  try {
+    const stream = new Blob([str]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+    const buffer = await new Response(stream).arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return 'C|' + btoa(binary);
+  } catch (e) {
+    // Graceful fallback if unsupported
+    return 'U|' + btoa(str);
+  }
+}
+
+export async function decompressPayload(payloadStr) {
+  if (typeof payloadStr === 'object') return payloadStr; // Legacy fallback
+
+  if (payloadStr.startsWith('C|')) {
+    const binary = atob(payloadStr.slice(2));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    const text = await new Response(stream).text();
+    return JSON.parse(text);
+  } else if (payloadStr.startsWith('U|')) {
+    return JSON.parse(atob(payloadStr.slice(2)));
+  }
+  return JSON.parse(payloadStr); // Unencoded legacy JSON strings
+}
+
 // ─── ProximityService ───────────────────────────────────────
 
 export class ProximityService {
@@ -490,19 +524,22 @@ export class ProximityService {
       setTimeout(resolve, 3000);
     });
 
-    const payload = JSON.stringify({
+    const payloadObj = {
       t: 'offer',
       deviceId: this.deviceId,
       nickname: this.nickname,
       o: offer.sdp,
       c: candidates
-    });
+    };
+
+    // Severely compress payload to drastically improve QR scan-ability
+    const payload = await compressPayload(payloadObj);
 
     return { payload, peerId };
   }
 
-  async acceptOfflineOffer(offerJson) {
-    const data = JSON.parse(offerJson);
+  async acceptOfflineOffer(offerCompressed) {
+    const data = await decompressPayload(offerCompressed);
     console.log('[Proximity] Accepting offline offer from', data.deviceId);
 
     const strictStunServers = ICE_SERVERS.filter(server => !server.urls.toString().includes('turn:'));
@@ -554,16 +591,18 @@ export class ProximityService {
       conn.pairingCode = code;
     }).catch(e => console.warn('Offline connection failed:', e));
 
-    return JSON.stringify({
+    const answerObj = {
       t: 'answer',
       nickname: this.nickname,
       a: answer.sdp,
       c: candidates
-    });
+    };
+
+    return await compressPayload(answerObj);
   }
 
-  async finalizeOfflineConnection(answerJson, originalPeerId) {
-    const data = JSON.parse(answerJson);
+  async finalizeOfflineConnection(answerCompressed, originalPeerId) {
+    const data = await decompressPayload(answerCompressed);
     const conn = this.connections.get(originalPeerId);
     if (!conn) throw new Error('No offline offer was created');
 

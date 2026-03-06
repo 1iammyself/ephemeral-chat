@@ -13,7 +13,7 @@ import HotspotSetup from './HotspotSetup';
 import { ConnectionQR } from './QRGenerator';
 import QRScanner from './QRScanner';
 import { isCapacitor, isElectron } from '../utils/platform';
-import { formatBytes, formatSpeed } from '../utils/proximity';
+import { formatBytes, formatSpeed, decompressPayload } from '../utils/proximity';
 
 const NearbyTransfer = () => {
   const navigate = useNavigate();
@@ -203,7 +203,7 @@ const NearbyTransfer = () => {
   // QR scan result
   const handleQRScan = async (data) => {
     try {
-      const info = JSON.parse(data);
+      const info = await decompressPayload(data);
 
       if (info.t === 'offer' && service) {
         setShowScanner(false);
