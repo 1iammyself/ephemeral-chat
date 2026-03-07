@@ -261,9 +261,8 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                                 <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white mb-2 sm:mb-3">{triviaData.question}</p>
                                 <div className="space-y-1 sm:space-y-2">
                                     {triviaData.options.map((opt, i) => (
-                                        <div key={i} className={`p-1.5 sm:p-2.5 rounded-lg text-xs sm:text-sm border ${i === triviaData.answer ? `bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 font-semibold` : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-700 dark:text-gray-300'}`}>
+                                        <div key={i} className="p-1.5 sm:p-2.5 rounded-lg text-xs sm:text-sm border bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-700 dark:text-gray-300">
                                             {String.fromCharCode(65 + i)}. {opt}
-                                            {i === triviaData.answer && <span className="ml-1 text-[9px] sm:text-[10px]">✓</span>}
                                         </div>
                                     ))}
                                 </div>

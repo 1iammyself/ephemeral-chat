@@ -2774,6 +2774,11 @@ io.on('connection', (socket) => {
 
       // Store the answer keyed by persistent ID
       message.gameData.answers[answererId] = answer;
+
+      // Store nickname mapping so the sender can see who answered what
+      if (!message.gameData.answerNicknames) message.gameData.answerNicknames = {};
+      message.gameData.answerNicknames[answererId] = message.isAnonymous ? 'Anonymous 👻' : (socket.nickname || 'Unknown');
+
       await roomManager.saveRoom(socket.roomCode, room);
 
       // Broadcast the updated message with masking

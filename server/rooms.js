@@ -734,6 +734,7 @@ class RoomManager {
         gameData: {
           ...message.gameData,
           answers: maskedAnswers,
+          answerNicknames: undefined, // Strip nicknames from non-sender view
           stats: stats,
           isMasked: true
         }

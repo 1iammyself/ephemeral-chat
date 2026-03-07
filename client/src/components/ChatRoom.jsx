@@ -1725,7 +1725,8 @@ const ChatRoom = () => {
     socketManager.emit('send-message', {
       messageType: 'poll',
       pollData,
-      recipients: selectedRecipients
+      recipients: selectedRecipients,
+      isAnonymous: isAnonymousMode
     });
   };
 
@@ -1739,11 +1740,15 @@ const ChatRoom = () => {
       return;
     }
 
+    // Anonymous mode applies to games except chess (chess needs real identity for player tracking)
+    const isChessGame = gameData.gameType === 'chess';
+
     socketManager.emit('send-message', {
       messageType: 'game',
       gameData,
       recipients: selectedRecipients,
-      userId: persistentUserId
+      userId: persistentUserId,
+      isAnonymous: isChessGame ? false : isAnonymousMode
     });
   };
 
@@ -1968,7 +1973,8 @@ const ChatRoom = () => {
           imageData: content,
           isEncrypted: false,
           isViewOnce: true,
-          recipients: selectedRecipients
+          recipients: selectedRecipients,
+          isAnonymous: isAnonymousMode
         });
         setIsUploading(false);
         return;
@@ -2025,7 +2031,8 @@ const ChatRoom = () => {
             fileName: file.name,
             mimeType: file.type,
             fileSize: file.size,
-            recipients: selectedRecipients
+            recipients: selectedRecipients,
+            isAnonymous: isAnonymousMode
           });
         });
       }

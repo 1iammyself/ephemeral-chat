@@ -187,6 +187,18 @@ function setupSecurity(window) {
     callback({ responseHeaders: details.responseHeaders });
   });
 
+  // ── Fix YouTube "Sign in to confirm you're not a bot" issue ──
+  // YouTube detects the "Electron" string in the user-agent and shows a CAPTCHA.
+  // Override the user-agent for YouTube/Google requests to use a standard Chrome UA.
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ['*://*.youtube.com/*', '*://*.google.com/*', '*://*.googlevideo.com/*', '*://*.youtube-nocookie.com/*', '*://*.ytimg.com/*'] },
+    (details, callback) => {
+      const chromeVersion = process.versions.chrome || '120.0.0.0';
+      details.requestHeaders['User-Agent'] = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`;
+      callback({ requestHeaders: details.requestHeaders });
+    }
+  );
+
   // Screen capture protection (Windows)
   if (process.platform === 'win32' && securityMode !== 'low') {
     window.setContentProtection(true);

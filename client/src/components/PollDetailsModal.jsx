@@ -107,6 +107,47 @@ const PollDetailsModal = ({ isOpen, onClose, pollData, currentUser, roomVibe }) 
                                         No votes yet
                                     </div>
                                 )}
+
+                                {/* Sub-poll (follow-up) details */}
+                                {option.subPoll && (
+                                    <div className="mt-4 ml-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700 space-y-4">
+                                        <p className={`text-sm font-bold text-${accentColor}-600 dark:text-${accentColor}-400`}>
+                                            ↳ {option.subPoll.question}
+                                        </p>
+                                        {option.subPoll.options.map((subOption) => (
+                                            <div key={subOption.id} className="space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                        {subOption.text}
+                                                    </h5>
+                                                    <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400">
+                                                        {subOption.votes?.length || 0} vote{(subOption.votes?.length || 0) !== 1 ? 's' : ''}
+                                                    </span>
+                                                </div>
+                                                {subOption.votes && subOption.votes.length > 0 && (
+                                                    <div className="space-y-2 pl-2">
+                                                        {subOption.votes.map((vote, idx) => {
+                                                            const isMe = vote.userId === currentUserId;
+                                                            return (
+                                                                <div key={idx} className="flex items-center space-x-3">
+                                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shadow-sm ${isMe
+                                                                        ? avatarClass
+                                                                        : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                                                                        }`}>
+                                                                        {vote.nickname?.charAt(0).toUpperCase() || '?'}
+                                                                    </div>
+                                                                    <span className={`text-sm font-medium ${isMe ? nicknameClass : 'text-gray-700 dark:text-gray-300'}`}>
+                                                                        {isMe ? 'You' : vote.nickname}
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>

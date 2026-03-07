@@ -391,7 +391,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                                     {Object.entries(answers).map(([uid, choice]) => (
                                         <div key={uid} className="flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 px-2.5 py-1.5 rounded-lg border border-gray-100 dark:border-gray-800">
                                             <span className="text-xs font-bold text-gray-600 dark:text-gray-400 truncate max-w-[120px]">
-                                                {uid === currentUserId ? 'You' : (message.sender.nickname === 'You' ? 'Anonymous' : 'Member')}
+                                                {uid === currentUserId ? 'You' : (gameData.answerNicknames?.[uid] || 'Member')}
                                             </span>
                                             <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${choice === 'A' ? 'bg-indigo-500' : 'bg-teal-500'} text-white`}>
                                                 Option {choice}
@@ -523,7 +523,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                                     {Object.entries(answers).map(([uid, choiceIdx]) => (
                                         <div key={uid} className="flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 px-2.5 py-1.5 rounded-lg border border-gray-100 dark:border-gray-800">
                                             <span className="text-xs font-bold text-gray-600 dark:text-gray-400 truncate max-w-[120px]">
-                                                {uid === currentUserId ? 'You' : (message.sender.nickname === 'You' ? 'Anonymous' : 'Member')}
+                                                {uid === currentUserId ? 'You' : (gameData.answerNicknames?.[uid] || 'Member')}
                                             </span>
                                             <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${choiceIdx === gameData.answer ? 'bg-green-500' : 'bg-red-500'} text-white`}>
                                                 {String.fromCharCode(65 + choiceIdx)}
