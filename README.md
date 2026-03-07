@@ -120,16 +120,6 @@ npm run dev
 - **Chat Interface**: `http://localhost:5173`
 - **Signal Server**: `http://localhost:3001`
 
----
-
-## 🤝 Contributing
-
-We welcome contributions from the security and privacy community! Please read our `CONTRIBUTING.md` (coming soon) and ensure your PRs adhere to our zero-knowledge philosophy.
-
-**License**: Distributed under the **Apache License 2.0**. See `LICENSE` for details.
-
----
-
 <div align="center">
   <i>Maintained with ❤️ by <a href="https://portfolio.kyere.me/">Caleb Kyere-Boateng</a></i>
 </div>
