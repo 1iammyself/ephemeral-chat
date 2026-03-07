@@ -666,11 +666,11 @@ class RoomManager {
     if (gameType === 'rock-paper-scissors') {
       const gd = message.gameData;
       const isP1 = gd.players.P1.id === userId || gd.players.P1.id === persistentId ||
-                    gd.players.P1.socketId === userId ||
-                    (persistentId && gd.players.P1.socketId === persistentId);
+        gd.players.P1.socketId === userId ||
+        (persistentId && gd.players.P1.socketId === persistentId);
       const isP2 = gd.players.P2.id && (gd.players.P2.id === userId || gd.players.P2.id === persistentId ||
-                    gd.players.P2.socketId === userId ||
-                    (persistentId && gd.players.P2.socketId === persistentId));
+        gd.players.P2.socketId === userId ||
+        (persistentId && gd.players.P2.socketId === persistentId));
 
       // If the round is complete (both moved) or the game has a winner, show everything
       if (gd.winner || (gd.players.P1.move && gd.players.P2.move)) {
@@ -709,7 +709,7 @@ class RoomManager {
 
     // Senders see everything
     if (message.sender.socketId === userId || message.sender.id === userId ||
-        (persistentId && message.sender.id === persistentId)) {
+      (persistentId && message.sender.id === persistentId)) {
       return message;
     }
 
@@ -1319,17 +1319,26 @@ class RoomManager {
     if (!message) return null;
 
     if (!message.reactions) message.reactions = {};
-    if (!message.reactions[emoji]) message.reactions[emoji] = [];
 
-    const userIndex = message.reactions[emoji].indexOf(userId);
-    if (userIndex !== -1) {
-      // Remove reaction
-      message.reactions[emoji].splice(userIndex, 1);
-      if (message.reactions[emoji].length === 0) {
-        delete message.reactions[emoji];
+    let userAlreadyHadThisEmoji = false;
+
+    // Remove user's existing reaction from ANY emoji first to ensure max 1 reaction per user
+    for (const existingEmoji of Object.keys(message.reactions)) {
+      const uIndex = message.reactions[existingEmoji].indexOf(userId);
+      if (uIndex !== -1) {
+        message.reactions[existingEmoji].splice(uIndex, 1);
+        if (existingEmoji === emoji) {
+          userAlreadyHadThisEmoji = true;
+        }
+        if (message.reactions[existingEmoji].length === 0) {
+          delete message.reactions[existingEmoji];
+        }
       }
-    } else {
-      // Add reaction
+    }
+
+    // If they were not toggling off their current emoji, add the new one
+    if (!userAlreadyHadThisEmoji) {
+      if (!message.reactions[emoji]) message.reactions[emoji] = [];
       message.reactions[emoji].push(userId);
     }
 
