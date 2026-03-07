@@ -40,6 +40,7 @@ const { initGatewayKeys, ohttpGatewayMiddleware, startKeyRotation: startOHTTPKey
 const { initIssuer, attachPrivacyPassRoutes, privacyPassAuth, startCleanup: startPPCleanup, stopCleanup: stopPPCleanup } = require('./privacy-pass-issuer');
 const { attachICESignaling } = require('./ice-signaling');
 const { trafficPaddingMiddleware, startServerChaff, stopServerChaff, isChaff, stripPadding, padResponseMiddleware } = require('./traffic-padding');
+const { LinkPreviewService } = require('./link-preview');
 
 // Initialize Cap.js for proof-of-work CAPTCHA
 const cap = new Cap({
@@ -260,6 +261,7 @@ const deferredRemovals = new Map();
 let redisClient = null;
 let roomManager;
 let securityManager;
+let linkPreviewService;
 
 async function initializeRedis() {
   try {
@@ -279,9 +281,14 @@ async function initializeRedis() {
   roomManager.setIo(io); // Pass io reference for stale user detection
   securityManager = new SecurityManager();
 
-  // Periodic cleanup for security manager
+  // Initialize Link Preview Service (uses Redis for cache if available, otherwise in-memory)
+  linkPreviewService = new LinkPreviewService(redisClient);
+  linkPreviewService.setIo(io);
+
+  // Periodic cleanup for security manager + link preview cache
   setInterval(() => {
     securityManager.cleanup();
+    linkPreviewService.cleanup();
   }, 60 * 60 * 1000); // Every hour
 
   // Periodic cleanup for expired persistent rooms
@@ -2210,6 +2217,29 @@ io.on('connection', (socket) => {
         io.to(socket.roomCode).emit('new-message', message);
       }
 
+      // ─── Link Preview Processing ────────────────────────────
+      // For unencrypted text messages, extract URLs and fetch previews.
+      // Cached previews are attached immediately; uncached ones are fetched
+      // asynchronously and sent via 'link-preview-update' socket event.
+      if (messageType === 'text' && !isEncrypted && !isV2 && !isV3 && !isV4 && content) {
+        try {
+          const cachedPreviews = await linkPreviewService.processMessage({
+            content: message.content,
+            messageId: message.id,
+            roomCode: socket.roomCode,
+            socketId: socket.id,
+          });
+          // If we got cached previews instantly, emit them right away
+          if (cachedPreviews.length > 0) {
+            io.to(socket.roomCode).emit('link-preview-update', {
+              messageId: message.id,
+              previews: cachedPreviews,
+            });
+          }
+        } catch (err) {
+          logger.warn(`[LinkPreview] Failed to process message: ${err.message}`);
+        }
+      }
 
     } catch (error) {
       logger.error('Error sending message:', error);

@@ -10,6 +10,7 @@ import ThreadView from './ThreadView';
 import socketManager from '../socket';
 import { getVibeById } from '../utils/vibes';
 import LinkPreviewModal, { isDomainTrusted } from './LinkPreviewModal';
+import LinkPreviewCard from './LinkPreviewCard';
 import { toast } from 'react-toastify';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
@@ -17,7 +18,7 @@ import { FileOpener } from '@capacitor-community/file-opener';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀', '🍕', '🍔', '🍦', '🍩', '🍺', '🎸', '🎮', '🚀', '🌈', '🍄'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onGameAnswer, onTicTacToeMove, onRPSAction, onLaunchChess, roomVibe, onOpenEmojiPicker }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onGameAnswer, onTicTacToeMove, onRPSAction, onLaunchChess, roomVibe, linkPreviews = {}, onOpenEmojiPicker }) => {
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
   const { theme } = useTheme();
@@ -399,6 +400,14 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         {renderMessageContent(message.content, currentUser, handleLinkClick)}
                         {message.isEdited && <span className="text-[10px] opacity-50 italic ml-1">(edited)</span>}
                       </div>
+                    )}
+
+                    {/* Link Preview Cards */}
+                    {message.messageType === 'text' && linkPreviews[message.id] && linkPreviews[message.id].length > 0 && (
+                      <LinkPreviewCard
+                        previews={linkPreviews[message.id]}
+                        isOwnMessage={isOwnMessage}
+                      />
                     )}
                   </div>
 

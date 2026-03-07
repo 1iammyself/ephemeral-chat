@@ -362,6 +362,7 @@ const ChatRoom = () => {
 
   const [room, setRoom] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [linkPreviews, setLinkPreviews] = useState({}); // { messageId: [preview, ...] }
   const [users, setUsers] = useState([]);
   const [persistentUserId] = useState(() => getCreatorId());
   const [currentUser, setCurrentUser] = useState(null);
@@ -1144,6 +1145,7 @@ const ChatRoom = () => {
     socketManager.on('chess-replace-pending', handleChessReplacePending);
     socketManager.on('messages-cleared', () => {
       setMessages([]);
+      setLinkPreviews({});
       setActivityLogs(prev => [{
         id: `log_${Date.now()}`,
         type: 'system',
@@ -1151,6 +1153,18 @@ const ChatRoom = () => {
         timestamp: new Date().toISOString()
       }, ...prev].slice(0, 50));
     });
+
+    // ─── Link Preview Updates ────────────────────────────────
+    // Server sends 'link-preview-update' when metadata is fetched for URLs in messages.
+    // Can arrive immediately (cached) or after async fetch.
+    const handleLinkPreviewUpdate = ({ messageId, previews }) => {
+      if (!messageId || !previews || !Array.isArray(previews)) return;
+      setLinkPreviews(prev => ({
+        ...prev,
+        [messageId]: [...(prev[messageId] || []), ...previews],
+      }));
+    };
+    socketManager.on('link-preview-update', handleLinkPreviewUpdate);
 
     // Now Playing status from other users
     const handleNowPlayingUpdate = async (data) => {
@@ -1280,6 +1294,7 @@ const ChatRoom = () => {
       socketManager.off('chess-swap-pending', handleChessSwapPending);
       socketManager.off('chess-replace-pending', handleChessReplacePending);
       socketManager.off('messages-cleared');
+      socketManager.off('link-preview-update', handleLinkPreviewUpdate);
       socketManager.off('now-playing-update', handleNowPlayingUpdate);
       if (window.electronAPI?.nowPlaying) {
         window.electronAPI.nowPlaying.stopPolling();
@@ -2460,6 +2475,7 @@ const ChatRoom = () => {
               onLaunchChess={handleLaunchChess}
               onDelete={handleDeleteMessage}
               roomVibe={roomVibe}
+              linkPreviews={linkPreviews}
               onOpenEmojiPicker={(messageId) => {
                 setReactionTargetId(messageId);
                 setShowEmojiPicker(true);

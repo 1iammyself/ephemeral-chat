@@ -187,11 +187,17 @@ function setupSecurity(window) {
     callback({ responseHeaders: details.responseHeaders });
   });
 
-  // ── Fix YouTube "Sign in to confirm you're not a bot" issue ──
-  // YouTube detects the "Electron" string in the user-agent and shows a CAPTCHA.
-  // Override the user-agent for YouTube/Google requests to use a standard Chrome UA.
+  // ── Fix embed compatibility for YouTube, Spotify, TikTok ──
+  // Services detect "Electron" in the user-agent and may block or show CAPTCHAs.
+  // Override the user-agent for embed/media domains to use a standard Chrome UA.
   session.defaultSession.webRequest.onBeforeSendHeaders(
-    { urls: ['*://*.youtube.com/*', '*://*.google.com/*', '*://*.googlevideo.com/*', '*://*.youtube-nocookie.com/*', '*://*.ytimg.com/*'] },
+    { urls: [
+      '*://*.youtube.com/*', '*://*.google.com/*', '*://*.googlevideo.com/*',
+      '*://*.youtube-nocookie.com/*', '*://*.ytimg.com/*',
+      '*://*.spotify.com/*', '*://*.scdn.co/*', '*://*.spotifycdn.com/*',
+      '*://*.tiktok.com/*', '*://*.tiktokcdn.com/*',
+      '*://*.twitter.com/*', '*://*.x.com/*', '*://*.twimg.com/*',
+    ] },
     (details, callback) => {
       const chromeVersion = process.versions.chrome || '120.0.0.0';
       details.requestHeaders['User-Agent'] = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`;
