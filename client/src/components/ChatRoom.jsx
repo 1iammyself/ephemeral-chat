@@ -2805,9 +2805,10 @@ const ChatRoom = () => {
                     <button
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}
-                      onTouchStart={(e) => { e.preventDefault(); setIsAnonymousMode(!isAnonymousMode); }}
-                      onClick={() => setIsAnonymousMode(!isAnonymousMode)}
-                      className={`p-1.5 sm:p-2 rounded-full transition-all text-base sm:text-lg flex-shrink-0 ${isAnonymousMode ? `${getVibeById(roomVibe).accentClass} ring-2 ring-white/20` : 'text-gray-400 hover:text-primary-500 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                      onTouchStart={(e) => { e.preventDefault(); setIsAnonymousMode(prev => !prev); }}
+                      onClick={() => setIsAnonymousMode(prev => !prev)}
+                      className={`p-2.5 sm:p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-all text-base sm:text-lg flex-shrink-0 touch-manipulation ${isAnonymousMode ? `${getVibeById(roomVibe).accentClass} ring-2 ring-white/20` : 'text-gray-400 hover:text-primary-500 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                      style={{ WebkitTapHighlightColor: 'transparent' }}
                       title={isAnonymousMode ? 'Anonymous mode ON' : 'Send anonymously'}
                     >
                       👻

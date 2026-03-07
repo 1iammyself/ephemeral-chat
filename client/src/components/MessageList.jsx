@@ -32,6 +32,15 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   const [newMessages, setNewMessages] = useState(new Set());
   const [linkPreviewUrl, setLinkPreviewUrl] = useState(null);
 
+  // Swipe to reply / Long press to react states
+  const touchState = React.useRef({
+    startX: 0,
+    startY: 0,
+    messageId: null,
+    longPressTimer: null,
+    isSwipe: false
+  });
+
   // Click away listener for reaction bar
   useEffect(() => {
     const handleClickAway = (e) => {
@@ -196,8 +205,70 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
         return;
       }
     } catch { /* invalid URL, show modal */ }
-    setLinkPreviewUrl(url);
   }, []);
+
+  // Touch handlers for mobile swipe-to-reply and long-press-to-react
+  const handleTouchStart = (e, message) => {
+    if (e.touches.length > 1) return;
+    const touch = e.touches[0];
+    touchState.current = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      messageId: message.id,
+      isSwipe: false,
+      longPressTimer: setTimeout(() => {
+        if (!touchState.current.isSwipe) {
+          navigator.vibrate?.(50);
+          setActiveReactionId(message.id);
+          setShowFullPicker(false);
+          touchState.current.messageId = null;
+        }
+      }, 500)
+    };
+  };
+
+  const handleTouchMove = (e, message) => {
+    if (!touchState.current.messageId || touchState.current.messageId !== message.id) return;
+    const touch = e.touches[0];
+    const diffX = touch.clientX - touchState.current.startX;
+    const diffY = Math.abs(touch.clientY - touchState.current.startY);
+
+    if (diffY > 20) {
+      clearTimeout(touchState.current.longPressTimer);
+      touchState.current.messageId = null;
+      return;
+    }
+
+    if (Math.abs(diffX) > 10) {
+      touchState.current.isSwipe = true;
+      clearTimeout(touchState.current.longPressTimer);
+      const el = document.getElementById(message.id)?.querySelector('.group\\\\/bubble');
+      if (el) {
+        const boundedDiff = Math.max(-60, Math.min(60, diffX));
+        el.style.transform = `translateX(${boundedDiff}px)`;
+      }
+    }
+  };
+
+  const handleTouchEnd = (e, message) => {
+    if (!touchState.current.messageId || touchState.current.messageId !== message.id) return;
+    clearTimeout(touchState.current.longPressTimer);
+    const touch = e.changedTouches[0];
+    const diffX = touch.clientX - touchState.current.startX;
+
+    if (touchState.current.isSwipe && Math.abs(diffX) > 40) {
+      navigator.vibrate?.(50);
+      onReply(message);
+    }
+
+    const el = document.getElementById(message.id)?.querySelector('.group\\\\/bubble');
+    if (el) {
+      el.style.transform = '';
+      el.style.transition = 'transform 0.2s ease-out';
+      setTimeout(() => { if (el) el.style.transition = ''; }, 200);
+    }
+    touchState.current.messageId = null;
+  };
 
   if (messages.length === 0) {
     return (
@@ -275,6 +346,9 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
             key={message.id}
             data-id={message.id}
             className={`message-item group flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'} ${isVanishing ? 'message-vanishing' : ''} relative ${activeReactionId === message.id ? 'z-[60]' : 'z-auto'}`}
+            onTouchStart={(e) => handleTouchStart(e, message)}
+            onTouchMove={(e) => handleTouchMove(e, message)}
+            onTouchEnd={(e) => handleTouchEnd(e, message)}
           >
             <div className={`flex items-center space-x-2 mb-1 px-1 text-[10px] font-bold uppercase tracking-tighter text-gray-400 dark:text-gray-500`}>
               {!isOwnMessage && (
@@ -396,7 +470,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         </button>
                       </div>
                     ) : (
-                      <div className="text-[15px] leading-relaxed select-text">
+                      <div className="text-[15px] leading-relaxed select-text whitespace-pre-wrap break-words">
                         {renderMessageContent(message.content, currentUser, handleLinkClick)}
                         {message.isEdited && <span className="text-[10px] opacity-50 italic ml-1">(edited)</span>}
                       </div>
@@ -446,7 +520,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                     {activeReactionId === message.id && (
                       <div className={`absolute ${index < 3 ? 'top-full mt-3' : 'bottom-full mb-3'} ${pickerPositionClass} z-50 flex flex-col items-center`}>
                         {!showFullPicker ? (
-                          <div className="bg-white/90 dark:bg-gray-800/95 backdrop-blur-md shadow-2xl rounded-full p-1.5 flex items-center space-x-1 border border-gray-100/50 dark:border-gray-700/50 whitespace-nowrap animate-in fade-in zoom-in slide-in-from-top-2 duration-300 max-w-[280px] sm:max-w-xs overflow-x-auto scrollbar-none no-scrollbar">
+                          <div className="bg-white/90 dark:bg-gray-800/95 backdrop-blur-md shadow-2xl rounded-full p-1.5 flex items-center space-x-1 border border-gray-100/50 dark:border-gray-700/50 whitespace-nowrap animate-in fade-in zoom-in slide-in-from-top-2 duration-300 max-w-[200px] sm:max-w-xs overflow-x-auto scrollbar-none no-scrollbar">
                             {QUICK_REACTIONS.map(emoji => (
                               <button
                                 key={emoji}
