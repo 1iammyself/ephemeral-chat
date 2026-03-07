@@ -106,6 +106,12 @@
       "languages": [
         "en-US"
       ],
+      "capabilities": [
+        "internetClient",
+        "microphone",
+        "webcam",
+        "privateNetworkClientServer"
+      ],
       "showNameOnTiles": true,
       "backgroundColor": "#4F46E5",
       "artifactName": "${productName}-${version}-${os}-${arch}.msix"
