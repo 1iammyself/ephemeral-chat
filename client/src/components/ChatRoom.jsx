@@ -972,10 +972,28 @@ const ChatRoom = () => {
       if (!showActivityLogs) setHasNewLogs(true);
     };
 
-    const handleMessageUpdated = (updatedMessage) => {
-      setMessages(prev => prev.map(m => m.id === updatedMessage.id ? updatedMessage : m));
+    const handleMessageUpdated = async (updatedMessage) => {
+      let finalMessage = updatedMessage;
+      if (updatedMessage.isEncrypted && (updatedMessage.v === 4 || (updatedMessage.v === 3 && updatedMessage.mls))) {
+        try {
+          const decrypted = await decryptMLSMessage(updatedMessage, roomCode);
+          finalMessage = { ...updatedMessage };
+          finalMessage.content = decrypted;
+          finalMessage.isEncrypted = false;
+          if (finalMessage.messageType === 'poll' && !finalMessage.pollData) {
+            try { finalMessage.pollData = JSON.parse(decrypted); } catch { }
+          }
+          if (finalMessage.messageType === 'game' && !finalMessage.gameData) {
+            try { finalMessage.gameData = JSON.parse(decrypted); } catch { }
+          }
+        } catch (e) {
+          console.warn('[ChatRoom] Update decrypt error:', e.message);
+          finalMessage.content = '⚠️ Decryption failed';
+        }
+      }
+      setMessages(prev => prev.map(m => m.id === finalMessage.id ? finalMessage : m));
       // Keep active chess modal in sync
-      setActiveChessMatch(prev => (prev && prev.id === updatedMessage.id) ? updatedMessage : prev);
+      setActiveChessMatch(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
     };
 
     // Role and moderation event handlers

@@ -298,14 +298,12 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
         const isViewOnce = message.isViewOnce;
         const hasBeenViewed = isMessageViewed(message);
 
-        // Adaptive Picker Logic
-        let pickerPositionClass = '';
+        // Adaptive Picker Logic for Desktop Overlay
+        let desktopPickerClass = '';
         if (isOwnMessage) {
-          // Own Message: Button is on LEFT. Extending from left-0 or left-full overlaps the message horizontally.
-          pickerPositionClass = 'left-full ml-1 sm:ml-0 sm:left-auto sm:right-0 origin-bottom-left sm:origin-bottom-right';
+          desktopPickerClass = 'sm:right-full sm:mr-2';
         } else {
-          // Other Message: Button is on RIGHT. Extending from right-0 or right-full overlaps the message horizontally.
-          pickerPositionClass = 'right-full mr-1 sm:mr-0 sm:right-auto sm:left-0 origin-bottom-right sm:origin-bottom-left';
+          desktopPickerClass = 'sm:left-full sm:ml-2';
         }
 
         // Viewed View-Once Content Layout
@@ -482,6 +480,63 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                   )}
                 </div>
 
+                {/* Mobile / Desktop Reaction Menu overlayed absolutely relative to the message bubble */}
+                {activeReactionId === message.id && (
+                  <div className={`absolute z-50 flex flex-col items-center top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 sm:top-1/2 sm:left-auto sm:-translate-x-0 ${desktopPickerClass}`}>
+                    {!showFullPicker ? (
+                      <div
+                        className="bg-white/90 dark:bg-gray-800/95 backdrop-blur-md shadow-2xl rounded-full p-1.5 flex items-center space-x-1 border border-gray-100/50 dark:border-gray-700/50 whitespace-nowrap animate-in fade-in zoom-in slide-in-from-top-2 duration-300 max-w-[200px] sm:max-w-xs overflow-x-auto scrollbar-none no-scrollbar touch-pan-x"
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchMove={(e) => e.stopPropagation()}
+                        onTouchEnd={(e) => e.stopPropagation()}
+                        onWheel={(e) => e.stopPropagation()}
+                      >
+                        {QUICK_REACTIONS.map(emoji => (
+                          <button
+                            key={emoji}
+                            onClick={() => { onReact(message.id, emoji); setActiveReactionId(null); }}
+                            className="w-10 h-10 flex items-center justify-center hover:bg-primary-500/10 dark:hover:bg-primary-500/20 rounded-full text-2xl transition-all duration-200 hover:scale-125 hover:-translate-y-1 flex-shrink-0"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                        <div className="w-[1px] h-6 bg-gray-200 dark:bg-gray-700 mx-1 flex-shrink-0" />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenEmojiPicker(message.id);
+                            setActiveReactionId(null);
+                          }}
+                          className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 hover:text-primary-500 transition-all duration-200 flex-shrink-0"
+                        >
+                          <Plus className="w-5 h-5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="bg-white dark:bg-gray-900 shadow-2xl rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden animate-in fade-in zoom-in slide-in-from-top-4 duration-300 ring-1 ring-black/5 dark:ring-white/5">
+                        <div className="p-2 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">All Emojis</span>
+                          <button onClick={() => setShowFullPicker(false)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"><X className="w-3 h-3 text-gray-400" /></button>
+                        </div>
+                        <EmojiPicker
+                          theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
+                          onEmojiClick={(emojiData) => {
+                            onReact(message.id, emojiData.emoji);
+                            setActiveReactionId(null);
+                            setShowFullPicker(false);
+                          }}
+                          width={280}
+                          height={350}
+                          skinTonesDisabled
+                          autoFocusSearch={false}
+                          searchPlaceholder="Search..."
+                          previewConfig={{ showPreview: false }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Hover Actions: Reply, React, Edit */}
                 <div className={`absolute top-1/2 -translate-y-1/2 flex items-center space-x-1 ${activeReactionId === message.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity duration-200 ${isOwnMessage ? 'right-full mr-3' : 'left-full ml-3'} z-20 select-none`}>
                   <button onClick={() => onReply(message)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400 hover:text-primary-500 transition-colors" title="Reply"><Reply className="w-4 h-4" /></button>
@@ -501,62 +556,6 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                     >
                       <Smile className="w-4 h-4" />
                     </button>
-
-                    {activeReactionId === message.id && (
-                      <div className={`absolute ${index < 3 ? 'top-full mt-3' : 'bottom-full mb-3'} ${pickerPositionClass} z-50 flex flex-col items-center`}>
-                        {!showFullPicker ? (
-                          <div
-                            className="bg-white/90 dark:bg-gray-800/95 backdrop-blur-md shadow-2xl rounded-full p-1.5 flex items-center space-x-1 border border-gray-100/50 dark:border-gray-700/50 whitespace-nowrap animate-in fade-in zoom-in slide-in-from-top-2 duration-300 max-w-[200px] sm:max-w-xs overflow-x-auto scrollbar-none no-scrollbar touch-pan-x"
-                            onTouchStart={(e) => e.stopPropagation()}
-                            onTouchMove={(e) => e.stopPropagation()}
-                            onTouchEnd={(e) => e.stopPropagation()}
-                            onWheel={(e) => e.stopPropagation()}
-                          >
-                            {QUICK_REACTIONS.map(emoji => (
-                              <button
-                                key={emoji}
-                                onClick={() => { onReact(message.id, emoji); setActiveReactionId(null); }}
-                                className="w-10 h-10 flex items-center justify-center hover:bg-primary-500/10 dark:hover:bg-primary-500/20 rounded-full text-2xl transition-all duration-200 hover:scale-125 hover:-translate-y-1"
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                            <div className="w-[1px] h-6 bg-gray-200 dark:bg-gray-700 mx-1 flex-shrink-0" />
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onOpenEmojiPicker(message.id);
-                                setActiveReactionId(null);
-                              }}
-                              className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 hover:text-primary-500 transition-all duration-200 flex-shrink-0"
-                            >
-                              <Plus className="w-5 h-5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="bg-white dark:bg-gray-900 shadow-2xl rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden animate-in fade-in zoom-in slide-in-from-top-4 duration-300 ring-1 ring-black/5 dark:ring-white/5">
-                            <div className="p-2 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">All Emojis</span>
-                              <button onClick={() => setShowFullPicker(false)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"><X className="w-3 h-3 text-gray-400" /></button>
-                            </div>
-                            <EmojiPicker
-                              theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
-                              onEmojiClick={(emojiData) => {
-                                onReact(message.id, emojiData.emoji);
-                                setActiveReactionId(null);
-                                setShowFullPicker(false);
-                              }}
-                              width={280}
-                              height={350}
-                              skinTonesDisabled
-                              autoFocusSearch={false}
-                              searchPlaceholder="Search..."
-                              previewConfig={{ showPreview: false }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                   {isOwnMessage && message.messageType === 'text' && (
                     <button onClick={() => onEdit(message)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400 hover:text-primary-500 transition-colors" title="Edit"><Pencil className="w-4 h-4" /></button>
