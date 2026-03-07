@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Send, Dices, Sparkles, HelpCircle, ChevronLeft, Hash, Trophy } from 'lucide-react';
+import { X, Send, Dices, Sparkles, HelpCircle, ChevronLeft, Hash, Trophy, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
 import { GAME_TYPES, getRandomWYR, getRandomTrivia, WYR_TOPIC_LIST, TRIVIA_TOPIC_LIST } from '../utils/games';
 
 const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL }) => {

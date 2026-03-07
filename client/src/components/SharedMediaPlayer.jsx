@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Play, Pause, SkipForward, Volume2, VolumeX, X, Minimize2, Maximize2,
-  ExternalLink, Users, Radio, ChevronDown
+  Play, Pause, Volume2, VolumeX, X, Minimize2, Maximize2,
+  ExternalLink, Users, Radio,
 } from 'lucide-react';
 import socketManager from '../socket';
 import {
@@ -132,6 +132,40 @@ const SingleMediaPlayer = ({
   const [isMuted, setIsMuted] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  // Free-resize: null means "full natural width", number = explicit px width
+  const [cardWidth, setCardWidth] = useState(null);
+  const MAX_WIDTH = 512; // matches old max-w-lg (~32rem)
+  const MIN_WIDTH = 200;
+  const cardRef = useRef(null);
+  const dragRef = useRef(null); // { startX, startWidth }
+
+  // ─── Resize drag handlers ────────────────────────────────────────
+  const startResize = useCallback((e) => {
+    e.preventDefault();
+    const currentW = cardRef.current
+      ? cardRef.current.getBoundingClientRect().width
+      : MAX_WIDTH;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    dragRef.current = { startX: clientX, startWidth: currentW };
+
+    const onMove = (ev) => {
+      const x = ev.touches ? ev.touches[0].clientX : ev.clientX;
+      const delta = x - dragRef.current.startX;
+      const newW = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, dragRef.current.startWidth + delta));
+      setCardWidth(newW);
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
+      dragRef.current = null;
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+  }, []);
 
   const ytPlayerRef = useRef(null);
   const scWidgetRef = useRef(null);
@@ -425,7 +459,15 @@ const SingleMediaPlayer = ({
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="w-full max-w-lg mx-auto my-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+    <div
+      ref={cardRef}
+      className="relative mx-auto my-3 animate-in fade-in slide-in-from-bottom-2 duration-300"
+      style={{
+        width: cardWidth ? `${cardWidth}px` : '100%',
+        maxWidth: `${MAX_WIDTH}px`,
+        minWidth: `${MIN_WIDTH}px`,
+      }}
+    >
       <div className={`bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl shadow-lg border border-gray-200/60 dark:border-gray-700/60 overflow-hidden ${isMinimized ? '' : 'ring-1 ring-black/5 dark:ring-white/5'}`}>
         {/* Header */}
         <div className={`flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-${vibeAccent}-50/80 dark:from-${vibeAccent}-950/40 to-transparent border-b border-gray-200/50 dark:border-gray-700/50`}>
@@ -454,7 +496,7 @@ const SingleMediaPlayer = ({
             <button
               onClick={() => setIsMinimized(!isMinimized)}
               className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              title={isMinimized ? 'Expand' : 'Minimize'}
+              title={isMinimized ? 'Restore' : 'Minimize'}
             >
               {isMinimized
                 ? <Maximize2 className="w-3.5 h-3.5 text-gray-500" />
@@ -503,7 +545,7 @@ const SingleMediaPlayer = ({
           </div>
         )}
 
-        {/* Full player (kept in DOM when minimized but pushed off-screen) */}
+        {/* Full / small player (kept in DOM when minimized but pushed off-screen) */}
         <div
           className={isMinimized ? 'sr-only' : ''}
           style={isMinimized ? { position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' } : {}}
@@ -590,6 +632,24 @@ const SingleMediaPlayer = ({
           </div>
         </div>
       </div>
+
+      {/* ── Resize grip — drag right edge to any width ── */}
+      {!isMinimized && (
+        <div
+          onMouseDown={startResize}
+          onTouchStart={startResize}
+          title="Drag to resize"
+          className="absolute bottom-1.5 right-1.5 w-4 h-4 cursor-ew-resize flex items-end justify-end opacity-30 hover:opacity-80 transition-opacity select-none z-30"
+          style={{ position: 'absolute', bottom: '6px', right: '6px' }}
+        >
+          {/* Three diagonal dots — classic resize handle */}
+          <svg width="10" height="10" viewBox="0 0 10 10" className="text-gray-500 dark:text-gray-400" fill="currentColor">
+            <circle cx="8.5" cy="8.5" r="1" />
+            <circle cx="5"   cy="8.5" r="1" />
+            <circle cx="8.5" cy="5"   r="1" />
+          </svg>
+        </div>
+      )}
     </div>
   );
 };
