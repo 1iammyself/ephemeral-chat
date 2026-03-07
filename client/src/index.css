@@ -28,7 +28,9 @@
     height: 100%;
     overflow: hidden;
     font-family: 'Inter', system-ui, sans-serif;
-    @apply bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 transition-colors duration-200;
+    @apply bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100;
+    /* Smooth out any background-color changes (e.g. keyboard dismiss resize flash) */
+    transition: background-color 0.25s ease, color 0.2s ease;
   }
 
   /* Ensure height chain: html → body → #root → .chat-container */

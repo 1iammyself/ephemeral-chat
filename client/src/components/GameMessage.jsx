@@ -622,7 +622,8 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                         </div>
                         <button
                             onClick={() => setIsExpanded(true)}
-                            className={`w-full py-2 rounded-xl bg-${accentColor}-500 hover:bg-${accentColor}-600 text-white text-[11px] font-bold transition-all shadow-md active:scale-95`}
+                            style={{ backgroundColor: vibeBtnColor }}
+                            className={`w-full py-2 rounded-xl text-white text-[11px] font-bold transition-all shadow-md active:scale-95`}
                         >
                             {gameData.winner ? 'View match' : (amPlaying ? 'Continue match' : 'View match')}
                         </button>

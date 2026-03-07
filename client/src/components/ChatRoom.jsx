@@ -2551,13 +2551,14 @@ const ChatRoom = () => {
                         <button
                           type="button"
                           onClick={() => setAudioViewOnce(!audioViewOnce)}
-                          className={`p-2 rounded-full font-bold text-[10px] w-8 h-8 flex items-center justify-center transition-colors ${audioViewOnce ? `bg-${vibeAccent}-500 text-white` : `bg-transparent text-${vibeAccent}-500 border border-${vibeAccent}-500`}`}
+                          style={audioViewOnce ? { backgroundColor: vibeHex } : undefined}
+                          className={`p-2 rounded-full font-bold text-[10px] w-8 h-8 flex items-center justify-center transition-colors ${audioViewOnce ? `text-white` : `bg-transparent text-${vibeAccent}-500 border border-${vibeAccent}-500`}`}
                           title={audioViewOnce ? "View Once Active" : "View Once Inactive"}
                         >
                           1x
                         </button>
                         <button type="button" onClick={handleCancelRecording} className={`p-2 hover:bg-${vibeAccent}-100 dark:hover:bg-${vibeAccent}-900/40 rounded-full text-${vibeAccent}-500`}><Trash2 className="w-5 h-5" /></button>
-                        <button type="button" onClick={handleStopRecording} className={`p-2 bg-${vibeAccent}-500 hover:bg-${vibeAccent}-600 rounded-full text-white shadow-sm`}><Send className="w-5 h-5" /></button>
+                        <button type="button" onClick={handleStopRecording} style={{ backgroundColor: vibeHex }} className={`p-2 rounded-full text-white shadow-sm`}><Send className="w-5 h-5" /></button>
                       </div>
                     </div>
                   </div>

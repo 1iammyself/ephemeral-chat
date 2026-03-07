@@ -14,6 +14,21 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
     roomVibe === 'chill' ? 'teal' :
       roomVibe === 'focus' ? 'orange' : 'blue';
 
+  // Explicit hex values to avoid Tailwind JIT purging dynamic class names
+  const vibeColor = {
+    party: '#6366f1',
+    chill: '#14b8a6',
+    focus: '#f97316',
+    default: '#3b82f6',
+  }[roomVibe] || '#3b82f6';
+
+  const vibeColorHover = {
+    party: '#4f46e5',
+    chill: '#0d9488',
+    focus: '#ea580c',
+    default: '#2563eb',
+  }[roomVibe] || '#2563eb';
+
   const detected = urlInput.trim() ? detectMediaUrl(urlInput.trim()) : null;
 
   useEffect(() => {
@@ -139,8 +154,11 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
           <button
             onClick={handleShare}
             disabled={!detected}
+            style={detected ? { backgroundColor: vibeColor } : undefined}
+            onMouseOver={e => { if (detected) e.currentTarget.style.backgroundColor = vibeColorHover; }}
+            onMouseOut={e => { if (detected) e.currentTarget.style.backgroundColor = vibeColor; }}
             className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${detected
-              ? `bg-${vibeAccent}-500 text-white hover:bg-${vibeAccent}-600 active:scale-95 shadow-lg shadow-${vibeAccent}-500/25`
+              ? `text-white active:scale-95 shadow-lg`
               : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
             }`}
           >

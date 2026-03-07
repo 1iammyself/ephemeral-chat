@@ -56,7 +56,7 @@ const SubPollInline = ({ subPoll, parentOptionId, messageId, currentUserId, acce
 };
 
 // ─── Sub-Poll Creation Mini-Form ────────────────────────────────
-const SubPollCreator = ({ messageId, optionId, accentColor, onDone }) => {
+const SubPollCreator = ({ messageId, optionId, accentColor, vibeBtnColor, onDone }) => {
     const [question, setQuestion] = useState('');
     const [opts, setOpts] = useState(['', '']);
 
@@ -92,7 +92,8 @@ const SubPollCreator = ({ messageId, optionId, accentColor, onDone }) => {
                 )}
                 <button onClick={handleSubmit}
                     disabled={!question.trim() || opts.filter(o => o.trim()).length < 2}
-                    className={`text-[10px] px-2 py-0.5 rounded bg-${accentColor}-500 text-white disabled:opacity-40`}>
+                    style={vibeBtnColor ? { backgroundColor: vibeBtnColor } : undefined}
+                    className={`text-[10px] px-2 py-0.5 rounded text-white disabled:opacity-40`}>
                     Create
                 </button>
                 <button onClick={onDone} className="text-[10px] text-gray-400 hover:text-gray-600">Cancel</button>
@@ -144,6 +145,14 @@ const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
     const accentColor = vibe.id === 'party' ? 'indigo' :
         vibe.id === 'chill' ? 'teal' :
             vibe.id === 'focus' ? 'orange' : 'primary';
+
+    // Explicit hex values to avoid Tailwind JIT purging dynamic class names
+    const vibeBtnColor = {
+        party: '#6366f1', chill: '#14b8a6', focus: '#f97316', default: '#3b82f6'
+    }[vibe.id] || '#3b82f6';
+    const vibeBtnColorHover = {
+        party: '#4f46e5', chill: '#0d9488', focus: '#ea580c', default: '#2563eb'
+    }[vibe.id] || '#2563eb';
 
     const headerClass = vibe.accentClass;
     const selectedOptionClass = `border-${accentColor}-500 bg-${accentColor}-50 dark:bg-${accentColor}-900/20`;
@@ -224,6 +233,7 @@ const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
                                         messageId={message.id}
                                         optionId={option.id}
                                         accentColor={accentColor}
+                                        vibeBtnColor={vibeBtnColor}
                                         onDone={() => setCreatingSubPollFor(null)}
                                     />
                                 )}
@@ -258,7 +268,8 @@ const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
                                     <button
                                         onClick={handleCustomAnswer}
                                         disabled={!customText.trim()}
-                                        className={`p-1.5 rounded-lg text-white bg-${accentColor}-500 hover:bg-${accentColor}-600 disabled:opacity-40 transition-colors shrink-0`}
+                                        style={customText.trim() ? { backgroundColor: vibeBtnColor } : undefined}
+                                        className={`p-1.5 rounded-lg text-white disabled:opacity-40 disabled:bg-gray-400 transition-colors shrink-0`}
                                     >
                                         <SendIcon className="w-3.5 h-3.5" />
                                     </button>

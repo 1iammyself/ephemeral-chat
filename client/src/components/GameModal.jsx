@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Send, Dices, Sparkles, HelpCircle, ChevronLeft, Hash, Trophy, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
+import { X, Send, Dices, Sparkles, HelpCircle, ChevronLeft, Hash, Trophy } from 'lucide-react';
 import { GAME_TYPES, getRandomWYR, getRandomTrivia, WYR_TOPIC_LIST, TRIVIA_TOPIC_LIST } from '../utils/games';
 
 const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL }) => {
@@ -311,7 +311,7 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                             <Dices className="w-8 h-8 mb-3 opacity-50" />
                             <p className="text-sm font-bold">Game Data Missing</p>
                             <p className="text-xs text-center mt-1">Please try selecting a topic again.</p>
-                            <button onClick={handleBack} className={`mt-4 px-4 py-2 rounded-lg bg-${vibeAccent}-500 text-white font-semibold text-xs hover:bg-${vibeAccent}-600 transition-colors`}>
+                            <button onClick={handleBack} style={{ backgroundColor: vibeColor }} className={`mt-4 px-4 py-2 rounded-lg text-white font-semibold text-xs transition-colors`}>
                                 Go Back
                             </button>
                         </div>

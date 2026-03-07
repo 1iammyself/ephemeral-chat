@@ -31,6 +31,21 @@ const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
         roomVibe === 'chill' ? 'teal' :
             roomVibe === 'focus' ? 'orange' : 'primary';
 
+    // Explicit hex values to avoid Tailwind JIT purging dynamic class names (especially focus/orange)
+    const vibeColor = {
+        party: '#6366f1',
+        chill: '#14b8a6',
+        focus: '#f97316',
+        default: '#3b82f6',
+    }[roomVibe] || '#3b82f6';
+
+    const vibeColorHover = {
+        party: '#4f46e5',
+        chill: '#0d9488',
+        focus: '#ea580c',
+        default: '#2563eb',
+    }[roomVibe] || '#2563eb';
+
     // ── Option helpers ──────────────────────────────────────────────
     const addOption = () => {
         if (options.length < 5) {
@@ -255,7 +270,10 @@ const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
                     <button
                         type="submit"
                         disabled={!canSubmit}
-                        className={`w-full py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 font-bold shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed bg-${vibeAccent}-500 hover:bg-${vibeAccent}-600 text-white transition-colors`}
+                        style={canSubmit ? { backgroundColor: vibeColor } : undefined}
+                        onMouseOver={e => { if (canSubmit) e.currentTarget.style.backgroundColor = vibeColorHover; }}
+                        onMouseOut={e => { if (canSubmit) e.currentTarget.style.backgroundColor = vibeColor; }}
+                        className={`w-full py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 font-bold shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors`}
                     >
                         <Send className="w-4 h-4" />
                         <span>Send Poll</span>
