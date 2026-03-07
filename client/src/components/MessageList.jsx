@@ -299,28 +299,13 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
         const hasBeenViewed = isMessageViewed(message);
 
         // Adaptive Picker Logic
-        const isLongMessage = isImage || isAudio || message.messageType === 'file' || message.messageType === 'poll' || (message.content && message.content.length > 25);
         let pickerPositionClass = '';
         if (isOwnMessage) {
-          // Own Message: Actions are on the LEFT of the bubble
-          if (isLongMessage) {
-            // Mobile: Grow Right (Over message) to avoid left screen edge
-            // Desktop: Grow Left (Into whitespace)
-            pickerPositionClass = 'left-0 origin-bottom-left sm:left-auto sm:right-0 sm:origin-bottom-right';
-          } else {
-            // Short: Grow Left (Into whitespace)
-            pickerPositionClass = 'right-0 origin-bottom-right';
-          }
+          // Own Message: Button is on LEFT. Extending from left-0 or left-full overlaps the message horizontally.
+          pickerPositionClass = 'left-full ml-1 sm:ml-0 sm:left-auto sm:right-0 origin-bottom-left sm:origin-bottom-right';
         } else {
-          // Other Message: Actions are on the RIGHT of the bubble
-          if (isLongMessage) {
-            // Mobile: Grow Left (Over message) to avoid right screen edge
-            // Desktop: Grow Right (Into whitespace)
-            pickerPositionClass = 'right-0 origin-bottom-right sm:right-auto sm:left-0 sm:origin-bottom-left';
-          } else {
-            // Short: Grow Right (Into whitespace)
-            pickerPositionClass = 'left-0 origin-bottom-left';
-          }
+          // Other Message: Button is on RIGHT. Extending from right-0 or right-full overlaps the message horizontally.
+          pickerPositionClass = 'right-full mr-1 sm:mr-0 sm:right-auto sm:left-0 origin-bottom-right sm:origin-bottom-left';
         }
 
         // Viewed View-Once Content Layout
@@ -498,7 +483,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                 </div>
 
                 {/* Hover Actions: Reply, React, Edit */}
-                <div className={`absolute top-1/2 -translate-y-1/2 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${isOwnMessage ? 'right-full mr-3' : 'left-full ml-3'} z-20 select-none`}>
+                <div className={`absolute top-1/2 -translate-y-1/2 flex items-center space-x-1 ${activeReactionId === message.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity duration-200 ${isOwnMessage ? 'right-full mr-3' : 'left-full ml-3'} z-20 select-none`}>
                   <button onClick={() => onReply(message)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400 hover:text-primary-500 transition-colors" title="Reply"><Reply className="w-4 h-4" /></button>
                   <div className="relative reaction-container">
                     <button
@@ -520,7 +505,13 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                     {activeReactionId === message.id && (
                       <div className={`absolute ${index < 3 ? 'top-full mt-3' : 'bottom-full mb-3'} ${pickerPositionClass} z-50 flex flex-col items-center`}>
                         {!showFullPicker ? (
-                          <div className="bg-white/90 dark:bg-gray-800/95 backdrop-blur-md shadow-2xl rounded-full p-1.5 flex items-center space-x-1 border border-gray-100/50 dark:border-gray-700/50 whitespace-nowrap animate-in fade-in zoom-in slide-in-from-top-2 duration-300 max-w-[200px] sm:max-w-xs overflow-x-auto scrollbar-none no-scrollbar">
+                          <div
+                            className="bg-white/90 dark:bg-gray-800/95 backdrop-blur-md shadow-2xl rounded-full p-1.5 flex items-center space-x-1 border border-gray-100/50 dark:border-gray-700/50 whitespace-nowrap animate-in fade-in zoom-in slide-in-from-top-2 duration-300 max-w-[200px] sm:max-w-xs overflow-x-auto scrollbar-none no-scrollbar touch-pan-x"
+                            onTouchStart={(e) => e.stopPropagation()}
+                            onTouchMove={(e) => e.stopPropagation()}
+                            onTouchEnd={(e) => e.stopPropagation()}
+                            onWheel={(e) => e.stopPropagation()}
+                          >
                             {QUICK_REACTIONS.map(emoji => (
                               <button
                                 key={emoji}
