@@ -443,10 +443,8 @@ class RoomManager {
     const isChess = (message.messageType === 'game' && message.gameData?.gameType === 'chess') ||
       (message.gameData?.type === 'chess'); // Compatibility check
     const isFinished = !!message.gameData?.winner || !!message.gameData?.endedAt;
-    const isTournament = message.messageType === 'tournament';
-    const isTournamentGame = message.messageType === 'game' && !!message.gameData?.tournamentRef;
     // Messages that should NEVER expire (overrideTtl === 0 means "no expiry")
-    const neverExpire = (isChess && !isFinished) || (isTournament && !isFinished) || isTournamentGame || message.overrideTtl === 0;
+    const neverExpire = (isChess && !isFinished) || message.overrideTtl === 0;
 
     // Active Chess games NEVER have an expiry
     if (isChess && !isFinished) {
@@ -458,7 +456,7 @@ class RoomManager {
       const messageKey = `message:${roomCode}:${message.id}`;
 
       if (neverExpire) {
-        // Persist without TTL — tournaments, active chess, and tournament games never expire
+        // Persist without TTL — active chess and overrideTtl=0 messages never expire
         await this.redis.set(messageKey, JSON.stringify(message));
       } else {
         // Calculate TTL:
@@ -722,10 +720,13 @@ class RoomManager {
         stats[val] = (stats[val] || 0) + 1;
       });
 
-      // Include only their own answer
+      // Include only their own answer (check both socketId and persistentId keys)
       const maskedAnswers = {};
-      if (answers[userId]) {
+      if (answers[userId] !== undefined) {
         maskedAnswers[userId] = answers[userId];
+      }
+      if (persistentId && answers[persistentId] !== undefined) {
+        maskedAnswers[persistentId] = answers[persistentId];
       }
 
       return {
@@ -761,9 +762,6 @@ class RoomManager {
           return true; // Keep active chess games forever
         }
 
-        // Tournament messages and tournament game messages NEVER expire via pruning
-        if (msg.messageType === 'tournament') return true;
-        if (msg.messageType === 'game' && msg.gameData?.tournamentRef) return true;
         // Messages with overrideTtl === 0 are "never expire"
         if (msg.overrideTtl === 0) return true;
 

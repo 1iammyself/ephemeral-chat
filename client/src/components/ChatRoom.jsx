@@ -27,7 +27,6 @@ import {
   Dices,
   Ghost,
   EyeOff,
-  Trophy,
   Snowflake,
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
@@ -39,7 +38,6 @@ import UserList from './UserList';
 import AudioCallModal from './AudioCallModal';
 import PollModal from './PollModal';
 import GameModal from './GameModal';
-import TournamentModal from './TournamentModal';
 import webRTCService, { CallState } from '../webrtc';
 import {
   initMLS,
@@ -97,7 +95,6 @@ const SLASH_COMMANDS = [
   { icon: Clock, label: 'Timer', value: '/timer', desc: 'Start a countdown', adminOnly: true },
   { icon: Activity, label: 'Vibe', value: '/vibe', desc: 'Change room vibe', adminOnly: true },
   { icon: Activity, label: 'Watch Party', value: '/media', desc: 'Share YouTube/SoundCloud' },
-  { icon: Trophy, label: 'Tournament', value: '/tournament', desc: 'Create a tournament' },
 ];
 
 // Safari detection (robust hybrid check)
@@ -377,7 +374,6 @@ const ChatRoom = () => {
   const [activeChessMatch, setActiveChessMatch] = useState(null);
   const [chessApprovalRequest, setChessApprovalRequest] = useState(null); // { type: 'swap'|'replace', messageId, ... }
   const [showGameModal, setShowGameModal] = useState(false);
-  const [showTournamentModal, setShowTournamentModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [callState, setCallState] = useState({ state: CallState.IDLE });
   const [isRecording, setIsRecording] = useState(false);
@@ -632,9 +628,6 @@ const ChatRoom = () => {
               if (msg.messageType === 'game' && !msg.gameData) {
                 try { result.gameData = JSON.parse(decrypted); } catch { }
               }
-              if (msg.messageType === 'tournament' && !msg.tournamentData) {
-                try { result.tournamentData = JSON.parse(decrypted); } catch { }
-              }
               return result;
             } catch (e) {
               return { ...msg, content: '⚠️ Decryption failed' };
@@ -840,9 +833,6 @@ const ChatRoom = () => {
             if (msg.messageType === 'game' && !msg.gameData) {
               try { result.gameData = JSON.parse(decrypted); } catch { }
             }
-            if (msg.messageType === 'tournament' && !msg.tournamentData) {
-              try { result.tournamentData = JSON.parse(decrypted); } catch { }
-            }
             return result;
           } catch (e) {
             return { ...msg, content: '⚠️ Decryption failed' };
@@ -914,9 +904,6 @@ const ChatRoom = () => {
           }
           if (message.messageType === 'game' && !message.gameData) {
             try { message.gameData = JSON.parse(decrypted); } catch { }
-          }
-          if (message.messageType === 'tournament' && !message.tournamentData) {
-            try { message.tournamentData = JSON.parse(decrypted); } catch { }
           }
         } catch (e) {
           console.warn('[ChatRoom] Decrypt error:', e.message);
@@ -1607,7 +1594,6 @@ const ChatRoom = () => {
           }
           setShowMediaPlayer(true);
           break;
-        case '/tournament': setShowTournamentModal(true); break;
         default: break;
       }
       if (cmd.startsWith('/')) {
@@ -1759,38 +1745,6 @@ const ChatRoom = () => {
       recipients: selectedRecipients,
       userId: persistentUserId
     });
-  };
-
-  // ─── Tournament Handlers ──────────────────────────────────────────
-  const handleCreateTournament = (tournamentConfig) => {
-    // Tournaments are NOT encrypted — server must manage bracket/results.
-    if (!isConnected) return;
-    socketManager.emit('send-message', {
-      content: `🏆 ${tournamentConfig.name}`,
-      messageType: 'tournament',
-      tournamentData: tournamentConfig,
-      userId: persistentUserId
-    });
-  };
-
-  const handleJoinTournament = (messageId) => {
-    if (!isConnected) return;
-    socketManager.emit('tournament-join', { messageId });
-  };
-
-  const handleStartTournament = (messageId) => {
-    if (!isConnected) return;
-    socketManager.emit('tournament-start', { messageId });
-  };
-
-  const handleTournamentMatchResult = (messageId, matchId, winnerId) => {
-    if (!isConnected) return;
-    socketManager.emit('tournament-match-result', { messageId, matchId, winnerId });
-  };
-
-  const handleStartMatch = (tournamentMessageId, matchId) => {
-    if (!isConnected) return;
-    socketManager.emit('tournament-start-match', { tournamentMessageId, matchId });
   };
 
   const handleDeleteMessage = (messageId) => {
@@ -2497,9 +2451,6 @@ const ChatRoom = () => {
               onTicTacToeMove={handleTicTacToeMove}
               onRPSAction={handleRPSAction}
               onLaunchChess={handleLaunchChess}
-              onJoinTournament={handleJoinTournament}
-              onStartTournament={handleStartTournament}
-              onStartMatch={handleStartMatch}
               onDelete={handleDeleteMessage}
               roomVibe={roomVibe}
               onOpenEmojiPicker={(messageId) => {
@@ -2653,12 +2604,6 @@ const ChatRoom = () => {
                                 <BarChart2 className={`w-4 h-4 text-${vibeAccent}-500`} />
                               </div>
                               <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Poll</span>
-                            </button>
-                            <button type="button" onClick={() => { setShowTournamentModal(true); setShowFeatureMenu(false); }} disabled={!isConnected} className={`flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/20 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`} title="Tournament">
-                              <div className={`sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/40 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm`}>
-                                <Trophy className={`w-4 h-4 text-amber-500`} />
-                              </div>
-                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Tournament</span>
                             </button>
                             <button type="button" onClick={() => { startRecording(); setShowFeatureMenu(false); }} disabled={!isConnected} className="flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group" title="Voice Note">
                               <div className="sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/10 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm">
@@ -2979,14 +2924,6 @@ const ChatRoom = () => {
         roomVibe={roomVibe}
         initialGameType={initialGameType}
         roomTTL={room?.settings?.messageTTL || 60}
-      />
-
-      <TournamentModal
-        isOpen={showTournamentModal}
-        onClose={() => setShowTournamentModal(false)}
-        onCreateTournament={handleCreateTournament}
-        roomVibe={roomVibe}
-        users={users}
       />
 
       <ChessModal

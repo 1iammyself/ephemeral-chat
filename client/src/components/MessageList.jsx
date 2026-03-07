@@ -6,7 +6,6 @@ import ImageViewer from './ImageViewer';
 import AudioPlayer from './AudioPlayer';
 import PollMessage from './PollMessage';
 import GameMessage from './GameMessage';
-import TournamentMessage from './TournamentMessage';
 import ThreadView from './ThreadView';
 import socketManager from '../socket';
 import { getVibeById } from '../utils/vibes';
@@ -18,7 +17,7 @@ import { FileOpener } from '@capacitor-community/file-opener';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀', '🍕', '🍔', '🍦', '🍩', '🍺', '🎸', '🎮', '🚀', '🌈', '🍄'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onGameAnswer, onTicTacToeMove, onRPSAction, onLaunchChess, onJoinTournament, onStartTournament, onStartMatch, roomVibe, onOpenEmojiPicker }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onGameAnswer, onTicTacToeMove, onRPSAction, onLaunchChess, roomVibe, onOpenEmojiPicker }) => {
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
   const { theme } = useTheme();
@@ -59,9 +58,8 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   useEffect(() => {
     messages.forEach(message => {
       const isChess = (message.messageType === 'game' && message.gameData?.gameType === 'chess') || (message.gameData?.type === 'chess');
-      const isTournament = message.messageType === 'tournament';
-      // Chess and tournament messages never expire (TTL = 0) — only deleted when completed
-      const ttl = (isChess || isTournament) ? (message.overrideTtl || 0) : (message.overrideTtl || messageTTL);
+      // Chess messages never expire (TTL = 0) — only deleted when completed
+      const ttl = isChess ? (message.overrideTtl || 0) : (message.overrideTtl || messageTTL);
 
       if (ttl && ttl > 0 && message.type !== 'system' && !messageTimers.has(message.id)) {
         const messageTime = new Date(message.timestamp).getTime();
@@ -229,7 +227,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
         const hasBeenViewed = isMessageViewed(message);
 
         // Adaptive Picker Logic
-        const isLongMessage = isImage || isAudio || message.messageType === 'file' || message.messageType === 'poll' || message.messageType === 'tournament' || (message.content && message.content.length > 25);
+        const isLongMessage = isImage || isAudio || message.messageType === 'file' || message.messageType === 'poll' || (message.content && message.content.length > 25);
         let pickerPositionClass = '';
         if (isOwnMessage) {
           // Own Message: Actions are on the LEFT of the bubble
@@ -300,9 +298,9 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
               <div className="relative group/bubble max-w-[70%] sm:max-w-lg md:max-w-xl">
                 <div
                   className={`relative z-10 rounded-2xl transition-all duration-300 ${message.messageType === 'poll' ? 'shadow-sm' :
-                    message.messageType === 'game' || message.messageType === 'tournament' ? '' :
+                    message.messageType === 'game' ? '' :
                       'shadow-sm px-3 py-2 sm:px-4 sm:py-3 box-border'
-                    } ${message.messageType === 'game' || message.messageType === 'tournament' ? '' :
+                    } ${message.messageType === 'game' ? '' :
                       (isOwnMessage
                         ? currentVibe.messageClass
                         : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 dark:text-gray-100 rounded-tl-none')
@@ -379,15 +377,6 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         onRPSAction={onRPSAction}
                         onLaunchChess={onLaunchChess}
                         onDelete={onDelete}
-                        roomVibe={roomVibe}
-                      />
-                    ) : message.messageType === 'tournament' ? (
-                      <TournamentMessage
-                        message={message}
-                        currentUser={currentUser}
-                        onJoinTournament={onJoinTournament}
-                        onStartTournament={onStartTournament}
-                        onStartMatch={onStartMatch}
                         roomVibe={roomVibe}
                       />
                     ) : message.messageType === 'file' ? (

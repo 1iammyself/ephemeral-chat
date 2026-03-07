@@ -55,6 +55,30 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
     const hasAnswered = myAnswer !== undefined;
 
     const stats = useMemo(() => {
+        // When server provides pre-computed stats (masked view for non-senders), use those
+        if (gameData.isMasked && gameData.stats) {
+            if (isWYR) {
+                const aCount = gameData.stats['A'] || 0;
+                const bCount = gameData.stats['B'] || 0;
+                const total = aCount + bCount;
+                return {
+                    aCount, bCount, total,
+                    aPct: total > 0 ? Math.round((aCount / total) * 100) : 0,
+                    bPct: total > 0 ? Math.round((bCount / total) * 100) : 0
+                };
+            }
+            if (isTrivia) {
+                const groups = {};
+                if (gameData.options) {
+                    gameData.options.forEach((_, i) => {
+                        groups[i] = gameData.stats[i] || 0;
+                    });
+                }
+                const total = Object.values(gameData.stats).reduce((a, b) => a + b, 0);
+                return { groups, total };
+            }
+        }
+
         if (isWYR) {
             const aCount = Object.values(answers).filter(v => v === 'A').length;
             const bCount = Object.values(answers).filter(v => v === 'B').length;
@@ -76,7 +100,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
             return { groups, total };
         }
         return {};
-    }, [answers, isWYR, isTrivia, gameData.options]);
+    }, [answers, isWYR, isTrivia, gameData.options, gameData.isMasked, gameData.stats]);
 
     const handleAnswer = (answer) => {
         if (hasAnswered) return;
