@@ -28,6 +28,7 @@ import {
   Ghost,
   EyeOff,
   Snowflake,
+  RefreshCw
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -1454,6 +1455,11 @@ const ChatRoom = () => {
 
   const applySuggestion = (item) => {
     if (suggestions.type === 'command') {
+      if (item.value === '/ice') {
+        handleSendIcebreaker();
+        setSuggestions(prev => ({ ...prev, show: false }));
+        return;
+      }
       setNewMessage(item.value + ' ');
     } else if (suggestions.type === 'mention') {
       const parts = newMessage.split(/\s/);
@@ -1904,6 +1910,7 @@ const ChatRoom = () => {
     const question = getRandomIcebreaker();
     setNewMessage(`🧊 ${question}`);
     setShowFeatureMenu(false);
+    hapticLight();
     // Focus the input field so user can edit or send
     setTimeout(() => {
       messageInputRef.current?.focus();
@@ -2811,6 +2818,16 @@ const ChatRoom = () => {
                         maxLength={500}
                         style={{ boxShadow: 'none' }}
                       />
+                      {newMessage.startsWith('🧊 ') && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); handleSendIcebreaker(); }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-cyan-500 hover:text-cyan-600 active:scale-95 transition-all"
+                          title="Shuffle question"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                     <button
                       type="button"
