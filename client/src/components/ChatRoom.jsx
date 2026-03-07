@@ -444,14 +444,8 @@ const ChatRoom = () => {
       };
 
       const handleWillHide = () => {
-        // If we're in the middle of sending a message, the keyboard dismiss
-        // was triggered by React's controlled-input re-render (setNewMessage('')).
-        // Force it back open at the native level before Android can resize the body.
-        if (sendingGuardRef.current) {
-          Keyboard.show();                           // native Android-only API
-          messageInputRef.current?.focus();           // re-focus the input
-          return;                                    // skip scroll — keyboard stays open
-        }
+        // Keyboard is hiding (user dismissed it intentionally).
+        // Scroll messages into view so the latest are visible.
         scrollToBottom();
       };
 
@@ -495,10 +489,6 @@ const ChatRoom = () => {
   }, [roomCode]);
 
   const messageInputRef = useRef(null);
-  // Guard flag: while true we're inside doSendMessage.
-  // The keyboardWillHide listener uses this to call Keyboard.show() and
-  // prevent the keyboard from actually dismissing during the send cycle.
-  const sendingGuardRef = useRef(false);
 
   useEffect(() => {
     if (!activeTimer) {
@@ -1695,42 +1685,31 @@ const ChatRoom = () => {
       hapticLight();
 
       // ── Clear message while keeping keyboard open ──
-      // Problem: setNewMessage('') re-renders the controlled <input>, which on
-      // Android briefly blurs it → keyboard dismisses → body expands (white flash)
-      // → focus() re-opens keyboard → body shrinks again.
-      //
-      // Solution: set sendingGuardRef so the keyboardWillHide listener calls
-      // Keyboard.show() (native Android API) to force the keyboard back open
-      // before Android can resize the body.
+      // On Android, setNewMessage('') causes a React re-render that briefly blurs
+      // the controlled <input>, firing keyboardWillHide and collapsing the keyboard.
+      // Fix: clear the DOM value instantly, keep focus, and defer the React state
+      // update by 300 ms so Android never receives a blur signal during the send.
       const isNative = Capacitor.getPlatform() !== 'web';
-      if (isNative) sendingGuardRef.current = true;
-
       if (messageInputRef.current) {
-        messageInputRef.current.value = '';          // instant visual clear
+        messageInputRef.current.value = '';          // instant visual clear (DOM only)
       }
-      setNewMessage('');
-      setReplyingTo(null);
 
-      // Re-focus the input and, on native, force keyboard open at the OS level.
-      messageInputRef.current?.focus();
       if (isNative) {
-        Keyboard.show();
-      }
-
-      // Drop the guard after two rAF ticks — give React time to reconcile
-      // the controlled input and give the native keyboard time to re-open.
-      requestAnimationFrame(() => {
         messageInputRef.current?.focus();
-        requestAnimationFrame(() => {
-          sendingGuardRef.current = false;
-        });
-      });
+        setTimeout(() => {
+          setNewMessage('');
+          setReplyingTo(null);
+          messageInputRef.current?.focus();
+        }, 300);
+      } else {
+        // On web, controlled state sync is instant with no keyboard side-effects.
+        setNewMessage('');
+        setReplyingTo(null);
+      }
     } catch (error) {
       setError('Failed to send message');
     } finally {
       setIsSending(false);
-      // Always drop the guard so normal blur behavior is restored
-      sendingGuardRef.current = false;
     }
   };
 
