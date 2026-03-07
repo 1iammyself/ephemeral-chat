@@ -357,11 +357,11 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
             </div>
 
             <div className={`flex items-center w-full ${isOwnMessage ? 'justify-end pl-8 sm:pl-12' : 'justify-start pr-8 sm:pr-12'}`}>
-              <div className="relative group/bubble max-w-[70%] sm:max-w-lg md:max-w-xl">
+              <div className="relative group/bubble w-fit max-w-[80%] sm:max-w-lg md:max-w-xl">
                 <div
-                  className={`relative z-10 rounded-2xl transition-all duration-300 ${message.messageType === 'poll' ? 'shadow-sm' :
+                  className={`relative z-10 w-fit rounded-2xl transition-all duration-300 ${message.messageType === 'poll' ? 'shadow-sm' :
                     message.messageType === 'game' ? '' :
-                      'shadow-sm px-3 py-2 sm:px-4 sm:py-3 box-border'
+                      'shadow-sm px-2.5 py-1.5 sm:px-3 sm:py-2 box-border'
                     } ${message.messageType === 'game' ? '' :
                       (isOwnMessage
                         ? currentVibe.messageClass
@@ -369,7 +369,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                     }`}
                 >
                   {/* Content Container */}
-                  <div className="break-words max-w-full">
+                  <div className="break-words w-fit max-w-full">
                     {/* Reply Context */}
                     {message.replyTo && (
                       <div
@@ -457,7 +457,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         </button>
                       </div>
                     ) : (
-                      <div className="text-[15px] leading-relaxed select-text whitespace-pre-wrap break-words">
+                      <div className="text-[15px] leading-[1.35] select-text whitespace-pre-wrap break-words">
                         {renderMessageContent(message.content, currentUser, handleLinkClick)}
                         {message.isEdited && <span className="text-[10px] opacity-50 italic ml-1">(edited)</span>}
                       </div>
