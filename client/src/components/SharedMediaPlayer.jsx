@@ -132,10 +132,14 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
   const ignoreNextSyncRef = useRef(0);                      // timestamp of last self-emit (echo rejection)
   const lastSeekRef = useRef(0);
   const controlsHideTimerRef = useRef(null);                // auto-hide controls timer
+  const mediaInfoRef = useRef(null);                        // tracks current mediaInfo for recovery handler
 
   const vibeAccent = roomVibe === 'party' ? 'indigo' :
     roomVibe === 'chill' ? 'teal' :
       roomVibe === 'focus' ? 'orange' : 'blue';
+
+  // Keep mediaInfoRef in sync so the recovery handler (in a [] useEffect) can read it
+  useEffect(() => { mediaInfoRef.current = mediaInfo; }, [mediaInfo]);
 
   // ─── Socket event handlers ────────────────────────────────────────
   useEffect(() => {
@@ -260,11 +264,25 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
       setTimeout(trySync, 1000);
     };
 
+    // Handle peer-to-peer media recovery: another user is rejoining and needs the URL
+    const handleMediaRecoverRequest = (data) => {
+      const info = mediaInfoRef.current;
+      if (!info || !info.url || !info.type) return; // We don't have the media loaded
+      socketManager.emit('media-recover-response', {
+        requesterId: data?.requesterId,
+        type: info.type,
+        id: info.id || null,
+        url: info.url,
+        sharedBy: info.sharedBy || 'Someone',
+      });
+    };
+
     socketManager.on('media-share', handleMediaShare);
     socketManager.on('media-sync', handleMediaSync);
     socketManager.on('media-sync-count', handleMediaSyncCount);
     socketManager.on('media-close', handleMediaClose);
     socketManager.on('media-sync-restore', handleMediaSyncRestore);
+    socketManager.on('media-recover-request', handleMediaRecoverRequest);
 
     return () => {
       socketManager.off('media-share', handleMediaShare);
@@ -272,6 +290,7 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
       socketManager.off('media-sync-count', handleMediaSyncCount);
       socketManager.off('media-close', handleMediaClose);
       socketManager.off('media-sync-restore', handleMediaSyncRestore);
+      socketManager.off('media-recover-request', handleMediaRecoverRequest);
     };
   }, []);
 
@@ -285,14 +304,15 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
 
     const restoreMedia = async () => {
       let parsed;
+      let decryptFailed = false;
       // Handle v4 AES-GCM encrypted media state
       if (initialMedia.v === 4 && initialMedia.ct) {
         try {
           const json = await decryptMLSMessage(initialMedia, roomCode);
           parsed = JSON.parse(json);
         } catch (e) {
-          console.warn('Could not decrypt v4 persisted media state:', e);
-          return;
+          console.warn('Could not decrypt v4 persisted media state, requesting peer recovery:', e);
+          decryptFailed = true;
         }
       // Handle MLS v3 encrypted media state
       } else if (initialMedia.v === 3 && initialMedia.mls) {
@@ -300,11 +320,22 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
           const json = await decryptMLSMessage(initialMedia, roomCode);
           parsed = JSON.parse(json);
         } catch (e) {
-          console.warn('Could not decrypt v3 persisted media state:', e);
-          return;
+          console.warn('Could not decrypt v3 persisted media state, requesting peer recovery:', e);
+          decryptFailed = true;
         }
+      } else if (initialMedia.isEncrypted) {
+        // Server stored encrypted blob without cleartext hint — can't decrypt
+        console.warn('Encrypted media blob without cleartext hint, requesting peer recovery');
+        decryptFailed = true;
       } else {
         parsed = initialMedia;
+      }
+
+      // If decryption failed, ask a peer who still has the video to send us the URL
+      if (decryptFailed) {
+        console.log('[SharedMediaPlayer] Requesting media URL recovery from peers...');
+        socketManager.emit('media-recover-request');
+        return;
       }
 
       const type = typeof parsed.type === 'string' ? parsed.type : '';

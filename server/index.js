@@ -2555,6 +2555,57 @@ io.on('connection', (socket) => {
     }
   });
 
+  // ─── Media Recover: peer-to-peer URL recovery for rejoin ────────────
+  // When a user rejoins and the stored activeMedia is encrypted (no cleartext URL),
+  // they emit 'media-recover-request'. The server asks ALL active watchers to send
+  // back the cleartext media URL. First responder wins.
+  socket.on('media-recover-request', () => {
+    if (!socket.roomCode) return;
+    if (!checkRateLimit(socket.id, 3, 60000)) return;
+
+    const watchers = io._mediaWatchers[socket.roomCode];
+    if (!watchers || watchers.size === 0) return;
+
+    // Ask all watchers (except the requester) to send back the media info
+    let asked = 0;
+    for (const wid of watchers) {
+      if (wid !== socket.id) {
+        io.to(wid).emit('media-recover-request', { requesterId: socket.id });
+        asked++;
+      }
+    }
+    if (asked > 0) {
+      logger.info(`Media recovery requested in room ${socket.roomCode} — asked ${asked} watchers for ${socket.id}`);
+    }
+  });
+
+  // The watcher responds with cleartext media info; server relays it to the requester
+  socket.on('media-recover-response', (data) => {
+    if (!socket.roomCode) return;
+    if (!checkRateLimit(socket.id, 5, 60000)) return;
+    if (!data || typeof data.requesterId !== 'string') return;
+
+    // Validate the media payload (same rules as cleartext media-share)
+    const type = typeof data.type === 'string' ? data.type.toLowerCase().trim() : '';
+    if (type !== 'youtube' && type !== 'soundcloud') return;
+    const rawUrl = typeof data.url === 'string' ? data.url.trim() : '';
+    if (!rawUrl || rawUrl.length > 2048) return;
+    if (type === 'youtube' && !SAFE_YT_URL.test(rawUrl)) return;
+    if (type === 'soundcloud' && !SAFE_SC_URL.test(rawUrl)) return;
+    const rawId = typeof data.id === 'string' ? data.id.trim() : null;
+    if (type === 'youtube' && (!rawId || !/^[a-zA-Z0-9_-]{11}$/.test(rawId))) return;
+    const sharedBy = typeof data.sharedBy === 'string' ? data.sharedBy.substring(0, 30) : 'Someone';
+
+    const payload = { type, id: rawId, url: rawUrl, sharedBy };
+
+    // Send as a normal media-share to the requester so their existing handler picks it up
+    io.to(data.requesterId).emit('media-share', payload);
+
+    // Also update the server's activeMedia to cleartext so future rejoins work directly
+    io._activeMedia[socket.roomCode] = { ...payload, sharedAt: Date.now() };
+    logger.info(`Media recovered in room ${socket.roomCode} — ${socket.id} sent URL to ${data.requesterId}`);
+  });
+
   socket.on('media-join', () => {
     if (!socket.roomCode) return;
     if (!checkRateLimit(socket.id, 10, 60000)) return;  // Prevent rapid join/leave spam
@@ -3014,6 +3065,132 @@ io.on('connection', (socket) => {
         }, 2000);
       }
 
+      // ── Auto-create round 1 game messages for non-trivia tournaments ──
+      // Without this, users would have to manually click "Play" for every match.
+      if (td.gameType !== 'trivia') {
+        setTimeout(async () => {
+          try {
+            // Re-read tournament state (the saveMessage above may not have propagated yet)
+            const freshMsg = await roomManager.getMessage(socket.roomCode, message.id);
+            if (!freshMsg || !freshMsg.tournamentData) return;
+            const ftd = freshMsg.tournamentData;
+            if (ftd.status !== 'in-progress') return;
+
+            // Collect ALL ready matches (includes round 2+ matches made ready by byes)
+            const readyMatches = [];
+            if (ftd.format === 'round-robin' && ftd.bracket.rounds) {
+              // Round-robin: only first round at start
+              const firstRound = ftd.bracket.rounds[0];
+              if (Array.isArray(firstRound)) {
+                for (const m of firstRound) {
+                  if (m.player1 && m.player2 && m.status === 'pending' && !m.gameMessageId) {
+                    readyMatches.push(m);
+                  }
+                }
+              }
+            } else {
+              // Single / double elimination: find ALL ready matches across all rounds
+              // (bye advancement can make round 2+ matches immediately playable)
+              const allR = [];
+              if (ftd.bracket.rounds) allR.push(...ftd.bracket.rounds);
+              if (ftd.bracket.winnersRounds) allR.push(...ftd.bracket.winnersRounds);
+              if (ftd.bracket.losersRounds) allR.push(...ftd.bracket.losersRounds);
+              if (ftd.bracket.grandFinals) allR.push(ftd.bracket.grandFinals);
+              for (const round of allR) {
+                if (!Array.isArray(round)) continue;
+                for (const m of round) {
+                  if (m.player1 && m.player2 && m.status === 'pending' && !m.gameMessageId) {
+                    readyMatches.push(m);
+                  }
+                }
+              }
+            }
+
+            if (readyMatches.length === 0) return;
+            logger.info(`🏆 Auto-creating ${readyMatches.length} initial game(s) for tournament in ${socket.roomCode}`);
+
+            for (let ri = 0; ri < readyMatches.length; ri++) {
+              const readyMatch = readyMatches[ri];
+              let gt = ftd.gameType;
+              if (gt === 'mixed' && ftd.roundGameTypes) {
+                const mr = readyMatch.round || 1;
+                gt = ftd.roundGameTypes[mr] || ftd.roundGameTypes[String(mr)] || 'chess';
+              }
+              if (gt === 'trivia') continue;
+
+              const p1 = readyMatch.player1;
+              const p2 = readyMatch.player2;
+              let gameData;
+              if (gt === 'tic-tac-toe') {
+                gameData = {
+                  gameType: 'tic-tac-toe',
+                  board: Array(9).fill(null),
+                  players: { X: { id: p1.id, socketId: null, name: p1.nickname }, O: { id: p2.id, socketId: null, name: p2.nickname } },
+                  turn: 'X', winner: null, winningLine: null, lastActivity: Date.now()
+                };
+              } else if (gt === 'rock-paper-scissors') {
+                gameData = {
+                  gameType: 'rock-paper-scissors',
+                  players: { P1: { id: p1.id, socketId: null, name: p1.nickname, move: null }, P2: { id: p2.id, socketId: null, name: p2.nickname, move: null } },
+                  scores: { P1: 0, P2: 0 }, rounds: [], winner: null, bestOf: ftd.bestOf || 3, lastActivity: Date.now()
+                };
+              } else if (gt === 'chess') {
+                gameData = {
+                  gameType: 'chess',
+                  fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+                  players: { white: { id: p1.id, socketId: null, name: p1.nickname }, black: { id: p2.id, socketId: null, name: p2.nickname } },
+                  turn: 'w', history: [], winner: null, lastActivity: Date.now()
+                };
+              } else {
+                continue;
+              }
+
+              gameData.tournamentRef = {
+                tournamentMessageId: message.id,
+                matchId: readyMatch.id,
+                matchRound: readyMatch.round || 1,
+                player1Id: p1.id,
+                player2Id: p2.id
+              };
+
+              const gameTypeName = gt === 'tic-tac-toe' ? 'Tic-Tac-Toe' :
+                gt === 'rock-paper-scissors' ? 'Rock Paper Scissors' : 'Chess';
+              const roundLabel = (ftd.gameType === 'mixed' && ftd.roundGameTypes)
+                ? ` (Round ${readyMatch.round || '?'})` : '';
+
+              const gameMessage = {
+                id: `msg_${Date.now()}_init_${ri}_${Math.random().toString(36).substr(2, 9)}`,
+                content: `🏆 Tournament${roundLabel}: ${p1.nickname} vs ${p2.nickname} — ${gameTypeName}`,
+                messageType: 'game',
+                gameData,
+                sender: { id: 'system', nickname: 'Tournament', socketId: 'system' },
+                timestamp: new Date().toISOString(),
+                reactions: {},
+                overrideTtl: 0
+              };
+
+              const room = await roomManager.getRoom(socket.roomCode);
+              if (room) {
+                room.messages = room.messages || [];
+                room.messages.push(gameMessage);
+                await roomManager.saveRoom(socket.roomCode, room);
+
+                readyMatch.gameMessageId = gameMessage.id;
+                readyMatch.status = 'in-progress';
+                await roomManager.saveMessage(socket.roomCode, freshMsg);
+
+                io.to(socket.roomCode).emit('new-message', gameMessage);
+                io.to(socket.roomCode).emit('message-updated', freshMsg);
+
+                logger.info(`🏆 Auto-created initial game: ${p1.nickname} vs ${p2.nickname} (${gameTypeName}) round ${readyMatch.round || '?'} in ${socket.roomCode}`);
+              }
+            }
+          } catch (autoErr) {
+            logger.error('Error auto-creating initial tournament matches:', autoErr);
+          }
+        }, 1500); // 1.5s delay to let UI render the tournament bracket first
+      }
+
       logger.info(`🏆 Tournament started in room ${socket.roomCode} with ${td.players.length} players (${td.format})`);
     } catch (error) {
       logger.error('Error starting tournament:', error);
@@ -3348,7 +3525,7 @@ io.on('connection', (socket) => {
         }
         if (!matchFound) return;
 
-        const allDone = rounds.every(r => r.every(m => m.status === 'completed'));
+        const allDone = rounds.every(r => r.every(m => m.status === 'completed' || m.status === 'bye'));
         if (allDone) td.status = 'completed';
       } else if (td.format === 'double-elimination' && td.bracket.format === 'double-elimination') {
         const { winnersRounds, losersRounds, grandFinals } = td.bracket;
