@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Play, Pause, SkipForward, Volume2, VolumeX, X, Minimize2, Maximize2,
-  Link, ExternalLink, Users, Radio, ChevronDown
+  ExternalLink, Users, Radio, ChevronDown
 } from 'lucide-react';
 import socketManager from '../socket';
 import {
@@ -121,8 +121,6 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
   const [isMuted, setIsMuted] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [syncCount, setSyncCount] = useState(0);           // listeners watching
-  const [showUrlInput, setShowUrlInput] = useState(false);
-  const [urlInput, setUrlInput] = useState('');
   const [showControls, setShowControls] = useState(true);   // overlay controls visibility
 
   const ytPlayerRef = useRef(null);
@@ -597,33 +595,6 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
     emitEncrypted('media-sync', { roomCode, action: 'seek', currentTime: time });
   };
 
-  const handleShareUrl = () => {
-    const detected = detectMediaUrl(urlInput.trim());
-    if (!detected) return;
-
-    // Optimistic local update so sender sees player immediately
-    setMediaInfo({
-      type: detected.type,
-      id: detected.id || null,
-      url: detected.url,
-      sharedBy: currentUser?.nickname || 'Someone',
-    });
-    setIsPlaying(false);
-    setCurrentTime(0);
-    setDuration(0);
-    setIsMinimized(false);
-
-    emitEncrypted('media-share', {
-      roomCode,
-      type: detected.type,
-      id: detected.id || null,
-      url: detected.url,
-      sharedBy: currentUser?.nickname || 'Someone',
-    });
-    setUrlInput('');
-    setShowUrlInput(false);
-  };
-
   const handleClose = () => {
     destroyPlayer();
     setMediaInfo(null);
@@ -634,214 +605,190 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
     withJitter(() => socketManager.emit('media-close', { roomCode }));
   };
 
-  // ─── No media yet → show share button ────────────────────────────
+  // ─── No media yet → render nothing (button is in sidebar, URL input is a modal) ──
   if (!mediaInfo) {
-    return (
-      <div className="relative">
-        {showUrlInput ? (
-          <div className={`flex items-center gap-2 bg-${vibeAccent}-50/80 dark:bg-${vibeAccent}-950/40 backdrop-blur-md border border-${vibeAccent}-200/30 dark:border-${vibeAccent}-700/30 rounded-2xl px-3 py-2 shadow-lg`}>
-            <Link className={`w-4 h-4 text-${vibeAccent}-500 flex-shrink-0`} />
-            <input
-              type="text"
-              value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleShareUrl()}
-              data-allow-copy="true"
-              placeholder="Paste YouTube or SoundCloud URL..."
-              className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 outline-none min-w-0"
-              autoFocus
-            />
-            <button
-              onClick={handleShareUrl}
-              disabled={!detectMediaUrl(urlInput.trim())}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${detectMediaUrl(urlInput.trim())
-                ? `bg-${vibeAccent}-500 text-white hover:bg-${vibeAccent}-600 active:scale-95`
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                }`}
-            >
-              Share
-            </button>
-            <button onClick={() => setShowUrlInput(false)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full">
-              <X className="w-3.5 h-3.5 text-gray-400" />
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setShowUrlInput(true)}
-            className={`flex items-center gap-2 px-3 py-2 bg-white/60 dark:bg-gray-800/60 backdrop-blur-md border border-gray-200/40 dark:border-gray-700/40 rounded-2xl shadow-sm hover:shadow-md transition-all active:scale-[0.98] group`}
-          >
-            <Radio className={`w-4 h-4 text-${vibeAccent}-500 group-hover:animate-pulse`} />
-            <span className="text-xs font-bold text-gray-700 dark:text-gray-300 tracking-tight">Watch Party</span>
-          </button>
-        )}
-      </div>
-    );
+    return null;
   }
 
-  // ─── Player (always rendered when mediaInfo exists — minimized just hides it via CSS) ──
+  // ─── Player (rendered as a message-like card in the chat flow) ──
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="relative">
-      {/* Minimized bar — shown when minimized, clicking expands */}
-      {isMinimized && (
-        <div
-          className="flex items-center gap-2 px-3 py-1.5 bg-black/80 backdrop-blur-md rounded-2xl shadow-lg cursor-pointer border border-white/10"
-          onClick={() => setIsMinimized(false)}
-        >
-          <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
-          <span className="text-xs font-bold text-white truncate max-w-[120px]">
-            {mediaInfo.type === 'youtube' ? '▶ YouTube' : '🎵 SoundCloud'}
-          </span>
-          <span className="text-[10px] text-gray-400">{formatTime(currentTime)}</span>
-          {syncCount > 0 && (
-            <span className="text-[10px] text-blue-400 flex items-center gap-0.5">
-              <Users className="w-2.5 h-2.5" />{syncCount}
-            </span>
-          )}
-          <Maximize2 className="w-3 h-3 text-gray-400" />
-        </div>
-      )}
-
-      {/* Full player — kept alive even when minimized (hidden via CSS, not removed from DOM) */}
-      <div
-        className={`w-80 max-w-[90vw] bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden ${isMinimized ? 'absolute -left-[9999px] w-0 h-0 overflow-hidden pointer-events-none' : ''}`}
-        style={isMinimized ? { position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' } : {}}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/5">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isPlaying ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
-            <span className="text-xs font-bold text-white truncate">
-              {mediaInfo.type === 'youtube' ? '▶ YouTube' : '🎵 SoundCloud'}
-            </span>
-            {syncCount > 0 && (
-              <span className="text-[10px] text-blue-400 flex items-center gap-0.5 flex-shrink-0">
-                <Users className="w-2.5 h-2.5" />{syncCount} watching
-              </span>
-            )}
+    <div className="w-full max-w-lg mx-auto my-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      {/* Message-like card wrapper */}
+      <div className={`bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl shadow-lg border border-gray-200/60 dark:border-gray-700/60 overflow-hidden ${isMinimized ? '' : 'ring-1 ring-black/5 dark:ring-white/5'}`}>
+        {/* Card Header — looks like a system message */}
+        <div className={`flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-${vibeAccent}-50/80 dark:from-${vibeAccent}-950/40 to-transparent border-b border-gray-200/50 dark:border-gray-700/50`}>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className={`w-8 h-8 rounded-xl bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 flex items-center justify-center flex-shrink-0`}>
+              <Radio className={`w-4 h-4 text-${vibeAccent}-500`} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-gray-900 dark:text-white tracking-tight">Watch Party</span>
+                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isPlaying ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`} />
+                {syncCount > 0 && (
+                  <span className="text-[10px] text-blue-500 dark:text-blue-400 flex items-center gap-0.5 flex-shrink-0 font-medium">
+                    <Users className="w-2.5 h-2.5" />{syncCount}
+                  </span>
+                )}
+              </div>
+              {mediaInfo.sharedBy && (
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+                  Shared by <span className="font-medium">{mediaInfo.sharedBy}</span>
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
-            <button onClick={() => setIsMinimized(true)} className="p-1 hover:bg-white/10 rounded-full transition-colors">
-              <Minimize2 className="w-3.5 h-3.5 text-gray-400" />
+            <button
+              onClick={() => setIsMinimized(!isMinimized)}
+              className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              title={isMinimized ? 'Expand' : 'Minimize'}
+            >
+              {isMinimized ? <Maximize2 className="w-3.5 h-3.5 text-gray-500" /> : <Minimize2 className="w-3.5 h-3.5 text-gray-500" />}
             </button>
             <button
               onClick={() => window.open(mediaInfo.url, '_blank')}
-              className="p-1 hover:bg-white/10 rounded-full transition-colors"
+              className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               title="Open in browser"
             >
-              <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
+              <ExternalLink className="w-3.5 h-3.5 text-gray-500" />
             </button>
-            <button onClick={handleClose} className="p-1 hover:bg-red-500/20 rounded-full transition-colors">
+            <button onClick={handleClose} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
               <X className="w-3.5 h-3.5 text-red-400" />
             </button>
           </div>
         </div>
 
-        {/* Video / Widget embed with overlay controls */}
-        <div
-          className="relative w-full aspect-video bg-black group"
-          ref={playerContainerRef}
-          onMouseEnter={() => {
-            if (controlsHideTimerRef.current) clearTimeout(controlsHideTimerRef.current);
-            setShowControls(true);
-          }}
-          onMouseLeave={() => {
-            controlsHideTimerRef.current = setTimeout(() => setShowControls(false), 2000);
-          }}
-          onMouseMove={() => {
-            setShowControls(true);
-            if (controlsHideTimerRef.current) clearTimeout(controlsHideTimerRef.current);
-            controlsHideTimerRef.current = setTimeout(() => setShowControls(false), 3000);
-          }}
-        >
-          {mediaInfo.type === 'youtube' ? (
-            <div id="shared-media-embed" className="w-full h-full" />
-          ) : (
-            <iframe
-              id="shared-media-embed"
-              className="w-full h-full"
-              scrolling="no"
-              frameBorder="no"
-              allow="autoplay"
-              sandbox="allow-scripts allow-same-origin allow-popups"
-              referrerPolicy="no-referrer"
-            />
-          )}
-
-          {/* Overlay: transparent click-catcher + big play/pause button center.
-              The iframe captures clicks in its own browsing context, so we need
-              a div on top of it to intercept taps/clicks and route them through
-              our synced handlePlayPause instead of YouTube's local toggle. */}
+        {/* Minimized: compact playback bar */}
+        {isMinimized && (
           <div
-            className="absolute inset-0 z-10 cursor-pointer"
-            onClick={(e) => {
-              e.stopPropagation();
-              handlePlayPause();
-            }}
+            className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+            onClick={() => setIsMinimized(false)}
           >
-            <div className={`w-full h-full flex items-center justify-center transition-opacity duration-300 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}>
-              <div className={`p-3 rounded-full bg-black/50 backdrop-blur-sm ${isPlaying ? 'opacity-0' : 'opacity-80'} transition-opacity`}>
-                {isPlaying ? <Pause className="w-8 h-8 text-white" /> : <Play className="w-8 h-8 text-white ml-1" />}
-              </div>
-            </div>
-          </div>
-
-          {/* Overlay: bottom controls bar — z-20 to sit above click-catcher (z-10) */}
-          <div
-            className={`absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 pt-6 pb-2 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Progress bar */}
-            <div
-              className="h-1 bg-white/20 rounded-full cursor-pointer group/seek mb-2 hover:h-2 transition-all"
-              onClick={handleSeek}
+            <button
+              onClick={(e) => { e.stopPropagation(); handlePlayPause(); }}
+              className={`p-2 rounded-full bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 hover:bg-${vibeAccent}-200 dark:hover:bg-${vibeAccent}-800/40 transition-colors`}
             >
-              <div
-                className={`h-full bg-${vibeAccent}-500 rounded-full transition-[width] duration-200 relative`}
-                style={{ width: `${progress}%` }}
-              >
-                <div className={`absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-${vibeAccent}-400 rounded-full opacity-0 group-hover/seek:opacity-100 transition-opacity shadow-lg`} />
-              </div>
-            </div>
-
-            {/* Time + play/pause + volume */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handlePlayPause}
-                  className="p-1 hover:bg-white/20 rounded-full transition-colors"
-                >
-                  {isPlaying ? <Pause className="w-4 h-4 text-white" /> : <Play className="w-4 h-4 text-white ml-0.5" />}
-                </button>
-                <span className="text-[10px] text-gray-300 font-mono tabular-nums">
+              {isPlaying ? <Pause className={`w-4 h-4 text-${vibeAccent}-600 dark:text-${vibeAccent}-400`} /> : <Play className={`w-4 h-4 text-${vibeAccent}-600 dark:text-${vibeAccent}-400 ml-0.5`} />}
+            </button>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate">
+                {mediaInfo.type === 'youtube' ? '▶ YouTube Video' : '🎵 SoundCloud Track'}
+              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex-1 h-1 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+                  <div className={`h-full bg-${vibeAccent}-500 rounded-full transition-[width] duration-200`} style={{ width: `${progress}%` }} />
+                </div>
+                <span className="text-[10px] text-gray-500 font-mono tabular-nums flex-shrink-0">
                   {formatTime(currentTime)} / {formatTime(duration)}
                 </span>
               </div>
+            </div>
+          </div>
+        )}
 
-              <div className="flex items-center gap-1.5">
-                <button onClick={() => setIsMuted(!isMuted)} className="p-0.5 hover:bg-white/20 rounded-full transition-colors">
-                  {isMuted ? <VolumeX className="w-3.5 h-3.5 text-gray-300" /> : <Volume2 className="w-3.5 h-3.5 text-gray-300" />}
-                </button>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={isMuted ? 0 : volume}
-                  onChange={(e) => { setVolume(Number(e.target.value)); setIsMuted(false); }}
-                  className="w-14 h-1 accent-white cursor-pointer"
-                />
+        {/* Full player — kept alive even when minimized (off-screen, not removed from DOM) */}
+        <div
+          className={isMinimized ? 'sr-only' : ''}
+          style={isMinimized ? { position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' } : {}}
+        >
+          {/* Video / Widget embed with overlay controls */}
+          <div
+            className="relative w-full aspect-video bg-black group"
+            ref={playerContainerRef}
+            onMouseEnter={() => {
+              if (controlsHideTimerRef.current) clearTimeout(controlsHideTimerRef.current);
+              setShowControls(true);
+            }}
+            onMouseLeave={() => {
+              controlsHideTimerRef.current = setTimeout(() => setShowControls(false), 2000);
+            }}
+            onMouseMove={() => {
+              setShowControls(true);
+              if (controlsHideTimerRef.current) clearTimeout(controlsHideTimerRef.current);
+              controlsHideTimerRef.current = setTimeout(() => setShowControls(false), 3000);
+            }}
+          >
+            {mediaInfo.type === 'youtube' ? (
+              <div id="shared-media-embed" className="w-full h-full" />
+            ) : (
+              <iframe
+                id="shared-media-embed"
+                className="w-full h-full"
+                scrolling="no"
+                frameBorder="no"
+                allow="autoplay"
+                sandbox="allow-scripts allow-same-origin allow-popups"
+                referrerPolicy="no-referrer"
+              />
+            )}
+
+            {/* Overlay: transparent click-catcher + big play/pause button center */}
+            <div
+              className="absolute inset-0 z-10 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePlayPause();
+              }}
+            >
+              <div className={`w-full h-full flex items-center justify-center transition-opacity duration-300 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}>
+                <div className={`p-3 rounded-full bg-black/50 backdrop-blur-sm ${isPlaying ? 'opacity-0' : 'opacity-80'} transition-opacity`}>
+                  {isPlaying ? <Pause className="w-8 h-8 text-white" /> : <Play className="w-8 h-8 text-white ml-1" />}
+                </div>
+              </div>
+            </div>
+
+            {/* Overlay: bottom controls bar — z-20 to sit above click-catcher (z-10) */}
+            <div
+              className={`absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 pt-6 pb-2 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Progress bar */}
+              <div
+                className="h-1 bg-white/20 rounded-full cursor-pointer group/seek mb-2 hover:h-2 transition-all"
+                onClick={handleSeek}
+              >
+                <div
+                  className={`h-full bg-${vibeAccent}-500 rounded-full transition-[width] duration-200 relative`}
+                  style={{ width: `${progress}%` }}
+                >
+                  <div className={`absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-${vibeAccent}-400 rounded-full opacity-0 group-hover/seek:opacity-100 transition-opacity shadow-lg`} />
+                </div>
+              </div>
+
+              {/* Time + play/pause + volume */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handlePlayPause}
+                    className="p-1 hover:bg-white/20 rounded-full transition-colors"
+                  >
+                    {isPlaying ? <Pause className="w-4 h-4 text-white" /> : <Play className="w-4 h-4 text-white ml-0.5" />}
+                  </button>
+                  <span className="text-[10px] text-gray-300 font-mono tabular-nums">
+                    {formatTime(currentTime)} / {formatTime(duration)}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => setIsMuted(!isMuted)} className="p-0.5 hover:bg-white/20 rounded-full transition-colors">
+                    {isMuted ? <VolumeX className="w-3.5 h-3.5 text-gray-300" /> : <Volume2 className="w-3.5 h-3.5 text-gray-300" />}
+                  </button>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={isMuted ? 0 : volume}
+                    onChange={(e) => { setVolume(Number(e.target.value)); setIsMuted(false); }}
+                    className="w-14 h-1 accent-white cursor-pointer"
+                  />
+                </div>
               </div>
             </div>
           </div>
         </div>
-
-        {/* Shared by — below the video */}
-        {mediaInfo.sharedBy && (
-          <p className="text-[10px] text-gray-500 text-center py-1">
-            Shared by <span className="text-gray-400 font-medium">{mediaInfo.sharedBy}</span>
-          </p>
-        )}
       </div>
     </div>
   );

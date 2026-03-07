@@ -1,0 +1,155 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Link, Radio, Play, Music, Youtube } from 'lucide-react';
+import { detectMediaUrl } from './SharedMediaPlayer';
+
+/**
+ * WatchPartyModal — Centered popup for pasting a YouTube/SoundCloud URL
+ * to start a watch party. Shows validation feedback inline.
+ */
+const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => {
+  const [urlInput, setUrlInput] = useState('');
+  const inputRef = useRef(null);
+
+  const vibeAccent = roomVibe === 'party' ? 'indigo' :
+    roomVibe === 'chill' ? 'teal' :
+      roomVibe === 'focus' ? 'orange' : 'blue';
+
+  const detected = urlInput.trim() ? detectMediaUrl(urlInput.trim()) : null;
+
+  useEffect(() => {
+    if (isOpen) {
+      setUrlInput('');
+      // Focus input after a small delay so the modal is rendered
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [isOpen]);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isOpen, onClose]);
+
+  const handleShare = () => {
+    if (!detected) return;
+    onShare(urlInput.trim());
+    setUrlInput('');
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Modal */}
+      <div className="relative w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden animate-in zoom-in-95 duration-200">
+        {/* Header */}
+        <div className={`flex items-center justify-between px-5 py-4 border-b border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-r from-${vibeAccent}-50/50 dark:from-${vibeAccent}-950/30 to-transparent`}>
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 flex items-center justify-center`}>
+              <Radio className={`w-5 h-5 text-${vibeAccent}-500`} />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">Watch Party</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Share media with everyone in the room</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
+          >
+            <X className="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-5 space-y-4">
+          {/* URL Input */}
+          <div className={`flex items-center gap-3 bg-gray-50 dark:bg-gray-800/80 border-2 rounded-xl px-4 py-3 transition-colors ${detected ? `border-${vibeAccent}-400 dark:border-${vibeAccent}-500` : 'border-gray-200 dark:border-gray-700 focus-within:border-gray-300 dark:focus-within:border-gray-600'}`}>
+            <Link className={`w-5 h-5 flex-shrink-0 ${detected ? `text-${vibeAccent}-500` : 'text-gray-400'}`} />
+            <input
+              ref={inputRef}
+              type="text"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleShare()}
+              data-allow-copy="true"
+              placeholder="Paste YouTube or SoundCloud URL..."
+              className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 outline-none min-w-0"
+            />
+            {urlInput && (
+              <button onClick={() => setUrlInput('')} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors">
+                <X className="w-3.5 h-3.5 text-gray-400" />
+              </button>
+            )}
+          </div>
+
+          {/* Detection Feedback */}
+          {detected && (
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg bg-${vibeAccent}-50 dark:bg-${vibeAccent}-950/30 border border-${vibeAccent}-200/50 dark:border-${vibeAccent}-700/30 animate-in slide-in-from-bottom-2 duration-200`}>
+              {detected.type === 'youtube' ? (
+                <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
+                  <Play className="w-4 h-4 text-red-500" />
+                </div>
+              ) : (
+                <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                  <Music className="w-4 h-4 text-orange-500" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-gray-700 dark:text-gray-200">
+                  {detected.type === 'youtube' ? 'YouTube Video' : 'SoundCloud Track'} detected
+                </p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">{urlInput.trim()}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Supported platforms hint */}
+          {!detected && !urlInput && (
+            <div className="flex items-center justify-center gap-4 py-2">
+              <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500">
+                <Play className="w-4 h-4 text-red-400" />
+                <span className="text-xs">YouTube</span>
+              </div>
+              <div className="w-px h-4 bg-gray-200 dark:bg-gray-700" />
+              <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500">
+                <Music className="w-4 h-4 text-orange-400" />
+                <span className="text-xs">SoundCloud</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-gray-200/50 dark:border-gray-700/50 flex items-center justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleShare}
+            disabled={!detected}
+            className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${detected
+              ? `bg-${vibeAccent}-500 text-white hover:bg-${vibeAccent}-600 active:scale-95 shadow-lg shadow-${vibeAccent}-500/25`
+              : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            Share to Room
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default WatchPartyModal;

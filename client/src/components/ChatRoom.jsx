@@ -70,6 +70,7 @@ import CameraModal from './CameraModal';
 import { getVibeById, getAllVibes } from '../utils/vibes';
 import AmbientPlayer from './AmbientPlayer';
 import SharedMediaPlayer, { detectMediaUrl } from './SharedMediaPlayer';
+import WatchPartyModal from './WatchPartyModal';
 import NowPlayingBadge from './NowPlayingBadge';
 import { canManageRoom } from '../utils/roles';
 import { getRandomIcebreaker } from '../utils/icebreakers';
@@ -383,6 +384,7 @@ const ChatRoom = () => {
   // Watch Party / Now Playing state
   const [nowPlayingMap, setNowPlayingMap] = useState({}); // { [userId]: { title, artist, source } }
   const [showMediaPlayer, setShowMediaPlayer] = useState(true);
+  const [showWatchPartyModal, setShowWatchPartyModal] = useState(false);
   const [initialMedia, setInitialMedia] = useState(null); // Persisted media state from server on rejoin
 
   // Stealth Actions State
@@ -1605,9 +1607,12 @@ const ChatRoom = () => {
             const detected = detectMediaUrl(args);
             if (detected) {
               socketManager.emit('media-share', { roomCode, type: detected.type, id: detected.id || null, url: detected.url, sharedBy: currentUser?.nickname || 'Someone' });
+              setShowMediaPlayer(true);
             } else setError('Paste a YouTube or SoundCloud URL after /media');
+          } else {
+            // No URL provided — open the watch party modal
+            setShowWatchPartyModal(true);
           }
-          setShowMediaPlayer(true);
           break;
         default: break;
       }
@@ -2388,34 +2393,13 @@ const ChatRoom = () => {
         </div>
       </div>
 
-      {/* ── Compact info bar: sits IN document flow, never overlaps messages ── */}
-      {(getVibeById(roomVibe)?.moodSound || showMediaPlayer || roomTopic || activeTimer) && (
+      {/* ── Compact info bar: only visible when topic, timer, or vibe mood is active ── */}
+      {(getVibeById(roomVibe)?.moodSound || roomTopic || activeTimer) && (
         <div className={`flex items-center gap-2 px-3 py-1.5 border-b border-gray-200/50 dark:border-gray-700/50 ${getVibeById(roomVibe).panelClass} backdrop-blur-md overflow-x-auto scrollbar-none shrink-0`}>
           {/* Ambient Player / Mood DJ */}
           {getVibeById(roomVibe)?.moodSound && (
             <div className="shrink-0">
               <AmbientPlayer moodSound={getVibeById(roomVibe).moodSound} isActive={true} />
-            </div>
-          )}
-          {/* Watch Party */}
-          {showMediaPlayer && (
-            <div className="shrink-0">
-              <SharedMediaPlayer
-                roomCode={roomCode}
-                currentUser={currentUser}
-                isHost={isHost}
-                roomVibe={roomVibe}
-                mlsReady={mlsReady}
-                initialMedia={initialMedia}
-                onNowPlayingChange={(np) => {
-                  const myId = currentUser?.socketId || currentUser?.id;
-                  if (myId && np) {
-                    setNowPlayingMap(prev => ({ ...prev, [myId]: np }));
-                  } else if (myId) {
-                    setNowPlayingMap(prev => { const copy = { ...prev }; delete copy[myId]; return copy; });
-                  }
-                }}
-              />
             </div>
           )}
           {/* Topic Pill */}
@@ -2461,6 +2445,25 @@ const ChatRoom = () => {
       <div className={`flex-1 flex overflow-hidden min-h-0 ${sidebarPosition === 'left' ? 'flex-row-reverse' : ''}`}>
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           <div className="flex-1 min-h-0 overflow-y-auto pl-4 lg:pl-10 pr-2 scrollbar-thin overscroll-contain touch-pan-y chat-messages-area">
+            {/* Watch Party Player — renders as a message-like card in the chat flow */}
+            {showMediaPlayer && (
+              <SharedMediaPlayer
+                roomCode={roomCode}
+                currentUser={currentUser}
+                isHost={isHost}
+                roomVibe={roomVibe}
+                mlsReady={mlsReady}
+                initialMedia={initialMedia}
+                onNowPlayingChange={(np) => {
+                  const myId = currentUser?.socketId || currentUser?.id;
+                  if (myId && np) {
+                    setNowPlayingMap(prev => ({ ...prev, [myId]: np }));
+                  } else if (myId) {
+                    setNowPlayingMap(prev => { const copy = { ...prev }; delete copy[myId]; return copy; });
+                  }
+                }}
+              />
+            )}
             <MessageList
               messages={messages}
               currentUser={currentUser}
@@ -2880,6 +2883,7 @@ const ChatRoom = () => {
               verbalCode={verbalCode}
               roomVibe={roomVibe}
               nowPlayingMap={nowPlayingMap}
+              onWatchParty={() => setShowWatchPartyModal(true)}
             />
           </div>
         )}
@@ -2909,6 +2913,7 @@ const ChatRoom = () => {
                   verbalCode={verbalCode}
                   roomVibe={roomVibe}
                   nowPlayingMap={nowPlayingMap}
+                  onWatchParty={() => { setShowMobileMenu(false); setShowWatchPartyModal(true); }}
                 />
               </div>
             </div>
@@ -2917,6 +2922,24 @@ const ChatRoom = () => {
       }
 
       {showCallModal && <AudioCallModal isOpen={showCallModal} onClose={() => setShowCallModal(false)} roomCode={roomCode} />}
+      <WatchPartyModal
+        isOpen={showWatchPartyModal}
+        onClose={() => setShowWatchPartyModal(false)}
+        roomVibe={roomVibe}
+        onShare={(url) => {
+          const detected = detectMediaUrl(url);
+          if (detected) {
+            socketManager.emit('media-share', {
+              roomCode,
+              type: detected.type,
+              id: detected.id || null,
+              url: detected.url,
+              sharedBy: currentUser?.nickname || 'Someone',
+            });
+            setShowMediaPlayer(true);
+          }
+        }}
+      />
       <TopicEditor
         isOpen={showTopicEditor}
         onClose={() => setShowTopicEditor(false)}

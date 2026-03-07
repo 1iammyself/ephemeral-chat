@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Crown, User, Check, X, ChevronDown, Shield, UserX, Info, Zap, Music } from 'lucide-react';
+import { Users, Crown, User, Check, X, ChevronDown, Shield, UserX, Info, Zap, Music, Radio } from 'lucide-react';
 import { ROLES, ROLE_INFO, canKick, canChangeRole, canManageGuests, getAssignableRoles } from '../utils/roles';
 import { hapticSuccess } from '../utils/platform';
 import NowPlayingBadge from './NowPlayingBadge';
@@ -20,7 +20,8 @@ const UserList = ({
   hasNewLogs = false,
   verbalCode = null,
   roomVibe,
-  nowPlayingMap = {}
+  nowPlayingMap = {},
+  onWatchParty,
 }) => {
   const [expandedUser, setExpandedUser] = useState(null);
 
@@ -273,6 +274,19 @@ const UserList = ({
           </div>
         )}
       </div>
+
+      {/* Watch Party Button */}
+      {onWatchParty && (
+        <div className="p-3 border-t border-gray-200/50 dark:border-gray-700/50 shrink-0">
+          <button
+            onClick={onWatchParty}
+            className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-${vibeAccent}-50 dark:from-${vibeAccent}-950/30 to-transparent border border-${vibeAccent}-200/50 dark:border-${vibeAccent}-700/30 rounded-xl hover:shadow-md hover:border-${vibeAccent}-300 dark:hover:border-${vibeAccent}-600 transition-all active:scale-[0.98] group`}
+          >
+            <Radio className={`w-4 h-4 text-${vibeAccent}-500 group-hover:animate-pulse`} />
+            <span className={`text-sm font-bold text-${vibeAccent}-700 dark:text-${vibeAccent}-300 tracking-tight`}>Watch Party</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };
