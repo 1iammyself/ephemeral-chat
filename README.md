@@ -1,178 +1,79 @@
 # 👻 Ephemeral Chat
 
-Ephemeral Chat is a high-security, Private messaging platform built for users who demand absolute privacy. No accounts, no logs.
+**The Gold Standard for Private, Zero-Knowledge Communication.**
 
-  <p align="center">
-    <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"></a>
-    <a href="https://github.com/cLLeB/ephemeral-chat/issues"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
-    <a href="https://ephchat.kyere.me/"><img src="https://img.shields.io/badge/🌐-Live_Demo-2ea44f" alt="Live Demo"></a>
-  </p>
-
-  <p align="center">
-    <a href="#features">Features</a> •
-    <a href="#quick-start">Quick Start</a> •
-    <a href="#tech-stack">Tech Stack</a> •
-    <a href="#architecture">Architecture</a> •
-    <a href="#deployment">Deployment</a>
-  </p>
-</div>
-
----
-
-## 🎥 Experience the Magic
-
-Watch how Ephemeral Chat redefines private communication:
-
-[![Watch the video](client/public/screenshot-chat.png)](https://youtu.be/gnvoWkvkkho)
-
-
-### 📸 Sneak Peek
+Ephemeral Chat is a cutting-edge messaging platform engineered for users who treat privacy as a fundamental right. Built on a **RAM-only, Zero-Persistence** model, it delivers military-grade security without compromising on the modern features you love.
 
 <p align="center">
-   <img src="client/public/screenshot-home.png" alt="Home Screen" width="400" style="border-radius: 10px; margin-right: 10px;"/>
-   <img src="client/public/screenshot-join.png" alt="Join Room UI" width="400" style="border-radius: 10px;"/>
-   <img src="client/public/screenshot-home.png" alt="Home Screen" width="400" style="border-radius: 10px; margin-right: 10px;"/>
-   <img src="client/public/screenshot-join.png" alt="Join Room UI" width="400" style="border-radius: 10px;"/>
+  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"></a>
+  <a href="https://github.com/cLLeB/ephemeral-chat/issues"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
+  <a href="https://ephchat.kyere.me/"><img src="https://img.shields.io/badge/🌐-Live_Demo-2ea44f" alt="Live Demo"></a>
+  <img src="https://img.shields.io/badge/Stack-React_|_Node_|_Rust-ff69b4" alt="Stack">
 </p>
 
 ---
 
-## ⚡ Advanced Features
+## 🚀 The Multi-Platform Ecosystem
 
-### 🔐 Ironclad Privacy
-- **E2EE (AES-GCM)**: Military-grade 256-bit encryption performed entirely in-browser. Keys are stored in the URL fragment (`#`) and never traverse the network.
-- **Snapshot Protection**: 
-    - **Privacy Blur**: Instant grayscale blur applied to the UI when focus is lost.
-    - **iOS Guard**: Automatic black-screen overlay to prevent sensitive snapshots in the App Switcher.
-    - **Ghost Watermark**: Dynamic, drifting watermark Layer that rotates and moves to deter AI-based OCR and screenshot reconstruction.
-- **Stealth Password Entry**: Invisible input system for room passwords—no characters, no dots, zero visual footprint.
+One codebase, everywhere. Ephemeral Chat spans the entire digital landscape:
 
-### 🎨 Modern UI & UX
-- **Glassmorphic Emoji Reactions**: Sleek, animated reaction system with backdrop-blur effects and curated quick-access emojis.
-- **Adaptive Interface**: Intelligent positioning of pickers and menus that dynamically avoid screen edges and keyboard overlap.
-- **Micro-Animations**: High-performance transitions for message delivery, editing, and reactions.
-
-### 📱 Perfect Mobile Experience
-- **Visual Viewport Sync**: Pixel-perfect layout adjustment using the `VisualViewport` API to eliminate keyboard-driven "dead space."
-- **Flush Input System**: Zero-gap integration with mobile browser UI bars using native `safe-area-inset` support.
-- **Contextual Mobile Actions**: Gesture-optimized hover-to-reveal simulation for a clean, native-feeling chat experience.
-
-### 🎙️ Elite Communication
-- **Hybrid Voice Engine**: State-of-the-art failover system that auto-scales from WebRTC P2P to Agora RTM/RTC based on network conditions.
-- **Universal Voice Notes**: Real-time FFmpeg conversion to AAC (.m4a) for flawless playback across all mobile and desktop browsers.
-- **Targeted Messaging**: Secure server relay for granular control over message recipients within a room.
-
-### 🛡️ System Integrity
-- **Proof-of-Work CAPTCHA**: Custom `@cap.js/widget` implementation for anti-spam without compromising user anonymity.
-- **Zero-Persistence**: All data resides in volatile RAM; environments are scrubbed instantly once the last user departs.
-- **Optimized Performance**: Hardware-accelerated CSS transforms for smooth interactions on low-end devices.
+*   **🌐 Web & PWA**: High-performance React app with full offline support.
+*   **📱 Android Native**: Powered by Capacitor with hardware-level Proximity integration.
+*   **💻 Desktop (Win/Mac/Linux)**: Electron-hardened shell with screenshot blocking and system tray service.
+*   **🧩 Browser Extension**: Quick-access widget for Chromium-based browsers.
 
 ---
 
-## 🛠️ Tech Stack
+## 🔐 Privacy & Security Architecture
 
-| Frontend | Backend | DevOps |
-| :--- | :--- | :--- |
-| **React** & **Vite** | **Node.js** & **Express** | **Docker** Ready |
-| **Tailwind CSS** | **Socket.io** | **GitHub Actions** CI/CD |
-| **Lucide Icons** | **FFmpeg** (Processing) | **CodeQL** Analysis |
-| **WebRTC & Agora** | **Redis** (Scaling) | **Render** Hosting |
+We don't just hide your data; we ensure it never exists in a recoverable state.
 
----
+### 🛡️ Core Protections
+- **E2EE (AES-GCM 256-bit)**: Encryption happens locally in your browser. Keys are stored in the URL fragment (`#`), meaning they **never** leave your device.
+- **OHTTP (Oblivious HTTP)**: Masks your IP address from the server using a trusted relay, decoupling your identity from your traffic.
+- **Privacy Pass**: Anonymous rate-limiting that prevents spam while preserving your total anonymity.
+- **RAM-Only Persistence**: All data resides in volatile server memory. Environments are scrubbed instantly once the last user leaves.
 
-## 🚀 Quick Start
-
-### 1. Requirements
-Ensure you have **Node.js (v16+)** and **npm (v8+)** installed.
-
-### 2. Installation
-```bash
-# Clone the repo
-git clone https://github.com/cLLeB/ephemeral-chat.git
-cd ephemeral-chat
-
-# Install dependencies for both root and client
-npm install
-cd client && npm install && cd ..
-```
-
-### 3. Configuration
-Copy the template and add your credentials:
-```bash
-cp client/.env.example client/.env
-```
-
-<details>
-<summary>🔑 <b>Click to see Environment Variables Guide</b></summary>
-
-| Variable | Description | Default |
-| :--- | :--- | :--- |
-| `VITE_AGORA_APP_ID` | Your Agora project ID | - |
-| `INACTIVITY_TIMEOUT_MINUTES` | Minutes before a user is timed out for inactivity | 60 |
-| `INVITE_TOKEN_EXPIRY_MINUTES` | Minutes before an invite token expires | 30 |
-| `LOCKOUT_DURATION_MINUTES` | Minutes a user is locked out after max failed attempts | 15 |
-| `MAX_FAILED_ATTEMPTS` | Number of failed attempts before lockout | 10 |
-| `RECONNECT_GRACE_MINUTES` | Grace period for mobile users to reconnect after disconnect | 5 |
-| `CAP_SECRET` | Secret key for Captcha system | - |
-| `ROOM_EXPIRY_MINUTES` | Default room expiry in minutes | 10 |
-
-</details>
-
-### 4. Run Locally
-```bash
-npm run dev
-```
-- **Frontend**: [http://localhost:5173](http://localhost:5173)
-- **Backend**: [http://localhost:3001](http://localhost:3001)
+### 📸 Anti-Surveillance Suite
+- **iOS & Windows Guard**: Native-level blocks on screenshots and screen recording in the App Switcher and OS level.
+- **Ghost Watermarking**: A dynamic, drifting background layer designed to defeat AI-based OCR and manual photo capture.
+- **Stealth Password Entry**: A zero-footprint input system for room access—no characters, no dots, no visual feedback for onlookers.
+- **Privacy Blur**: Automatic UI blurring when the app window loses focus.
 
 ---
 
-## 🏗️ Architecture & Deep Dives
+## ✨ Standout Features
 
-<details>
-<summary><b>📐 Hybrid Call State Machine</b></summary>
+### 📺 Watch Party 2.0
+Collaborate and consume media together in real-time within your secure room:
+- **Twitch**: Sync live streams and VODs.
+- **Figma**: Real-time collaborative design viewing.
+- **Google Drive & PDF**: Seamless document review with encrypted syncing.
 
-We use a sophisticated failover logic for audio calls:
-1. **P2P Mode**: Uses WebRTC via Google STUN and ExpressTURN.
-2. **Fallback**: Auto-switches to Agora SDK if:
-   - Packet loss exceeds 5%.
-   - More than 3 participants join.
-   - P2P connection fails to establish.
+### 📡 Proximity Mesh (Beta)
+Powered by a high-performance **Rust & QUIC core**, our proximity engine allows:
+- **mDNS Discovery**: Find local peers automatically without a central server.
+- **Hotspot Transfer**: High-speed, offline file sharing using TCP/UDP bridging.
+- **Native Android Plugin**: Low-level hardware access for device-to-device communication.
 
-</details>
+### 🎙️ Advanced Media
+- **Audio Drops**: Secure voice notes with end-to-end encryption.
+- **Failover Voice Engine**: Intelligent switching between **WebRTC P2P** and **Agora RTC** based on network quality.
+- **FFmpeg Processing**: Server-side normalization and conversion for universal device compatibility.
 
-<details>
-<summary><b>🔒 Security & Encryption Deep Dive</b></summary>
+---
 
-Using **Web Crypto API (AES-GCM 256-bit)**:
-1. **Key Generation**: A cryptographically strong pseudo-random key is generated on the client.
-2. **Key Storage**: The key is stored in `window.location.hash`. Fragment identifiers are client-side only and are **never** included in HTTP requests.
-3. **Encryption**: Every message is encrypted with a unique Initialization Vector (IV).
-4. **Targeting**: Private messages are encrypted and tagged with specific recipient IDs for the server to relay exclusively to the intended sockets.
+## 🛠️ Technology Stack
 
-</details>
-
-<details>
-<summary><b>📱 Multi-Platform Architecture</b></summary>
-
-- **PWA**: Fully offline-capable service workers using Workbox.
-- **TWA (Android)**: Wrapped via Trusted Web Activity for Google Play Store distribution, utilizing Digital Asset Links for seamless verification.
-- **Microsoft Store**: Packaged PWA optimized for Windows 10/11 system integration.
-
-</details>
-
-<details>
-<summary><b>🌍 ICE Server Configuration</b></summary>
-
-```javascript
-[
-   { urls: "stun:stun.l.google.com:19302" },
-   { urls: "turn:free.expressturn.com:3478?transport=udp", username: "...", credential: "..." },
-   { urls: "turn:relay.metered.ca:80", username: "...", credential: "..." }
-]
-```
-
-</details>
+| Component | technologies |
+| :--- | :--- |
+| **Frontend** | React, Vite, Tailwind CSS, Lucide, Workbox (PWA) |
+| **Backend** | Node.js, Express, Socket.io, Redis |
+| **Security Core** | Web Crypto API, OHTTP, Privacy Pass, mlkem (Kyber) |
+| **Proximity Core** | **Rust**, QUIC (Quinn), mDNS-SD, Tokio |
+| **Desktop** | Electron, Electron-Store, Electron-Builder |
+| **Mobile** | Capacitor, Java/Kotlin Plugins, Android Studio |
+| **DevOps** | Docker, GitHub Actions, CodeQL, Render |
 
 ---
 
@@ -180,25 +81,55 @@ Using **Web Crypto API (AES-GCM 256-bit)**:
 
 ```text
 ephemeral-chat/
-├── android/          # Android TWA project (Play Store)
-├── client/           # React frontend (Vite + PWA)
-│   ├── src/          # React components, hooks, services
-│   └── public/       # PWA manifest and icons
-├── server/           # Express + Socket.IO backend
-│   ├── auth-utils.js # Security & Validation
-│   └── rooms.js      # Room management logic
-└── docs/             # Detailed user and dev guides
+├── client/           # React frontend (Vite + Capacitor)
+├── server/           # Express + Socket.IO + OHTTP Gateway
+├── electron-app/     # Desktop implementation (Hardened shell)
+├── proximity-core/   # Rust-based P2P networking engine
+├── chrome-extension/ # Browser quick-access tool
+├── e2ecp/            # Custom End-to-End Encryption Protocol
+└── docs/             # Technical specifications and API guides
 ```
 
 ---
 
-## 🤝 Contributing & License
+## 🚀 Quick Start (Development)
 
-We love contributions! Please feel free to open an issue or submit a pull request.
+### 1. Prerequisites
+- **Node.js** (v18+)
+- **Rust** (Latest Stable) - for `proximity-core`
+- **npm** (v9+)
 
-**License**: Distributed under the **Apache License 2.0**. See `LICENSE` and `NOTICE` for details.
+### 2. Installation
+```bash
+# Clone the repository
+git clone https://github.com/cLLeB/ephemeral-chat.git
+cd ephemeral-chat
+
+# Install root & submodule dependencies
+npm install
+cd client && npm install
+cd ../electron-app && npm install
+```
+
+### 3. Running the Stack
+```bash
+# Start both Server and Client concurrently
+npm run dev
+```
+
+- **Chat Interface**: `http://localhost:5173`
+- **Signal Server**: `http://localhost:3001`
 
 ---
+
+## 🤝 Contributing
+
+We welcome contributions from the security and privacy community! Please read our `CONTRIBUTING.md` (coming soon) and ensure your PRs adhere to our zero-knowledge philosophy.
+
+**License**: Distributed under the **Apache License 2.0**. See `LICENSE` for details.
+
+---
+
 <div align="center">
-  <i>Maintained and Powered by <a href="https://portfolio.kyere.me/">Caleb Kyere-Boateng</a></i>
+  <i>Maintained with ❤️ by <a href="https://portfolio.kyere.me/">Caleb Kyere-Boateng</a></i>
 </div>
