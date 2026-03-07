@@ -111,411 +111,48 @@ function formatTime(seconds) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-// ─── Component ─────────────────────────────────────────────────────────
-const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default', onNowPlayingChange, mlsReady = false, initialMedia = null }) => {
-  const [mediaInfo, setMediaInfo] = useState(null);       // { type, id, url, sharedBy }
+// ─── SingleMediaPlayer ────────────────────────────────────────────────
+// Renders one watch-party media card. Each card is fully independent:
+// its own player refs, playback state, and socket handler scoped by mediaId.
+const SingleMediaPlayer = ({
+  mediaId,      // unique string ID for this media item
+  mediaInfo,    // { type, id, url, sharedBy }
+  roomCode,
+  isHost,
+  roomVibe = 'default',
+  onNowPlayingChange,
+  mlsReady = false,
+  onRemove,     // () => void — called when this card wants to be removed from the list
+  syncCount,    // shared watcher count (room-wide — passed down from list manager)
+}) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(70);
   const [isMuted, setIsMuted] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [syncCount, setSyncCount] = useState(0);           // listeners watching
-  const [showControls, setShowControls] = useState(true);   // overlay controls visibility
+  const [showControls, setShowControls] = useState(true);
 
   const ytPlayerRef = useRef(null);
   const scWidgetRef = useRef(null);
   const playerContainerRef = useRef(null);
   const timeUpdateRef = useRef(null);
-  const ignoreNextSyncRef = useRef(0);                      // timestamp of last self-emit (echo rejection)
+  const ignoreNextSyncRef = useRef(0);
   const lastSeekRef = useRef(0);
-  const controlsHideTimerRef = useRef(null);                // auto-hide controls timer
-  const mediaInfoRef = useRef(null);                        // tracks current mediaInfo for recovery handler
+  const controlsHideTimerRef = useRef(null);
+  const mediaInfoRef = useRef(mediaInfo);
+
+  // Unique DOM ID per card — critical so multiple embeds can coexist
+  const embedId = `shared-media-embed-${mediaId}`;
 
   const vibeAccent = roomVibe === 'party' ? 'indigo' :
     roomVibe === 'chill' ? 'teal' :
       roomVibe === 'focus' ? 'orange' : 'blue';
 
-  // Keep mediaInfoRef in sync so the recovery handler (in a [] useEffect) can read it
+  // Keep mediaInfoRef in sync
   useEffect(() => { mediaInfoRef.current = mediaInfo; }, [mediaInfo]);
 
-  // ─── Socket event handlers ────────────────────────────────────────
-  useEffect(() => {
-    const handleMediaShare = async (data) => {
-      let parsed;
-      // ─── v4 AES-GCM: decrypt if encrypted ──────────────────
-      if (data.v === 4 && data.ct) {
-        try {
-          const json = await decryptMLSMessage(data, roomCode);
-          parsed = JSON.parse(json);
-        } catch (e) {
-          console.error('media-share v4 decrypt failed:', e);
-          return;
-        }
-      // ─── MLS v3: decrypt if encrypted ──────────────────
-      } else if (data.v === 3 && data.mls) {
-        try {
-          const json = await decryptMLSMessage(data, roomCode);
-          parsed = JSON.parse(json);
-        } catch (e) {
-          console.error('media-share v3 decrypt failed:', e);
-          return;
-        }
-      } else {
-        parsed = data; // Fallback for cleartext / pre-upgrade clients
-      }
-
-      // Defense-in-depth: validate incoming media before rendering
-      const type = typeof parsed.type === 'string' ? parsed.type : '';
-      if (type !== 'youtube' && type !== 'soundcloud') return;
-      if (!isSafeMediaUrl(parsed.url, type)) return;
-      if (type === 'youtube' && (!parsed.id || !/^[a-zA-Z0-9_-]{11}$/.test(parsed.id))) return;
-
-      setMediaInfo({
-        type,
-        id: parsed.id || null,
-        url: parsed.url,
-        sharedBy: typeof parsed.sharedBy === 'string' ? parsed.sharedBy.substring(0, 30) : 'Someone'
-      });
-      setIsPlaying(false);
-      setCurrentTime(0);
-      setDuration(0);
-      setIsMinimized(false);
-    };
-
-    const handleMediaSync = async (data) => {
-      // Timestamp-based echo rejection: ignore syncs within 1s of our own emit
-      if (ignoreNextSyncRef.current && (Date.now() - ignoreNextSyncRef.current) < 1000) {
-        return;
-      }
-      ignoreNextSyncRef.current = 0;
-
-      let parsed;
-      // ─── v4 AES-GCM: decrypt if encrypted ──────────────────
-      if (data.v === 4 && data.ct) {
-        try {
-          const json = await decryptMLSMessage(data, roomCode);
-          parsed = JSON.parse(json);
-        } catch (e) {
-          console.error('media-sync v4 decrypt failed:', e);
-          return;
-        }
-      // ─── MLS v3: decrypt if encrypted ──────────────────
-      } else if (data.v === 3 && data.mls) {
-        try {
-          const json = await decryptMLSMessage(data, roomCode);
-          parsed = JSON.parse(json);
-        } catch (e) {
-          console.error('media-sync v3 decrypt failed:', e);
-          return;
-        }
-      } else {
-        parsed = data;
-      }
-
-      // Validate sync action (whitelist)
-      const action = typeof parsed.action === 'string' ? parsed.action : '';
-      if (action !== 'play' && action !== 'pause' && action !== 'seek') return;
-      const time = typeof parsed.currentTime === 'number'
-        ? Math.max(0, Math.min(parsed.currentTime, 86400))
-        : 0;
-
-      if (action === 'play') {
-        seekTo(time);
-        playMedia();
-      } else if (action === 'pause') {
-        pauseMedia();
-      } else if (action === 'seek') {
-        seekTo(time);
-      }
-    };
-
-    const handleMediaSyncCount = (data) => {
-      setSyncCount(data.count || 0);
-    };
-
-    const handleMediaClose = () => {
-      destroyPlayer();
-      setMediaInfo(null);
-      setIsPlaying(false);
-      setCurrentTime(0);
-    };
-
-    // Handle rejoin sync response from server
-    const handleMediaSyncRestore = (data) => {
-      if (!data || typeof data.currentTime !== 'number') return;
-      // Retry until the player is actually ready (YT player needs time to load after re-init)
-      let attempts = 0;
-      const trySync = () => {
-        attempts++;
-        const yt = ytPlayerRef.current;
-        const sc = scWidgetRef.current;
-        if (yt?.seekTo || sc?.seekTo) {
-          seekTo(data.currentTime);
-          if (data.isPlaying) playMedia();
-        } else if (attempts < 20) {
-          // Player not ready yet — retry in 500ms (up to 10s total)
-          setTimeout(trySync, 500);
-        }
-      };
-      // First attempt after 1s to give embed time to initialize
-      setTimeout(trySync, 1000);
-    };
-
-    // Handle peer-to-peer media recovery: another user is rejoining and needs the URL
-    const handleMediaRecoverRequest = (data) => {
-      const info = mediaInfoRef.current;
-      if (!info || !info.url || !info.type) return; // We don't have the media loaded
-      socketManager.emit('media-recover-response', {
-        requesterId: data?.requesterId,
-        type: info.type,
-        id: info.id || null,
-        url: info.url,
-        sharedBy: info.sharedBy || 'Someone',
-      });
-    };
-
-    socketManager.on('media-share', handleMediaShare);
-    socketManager.on('media-sync', handleMediaSync);
-    socketManager.on('media-sync-count', handleMediaSyncCount);
-    socketManager.on('media-close', handleMediaClose);
-    socketManager.on('media-sync-restore', handleMediaSyncRestore);
-    socketManager.on('media-recover-request', handleMediaRecoverRequest);
-
-    return () => {
-      socketManager.off('media-share', handleMediaShare);
-      socketManager.off('media-sync', handleMediaSync);
-      socketManager.off('media-sync-count', handleMediaSyncCount);
-      socketManager.off('media-close', handleMediaClose);
-      socketManager.off('media-sync-restore', handleMediaSyncRestore);
-      socketManager.off('media-recover-request', handleMediaRecoverRequest);
-    };
-  }, []);
-
-  // ─── Restore persisted media state on reconnect ────────────────────
-  useEffect(() => {
-    if (!initialMedia) return;
-
-    // If the media blob is encrypted, wait until the AES/MLS key is ready
-    const isEncrypted = (initialMedia.v === 4 && initialMedia.ct) || (initialMedia.v === 3 && initialMedia.mls);
-    if (isEncrypted && !mlsReady) return; // will re-run when mlsReady flips to true
-
-    const restoreMedia = async () => {
-      let parsed;
-      let decryptFailed = false;
-      // Handle v4 AES-GCM encrypted media state
-      if (initialMedia.v === 4 && initialMedia.ct) {
-        try {
-          const json = await decryptMLSMessage(initialMedia, roomCode);
-          parsed = JSON.parse(json);
-        } catch (e) {
-          console.warn('Could not decrypt v4 persisted media state, requesting peer recovery:', e);
-          decryptFailed = true;
-        }
-      // Handle MLS v3 encrypted media state
-      } else if (initialMedia.v === 3 && initialMedia.mls) {
-        try {
-          const json = await decryptMLSMessage(initialMedia, roomCode);
-          parsed = JSON.parse(json);
-        } catch (e) {
-          console.warn('Could not decrypt v3 persisted media state, requesting peer recovery:', e);
-          decryptFailed = true;
-        }
-      } else if (initialMedia.isEncrypted) {
-        // Server stored encrypted blob without cleartext hint — can't decrypt
-        console.warn('Encrypted media blob without cleartext hint, requesting peer recovery');
-        decryptFailed = true;
-      } else {
-        parsed = initialMedia;
-      }
-
-      // If decryption failed, ask a peer who still has the video to send us the URL
-      if (decryptFailed) {
-        console.log('[SharedMediaPlayer] Requesting media URL recovery from peers...');
-        socketManager.emit('media-recover-request');
-        return;
-      }
-
-      const type = typeof parsed.type === 'string' ? parsed.type : '';
-      if (type !== 'youtube' && type !== 'soundcloud') return;
-      if (!isSafeMediaUrl(parsed.url, type)) return;
-      if (type === 'youtube' && (!parsed.id || !/^[a-zA-Z0-9_-]{11}$/.test(parsed.id))) return;
-
-      // If already showing the same media, check if player is still alive
-      let needsReinit = false;
-      if (mediaInfo && mediaInfo.type === type && mediaInfo.url === parsed.url) {
-        const playerAlive = type === 'youtube'
-          ? (ytPlayerRef.current && typeof ytPlayerRef.current.getPlayerState === 'function')
-          : (scWidgetRef.current && typeof scWidgetRef.current.play === 'function');
-
-        if (playerAlive) {
-          // Player is still functional — just sync playback position
-          socketManager.emit('media-request-sync');
-          return;
-        }
-        // Player is dead (e.g. after reconnect) — destroy stale refs and force full re-init
-        console.log('[SharedMediaPlayer] Player dead on reconnect, forcing re-init');
-        destroyPlayer();
-        // Clear mediaInfo so the embed effect re-triggers with a fresh player
-        setMediaInfo(null);
-        needsReinit = true;
-      }
-
-      const applyMedia = () => {
-        setMediaInfo({
-          type,
-          id: parsed.id || null,
-          url: parsed.url,
-          sharedBy: typeof parsed.sharedBy === 'string' ? parsed.sharedBy.substring(0, 30) : 'Room'
-        });
-        setIsPlaying(false);
-        setCurrentTime(0);
-        setDuration(0);
-        setIsMinimized(false);
-
-        // Request current playback position from server so we sync to where others are
-        setTimeout(() => socketManager.emit('media-request-sync'), 500);
-      };
-
-      if (needsReinit) {
-        // Delay so React flushes the null mediaInfo before we set it again (same URL)
-        // This ensures the embed effect deps [mediaInfo?.type, mediaInfo?.id, mediaInfo?.url]
-        // transition null → value, causing a re-run and fresh player creation
-        setTimeout(applyMedia, 100);
-      } else {
-        applyMedia();
-      }
-    };
-
-    restoreMedia();
-  }, [initialMedia, mlsReady]);
-
-  // ─── Embed player when media changes ──────────────────────────────
-  useEffect(() => {
-    if (!mediaInfo) return;
-
-    if (mediaInfo.type === 'youtube') {
-      loadYouTubeApi().then(() => {
-        if (ytPlayerRef.current) {
-          ytPlayerRef.current.destroy();
-          ytPlayerRef.current = null;
-        }
-
-        ytPlayerRef.current = new window.YT.Player('shared-media-embed', {
-          height: '100%',
-          width: '100%',
-          videoId: mediaInfo.id,
-          playerVars: {
-            autoplay: 0,
-            controls: 0,
-            modestbranding: 1,
-            rel: 0,
-            fs: 0,
-            playsinline: 1,
-          },
-          events: {
-            onReady: (e) => {
-              setDuration(e.target.getDuration());
-              e.target.setVolume(volume);
-              // Start time update polling
-              clearInterval(timeUpdateRef.current);
-              timeUpdateRef.current = setInterval(() => {
-                if (ytPlayerRef.current?.getCurrentTime) {
-                  setCurrentTime(ytPlayerRef.current.getCurrentTime());
-                }
-              }, 500);
-            },
-            onStateChange: (e) => {
-              // YT.PlayerState: PLAYING=1, PAUSED=2, ENDED=0
-              if (e.data === 1) setIsPlaying(true);
-              else if (e.data === 2 || e.data === 0) setIsPlaying(false);
-              if (e.data === 0) setCurrentTime(0); // ended
-            }
-          }
-        });
-      });
-    } else if (mediaInfo.type === 'soundcloud') {
-      loadSoundCloudApi().then(() => {
-        const iframe = document.getElementById('shared-media-embed');
-        if (!iframe) return;
-        iframe.src = `https://w.soundcloud.com/player/?url=${encodeURIComponent(mediaInfo.url)}&auto_play=false&show_artwork=true&visual=true&color=%236366f1`;
-
-        // Wait for iframe to load, then bind SC widget
-        iframe.onload = () => {
-          const widget = window.SC.Widget(iframe);
-          scWidgetRef.current = widget;
-
-          widget.bind(window.SC.Widget.Events.READY, () => {
-            widget.getDuration((d) => setDuration(d / 1000));
-          });
-
-          widget.bind(window.SC.Widget.Events.PLAY, () => setIsPlaying(true));
-          widget.bind(window.SC.Widget.Events.PAUSE, () => setIsPlaying(false));
-          widget.bind(window.SC.Widget.Events.PLAY_PROGRESS, (e) => {
-            setCurrentTime(e.currentPosition / 1000);
-          });
-          widget.bind(window.SC.Widget.Events.FINISH, () => {
-            setIsPlaying(false);
-            setCurrentTime(0);
-          });
-        };
-      });
-    }
-
-    // Tell server we're watching
-    socketManager.emit('media-join', { roomCode });
-
-    return () => {
-      clearInterval(timeUpdateRef.current);
-      socketManager.emit('media-leave', { roomCode });
-    };
-  }, [mediaInfo?.type, mediaInfo?.id, mediaInfo?.url]);
-
-  // ─── Volume ───────────────────────────────────────────────────────
-  useEffect(() => {
-    const effectiveVol = isMuted ? 0 : volume;
-    if (ytPlayerRef.current?.setVolume) ytPlayerRef.current.setVolume(effectiveVol);
-    if (scWidgetRef.current?.setVolume) scWidgetRef.current.setVolume(effectiveVol);
-  }, [volume, isMuted]);
-
-  // ─── Broadcast "Now Playing" to room (all platforms) ──────────────
-  // This makes every web/PWA/mobile user show up with a 🎵 badge in
-  // the UserList — not just Electron users with system media detection.
-  useEffect(() => {
-    const emitNowPlaying = async (nowPlaying) => {
-      // Encrypt now-playing data with MLS when session is ready
-      if (isMLSReady(roomCode) && nowPlaying) {
-        try {
-          const payload = encryptMLSMessage(JSON.stringify({ nowPlaying }), roomCode);
-          await withJitter(() => socketManager.emit('now-playing-update', payload));
-          return;
-        } catch (e) {
-          console.warn('now-playing encrypt failed, sending cleartext:', e.message);
-        }
-      }
-      // Fallback (session not ready or null nowPlaying to clear status)
-      socketManager.emit('now-playing-update', { nowPlaying });
-    };
-
-    if (mediaInfo && isPlaying) {
-      const title = mediaInfo.type === 'youtube'
-        ? `YouTube video`
-        : `SoundCloud track`;
-      const nowPlaying = {
-        title: mediaInfo.sharedBy ? `${title} (via ${mediaInfo.sharedBy})` : title,
-        artist: 'Watch Party',
-        source: mediaInfo.type,
-      };
-      emitNowPlaying(nowPlaying);
-      onNowPlayingChange?.(nowPlaying);
-    } else {
-      // Paused or closed — clear now-playing
-      emitNowPlaying(null);
-      onNowPlayingChange?.(null);
-    }
-  }, [isPlaying, mediaInfo?.type, mediaInfo?.id, mediaInfo?.url, roomCode]);
-
-  // ─── Playback controls ───────────────────────────────────────────
+  // ─── Playback controls ──────────────────────────────────────────
   const playMedia = useCallback(() => {
     if (ytPlayerRef.current?.playVideo) ytPlayerRef.current.playVideo();
     if (scWidgetRef.current?.play) scWidgetRef.current.play();
@@ -537,41 +174,225 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
   const destroyPlayer = useCallback(() => {
     clearInterval(timeUpdateRef.current);
     if (controlsHideTimerRef.current) clearTimeout(controlsHideTimerRef.current);
-    if (ytPlayerRef.current) { try { ytPlayerRef.current.destroy(); } catch (e) { } ytPlayerRef.current = null; }
+    if (ytPlayerRef.current) {
+      try { ytPlayerRef.current.destroy(); } catch (_) {}
+      ytPlayerRef.current = null;
+    }
     scWidgetRef.current = null;
   }, []);
 
-  // ─── Encrypted media emit helper ──────────────────────────────────
-  // Encrypts media control payloads with AES-GCM.
-  // Media-sync (play/pause/seek) is time-critical — NO jitter delay.
-  // For media-sync, attaches a cleartext _hint so the server can track
-  // playback position for rejoin sync (not sensitive — just action + timestamp).
-  // For media-share, attaches a cleartext _mediaHint so the server stores
-  // the URL for rejoin without requiring decryption.
+  // ─── Encrypted emit helper (scoped: includes mediaId) ───────────
   const emitEncrypted = useCallback(async (event, data) => {
+    const payload = { ...data, mediaId };
     if (isMLSReady(roomCode)) {
       try {
-        const payload = await encryptMLSMessage(JSON.stringify(data), roomCode);
-        // Attach cleartext hint for server-side playback tracking
+        const enc = await encryptMLSMessage(JSON.stringify(payload), roomCode);
         if (event === 'media-sync') {
-          payload._hint = { action: data.action, currentTime: data.currentTime };
+          enc._hint = { action: data.action, currentTime: data.currentTime, mediaId };
         }
-        // Attach cleartext media metadata so server can restore for rejoining users
         if (event === 'media-share') {
-          payload._mediaHint = { type: data.type, id: data.id, url: data.url, sharedBy: data.sharedBy };
+          enc._mediaHint = { type: data.type, id: data.id, url: data.url, sharedBy: data.sharedBy };
+          enc._mediaId = mediaId;
         }
-        socketManager.emit(event, payload);
+        socketManager.emit(event, enc);
         return;
       } catch (e) {
-        console.warn(`${event} encrypt failed, falling back to cleartext:`, e.message);
+        console.warn(`${event} encrypt failed, sending cleartext:`, e.message);
       }
     }
-    socketManager.emit(event, data);
-  }, [roomCode]);
+    socketManager.emit(event, payload);
+  }, [roomCode, mediaId]);
 
-  // ─── Sync actions (emit to room) ─────────────────────────────────
+  // ─── Socket event handlers (filtered by mediaId) ────────────────
+  useEffect(() => {
+    const handleMediaSync = async (data) => {
+      // Only respond to sync events for THIS media card
+      if (data.mediaId && data.mediaId !== mediaId) return;
+
+      if (ignoreNextSyncRef.current && (Date.now() - ignoreNextSyncRef.current) < 1000) return;
+      ignoreNextSyncRef.current = 0;
+
+      let parsed;
+      if (data.v === 4 && data.ct) {
+        try { parsed = JSON.parse(await decryptMLSMessage(data, roomCode)); }
+        catch (e) { console.error('media-sync v4 decrypt failed:', e); return; }
+      } else if (data.v === 3 && data.mls) {
+        try { parsed = JSON.parse(await decryptMLSMessage(data, roomCode)); }
+        catch (e) { console.error('media-sync v3 decrypt failed:', e); return; }
+      } else {
+        parsed = data;
+      }
+
+      // Filter again after decryption (encrypted payload may carry mediaId inside)
+      if (parsed.mediaId && parsed.mediaId !== mediaId) return;
+
+      const action = typeof parsed.action === 'string' ? parsed.action : '';
+      if (action !== 'play' && action !== 'pause' && action !== 'seek') return;
+      const time = typeof parsed.currentTime === 'number'
+        ? Math.max(0, Math.min(parsed.currentTime, 86400)) : 0;
+
+      if (action === 'play') { seekTo(time); playMedia(); }
+      else if (action === 'pause') { pauseMedia(); }
+      else if (action === 'seek') { seekTo(time); }
+    };
+
+    const handleMediaSyncRestore = (data) => {
+      // Only apply restore for this specific media card
+      if (data.mediaId && data.mediaId !== mediaId) return;
+      if (typeof data.currentTime !== 'number') return;
+
+      let attempts = 0;
+      const trySync = () => {
+        attempts++;
+        const yt = ytPlayerRef.current;
+        const sc = scWidgetRef.current;
+        if (yt?.seekTo || sc?.seekTo) {
+          seekTo(data.currentTime);
+          if (data.isPlaying) playMedia();
+        } else if (attempts < 20) {
+          setTimeout(trySync, 500);
+        }
+      };
+      setTimeout(trySync, 1000);
+    };
+
+    const handleMediaRecoverRequest = (data) => {
+      // Only respond if this card has the requested mediaId (or if it's an open broadcast)
+      if (data.mediaId && data.mediaId !== mediaId) return;
+      const info = mediaInfoRef.current;
+      if (!info?.url || !info?.type) return;
+      socketManager.emit('media-recover-response', {
+        requesterId: data?.requesterId,
+        type: info.type,
+        id: info.id || null,
+        url: info.url,
+        sharedBy: info.sharedBy || 'Someone',
+        mediaId,
+      });
+    };
+
+    socketManager.on('media-sync', handleMediaSync);
+    socketManager.on('media-sync-restore', handleMediaSyncRestore);
+    socketManager.on('media-recover-request', handleMediaRecoverRequest);
+
+    return () => {
+      socketManager.off('media-sync', handleMediaSync);
+      socketManager.off('media-sync-restore', handleMediaSyncRestore);
+      socketManager.off('media-recover-request', handleMediaRecoverRequest);
+    };
+  }, [mediaId, roomCode, seekTo, playMedia, pauseMedia]);
+
+  // ─── Embed player ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!mediaInfo) return;
+
+    if (mediaInfo.type === 'youtube') {
+      loadYouTubeApi().then(() => {
+        if (ytPlayerRef.current) {
+          try { ytPlayerRef.current.destroy(); } catch (_) {}
+          ytPlayerRef.current = null;
+        }
+        // Guard: the DOM node might not exist yet if React hasn't flushed
+        if (!document.getElementById(embedId)) return;
+
+        ytPlayerRef.current = new window.YT.Player(embedId, {
+          height: '100%',
+          width: '100%',
+          videoId: mediaInfo.id,
+          playerVars: { autoplay: 0, controls: 0, modestbranding: 1, rel: 0, fs: 0, playsinline: 1 },
+          events: {
+            onReady: (e) => {
+              setDuration(e.target.getDuration());
+              e.target.setVolume(volume);
+              clearInterval(timeUpdateRef.current);
+              timeUpdateRef.current = setInterval(() => {
+                if (ytPlayerRef.current?.getCurrentTime) {
+                  setCurrentTime(ytPlayerRef.current.getCurrentTime());
+                }
+              }, 500);
+            },
+            onStateChange: (e) => {
+              if (e.data === 1) setIsPlaying(true);
+              else if (e.data === 2 || e.data === 0) setIsPlaying(false);
+              if (e.data === 0) setCurrentTime(0);
+            }
+          }
+        });
+      });
+    } else if (mediaInfo.type === 'soundcloud') {
+      loadSoundCloudApi().then(() => {
+        const iframe = document.getElementById(embedId);
+        if (!iframe) return;
+        iframe.src = `https://w.soundcloud.com/player/?url=${encodeURIComponent(mediaInfo.url)}&auto_play=false&show_artwork=true&visual=true&color=%236366f1`;
+        iframe.onload = () => {
+          const widget = window.SC.Widget(iframe);
+          scWidgetRef.current = widget;
+          widget.bind(window.SC.Widget.Events.READY, () => {
+            widget.getDuration((d) => setDuration(d / 1000));
+          });
+          widget.bind(window.SC.Widget.Events.PLAY, () => setIsPlaying(true));
+          widget.bind(window.SC.Widget.Events.PAUSE, () => setIsPlaying(false));
+          widget.bind(window.SC.Widget.Events.PLAY_PROGRESS, (e) => {
+            setCurrentTime(e.currentPosition / 1000);
+          });
+          widget.bind(window.SC.Widget.Events.FINISH, () => {
+            setIsPlaying(false);
+            setCurrentTime(0);
+          });
+        };
+      });
+    }
+
+    socketManager.emit('media-join', { roomCode });
+    // Request sync for this specific media after player loads
+    setTimeout(() => socketManager.emit('media-request-sync', { mediaId }), 1200);
+
+    return () => {
+      clearInterval(timeUpdateRef.current);
+      destroyPlayer();
+      socketManager.emit('media-leave', { roomCode });
+    };
+  }, [mediaInfo?.type, mediaInfo?.id, mediaInfo?.url, embedId]);
+
+  // ─── Volume ─────────────────────────────────────────────────────
+  useEffect(() => {
+    const v = isMuted ? 0 : volume;
+    if (ytPlayerRef.current?.setVolume) ytPlayerRef.current.setVolume(v);
+    if (scWidgetRef.current?.setVolume) scWidgetRef.current.setVolume(v);
+  }, [volume, isMuted]);
+
+  // ─── Now Playing ────────────────────────────────────────────────
+  useEffect(() => {
+    const emitNowPlaying = async (nowPlaying) => {
+      if (isMLSReady(roomCode) && nowPlaying) {
+        try {
+          const enc = encryptMLSMessage(JSON.stringify({ nowPlaying }), roomCode);
+          await withJitter(() => socketManager.emit('now-playing-update', enc));
+          return;
+        } catch (e) {
+          console.warn('now-playing encrypt failed, sending cleartext:', e.message);
+        }
+      }
+      socketManager.emit('now-playing-update', { nowPlaying });
+    };
+
+    if (mediaInfo && isPlaying) {
+      const title = mediaInfo.type === 'youtube' ? 'YouTube video' : 'SoundCloud track';
+      const nowPlaying = {
+        title: mediaInfo.sharedBy ? `${title} (via ${mediaInfo.sharedBy})` : title,
+        artist: 'Watch Party',
+        source: mediaInfo.type,
+      };
+      emitNowPlaying(nowPlaying);
+      onNowPlayingChange?.(nowPlaying);
+    } else {
+      emitNowPlaying(null);
+      onNowPlayingChange?.(null);
+    }
+  }, [isPlaying, mediaInfo?.type, mediaInfo?.id, mediaInfo?.url, roomCode]);
+
+  // ─── Sync emit helpers ───────────────────────────────────────────
   const handlePlayPause = () => {
-    // Mark that we're about to emit — ignore echoes for 1 second
     ignoreNextSyncRef.current = Date.now();
     if (isPlaying) {
       pauseMedia();
@@ -586,10 +407,8 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const time = pct * duration;
-
     if (Math.abs(time - lastSeekRef.current) < 0.5) return;
     lastSeekRef.current = time;
-
     ignoreNextSyncRef.current = Date.now();
     seekTo(time);
     emitEncrypted('media-sync', { roomCode, action: 'seek', currentTime: time });
@@ -597,27 +416,18 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
 
   const handleClose = () => {
     destroyPlayer();
-    setMediaInfo(null);
-    // Server enforces role check — only host/elevated can close for everyone.
-    // For regular users, this emit is silently ignored server-side,
-    // but local player still closes for this user.
-    // media-close has no sensitive payload, but still jitter for timing protection.
-    withJitter(() => socketManager.emit('media-close', { roomCode }));
+    // Tell server to close this specific media item
+    withJitter(() => socketManager.emit('media-close', { roomCode, mediaId }));
+    onRemove?.();
   };
 
-  // ─── No media yet → render nothing (button is in sidebar, URL input is a modal) ──
-  if (!mediaInfo) {
-    return null;
-  }
-
-  // ─── Player (rendered as a message-like card in the chat flow) ──
+  // ─── Render ─────────────────────────────────────────────────────
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
     <div className="w-full max-w-lg mx-auto my-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      {/* Message-like card wrapper */}
       <div className={`bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl shadow-lg border border-gray-200/60 dark:border-gray-700/60 overflow-hidden ${isMinimized ? '' : 'ring-1 ring-black/5 dark:ring-white/5'}`}>
-        {/* Card Header — looks like a system message */}
+        {/* Header */}
         <div className={`flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-${vibeAccent}-50/80 dark:from-${vibeAccent}-950/40 to-transparent border-b border-gray-200/50 dark:border-gray-700/50`}>
           <div className="flex items-center gap-2.5 min-w-0">
             <div className={`w-8 h-8 rounded-xl bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 flex items-center justify-center flex-shrink-0`}>
@@ -646,7 +456,9 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
               className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               title={isMinimized ? 'Expand' : 'Minimize'}
             >
-              {isMinimized ? <Maximize2 className="w-3.5 h-3.5 text-gray-500" /> : <Minimize2 className="w-3.5 h-3.5 text-gray-500" />}
+              {isMinimized
+                ? <Maximize2 className="w-3.5 h-3.5 text-gray-500" />
+                : <Minimize2 className="w-3.5 h-3.5 text-gray-500" />}
             </button>
             <button
               onClick={() => window.open(mediaInfo.url, '_blank')}
@@ -661,7 +473,7 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
           </div>
         </div>
 
-        {/* Minimized: compact playback bar */}
+        {/* Minimized compact bar */}
         {isMinimized && (
           <div
             className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
@@ -671,7 +483,9 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
               onClick={(e) => { e.stopPropagation(); handlePlayPause(); }}
               className={`p-2 rounded-full bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 hover:bg-${vibeAccent}-200 dark:hover:bg-${vibeAccent}-800/40 transition-colors`}
             >
-              {isPlaying ? <Pause className={`w-4 h-4 text-${vibeAccent}-600 dark:text-${vibeAccent}-400`} /> : <Play className={`w-4 h-4 text-${vibeAccent}-600 dark:text-${vibeAccent}-400 ml-0.5`} />}
+              {isPlaying
+                ? <Pause className={`w-4 h-4 text-${vibeAccent}-600 dark:text-${vibeAccent}-400`} />
+                : <Play className={`w-4 h-4 text-${vibeAccent}-600 dark:text-${vibeAccent}-400 ml-0.5`} />}
             </button>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate">
@@ -689,12 +503,11 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
           </div>
         )}
 
-        {/* Full player — kept alive even when minimized (off-screen, not removed from DOM) */}
+        {/* Full player (kept in DOM when minimized but pushed off-screen) */}
         <div
           className={isMinimized ? 'sr-only' : ''}
           style={isMinimized ? { position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' } : {}}
         >
-          {/* Video / Widget embed with overlay controls */}
           <div
             className="relative w-full aspect-video bg-black group"
             ref={playerContainerRef}
@@ -711,11 +524,12 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
               controlsHideTimerRef.current = setTimeout(() => setShowControls(false), 3000);
             }}
           >
+            {/* Unique embed ID per card */}
             {mediaInfo.type === 'youtube' ? (
-              <div id="shared-media-embed" className="w-full h-full" />
+              <div id={embedId} className="w-full h-full" />
             ) : (
               <iframe
-                id="shared-media-embed"
+                id={embedId}
                 className="w-full h-full"
                 scrolling="no"
                 frameBorder="no"
@@ -725,13 +539,10 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
               />
             )}
 
-            {/* Overlay: transparent click-catcher + big play/pause button center */}
+            {/* Click overlay — play/pause on click */}
             <div
               className="absolute inset-0 z-10 cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePlayPause();
-              }}
+              onClick={(e) => { e.stopPropagation(); handlePlayPause(); }}
             >
               <div className={`w-full h-full flex items-center justify-center transition-opacity duration-300 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}>
                 <div className={`p-3 rounded-full bg-black/50 backdrop-blur-sm ${isPlaying ? 'opacity-0' : 'opacity-80'} transition-opacity`}>
@@ -740,16 +551,12 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
               </div>
             </div>
 
-            {/* Overlay: bottom controls bar — z-20 to sit above click-catcher (z-10) */}
+            {/* Bottom controls bar */}
             <div
               className={`absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 pt-6 pb-2 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Progress bar */}
-              <div
-                className="h-1 bg-white/20 rounded-full cursor-pointer group/seek mb-2 hover:h-2 transition-all"
-                onClick={handleSeek}
-              >
+              <div className="h-1 bg-white/20 rounded-full cursor-pointer group/seek mb-2 hover:h-2 transition-all" onClick={handleSeek}>
                 <div
                   className={`h-full bg-${vibeAccent}-500 rounded-full transition-[width] duration-200 relative`}
                   style={{ width: `${progress}%` }}
@@ -758,28 +565,21 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
                 </div>
               </div>
 
-              {/* Time + play/pause + volume */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={handlePlayPause}
-                    className="p-1 hover:bg-white/20 rounded-full transition-colors"
-                  >
+                  <button onClick={handlePlayPause} className="p-1 hover:bg-white/20 rounded-full transition-colors">
                     {isPlaying ? <Pause className="w-4 h-4 text-white" /> : <Play className="w-4 h-4 text-white ml-0.5" />}
                   </button>
                   <span className="text-[10px] text-gray-300 font-mono tabular-nums">
                     {formatTime(currentTime)} / {formatTime(duration)}
                   </span>
                 </div>
-
                 <div className="flex items-center gap-1.5">
                   <button onClick={() => setIsMuted(!isMuted)} className="p-0.5 hover:bg-white/20 rounded-full transition-colors">
                     {isMuted ? <VolumeX className="w-3.5 h-3.5 text-gray-300" /> : <Volume2 className="w-3.5 h-3.5 text-gray-300" />}
                   </button>
                   <input
-                    type="range"
-                    min={0}
-                    max={100}
+                    type="range" min={0} max={100}
                     value={isMuted ? 0 : volume}
                     onChange={(e) => { setVolume(Number(e.target.value)); setIsMuted(false); }}
                     className="w-14 h-1 accent-white cursor-pointer"
@@ -791,6 +591,173 @@ const SharedMediaPlayer = ({ roomCode, currentUser, isHost, roomVibe = 'default'
         </div>
       </div>
     </div>
+  );
+};
+
+// ─── SharedMediaPlayer ────────────────────────────────────────────────
+// List manager: receives media-share / media-close events and renders
+// a SingleMediaPlayer card for each active media item in the room.
+const SharedMediaPlayer = ({
+  roomCode,
+  currentUser,
+  isHost,
+  roomVibe = 'default',
+  onNowPlayingChange,
+  mlsReady = false,
+  initialMedia = null,    // array of media objects from server on room-join (or null/[])
+}) => {
+  // mediaList: [{ mediaId, type, id, url, sharedBy }]
+  const [mediaList, setMediaList] = useState([]);
+  const [syncCount, setSyncCount] = useState(0);
+
+  // ─── Restore initial media list from server (on join / rejoin) ──
+  useEffect(() => {
+    if (!initialMedia) return;
+    // Server now sends an array; guard against legacy single-object shape
+    const items = Array.isArray(initialMedia) ? initialMedia : [initialMedia];
+    if (items.length === 0) return;
+
+    const restoreAll = async () => {
+      const restored = [];
+      for (const item of items) {
+        // Skip truly empty entries
+        if (!item || (!item.mediaId && !item.type && !item.ct && !item.mls && !item.ciphertext)) continue;
+
+        const isEncrypted = (item.v === 4 && item.ct) || (item.v === 3 && item.mls);
+        // Wait for key if encrypted
+        if (isEncrypted && !mlsReady) continue;
+
+        let parsed;
+        let decryptFailed = false;
+
+        if (item.v === 4 && item.ct) {
+          try { parsed = JSON.parse(await decryptMLSMessage(item, roomCode)); }
+          catch (e) { console.warn('Could not decrypt v4 media on join:', e); decryptFailed = true; }
+        } else if (item.v === 3 && item.mls) {
+          try { parsed = JSON.parse(await decryptMLSMessage(item, roomCode)); }
+          catch (e) { console.warn('Could not decrypt v3 media on join:', e); decryptFailed = true; }
+        } else if (item.isEncrypted) {
+          decryptFailed = true;
+        } else {
+          parsed = item;
+        }
+
+        const resolvedMediaId = item.mediaId || parsed?.mediaId;
+
+        if (decryptFailed) {
+          // Request peer recovery for this specific media item
+          console.log('[SharedMediaPlayer] Requesting peer recovery for', resolvedMediaId);
+          socketManager.emit('media-recover-request', { mediaId: resolvedMediaId || null });
+          continue;
+        }
+
+        const type = typeof parsed.type === 'string' ? parsed.type : '';
+        if (type !== 'youtube' && type !== 'soundcloud') continue;
+        if (!isSafeMediaUrl(parsed.url, type)) continue;
+        if (type === 'youtube' && (!parsed.id || !/^[a-zA-Z0-9_-]{11}$/.test(parsed.id))) continue;
+
+        const mediaId = resolvedMediaId || `restore-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        restored.push({
+          mediaId,
+          type,
+          id: parsed.id || null,
+          url: parsed.url,
+          sharedBy: typeof parsed.sharedBy === 'string' ? parsed.sharedBy.substring(0, 30) : 'Room',
+        });
+      }
+
+      if (restored.length > 0) {
+        setMediaList((prev) => {
+          // Merge without duplicates (by mediaId)
+          const existing = new Set(prev.map(m => m.mediaId));
+          return [...prev, ...restored.filter(r => !existing.has(r.mediaId))];
+        });
+      }
+    };
+
+    restoreAll();
+  }, [initialMedia, mlsReady]);
+
+  // ─── Socket event handlers (list-level) ─────────────────────────
+  useEffect(() => {
+    const handleMediaShare = async (data) => {
+      let parsed;
+      if (data.v === 4 && data.ct) {
+        try { parsed = JSON.parse(await decryptMLSMessage(data, roomCode)); }
+        catch (e) { console.error('media-share v4 decrypt failed:', e); return; }
+      } else if (data.v === 3 && data.mls) {
+        try { parsed = JSON.parse(await decryptMLSMessage(data, roomCode)); }
+        catch (e) { console.error('media-share v3 decrypt failed:', e); return; }
+      } else {
+        parsed = data;
+      }
+
+      const type = typeof parsed.type === 'string' ? parsed.type : '';
+      if (type !== 'youtube' && type !== 'soundcloud') return;
+      if (!isSafeMediaUrl(parsed.url, type)) return;
+      if (type === 'youtube' && (!parsed.id || !/^[a-zA-Z0-9_-]{11}$/.test(parsed.id))) return;
+
+      const mediaId = parsed.mediaId || data.mediaId || `live-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+      setMediaList((prev) => {
+        // Deduplicate by mediaId
+        if (prev.some(m => m.mediaId === mediaId)) return prev;
+        return [...prev, {
+          mediaId,
+          type,
+          id: parsed.id || null,
+          url: parsed.url,
+          sharedBy: typeof parsed.sharedBy === 'string' ? parsed.sharedBy.substring(0, 30) : 'Someone',
+        }];
+      });
+    };
+
+    const handleMediaClose = (data) => {
+      const mediaId = data?.mediaId;
+      if (mediaId) {
+        // Close a specific media card
+        setMediaList((prev) => prev.filter(m => m.mediaId !== mediaId));
+      } else {
+        // No mediaId = close all
+        setMediaList([]);
+      }
+    };
+
+    const handleMediaSyncCount = (data) => {
+      setSyncCount(data.count || 0);
+    };
+
+    socketManager.on('media-share', handleMediaShare);
+    socketManager.on('media-close', handleMediaClose);
+    socketManager.on('media-sync-count', handleMediaSyncCount);
+
+    return () => {
+      socketManager.off('media-share', handleMediaShare);
+      socketManager.off('media-close', handleMediaClose);
+      socketManager.off('media-sync-count', handleMediaSyncCount);
+    };
+  }, [roomCode]);
+
+  // Render nothing when no media is active
+  if (mediaList.length === 0) return null;
+
+  return (
+    <>
+      {mediaList.map((media) => (
+        <SingleMediaPlayer
+          key={media.mediaId}
+          mediaId={media.mediaId}
+          mediaInfo={media}
+          roomCode={roomCode}
+          isHost={isHost}
+          roomVibe={roomVibe}
+          onNowPlayingChange={onNowPlayingChange}
+          mlsReady={mlsReady}
+          syncCount={syncCount}
+          onRemove={() => setMediaList((prev) => prev.filter(m => m.mediaId !== media.mediaId))}
+        />
+      ))}
+    </>
   );
 };
 

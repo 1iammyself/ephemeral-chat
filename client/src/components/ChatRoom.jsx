@@ -859,10 +859,11 @@ const ChatRoom = () => {
       setShowJoinModal(false);
       setError(null);
 
-      // Restore persisted media state if the room had an active media session
-      if (data.activeMedia) {
-        // Add a unique _ts to force React to re-trigger the effect on reconnect
-        setInitialMedia({ ...data.activeMedia, _ts: Date.now() });
+      // Restore persisted media state if the room had active media sessions
+      if (data.activeMedia && (Array.isArray(data.activeMedia) ? data.activeMedia.length > 0 : data.activeMedia)) {
+        // Server now sends an array; tag with _ts so reconnects re-trigger the effect
+        const mediaArr = Array.isArray(data.activeMedia) ? data.activeMedia : [data.activeMedia];
+        setInitialMedia(mediaArr.map(m => ({ ...m, _ts: Date.now() })));
       }
     };
 

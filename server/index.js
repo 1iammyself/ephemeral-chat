@@ -1542,7 +1542,7 @@ io.on('connection', (socket) => {
               messages,
               nickname: socket.nickname,
               sessionToken,
-              activeMedia: io._activeMedia?.[roomCode] || null
+              activeMedia: getActiveMediaArray(roomCode)
             });
           }
         } else if (gracePeriodSession && gracePeriodSession.roomCode === roomCode) {
@@ -1786,7 +1786,7 @@ io.on('connection', (socket) => {
           isInviteOnly: result.room.settings?.isInviteOnly || false,
           inactivityTimeoutMs: securityManager.INACTIVITY_TIMEOUT_MS,
           sessionToken,
-          activeMedia: io._activeMedia?.[roomCode] || null
+          activeMedia: getActiveMediaArray(roomCode)
         });
 
         // Notify others
@@ -2338,10 +2338,15 @@ io.on('connection', (socket) => {
   // ─── Watch Party: Synced Media Player ────────────────────────────
   // Track media watchers per room (stored in-memory; rooms are ephemeral)
   if (!io._mediaWatchers) io._mediaWatchers = {};  // { roomCode: Set<socketId> }
-  // Persist active media state per room so reconnecting users get it back
-  if (!io._activeMedia) io._activeMedia = {};      // { roomCode: { type, id, url, sharedBy, sharedAt } }
-  // Track current playback state per room for rejoin sync (cleartext, not E2E)
-  if (!io._mediaPlaybackState) io._mediaPlaybackState = {}; // { roomCode: { isPlaying, currentTime, updatedAt } }
+  // Persist MULTIPLE active media items per room so reconnecting users get them back
+  // Changed from single-object to Map: { roomCode: Map<mediaId, mediaEntry> }
+  if (!io._activeMedia) io._activeMedia = {};
+  // Track playback state per media item per room
+  // { roomCode: Map<mediaId, { isPlaying, currentTime, updatedAt }> }
+  if (!io._mediaPlaybackState) io._mediaPlaybackState = {};
+
+  // Max concurrent media items per room (prevents memory abuse)
+  const MAX_MEDIA_PER_ROOM = 10;
 
   // Allowed media types whitelist
   const ALLOWED_MEDIA_TYPES = ['youtube', 'soundcloud'];
@@ -2351,9 +2356,36 @@ io.on('connection', (socket) => {
   const SAFE_YT_URL = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)\//;
   const SAFE_SC_URL = /^https?:\/\/(www\.)?soundcloud\.com\//;
 
+  // Helper: generate a short unique mediaId (8 hex chars)
+  const genMediaId = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+
+  // Helper: ensure the room's media map exists
+  const ensureMediaMap = (roomCode) => {
+    if (!io._activeMedia[roomCode]) io._activeMedia[roomCode] = new Map();
+    if (!io._mediaPlaybackState[roomCode]) io._mediaPlaybackState[roomCode] = new Map();
+  };
+
+  // Helper: get serialisable array of all active media for a room (for room-joined payload)
+  const getActiveMediaArray = (roomCode) => {
+    const map = io._activeMedia[roomCode];
+    if (!map || map.size === 0) return [];
+    return Array.from(map.entries()).map(([mediaId, entry]) => ({ mediaId, ...entry }));
+  };
+
   socket.on('media-share', (data) => {
     if (!socket.roomCode) return;
     if (!checkRateLimit(socket.id, 10, 60000)) return;
+
+    ensureMediaMap(socket.roomCode);
+    const mediaMap = io._activeMedia[socket.roomCode];
+
+    // Enforce per-room cap
+    if (mediaMap.size >= MAX_MEDIA_PER_ROOM) {
+      // Remove oldest entry to make room
+      const oldestId = mediaMap.keys().next().value;
+      mediaMap.delete(oldestId);
+      io._mediaPlaybackState[socket.roomCode].delete(oldestId);
+    }
 
     // Helper: extract cleartext media hint for rejoin (type, id, url, sharedBy)
     const extractMediaHint = (payload) => {
@@ -2377,45 +2409,47 @@ io.on('connection', (socket) => {
     if (data && data.v === 4 && data.ct) {
       if (typeof data.ct !== 'string' || data.ct.length > 131072) return;
       if (typeof data.iv !== 'string' || data.iv.length > 256) return;
-      io.to(socket.roomCode).emit('media-share', data);
-      // Store cleartext media metadata for rejoin (from _mediaHint)
+      const mediaId = typeof data._mediaId === 'string' ? data._mediaId.slice(0, 20) : genMediaId();
+      const outData = { ...data, mediaId };
+      io.to(socket.roomCode).emit('media-share', outData);
       const hint = extractMediaHint(data);
       if (hint) {
-        io._activeMedia[socket.roomCode] = { ...hint, sharedAt: Date.now() };
-        io._mediaPlaybackState[socket.roomCode] = { isPlaying: false, currentTime: 0, updatedAt: Date.now() };
+        mediaMap.set(mediaId, { ...hint, sharedAt: Date.now() });
+        io._mediaPlaybackState[socket.roomCode].set(mediaId, { isPlaying: false, currentTime: 0, updatedAt: Date.now() });
       } else {
-        // Fallback: store encrypted blob (old clients without _mediaHint)
-        io._activeMedia[socket.roomCode] = { v: 4, ct: data.ct, iv: data.iv, isEncrypted: true, sharedAt: Date.now() };
+        mediaMap.set(mediaId, { v: 4, ct: data.ct, iv: data.iv, isEncrypted: true, sharedAt: Date.now() });
       }
-      logger.info(`AES-GCM encrypted media shared in room ${socket.roomCode}`);
+      logger.info(`AES-GCM encrypted media shared in room ${socket.roomCode} (id=${mediaId})`);
       return;
     }
 
     // ── Encrypted v3 MLS payload: relay opaquely (E2E encrypted by MLS) ──
     if (data && data.v === 3 && data.mls) {
       if (typeof data.mls !== 'string' || data.mls.length > 131072) return;
-      io.to(socket.roomCode).emit('media-share', data);
+      const mediaId = typeof data._mediaId === 'string' ? data._mediaId.slice(0, 20) : genMediaId();
+      const outData = { ...data, mediaId };
+      io.to(socket.roomCode).emit('media-share', outData);
       const hint = extractMediaHint(data);
       if (hint) {
-        io._activeMedia[socket.roomCode] = { ...hint, sharedAt: Date.now() };
-        io._mediaPlaybackState[socket.roomCode] = { isPlaying: false, currentTime: 0, updatedAt: Date.now() };
+        mediaMap.set(mediaId, { ...hint, sharedAt: Date.now() });
+        io._mediaPlaybackState[socket.roomCode].set(mediaId, { isPlaying: false, currentTime: 0, updatedAt: Date.now() });
       } else {
-        io._activeMedia[socket.roomCode] = { v: 3, mls: data.mls, sharedAt: Date.now() };
+        mediaMap.set(mediaId, { v: 3, mls: data.mls, sharedAt: Date.now() });
       }
-      logger.info(`MLS-encrypted media shared in room ${socket.roomCode}`);
+      logger.info(`MLS-encrypted media shared in room ${socket.roomCode} (id=${mediaId})`);
       return;
     }
 
     // ── Encrypted v2 payload: relay opaquely (E2E encrypted by Double Ratchet) ──
     if (data && data.v === 2 && data.ratchet === true && data.ciphertext) {
-      // Size-limit the opaque blob to prevent abuse (~128KB generous ceiling)
       if (typeof data.ciphertext !== 'string' || data.ciphertext.length > 131072) return;
       if (typeof data.iv !== 'string' || data.iv.length > 256) return;
       if (data.header && typeof data.header !== 'object') return;
-      io.to(socket.roomCode).emit('media-share', data);
-      // Store encrypted blob so reconnecting users with ratchet session can decrypt
-      io._activeMedia[socket.roomCode] = { v: 2, ratchet: true, ciphertext: data.ciphertext, iv: data.iv, header: data.header, sharedAt: Date.now() };
-      logger.info(`Encrypted media shared in room ${socket.roomCode}`);
+      const mediaId = typeof data._mediaId === 'string' ? data._mediaId.slice(0, 20) : genMediaId();
+      const outData = { ...data, mediaId };
+      io.to(socket.roomCode).emit('media-share', outData);
+      mediaMap.set(mediaId, { v: 2, ratchet: true, ciphertext: data.ciphertext, iv: data.iv, header: data.header, sharedAt: Date.now() });
+      logger.info(`Encrypted media shared in room ${socket.roomCode} (id=${mediaId})`);
       return;
     }
 
@@ -2426,52 +2460,45 @@ io.on('connection', (socket) => {
     const rawUrl = typeof data.url === 'string' ? data.url.trim() : '';
     if (!rawUrl || rawUrl.length > 2048) return;
 
-    // Validate URL matches the declared type
     if (type === 'youtube' && !SAFE_YT_URL.test(rawUrl)) return;
     if (type === 'soundcloud' && !SAFE_SC_URL.test(rawUrl)) return;
 
-    // Validate YouTube video ID if provided (must be 11 alphanumeric/dash/underscore chars)
     const rawId = typeof data.id === 'string' ? data.id.trim() : null;
     if (type === 'youtube') {
       if (!rawId || !/^[a-zA-Z0-9_-]{11}$/.test(rawId)) return;
     }
 
-    // Sanitize the sharedBy name (use socket.nickname as authoritative source)
     const sharedBy = sanitizeInput(socket.nickname || 'Someone').substring(0, 30);
+    const mediaId = typeof data.mediaId === 'string' ? data.mediaId.slice(0, 20) : genMediaId();
 
-    const payload = {
-      type,
-      id: rawId,
-      url: rawUrl,
-      sharedBy,
-    };
+    const payload = { type, id: rawId, url: rawUrl, sharedBy, mediaId };
 
     // Broadcast to entire room (including sender so UI updates)
     io.to(socket.roomCode).emit('media-share', payload);
-    // Persist active media state for reconnecting users
-    io._activeMedia[socket.roomCode] = { ...payload, sharedAt: Date.now() };
-    // Reset playback state (new video starts at 0)
-    io._mediaPlaybackState[socket.roomCode] = { isPlaying: false, currentTime: 0, updatedAt: Date.now() };
-    logger.info(`Media shared in room ${socket.roomCode}: ${type} by ${sharedBy}`);
+    // Persist this media item in the room's media map
+    mediaMap.set(mediaId, { type, id: rawId, url: rawUrl, sharedBy, sharedAt: Date.now() });
+    // Initialise playback state for this item
+    io._mediaPlaybackState[socket.roomCode].set(mediaId, { isPlaying: false, currentTime: 0, updatedAt: Date.now() });
+    logger.info(`Media shared in room ${socket.roomCode}: ${type} by ${sharedBy} (id=${mediaId})`);
   });
 
   socket.on('media-sync', (data) => {
     if (!socket.roomCode) return;
-    // Rate limit sync events (generous for seek but prevents abuse)
     if (!checkRateLimit(socket.id, 40, 60000)) return;
+
+    const mediaId = typeof data?.mediaId === 'string' ? data.mediaId.slice(0, 20) : null;
 
     // ── Encrypted v4 AES-GCM payload: relay opaquely ──
     if (data && data.v === 4 && data.ct) {
       if (typeof data.ct !== 'string' || data.ct.length > 65536) return;
       if (typeof data.iv !== 'string' || data.iv.length > 256) return;
       socket.to(socket.roomCode).emit('media-sync', data);
-      // Track unencrypted playback hint for rejoin sync
-      if (typeof data._hint === 'object' && data._hint) {
-        io._mediaPlaybackState[socket.roomCode] = {
+      if (mediaId && typeof data._hint === 'object' && data._hint && io._mediaPlaybackState[socket.roomCode]) {
+        io._mediaPlaybackState[socket.roomCode].set(mediaId, {
           isPlaying: data._hint.action === 'play',
           currentTime: typeof data._hint.currentTime === 'number' ? data._hint.currentTime : 0,
           updatedAt: Date.now()
-        };
+        });
       }
       return;
     }
@@ -2497,61 +2524,65 @@ io.on('connection', (socket) => {
     if (!ALLOWED_SYNC_ACTIONS.includes(action)) return;
 
     const currentTime = typeof data.currentTime === 'number'
-      ? Math.max(0, Math.min(data.currentTime, 86400))  // Cap at 24h
+      ? Math.max(0, Math.min(data.currentTime, 86400))
       : 0;
 
-    // Track playback state for rejoin sync
-    io._mediaPlaybackState[socket.roomCode] = {
-      isPlaying: action === 'play',
-      currentTime,
-      updatedAt: Date.now()
-    };
+    // Track playback state per media item
+    if (mediaId && io._mediaPlaybackState[socket.roomCode]) {
+      io._mediaPlaybackState[socket.roomCode].set(mediaId, {
+        isPlaying: action === 'play',
+        currentTime,
+        updatedAt: Date.now()
+      });
+    }
 
-    // Forward play / pause / seek to all *other* participants
-    socket.to(socket.roomCode).emit('media-sync', {
-      action,
-      currentTime,
-      userId: socket.id,
-    });
+    socket.to(socket.roomCode).emit('media-sync', { action, currentTime, mediaId, userId: socket.id });
   });
 
   // ─── Media Request Sync: rejoining user asks for current playback state ──
-  socket.on('media-request-sync', () => {
+  socket.on('media-request-sync', (data) => {
     if (!socket.roomCode) return;
     if (!checkRateLimit(socket.id, 5, 60000)) return;
 
-    const playbackState = io._mediaPlaybackState[socket.roomCode];
-    if (playbackState) {
-      // Estimate current position: if playing, add elapsed time since last update
+    const requestedId = typeof data?.mediaId === 'string' ? data.mediaId.slice(0, 20) : null;
+    const playbackMap = io._mediaPlaybackState[socket.roomCode];
+    if (!playbackMap) return;
+
+    const respond = (mediaId, playbackState) => {
       let estimatedTime = playbackState.currentTime;
       if (playbackState.isPlaying && playbackState.updatedAt) {
-        const elapsed = (Date.now() - playbackState.updatedAt) / 1000;
-        estimatedTime += elapsed;
+        estimatedTime += (Date.now() - playbackState.updatedAt) / 1000;
       }
-
       socket.emit('media-sync-restore', {
+        mediaId,
         isPlaying: playbackState.isPlaying,
         currentTime: Math.max(0, estimatedTime)
       });
+    };
+
+    if (requestedId) {
+      const state = playbackMap.get(requestedId);
+      if (state) respond(requestedId, state);
+    } else {
+      // No specific mediaId — restore all active media states
+      for (const [mediaId, state] of playbackMap) {
+        respond(mediaId, state);
+      }
     }
   });
 
   // ─── Media Recover: peer-to-peer URL recovery for rejoin ────────────
-  // When a user rejoins and the stored activeMedia is encrypted (no cleartext URL),
-  // they emit 'media-recover-request'. The server asks ALL active watchers to send
-  // back the cleartext media URL. First responder wins.
-  socket.on('media-recover-request', () => {
+  socket.on('media-recover-request', (data) => {
     if (!socket.roomCode) return;
     if (!checkRateLimit(socket.id, 3, 60000)) return;
 
     const watchers = io._mediaWatchers[socket.roomCode];
     if (!watchers || watchers.size === 0) return;
 
-    // Ask all watchers (except the requester) to send back the media info
     let asked = 0;
     for (const wid of watchers) {
       if (wid !== socket.id) {
-        io.to(wid).emit('media-recover-request', { requesterId: socket.id });
+        io.to(wid).emit('media-recover-request', { requesterId: socket.id, mediaId: data?.mediaId || null });
         asked++;
       }
     }
@@ -2560,13 +2591,11 @@ io.on('connection', (socket) => {
     }
   });
 
-  // The watcher responds with cleartext media info; server relays it to the requester
   socket.on('media-recover-response', (data) => {
     if (!socket.roomCode) return;
     if (!checkRateLimit(socket.id, 5, 60000)) return;
     if (!data || typeof data.requesterId !== 'string') return;
 
-    // Validate the media payload (same rules as cleartext media-share)
     const type = typeof data.type === 'string' ? data.type.toLowerCase().trim() : '';
     if (type !== 'youtube' && type !== 'soundcloud') return;
     const rawUrl = typeof data.url === 'string' ? data.url.trim() : '';
@@ -2576,20 +2605,22 @@ io.on('connection', (socket) => {
     const rawId = typeof data.id === 'string' ? data.id.trim() : null;
     if (type === 'youtube' && (!rawId || !/^[a-zA-Z0-9_-]{11}$/.test(rawId))) return;
     const sharedBy = typeof data.sharedBy === 'string' ? data.sharedBy.substring(0, 30) : 'Someone';
+    const mediaId = typeof data.mediaId === 'string' ? data.mediaId.slice(0, 20) : genMediaId();
 
-    const payload = { type, id: rawId, url: rawUrl, sharedBy };
+    const payload = { type, id: rawId, url: rawUrl, sharedBy, mediaId };
 
-    // Send as a normal media-share to the requester so their existing handler picks it up
     io.to(data.requesterId).emit('media-share', payload);
 
-    // Also update the server's activeMedia to cleartext so future rejoins work directly
-    io._activeMedia[socket.roomCode] = { ...payload, sharedAt: Date.now() };
-    logger.info(`Media recovered in room ${socket.roomCode} — ${socket.id} sent URL to ${data.requesterId}`);
+    // Update server's media map so future rejoins work directly
+    if (io._activeMedia[socket.roomCode]) {
+      io._activeMedia[socket.roomCode].set(mediaId, { ...payload, sharedAt: Date.now() });
+    }
+    logger.info(`Media recovered in room ${socket.roomCode} — ${socket.id} sent ${mediaId} to ${data.requesterId}`);
   });
 
   socket.on('media-join', () => {
     if (!socket.roomCode) return;
-    if (!checkRateLimit(socket.id, 10, 60000)) return;  // Prevent rapid join/leave spam
+    if (!checkRateLimit(socket.id, 10, 60000)) return;
     if (!io._mediaWatchers[socket.roomCode]) io._mediaWatchers[socket.roomCode] = new Set();
     io._mediaWatchers[socket.roomCode].add(socket.id);
     io.to(socket.roomCode).emit('media-sync-count', { count: io._mediaWatchers[socket.roomCode].size });
@@ -2597,7 +2628,7 @@ io.on('connection', (socket) => {
 
   socket.on('media-leave', () => {
     if (!socket.roomCode) return;
-    if (!checkRateLimit(socket.id, 10, 60000)) return;  // Prevent rapid join/leave spam
+    if (!checkRateLimit(socket.id, 10, 60000)) return;
     if (io._mediaWatchers[socket.roomCode]) {
       io._mediaWatchers[socket.roomCode].delete(socket.id);
       const count = io._mediaWatchers[socket.roomCode].size;
@@ -2606,24 +2637,36 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('media-close', () => {
+  socket.on('media-close', (data) => {
     if (!socket.roomCode) return;
     if (!checkRateLimit(socket.id, 5, 60000)) return;
 
-    // Only host or elevated roles can close the media player for the room
+    // Only host or elevated roles can close media for the room
     const room = roomData[socket.roomCode];
     if (room) {
       const userRole = room.userRoles?.[socket.id] || (room.hostId === socket.id ? 'host' : 'user');
       if (userRole !== 'host' && userRole !== 'tier1' && userRole !== 'tier2') {
-        // Regular users can only leave — not close for everyone
         return;
       }
     }
 
-    socket.to(socket.roomCode).emit('media-close');
-    delete io._mediaWatchers[socket.roomCode];
-    delete io._activeMedia[socket.roomCode];  // Clear persisted media state
-    delete io._mediaPlaybackState[socket.roomCode]; // Clear playback state
+    const mediaId = typeof data?.mediaId === 'string' ? data.mediaId.slice(0, 20) : null;
+
+    if (mediaId) {
+      // Close a specific media item
+      socket.to(socket.roomCode).emit('media-close', { mediaId });
+      if (io._activeMedia[socket.roomCode]) io._activeMedia[socket.roomCode].delete(mediaId);
+      if (io._mediaPlaybackState[socket.roomCode]) io._mediaPlaybackState[socket.roomCode].delete(mediaId);
+      // Clean up empty maps
+      if (io._activeMedia[socket.roomCode]?.size === 0) delete io._activeMedia[socket.roomCode];
+      if (io._mediaPlaybackState[socket.roomCode]?.size === 0) delete io._mediaPlaybackState[socket.roomCode];
+    } else {
+      // Close ALL media in the room (full clear)
+      socket.to(socket.roomCode).emit('media-close', {});
+      delete io._mediaWatchers[socket.roomCode];
+      delete io._activeMedia[socket.roomCode];
+      delete io._mediaPlaybackState[socket.roomCode];
+    }
   });
 
   // ─── Now Playing Status ─────────────────────────────────────────
