@@ -10,33 +10,33 @@ import QRCode from 'qrcode';
 
 // ─── QR Generator Component ───────────────────────────────
 
-export default function QRGenerator({ 
-  data, 
-  size = 200, 
-  fgColor = '#000000', 
+export default function QRGenerator({
+  data,
+  size = 200,
+  fgColor = '#000000',
   bgColor = '#ffffff',
-  className = '' 
+  className = ''
 }) {
   const canvasRef = useRef(null);
-  
+
   useEffect(() => {
     if (!data || !canvasRef.current) return;
-    
+
     QRCode.toCanvas(canvasRef.current, data, {
       width: size,
-      margin: 2,
+      margin: 1,
       color: {
         dark: fgColor,
         light: bgColor,
       },
-      errorCorrectionLevel: 'M',
+      errorCorrectionLevel: 'L',
     }).catch(err => {
       console.error('[QRGenerator] Failed to render QR code:', err);
     });
   }, [data, size, fgColor, bgColor]);
-  
+
   if (!data) return null;
-  
+
   return (
     <div className={`inline-block ${className}`}>
       <canvas
@@ -53,15 +53,15 @@ export default function QRGenerator({
  */
 export function ConnectionQR({ connectionInfo, size = 200 }) {
   if (!connectionInfo) return null;
-  
-  const data = typeof connectionInfo === 'string' 
-    ? connectionInfo 
+
+  const data = typeof connectionInfo === 'string'
+    ? connectionInfo
     : JSON.stringify(connectionInfo);
-  
+
   return (
     <div className="flex flex-col items-center gap-3">
-      <QRGenerator 
-        data={data} 
+      <QRGenerator
+        data={data}
         size={size}
         className="shadow-lg border-4 border-white dark:border-gray-700 rounded-xl"
       />

@@ -566,7 +566,7 @@ const NearbyTransfer = () => {
                               platform: isElectron ? 'electron' : isCapacitor ? 'android' : 'web',
                               version: '1.0'
                             }}
-                            size={240}
+                            size={280}
                           />
                           {offlineStep === 'offer-ready' && (
                             <div className="mt-4 text-center">

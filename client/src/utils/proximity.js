@@ -153,6 +153,11 @@ function readChunkAsArrayBuffer(blob) {
  * Compress JSON payload to reduce QR code density for fast scanning natively.
  */
 export async function compressPayload(obj) {
+  // Dramatically shrink SDP before compression by removing A/V extensions 
+  // that we don't need for a pure data channel.
+  if (obj.o) obj.o = obj.o.replace(/a=extmap:[^\r\n]+\r\n/g, '');
+  if (obj.a) obj.a = obj.a.replace(/a=extmap:[^\r\n]+\r\n/g, '');
+
   const str = JSON.stringify(obj);
   try {
     const stream = new Blob([str]).stream().pipeThrough(new CompressionStream('deflate-raw'));
@@ -491,11 +496,13 @@ export class ProximityService {
 
   async createOfflineOffer() {
     console.log('[Proximity] Creating true offline offer...');
-    const strictStunServers = ICE_SERVERS.filter(server => !server.urls.toString().includes('turn:'));
+
+    // For pure zero-internet Hotspot offline, having ICE servers present
+    // actually bloats the SDP and ICE candidates with public internet hops that we cannot reach.
+    // So we use strict empty `[]` to force native LAN IP mappings.
     const pc = new RTCPeerConnection({
-      iceServers: strictStunServers,
-      iceTransportPolicy: 'all',
-      iceCandidatePoolSize: 10
+      iceServers: [],
+      iceTransportPolicy: 'all'
     });
 
     const dc = pc.createDataChannel(DATA_CHANNEL_LABEL, { ordered: true });
@@ -510,7 +517,11 @@ export class ProximityService {
 
     const candidates = [];
     pc.onicecandidate = (e) => {
-      if (e.candidate) candidates.push(e.candidate.candidate);
+      if (e.candidate) {
+        if (!e.candidate.candidate.includes('srflx') && !e.candidate.candidate.includes('relay')) {
+          candidates.push(e.candidate.candidate);
+        }
+      }
     };
 
     const offer = await pc.createOffer();
@@ -542,11 +553,10 @@ export class ProximityService {
     const data = await decompressPayload(offerCompressed);
     console.log('[Proximity] Accepting offline offer from', data.deviceId);
 
-    const strictStunServers = ICE_SERVERS.filter(server => !server.urls.toString().includes('turn:'));
+    // Empty array ensures it generates small, ultra-dense Host LAN IPs only
     const pc = new RTCPeerConnection({
-      iceServers: strictStunServers,
-      iceTransportPolicy: 'all',
-      iceCandidatePoolSize: 10
+      iceServers: [],
+      iceTransportPolicy: 'all'
     });
 
     const peerId = data.deviceId || 'offline-host';
@@ -563,7 +573,11 @@ export class ProximityService {
 
     const candidates = [];
     pc.onicecandidate = (e) => {
-      if (e.candidate) candidates.push(e.candidate.candidate);
+      if (e.candidate) {
+        if (!e.candidate.candidate.includes('srflx') && !e.candidate.candidate.includes('relay')) {
+          candidates.push(e.candidate.candidate);
+        }
+      }
     };
 
     await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: data.o }));
