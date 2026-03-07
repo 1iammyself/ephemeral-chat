@@ -379,7 +379,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                           }`}
                         onClick={() => {
                           const el = document.getElementById(message.replyTo.id);
-                          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          if (el) el.scrollIntoView({ behavior: 'auto', block: 'center' });
                         }}
                       >
                         <div className="font-bold opacity-80 mb-0.5">{message.replyTo.sender}</div>

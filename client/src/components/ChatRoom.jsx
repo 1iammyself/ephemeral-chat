@@ -439,7 +439,7 @@ const ChatRoom = () => {
       const scrollToBottom = () => {
         // Wait a frame for the WebView body to finish resizing
         requestAnimationFrame(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
         });
       };
 
@@ -1397,7 +1397,7 @@ const ChatRoom = () => {
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages]);
 
   useEffect(() => {
@@ -2831,7 +2831,7 @@ const ChatRoom = () => {
                         doSendMessage();
                       }}
                       onClick={doSendMessage}
-                      disabled={!newMessage.trim() || !isConnected || isSending}
+                      disabled={!newMessage.trim() || !isConnected}
                       className={`flex-shrink-0 ml-1 sm:ml-2 ${getVibeById(roomVibe).accentClass} h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       <Send className="w-4 h-4 sm:w-5 sm:h-5 -ml-0.5" />
