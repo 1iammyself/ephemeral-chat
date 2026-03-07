@@ -26,12 +26,12 @@ const DropViewer = ({ onClose, claimData }) => {
   } = claimData;
 
   // Reconstruct contentMeta from flat server response fields
-  const contentMeta = {
+  const contentMeta = useMemo(() => ({
     type: rawContentType || 'text',
     fileName: fileName || null,
     mimeType: mimeType || null,
     size: fileSize || null,
-  };
+  }), [rawContentType, fileName, mimeType, fileSize]);
 
   const [decryptedContent, setDecryptedContent] = useState(null);
   const [decryptionError, setDecryptionError] = useState('');
@@ -59,6 +59,23 @@ const DropViewer = ({ onClose, claimData }) => {
 
         const type = contentMeta?.type || 'text';
 
+        const getMimeType = (meta, defaultType) => {
+          if (meta?.mimeType) return meta.mimeType;
+          if (meta?.fileName) {
+            const ext = meta.fileName.split('.').pop().toLowerCase();
+            const audioTypes = {
+              'mp3': 'audio/mpeg',
+              'wav': 'audio/wav',
+              'ogg': 'audio/ogg',
+              'm4a': 'audio/mp4',
+              'webm': 'audio/webm',
+              'aac': 'audio/aac'
+            };
+            if (audioTypes[ext]) return audioTypes[ext];
+          }
+          return defaultType;
+        };
+
         if (type === 'text') {
           const text = arrayBufferToText(plainBuffer);
           setDecryptedContent({ type: 'text', data: text });
@@ -66,12 +83,14 @@ const DropViewer = ({ onClose, claimData }) => {
           const dataUrl = arrayBufferToDataUrl(plainBuffer, contentMeta.mimeType || 'image/png');
           setDecryptedContent({ type: 'image', data: dataUrl, meta: contentMeta });
         } else if (type === 'audio') {
-          const url = arrayBufferToObjectUrl(plainBuffer, contentMeta.mimeType || 'audio/webm');
+          const mType = getMimeType(contentMeta, 'audio/mpeg');
+          const url = arrayBufferToObjectUrl(plainBuffer, mType);
           setObjectUrl(url);
           setDecryptedContent({ type: 'audio', data: url, meta: contentMeta });
         } else {
           // Generic file
-          const url = arrayBufferToObjectUrl(plainBuffer, contentMeta.mimeType || 'application/octet-stream');
+          const mType = getMimeType(contentMeta, 'application/octet-stream');
+          const url = arrayBufferToObjectUrl(plainBuffer, mType);
           setObjectUrl(url);
           setDecryptedContent({ type: 'file', data: url, meta: contentMeta });
         }
@@ -168,11 +187,10 @@ const DropViewer = ({ onClose, claimData }) => {
           <div className="flex items-center gap-2">
             {/* Timer */}
             {timeRemaining && (
-              <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                isExpired
-                  ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
-                  : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
-              }`}>
+              <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${isExpired
+                ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+                }`}>
                 <Clock className="w-3 h-3" />
                 {timeRemaining}
               </div>
