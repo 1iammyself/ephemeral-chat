@@ -50,7 +50,11 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
       }
     };
     document.addEventListener('mousedown', handleClickAway);
-    return () => document.removeEventListener('mousedown', handleClickAway);
+    document.addEventListener('touchstart', handleClickAway, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', handleClickAway);
+      document.removeEventListener('touchstart', handleClickAway);
+    };
   }, [activeReactionId]);
 
   // Listen for message-viewed events from server
@@ -482,7 +486,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
 
                 {/* Mobile / Desktop Reaction Menu overlayed absolutely relative to the message bubble */}
                 {activeReactionId === message.id && (
-                  <div className={`absolute z-50 flex flex-col items-center top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 sm:top-1/2 sm:left-auto sm:-translate-x-0 ${desktopPickerClass}`}>
+                  <div className={`reaction-container absolute z-50 flex flex-col items-center top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 sm:top-1/2 sm:left-auto sm:-translate-x-0 ${desktopPickerClass}`}>
                     {!showFullPicker ? (
                       <div
                         className="bg-white/90 dark:bg-gray-800/95 backdrop-blur-md shadow-2xl rounded-full p-1.5 flex items-center space-x-1 border border-gray-100/50 dark:border-gray-700/50 whitespace-nowrap animate-in fade-in zoom-in slide-in-from-top-2 duration-300 max-w-[200px] sm:max-w-xs overflow-x-auto scrollbar-none no-scrollbar touch-pan-x"
