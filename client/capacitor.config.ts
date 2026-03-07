@@ -1,4 +1,5 @@
 import type { CapacitorConfig } from '@capacitor/cli';
+import { KeyboardResize } from '@capacitor/keyboard';
 
 const config: CapacitorConfig = {
   appId: 'me.kyere.chat',
@@ -33,7 +34,7 @@ const config: CapacitorConfig = {
   },
   plugins: {
     Keyboard: {
-      resize: "body",
+      resize: KeyboardResize.Body,
       resizeOnFullScreen: true
     },
     SplashScreen: {

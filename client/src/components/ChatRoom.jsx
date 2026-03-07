@@ -1703,26 +1703,18 @@ const ChatRoom = () => {
       hapticLight();
 
       // ── Clear message while keeping keyboard open ──
-      // On Android, setNewMessage('') causes a React re-render that briefly blurs
-      // the controlled <input>, firing keyboardWillHide and collapsing the keyboard.
-      // Fix: clear the DOM value instantly, keep focus, and defer the React state
-      // update by 300 ms so Android never receives a blur signal during the send.
-      const isNative = Capacitor.getPlatform() !== 'web';
-      if (messageInputRef.current) {
-        messageInputRef.current.value = '';          // instant visual clear (DOM only)
-      }
+      // We clear state after sends. On mobile, we avoid disabling the input 
+      // during isSending to prevent the OS from auto-blurring (which hides keyboard).
+      setNewMessage('');
+      setReplyingTo(null);
 
-      if (isNative) {
-        messageInputRef.current?.focus();
+      // Focus the input to ensure keyboard stays up
+      if (messageInputRef.current) {
+        messageInputRef.current.focus();
+        // Defer a visual focus to ensure React re-render doesn't stomp it
         setTimeout(() => {
-          setNewMessage('');
-          setReplyingTo(null);
           messageInputRef.current?.focus();
-        }, 300);
-      } else {
-        // On web, controlled state sync is instant with no keyboard side-effects.
-        setNewMessage('');
-        setReplyingTo(null);
+        }, 10);
       }
     } catch (error) {
       setError('Failed to send message');
@@ -2815,7 +2807,7 @@ const ChatRoom = () => {
                         onPaste={(e) => e.preventDefault()}
                         placeholder={isAnonymousMode ? "Confess anonymously..." : "Type message..."}
                         className="w-full bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white text-[15px] sm:text-base px-2 py-2.5 min-w-0 placeholder:text-gray-400"
-                        disabled={!isConnected || isSending}
+                        disabled={!isConnected}
                         maxLength={500}
                         style={{ boxShadow: 'none' }}
                       />
