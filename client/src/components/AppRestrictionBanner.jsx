@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import { Download, Smartphone, Shield, Zap, Monitor, Laptop, Globe, ExternalLink } from 'lucide-react';
 
 const APK_DOWNLOAD_URL = 'https://github.com/cLLeB/ephemeral-chat/releases/download/chapter/app-release.apk';
-const REPO_BASE = 'https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.2';
+const REPO_BASE = 'https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.3';
 
 // Desktop download URLs
 const DESKTOP_DOWNLOADS = {
-    win: `${REPO_BASE}/Ephemeral-Chat-1.1.2-win.exe`,
-    mac: `${REPO_BASE}/Ephemeral-Chat-1.1.2-mac-arm64.dmg`,
-    linux: `${REPO_BASE}/Ephemeral-Chat-1.1.2-linux-x86_64.AppImage`,
+    win: `${REPO_BASE}/Ephemeral.Chat-1.1.3-win.exe`,
+    mac: `${REPO_BASE}/Ephemeral.Chat-1.1.3-mac-arm64.dmg`,
+    linux: `${REPO_BASE}/Ephemeral.Chat-1.1.3-linux-x86_64.AppImage`,
     fallback: 'https://ephchat.kyere.me'
 };
 
