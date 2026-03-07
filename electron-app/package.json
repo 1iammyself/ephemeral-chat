@@ -46,7 +46,7 @@
     ],
     "publish": {
       "provider": "github",
-      "owner": "cLLeB",
+      "owner": "1iammyself",
       "repo": "ephemeral-chat"
     },
     "protocols": [
