@@ -2265,17 +2265,46 @@ io.on('connection', (socket) => {
   // Edit Message
   // ─── v2-aware: accepts both legacy { newContent } and v2 { v, header, ciphertext, ratchet } ─
   socket.on('edit-message', async (data) => {
-    const { messageId, newContent, v: editV, header: editHeader, ciphertext: editCiphertext, ratchet: editRatchet, isEncrypted: editEncrypted, iv: editIv } = data || {};
+    const {
+      messageId,
+      newContent,
+      v: editV,
+      header: editHeader,
+      ciphertext: editCiphertext,
+      ratchet: editRatchet,
+      isEncrypted: editEncrypted,
+      iv: editIv,
+      ct: editCt,
+      mls: editMls
+    } = data || {};
+
+    const isV4Edit = editV === 4 && editCt;
+    const isV3Edit = editV === 3 && editMls;
     const isV2Edit = editV === 2 && editRatchet;
-    const effectiveContent = isV2Edit ? editCiphertext : newContent;
+
+    let effectiveContent;
+    if (isV4Edit) effectiveContent = editCt;
+    else if (isV3Edit) effectiveContent = editMls;
+    else if (isV2Edit) effectiveContent = editCiphertext;
+    else effectiveContent = newContent;
+
     if (!socket.roomCode || !messageId || !effectiveContent) return;
 
     // Call roomManager
-    const updatedMessage = await roomManager.editMessage(socket.roomCode, messageId, effectiveContent, socket.id);
+    const updatedMessage = await roomManager.editMessage(socket.roomCode, messageId, data, socket.id);
 
     if (updatedMessage) {
-      // Attach v2 ratchet fields so the receiving client can decrypt
-      if (isV2Edit) {
+      // Re-attach encryption metadata before broadcast
+      if (isV4Edit) {
+        updatedMessage.v = 4;
+        updatedMessage.ct = editCt;
+        updatedMessage.iv = editIv;
+        updatedMessage.isEncrypted = true;
+      } else if (isV3Edit) {
+        updatedMessage.v = 3;
+        updatedMessage.mls = editMls;
+        updatedMessage.isEncrypted = true;
+      } else if (isV2Edit) {
         updatedMessage.v = 2;
         updatedMessage.header = editHeader;
         updatedMessage.ciphertext = editCiphertext;
@@ -2283,6 +2312,7 @@ io.on('connection', (socket) => {
         updatedMessage.ratchet = true;
         updatedMessage.isEncrypted = true;
       }
+
       // Broadcast update
       io.to(socket.roomCode).emit('message-updated', updatedMessage);
     }

@@ -1349,14 +1349,14 @@ class RoomManager {
   }
 
   /**
-   * Edit a message content
+   * Edit a message content and metadata
    * @param {string} roomCode - Room code
    * @param {string} messageId - Message ID
-   * @param {string} newContent - New message content
+   * @param {string|Object} update - New message content or update object containing encryption fields
    * @param {string} userId - User ID (for permission check)
    * @returns {Promise<Object|null>} Updated message or null
    */
-  async editMessage(roomCode, messageId, newContent, userId) {
+  async editMessage(roomCode, messageId, update, userId) {
     const room = await this.getRoom(roomCode);
     if (!room) return null;
 
@@ -1376,9 +1376,29 @@ class RoomManager {
       return null;
     }
 
-    // Update content
-    message.content = sanitizeInput(newContent);
+    // Update content and encryption metadata
+    if (typeof update === 'string') {
+      message.content = sanitizeInput(update);
+    } else if (typeof update === 'object' && update !== null) {
+      // Basic content
+      if (update.content) message.content = sanitizeInput(update.content);
+      else if (update.newContent) message.content = sanitizeInput(update.newContent);
+      else if (update.ct) message.content = update.ct; // For v4, use ct as content fallback
+      else if (update.ciphertext) message.content = update.ciphertext; // For v2
+
+      // Encryption Metadata
+      if (update.v) message.v = update.v;
+      if (update.ct) message.ct = update.ct;
+      if (update.iv) message.iv = update.iv;
+      if (update.mls) message.mls = update.mls;
+      if (update.header) message.header = update.header;
+      if (update.ciphertext) message.ciphertext = update.ciphertext;
+      if (update.ratchet !== undefined) message.ratchet = update.ratchet;
+      if (update.isEncrypted !== undefined) message.isEncrypted = update.isEncrypted;
+    }
+
     message.isEdited = true;
+    message.editTimestamp = new Date().toISOString();
 
     // Save back to storage using unified logic
     await this.saveMessage(roomCode, message);
