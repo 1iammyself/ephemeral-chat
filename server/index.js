@@ -2349,12 +2349,15 @@ io.on('connection', (socket) => {
   const MAX_MEDIA_PER_ROOM = 10;
 
   // Allowed media types whitelist
-  const ALLOWED_MEDIA_TYPES = ['youtube', 'soundcloud'];
+  const ALLOWED_MEDIA_TYPES = ['youtube', 'soundcloud', 'twitch', 'figma', 'gdrive'];
   // Allowed sync actions whitelist
   const ALLOWED_SYNC_ACTIONS = ['play', 'pause', 'seek'];
-  // URL validation: must be a real YouTube or SoundCloud URL
+  // URL validation: must be a real YouTube, SoundCloud, Twitch, Figma, or GDrive URL
   const SAFE_YT_URL = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)\//;
   const SAFE_SC_URL = /^https?:\/\/(www\.)?soundcloud\.com\//;
+  const SAFE_TWITCH_URL = /^https?:\/\/(www\.|player\.)?twitch\.tv\//;
+  const SAFE_FIGMA_URL = /^https?:\/\/(www\.)?figma\.com\//;
+  const SAFE_GDRIVE_URL = /^https?:\/\/(www\.|docs\.|drive\.)?google\.com\//;
 
   // Helper: generate a short unique mediaId (8 hex chars)
   const genMediaId = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -2392,11 +2395,14 @@ io.on('connection', (socket) => {
       if (payload._mediaHint && typeof payload._mediaHint === 'object') {
         const h = payload._mediaHint;
         const type = typeof h.type === 'string' ? h.type.toLowerCase().trim() : '';
-        if (type !== 'youtube' && type !== 'soundcloud') return null;
+        if (['youtube', 'soundcloud', 'twitch', 'figma', 'gdrive'].indexOf(type) === -1) return null;
         const url = typeof h.url === 'string' ? h.url.trim() : '';
         if (!url || url.length > 2048) return null;
         if (type === 'youtube' && !SAFE_YT_URL.test(url)) return null;
         if (type === 'soundcloud' && !SAFE_SC_URL.test(url)) return null;
+        if (type === 'twitch' && !SAFE_TWITCH_URL.test(url)) return null;
+        if (type === 'figma' && !SAFE_FIGMA_URL.test(url)) return null;
+        if (type === 'gdrive' && !SAFE_GDRIVE_URL.test(url)) return null;
         const id = typeof h.id === 'string' ? h.id.trim() : null;
         if (type === 'youtube' && (!id || !/^[a-zA-Z0-9_-]{11}$/.test(id))) return null;
         const sharedBy = typeof h.sharedBy === 'string' ? h.sharedBy.substring(0, 30) : 'Someone';
