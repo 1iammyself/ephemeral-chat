@@ -110,9 +110,9 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
           {detected && (
             <div className={`flex items-center gap-2 px-3 py-2 rounded-lg bg-${vibeAccent}-50 dark:bg-${vibeAccent}-950/30 border border-${vibeAccent}-200/50 dark:border-${vibeAccent}-700/30 animate-in slide-in-from-bottom-2 duration-200`}>
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${detected.type === 'youtube' ? 'bg-red-500/10' :
-                  detected.type === 'soundcloud' ? 'bg-orange-500/10' :
-                    detected.type === 'twitch' ? 'bg-purple-500/10' :
-                      detected.type === 'figma' ? 'bg-pink-500/10' : 'bg-blue-500/10'
+                detected.type === 'soundcloud' ? 'bg-orange-500/10' :
+                  detected.type === 'twitch' ? 'bg-purple-500/10' :
+                    detected.type === 'figma' ? 'bg-pink-500/10' : 'bg-blue-500/10'
                 }`}>
                 {detected.type === 'youtube' && <Youtube className="w-4 h-4 text-red-500" />}
                 {detected.type === 'soundcloud' && <Music className="w-4 h-4 text-orange-500" />}
@@ -153,7 +153,7 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
               </div>
               <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-500 transition-colors cursor-default">
                 <FileText className="w-4 h-4" />
-                <span className="text-[10px] font-medium">PDF / Docs</span>
+                <span className="text-[10px] font-medium">GDrive / PDF</span>
               </div>
             </div>
           )}

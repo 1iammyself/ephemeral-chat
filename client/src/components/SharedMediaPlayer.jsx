@@ -21,7 +21,7 @@ import { withJitter } from '../crypto/traffic-padding';
 // ─── URL Detection Helpers ────────────────────────────────────────────
 const YT_REGEX = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
 const SC_REGEX = /soundcloud\.com\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+/;
-const TWITCH_REGEX = /twitch\.tv\/([a-zA-Z0-9_-]+)(?:\/v\/(\d+))?/;
+const TWITCH_REGEX = /(?:twitch\.tv\/([a-zA-Z0-9_-]+)(?:\/(?:v|clip)\/([a-zA-Z0-9_-]+))?|clips\.twitch\.tv\/([a-zA-Z0-9_-]+))/;
 const FIGMA_REGEX = /figma\.com\/(file|proto|design)\/([a-zA-Z0-9]+)/;
 const GDRIVE_REGEX = /drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)/;
 
@@ -68,9 +68,17 @@ export function detectMediaUrl(text) {
   if (twitchMatch) {
     const url = text.match(/https?:\/\/[^\s]+/)?.[0] || text;
     if (!isSafeMediaUrl(url, 'twitch')) return null;
-    const channel = twitchMatch[1];
-    const videoId = twitchMatch[2];
-    return { type: 'twitch', channel, videoId, url };
+
+    // Determine channel, videoId, or clipId
+    let channel = twitchMatch[1];
+    let videoId = twitchMatch[2];
+    let clipId = twitchMatch[3];
+
+    if (text.includes('/clip/')) {
+      clipId = text.split('/clip/')[1]?.split('?')[0]?.split('/')[0];
+    }
+
+    return { type: 'twitch', channel, videoId, clipId, url };
   }
 
   const figmaMatch = text.match(FIGMA_REGEX);
@@ -411,13 +419,24 @@ const SingleMediaPlayer = ({
         };
       });
     } else if (mediaInfo.type === 'twitch') {
+      const parentDomain = window.location.hostname || 'localhost';
+
+      if (mediaInfo.clipId) {
+        // Clips use an iframe embed instead of the Interactive API for better reliability
+        const iframe = document.getElementById(embedId);
+        if (iframe) {
+          iframe.src = `https://clips.twitch.tv/embed?clip=${mediaInfo.clipId}&parent=${parentDomain}&autoplay=false`;
+        }
+        return;
+      }
+
       loadTwitchApi().then(() => {
         const options = {
           width: '100%',
           height: '100%',
           autoplay: false,
           muted: false,
-          parent: [window.location.hostname]
+          parent: [parentDomain]
         };
         if (mediaInfo.videoId) options.video = mediaInfo.videoId;
         else options.channel = mediaInfo.channel;
@@ -644,7 +663,7 @@ const SingleMediaPlayer = ({
             }}
           >
             {/* Unique embed ID per card */}
-            {mediaInfo.type === 'youtube' || mediaInfo.type === 'twitch' ? (
+            {mediaInfo.type === 'youtube' || (mediaInfo.type === 'twitch' && !mediaInfo.clipId) ? (
               <div id={embedId} className="w-full h-full" />
             ) : (
               <iframe
@@ -658,54 +677,58 @@ const SingleMediaPlayer = ({
               />
             )}
 
-            {/* Click overlay — play/pause on click */}
-            <div
-              className="absolute inset-0 z-10 cursor-pointer"
-              onClick={(e) => { e.stopPropagation(); handlePlayPause(); }}
-            >
-              <div className={`w-full h-full flex items-center justify-center transition-opacity duration-300 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}>
-                <div className={`p-3 rounded-full bg-black/50 backdrop-blur-sm ${isPlaying ? 'opacity-0' : 'opacity-80'} transition-opacity`}>
-                  {isPlaying ? <Pause className="w-8 h-8 text-white" /> : <Play className="w-8 h-8 text-white ml-1" />}
+            {/* Click overlay — play/pause on click (ONLY FOR VIDEO TYPES) */}
+            {(mediaInfo.type === 'youtube' || mediaInfo.type === 'soundcloud' || mediaInfo.type === 'twitch') && (
+              <div
+                className="absolute inset-0 z-10 cursor-pointer"
+                onClick={(e) => { e.stopPropagation(); handlePlayPause(); }}
+              >
+                <div className={`w-full h-full flex items-center justify-center transition-opacity duration-300 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}>
+                  <div className={`p-3 rounded-full bg-black/50 backdrop-blur-sm ${isPlaying ? 'opacity-0' : 'opacity-80'} transition-opacity`}>
+                    {isPlaying ? <Pause className="w-8 h-8 text-white" /> : <Play className="w-8 h-8 text-white ml-1" />}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Bottom controls bar */}
-            <div
-              className={`absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 pt-6 pb-2 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="h-1 bg-white/20 rounded-full cursor-pointer group/seek mb-2 hover:h-2 transition-all" onClick={handleSeek}>
-                <div
-                  className={`h-full bg-${vibeAccent}-500 rounded-full transition-[width] duration-200 relative`}
-                  style={{ width: `${progress}%` }}
-                >
-                  <div className={`absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-${vibeAccent}-400 rounded-full opacity-0 group-hover/seek:opacity-100 transition-opacity shadow-lg`} />
+            {/* Bottom controls bar (ONLY FOR VIDEO TYPES) */}
+            {(mediaInfo.type === 'youtube' || mediaInfo.type === 'soundcloud' || mediaInfo.type === 'twitch') && (
+              <div
+                className={`absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 pt-6 pb-2 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="h-1 bg-white/20 rounded-full cursor-pointer group/seek mb-2 hover:h-2 transition-all" onClick={handleSeek}>
+                  <div
+                    className={`h-full bg-${vibeAccent}-500 rounded-full transition-[width] duration-200 relative`}
+                    style={{ width: `${progress}%` }}
+                  >
+                    <div className={`absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-${vibeAccent}-400 rounded-full opacity-0 group-hover/seek:opacity-100 transition-opacity shadow-lg`} />
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <button onClick={handlePlayPause} className="p-1 hover:bg-white/20 rounded-full transition-colors">
-                    {isPlaying ? <Pause className="w-4 h-4 text-white" /> : <Play className="w-4 h-4 text-white ml-0.5" />}
-                  </button>
-                  <span className="text-[10px] text-gray-300 font-mono tabular-nums">
-                    {duration > 0 ? `${formatTime(currentTime)} / ${formatTime(duration)}` : 'Live'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button onClick={() => setIsMuted(!isMuted)} className="p-0.5 hover:bg-white/20 rounded-full transition-colors">
-                    {isMuted ? <VolumeX className="w-3.5 h-3.5 text-gray-300" /> : <Volume2 className="w-3.5 h-3.5 text-gray-300" />}
-                  </button>
-                  <input
-                    type="range" min={0} max={100}
-                    value={isMuted ? 0 : volume}
-                    onChange={(e) => { setVolume(Number(e.target.value)); setIsMuted(false); }}
-                    className="w-14 h-1 accent-white cursor-pointer"
-                  />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <button onClick={handlePlayPause} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+                      {isPlaying ? <Pause className="w-4 h-4 text-white" /> : <Play className="w-4 h-4 text-white ml-0.5" />}
+                    </button>
+                    <span className="text-[10px] text-gray-300 font-mono tabular-nums">
+                      {duration > 0 ? `${formatTime(currentTime)} / ${formatTime(duration)}` : 'Live'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => setIsMuted(!isMuted)} className="p-0.5 hover:bg-white/20 rounded-full transition-colors">
+                      {isMuted ? <VolumeX className="w-3.5 h-3.5 text-gray-300" /> : <Volume2 className="w-3.5 h-3.5 text-gray-300" />}
+                    </button>
+                    <input
+                      type="range" min={0} max={100}
+                      value={isMuted ? 0 : volume}
+                      onChange={(e) => { setVolume(Number(e.target.value)); setIsMuted(false); }}
+                      className="w-14 h-1 accent-white cursor-pointer"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -798,6 +821,7 @@ const SharedMediaPlayer = ({
           mediaId,
           type,
           id: parsed.id || null,
+          clipId: parsed.clipId || null,
           url: parsed.url,
           sharedBy: typeof parsed.sharedBy === 'string' ? parsed.sharedBy.substring(0, 30) : 'Room',
         });
@@ -843,6 +867,7 @@ const SharedMediaPlayer = ({
           mediaId,
           type,
           id: parsed.id || null,
+          clipId: parsed.clipId || null,
           url: parsed.url,
           sharedBy: typeof parsed.sharedBy === 'string' ? parsed.sharedBy.substring(0, 30) : 'Someone',
         }];
