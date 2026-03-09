@@ -21,9 +21,9 @@ import { withJitter } from '../crypto/traffic-padding';
 // ─── URL Detection Helpers ────────────────────────────────────────────
 const YT_REGEX = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
 const SC_REGEX = /soundcloud\.com\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+/;
-const FIGMA_REGEX = /figma\.com\/(file|proto|design)\/([a-zA-Z0-9_-]+)/;
+const FIGMA_REGEX = /figma\.com\/(file|proto|design)\/([a-zA-Z0-9]+)/;
 const GDRIVE_REGEX = /drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)([^\s]*)/;
-const DOCS_REGEX = /docs\.google\.com\/(document|spreadsheets|spreadsheet|presentation|forms)\/d\/([a-zA-Z0-9_-]+)([^\s]*)/;
+const DOCS_REGEX = /docs\.google\.com\/(document|spreadsheets|spreadsheet|presentation|forms)\/d\/([a-zA-Z0-9_-]+)(?:\/(?:edit|view))?([^\s]*)/;
 
 // Security: URL origin whitelist (must match server-side validation)
 const SAFE_YT_ORIGIN = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)\//;
@@ -80,7 +80,11 @@ export function detectMediaUrl(text) {
   if (docsMatch) {
     const url = text.match(/https?:\/\/[^\s]+/)?.[0] || text;
     if (!isSafeMediaUrl(url, 'docs')) return null;
-    return { type: 'docs', service: docsMatch[1], id: docsMatch[2], query: docsMatch[3] || '', url };
+    let query = docsMatch[3] || '';
+    // If query starts with /edit or /view followed by params, strip the path prefix
+    if (query.startsWith('/edit')) query = query.substring(5);
+    else if (query.startsWith('/view')) query = query.substring(5);
+    return { type: 'docs', service: docsMatch[1], id: docsMatch[2], query, url };
   }
 
   return null;
@@ -404,7 +408,7 @@ const SingleMediaPlayer = ({
     } else if (mediaInfo.type === 'figma') {
       const iframe = document.getElementById(embedId);
       if (iframe) {
-        iframe.src = `https://www.figma.com/embed?embed_host=share&url=${encodeURIComponent(mediaInfo.url)}`;
+        iframe.src = `https://www.figma.com/embed?embed_host=ephemeral_chat&url=${encodeURIComponent(mediaInfo.url)}`;
       }
     } else if (mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs') {
       const iframe = document.getElementById(embedId);
@@ -636,7 +640,7 @@ const SingleMediaPlayer = ({
                 scrolling={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs') ? 'yes' : 'no'}
                 frameBorder="no"
                 allow="autoplay; fullscreen"
-                sandbox={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs') ? undefined : "allow-scripts allow-same-origin allow-popups allow-forms"}
+                sandbox={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs' || mediaInfo.type === 'figma') ? undefined : "allow-scripts allow-same-origin allow-popups allow-forms"}
                 referrerPolicy="strict-origin-when-cross-origin"
               />
             )}
