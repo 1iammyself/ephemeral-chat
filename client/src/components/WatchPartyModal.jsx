@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Link, Radio, Play, Music, Youtube, Twitch, Figma, FileText } from 'lucide-react';
+import { X, Link, Radio, Play, Music, Youtube, Figma, FileText } from 'lucide-react';
 import { detectMediaUrl } from './SharedMediaPlayer';
 
 /**
@@ -111,21 +111,18 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
             <div className={`flex items-center gap-2 px-3 py-2 rounded-lg bg-${vibeAccent}-50 dark:bg-${vibeAccent}-950/30 border border-${vibeAccent}-200/50 dark:border-${vibeAccent}-700/30 animate-in slide-in-from-bottom-2 duration-200`}>
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${detected.type === 'youtube' ? 'bg-red-500/10' :
                 detected.type === 'soundcloud' ? 'bg-orange-500/10' :
-                  detected.type === 'twitch' ? 'bg-purple-500/10' :
-                    detected.type === 'figma' ? 'bg-pink-500/10' : 'bg-blue-500/10'
+                  detected.type === 'figma' ? 'bg-pink-500/10' : 'bg-blue-500/10'
                 }`}>
                 {detected.type === 'youtube' && <Youtube className="w-4 h-4 text-red-500" />}
                 {detected.type === 'soundcloud' && <Music className="w-4 h-4 text-orange-500" />}
-                {detected.type === 'twitch' && <Twitch className="w-4 h-4 text-purple-500" />}
                 {detected.type === 'figma' && <Figma className="w-4 h-4 text-pink-500" />}
-                {detected.type === 'gdrive' && <FileText className="w-4 h-4 text-blue-500" />}
+                {(detected.type === 'gdrive' || detected.type === 'docs') && <FileText className="w-4 h-4 text-blue-500" />}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-gray-700 dark:text-gray-200">
                   {detected.type === 'youtube' ? 'YouTube Video' :
                     detected.type === 'soundcloud' ? 'SoundCloud Track' :
-                      detected.type === 'twitch' ? 'Twitch Stream' :
-                        detected.type === 'figma' ? 'Figma Project' : 'Document'} detected
+                      detected.type === 'figma' ? 'Figma Project' : 'Document'} detected
                 </p>
                 <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">{urlInput.trim()}</p>
               </div>
@@ -134,7 +131,7 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
 
           {/* Supported platforms hint */}
           {!detected && !urlInput && (
-            <div className="grid grid-cols-3 gap-3 py-2 border-t border-gray-100 dark:border-gray-800 pt-4">
+            <div className="grid grid-cols-2 gap-3 py-2 border-t border-gray-100 dark:border-gray-800 pt-4">
               <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500 hover:text-red-500 transition-colors cursor-default">
                 <Youtube className="w-4 h-4" />
                 <span className="text-[10px] font-medium">YouTube</span>
@@ -143,17 +140,13 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
                 <Music className="w-4 h-4" />
                 <span className="text-[10px] font-medium">SoundCloud</span>
               </div>
-              <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500 hover:text-purple-500 transition-colors cursor-default">
-                <Twitch className="w-4 h-4" />
-                <span className="text-[10px] font-medium">Twitch</span>
-              </div>
               <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500 hover:text-pink-500 transition-colors cursor-default">
                 <Figma className="w-4 h-4" />
                 <span className="text-[10px] font-medium">Figma</span>
               </div>
               <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-500 transition-colors cursor-default">
                 <FileText className="w-4 h-4" />
-                <span className="text-[10px] font-medium">GDrive / PDF</span>
+                <span className="text-[10px] font-medium">GDrive / Docs</span>
               </div>
             </div>
           )}

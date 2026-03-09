@@ -21,16 +21,15 @@ import { withJitter } from '../crypto/traffic-padding';
 // ─── URL Detection Helpers ────────────────────────────────────────────
 const YT_REGEX = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
 const SC_REGEX = /soundcloud\.com\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+/;
-const TWITCH_REGEX = /(?:twitch\.tv\/([a-zA-Z0-9_-]+)(?:\/(?:v|clip)\/([a-zA-Z0-9_-]+))?|clips\.twitch\.tv\/([a-zA-Z0-9_-]+))/;
 const FIGMA_REGEX = /figma\.com\/(file|proto|design)\/([a-zA-Z0-9]+)/;
-const GDRIVE_REGEX = /drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)/;
+const GDRIVE_REGEX = /drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)(?:\/view|\/edit)?/;
+const DOCS_REGEX = /docs\.google\.com\/(?:document|spreadsheets|presentation|forms)\/d\/([a-zA-Z0-9_-]+)(?:\/edit|\/view)?/;
 
 // Security: URL origin whitelist (must match server-side validation)
 const SAFE_YT_ORIGIN = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)\//;
 const SAFE_SC_ORIGIN = /^https?:\/\/(www\.)?soundcloud\.com\//;
-const SAFE_TWITCH_ORIGIN = /^https?:\/\/(www\.|player\.)?twitch\.tv\//;
 const SAFE_FIGMA_ORIGIN = /^https?:\/\/(www\.)?figma\.com\//;
-const SAFE_GDRIVE_ORIGIN = /^https?:\/\/(www\.|docs\.)?google\.com\//;
+const SAFE_GDRIVE_ORIGIN = /^https?:\/\/(www\.|docs\.|drive\.)?google\.com\//;
 
 /**
  * Validate that a URL is a safe, whitelisted media URL.
@@ -43,9 +42,8 @@ function isSafeMediaUrl(url, type) {
   if (lower.startsWith('javascript:') || lower.startsWith('data:') || lower.startsWith('vbscript:')) return false;
   if (type === 'youtube') return SAFE_YT_ORIGIN.test(url);
   if (type === 'soundcloud') return SAFE_SC_ORIGIN.test(url);
-  if (type === 'twitch') return SAFE_TWITCH_ORIGIN.test(url);
   if (type === 'figma') return SAFE_FIGMA_ORIGIN.test(url);
-  if (type === 'gdrive') return SAFE_GDRIVE_ORIGIN.test(url);
+  if (type === 'gdrive' || type === 'docs') return SAFE_GDRIVE_ORIGIN.test(url);
   return false;
 }
 
@@ -64,23 +62,6 @@ export function detectMediaUrl(text) {
     return { type: 'soundcloud', url };
   }
 
-  const twitchMatch = text.match(TWITCH_REGEX);
-  if (twitchMatch) {
-    const url = text.match(/https?:\/\/[^\s]+/)?.[0] || text;
-    if (!isSafeMediaUrl(url, 'twitch')) return null;
-
-    // Determine channel, videoId, or clipId
-    let channel = twitchMatch[1];
-    let videoId = twitchMatch[2];
-    let clipId = twitchMatch[3];
-
-    if (text.includes('/clip/')) {
-      clipId = text.split('/clip/')[1]?.split('?')[0]?.split('/')[0];
-    }
-
-    return { type: 'twitch', channel, videoId, clipId, url };
-  }
-
   const figmaMatch = text.match(FIGMA_REGEX);
   if (figmaMatch) {
     const url = text.match(/https?:\/\/[^\s]+/)?.[0] || text;
@@ -93,6 +74,13 @@ export function detectMediaUrl(text) {
     const url = text.match(/https?:\/\/[^\s]+/)?.[0] || text;
     if (!isSafeMediaUrl(url, 'gdrive')) return null;
     return { type: 'gdrive', id: driveMatch[1], url };
+  }
+
+  const docsMatch = text.match(DOCS_REGEX);
+  if (docsMatch) {
+    const url = text.match(/https?:\/\/[^\s]+/)?.[0] || text;
+    if (!isSafeMediaUrl(url, 'docs')) return null;
+    return { type: 'docs', id: docsMatch[1], url };
   }
 
   return null;
@@ -117,27 +105,6 @@ function loadYouTubeApi() {
       ytApiCallbacks.forEach(cb => cb());
       ytApiCallbacks = [];
     };
-  });
-}
-
-// ─── Twitch Interactive API loader ───────────────────────────────
-let twitchApiLoaded = false;
-let twitchApiCallbacks = [];
-
-function loadTwitchApi() {
-  return new Promise((resolve) => {
-    if (twitchApiLoaded && window.Twitch?.Player) { resolve(); return; }
-    twitchApiCallbacks.push(resolve);
-    if (document.querySelector('script[src*="twitch.tv/embed/v1/external/subs.js"]')) return;
-
-    const tag = document.createElement('script');
-    tag.src = 'https://player.twitch.tv/js/embed/v1.js';
-    tag.onload = () => {
-      twitchApiLoaded = true;
-      twitchApiCallbacks.forEach(cb => cb());
-      twitchApiCallbacks = [];
-    };
-    document.head.appendChild(tag);
   });
 }
 
@@ -207,7 +174,6 @@ const SingleMediaPlayer = ({
 
   const ytPlayerRef = useRef(null);
   const scWidgetRef = useRef(null);
-  const twitchPlayerRef = useRef(null);
   const playerContainerRef = useRef(null);
   const timeUpdateRef = useRef(null);
   const ignoreNextSyncRef = useRef(0);
@@ -229,21 +195,18 @@ const SingleMediaPlayer = ({
   const playMedia = useCallback(() => {
     if (ytPlayerRef.current?.playVideo) ytPlayerRef.current.playVideo();
     if (scWidgetRef.current?.play) scWidgetRef.current.play();
-    if (twitchPlayerRef.current?.play) twitchPlayerRef.current.play();
     setIsPlaying(true);
   }, []);
 
   const pauseMedia = useCallback(() => {
     if (ytPlayerRef.current?.pauseVideo) ytPlayerRef.current.pauseVideo();
     if (scWidgetRef.current?.pause) scWidgetRef.current.pause();
-    if (twitchPlayerRef.current?.pause) twitchPlayerRef.current.pause();
     setIsPlaying(false);
   }, []);
 
   const seekTo = useCallback((time) => {
     if (ytPlayerRef.current?.seekTo) ytPlayerRef.current.seekTo(time, true);
     if (scWidgetRef.current?.seekTo) scWidgetRef.current.seekTo(time * 1000);
-    if (twitchPlayerRef.current?.seek) twitchPlayerRef.current.seek(time);
     setCurrentTime(time);
   }, []);
 
@@ -255,7 +218,6 @@ const SingleMediaPlayer = ({
       ytPlayerRef.current = null;
     }
     scWidgetRef.current = null;
-    twitchPlayerRef.current = null;
   }, []);
 
   // ─── Encrypted emit helper (scoped: includes mediaId) ───────────
@@ -323,7 +285,7 @@ const SingleMediaPlayer = ({
         attempts++;
         const yt = ytPlayerRef.current;
         const sc = scWidgetRef.current;
-        if (yt?.seekTo || sc?.seekTo || twitchPlayerRef.current?.seek) {
+        if (yt?.seekTo || sc?.seekTo) {
           seekTo(data.currentTime);
           if (data.isPlaying) playMedia();
         } else if (attempts < 20) {
@@ -418,52 +380,21 @@ const SingleMediaPlayer = ({
           });
         };
       });
-    } else if (mediaInfo.type === 'twitch') {
-      const parentDomain = window.location.hostname || 'localhost';
-
-      if (mediaInfo.clipId) {
-        // Clips use an iframe embed instead of the Interactive API for better reliability
-        const iframe = document.getElementById(embedId);
-        if (iframe) {
-          iframe.src = `https://clips.twitch.tv/embed?clip=${mediaInfo.clipId}&parent=${parentDomain}&autoplay=false`;
-        }
-        return;
-      }
-
-      loadTwitchApi().then(() => {
-        const options = {
-          width: '100%',
-          height: '100%',
-          autoplay: false,
-          muted: false,
-          parent: [parentDomain]
-        };
-        if (mediaInfo.videoId) options.video = mediaInfo.videoId;
-        else options.channel = mediaInfo.channel;
-
-        const player = new window.Twitch.Player(embedId, options);
-        twitchPlayerRef.current = player;
-        player.addEventListener(window.Twitch.Player.READY, () => {
-          setDuration(player.getDuration() || 0);
-          player.setVolume(volume / 100);
-          clearInterval(timeUpdateRef.current);
-          timeUpdateRef.current = setInterval(() => {
-            setCurrentTime(player.getCurrentTime());
-          }, 500);
-        });
-        player.addEventListener(window.Twitch.Player.PLAYING, () => setIsPlaying(true));
-        player.addEventListener(window.Twitch.Player.PAUSE, () => setIsPlaying(false));
-      });
     } else if (mediaInfo.type === 'figma') {
       const iframe = document.getElementById(embedId);
       if (iframe) {
         iframe.src = `https://www.figma.com/embed?embed_host=ephemeral_chat&url=${encodeURIComponent(mediaInfo.url)}`;
       }
-    } else if (mediaInfo.type === 'gdrive') {
+    } else if (mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs') {
       const iframe = document.getElementById(embedId);
       if (iframe) {
         // Use Google Docs viewer for inline display
-        iframe.src = `https://docs.google.com/viewer?url=${encodeURIComponent(mediaInfo.url)}&embedded=true`;
+        if (mediaInfo.type === 'docs') {
+          // For docs links, we can often just point to the embed-compatible URL or keep existing viewer
+          iframe.src = `https://docs.google.com/viewer?url=${encodeURIComponent(mediaInfo.url)}&embedded=true`;
+        } else {
+          iframe.src = `https://docs.google.com/viewer?url=${encodeURIComponent(mediaInfo.url)}&embedded=true`;
+        }
       }
     }
 
@@ -483,7 +414,6 @@ const SingleMediaPlayer = ({
     const v = isMuted ? 0 : volume;
     if (ytPlayerRef.current?.setVolume) ytPlayerRef.current.setVolume(v);
     if (scWidgetRef.current?.setVolume) scWidgetRef.current.setVolume(v);
-    if (twitchPlayerRef.current?.setVolume) twitchPlayerRef.current.setVolume(v / 100);
   }, [volume, isMuted]);
 
   // ─── Now Playing ────────────────────────────────────────────────
@@ -503,8 +433,7 @@ const SingleMediaPlayer = ({
 
     if (mediaInfo && isPlaying) {
       const title = mediaInfo.type === 'youtube' ? 'YouTube video' :
-        mediaInfo.type === 'soundcloud' ? 'SoundCloud track' :
-          mediaInfo.type === 'twitch' ? 'Twitch stream' : 'Media content';
+        mediaInfo.type === 'soundcloud' ? 'SoundCloud track' : 'Media content';
       const nowPlaying = {
         title: mediaInfo.sharedBy ? `${title} (via ${mediaInfo.sharedBy})` : title,
         artist: 'Watch Party',
@@ -626,8 +555,7 @@ const SingleMediaPlayer = ({
               <p className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate">
                 {mediaInfo.type === 'youtube' ? '▶ YouTube Video' :
                   mediaInfo.type === 'soundcloud' ? '🎵 SoundCloud Track' :
-                    mediaInfo.type === 'twitch' ? '🎮 Twitch' :
-                      mediaInfo.type === 'figma' ? '🎨 Figma' : '📄 Doc Viewer'}
+                    mediaInfo.type === 'figma' ? '🎨 Figma' : '📄 Doc Viewer'}
               </p>
               <div className="flex items-center gap-2 mt-0.5">
                 <div className="flex-1 h-1 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
@@ -647,7 +575,7 @@ const SingleMediaPlayer = ({
           style={isMinimized ? { position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' } : {}}
         >
           <div
-            className="relative w-full aspect-video bg-black group"
+            className={`relative w-full ${mediaInfo.type === 'figma' ? 'aspect-square sm:aspect-[4/3]' : 'aspect-video'} bg-black group`}
             ref={playerContainerRef}
             onMouseEnter={() => {
               if (controlsHideTimerRef.current) clearTimeout(controlsHideTimerRef.current);
@@ -663,13 +591,13 @@ const SingleMediaPlayer = ({
             }}
           >
             {/* Unique embed ID per card */}
-            {mediaInfo.type === 'youtube' || (mediaInfo.type === 'twitch' && !mediaInfo.clipId) ? (
+            {mediaInfo.type === 'youtube' ? (
               <div id={embedId} className="w-full h-full" />
             ) : (
               <iframe
                 id={embedId}
                 className="w-full h-full"
-                scrolling={mediaInfo.type === 'gdrive' ? 'yes' : 'no'}
+                scrolling={mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs' ? 'yes' : 'no'}
                 frameBorder="no"
                 allow="autoplay; fullscreen"
                 sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
@@ -678,7 +606,7 @@ const SingleMediaPlayer = ({
             )}
 
             {/* Click overlay — play/pause on click (ONLY FOR VIDEO TYPES) */}
-            {(mediaInfo.type === 'youtube' || mediaInfo.type === 'soundcloud' || mediaInfo.type === 'twitch') && (
+            {(mediaInfo.type === 'youtube' || mediaInfo.type === 'soundcloud') && (
               <div
                 className="absolute inset-0 z-10 cursor-pointer"
                 onClick={(e) => { e.stopPropagation(); handlePlayPause(); }}
@@ -692,7 +620,7 @@ const SingleMediaPlayer = ({
             )}
 
             {/* Bottom controls bar (ONLY FOR VIDEO TYPES) */}
-            {(mediaInfo.type === 'youtube' || mediaInfo.type === 'soundcloud' || mediaInfo.type === 'twitch') && (
+            {(mediaInfo.type === 'youtube' || mediaInfo.type === 'soundcloud') && (
               <div
                 className={`absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 pt-6 pb-2 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                 onClick={(e) => e.stopPropagation()}
@@ -812,7 +740,7 @@ const SharedMediaPlayer = ({
         }
 
         const type = typeof parsed.type === 'string' ? parsed.type : '';
-        if (['youtube', 'soundcloud', 'twitch', 'figma', 'gdrive'].indexOf(type) === -1) continue;
+        if (['youtube', 'soundcloud', 'figma', 'gdrive', 'docs'].indexOf(type) === -1) continue;
         if (!isSafeMediaUrl(parsed.url, type)) continue;
         if (type === 'youtube' && (!parsed.id || !/^[a-zA-Z0-9_-]{11}$/.test(parsed.id))) continue;
 
@@ -821,7 +749,6 @@ const SharedMediaPlayer = ({
           mediaId,
           type,
           id: parsed.id || null,
-          clipId: parsed.clipId || null,
           url: parsed.url,
           sharedBy: typeof parsed.sharedBy === 'string' ? parsed.sharedBy.substring(0, 30) : 'Room',
         });
@@ -854,7 +781,7 @@ const SharedMediaPlayer = ({
       }
 
       const type = typeof parsed.type === 'string' ? parsed.type : '';
-      if (['youtube', 'soundcloud', 'twitch', 'figma', 'gdrive'].indexOf(type) === -1) return;
+      if (['youtube', 'soundcloud', 'figma', 'gdrive', 'docs'].indexOf(type) === -1) return;
       if (!isSafeMediaUrl(parsed.url, type)) return;
       if (type === 'youtube' && (!parsed.id || !/^[a-zA-Z0-9_-]{11}$/.test(parsed.id))) return;
 
@@ -867,7 +794,6 @@ const SharedMediaPlayer = ({
           mediaId,
           type,
           id: parsed.id || null,
-          clipId: parsed.clipId || null,
           url: parsed.url,
           sharedBy: typeof parsed.sharedBy === 'string' ? parsed.sharedBy.substring(0, 30) : 'Someone',
         }];
