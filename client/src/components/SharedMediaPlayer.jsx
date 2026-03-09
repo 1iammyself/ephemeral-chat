@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Play, Pause, Volume2, VolumeX, X, Minimize2, Maximize2,
+  Play, Pause, Volume2, VolumeX, X, Minimize2, Maximize2, Maximize, Shrink,
   ExternalLink, Users, Radio,
 } from 'lucide-react';
 import socketManager from '../socket';
@@ -23,7 +23,7 @@ const YT_REGEX = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([
 const SC_REGEX = /soundcloud\.com\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+/;
 const FIGMA_REGEX = /figma\.com\/(file|proto|design)\/([a-zA-Z0-9]+)/;
 const GDRIVE_REGEX = /drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)(?:\/view|\/edit)?/;
-const DOCS_REGEX = /docs\.google\.com\/(?:document|spreadsheets|presentation|forms)\/d\/([a-zA-Z0-9_-]+)(?:\/edit|\/view)?/;
+const DOCS_REGEX = /docs\.google\.com\/(document|spreadsheets|presentation|forms)\/d\/([a-zA-Z0-9_-]+)(?:\/edit|\/view)?/;
 
 // Security: URL origin whitelist (must match server-side validation)
 const SAFE_YT_ORIGIN = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)\//;
@@ -80,7 +80,7 @@ export function detectMediaUrl(text) {
   if (docsMatch) {
     const url = text.match(/https?:\/\/[^\s]+/)?.[0] || text;
     if (!isSafeMediaUrl(url, 'docs')) return null;
-    return { type: 'docs', id: docsMatch[1], url };
+    return { type: 'docs', service: docsMatch[1], id: docsMatch[2], url };
   }
 
   return null;
@@ -136,6 +136,7 @@ const SingleMediaPlayer = ({
   const [volume, setVolume] = useState(70);
   const [isMuted, setIsMuted] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   // Free-resize: null means "full natural width", number = explicit px width
   const [cardWidth, setCardWidth] = useState(null);
@@ -143,6 +144,26 @@ const SingleMediaPlayer = ({
   const MIN_WIDTH = 200;
   const cardRef = useRef(null);
   const dragRef = useRef(null); // { startX, startWidth }
+
+  // ─── Fullscreen logic ───────────────────────────────────────────
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  const handleToggleFullscreen = () => {
+    if (!cardRef.current) return;
+    if (!document.fullscreenElement) {
+      cardRef.current.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
 
   // ─── Resize drag handlers ────────────────────────────────────────
   const startResize = useCallback((e) => {
@@ -383,17 +404,21 @@ const SingleMediaPlayer = ({
     } else if (mediaInfo.type === 'figma') {
       const iframe = document.getElementById(embedId);
       if (iframe) {
-        iframe.src = `https://www.figma.com/embed?embed_host=ephemeral_chat&url=${encodeURIComponent(mediaInfo.url)}`;
+        // Add show_ui=1 for better interactivity
+        const figmaUrl = new URL(mediaInfo.url);
+        figmaUrl.searchParams.set('show_ui', '1');
+        iframe.src = `https://www.figma.com/embed?embed_host=ephemeral_chat&url=${encodeURIComponent(figmaUrl.toString())}`;
       }
     } else if (mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs') {
       const iframe = document.getElementById(embedId);
       if (iframe) {
-        // Use Google Docs viewer for inline display
         if (mediaInfo.type === 'docs') {
-          // For docs links, we can often just point to the embed-compatible URL or keep existing viewer
-          iframe.src = `https://docs.google.com/viewer?url=${encodeURIComponent(mediaInfo.url)}&embedded=true`;
+          // Use native Google preview endpoint which is cleaner and more compatible
+          const service = mediaInfo.service || 'document';
+          iframe.src = `https://docs.google.com/${service}/d/${mediaInfo.id}/preview`;
         } else {
-          iframe.src = `https://docs.google.com/viewer?url=${encodeURIComponent(mediaInfo.url)}&embedded=true`;
+          // Use native Drive preview endpoint to avoid "No Preview" errors
+          iframe.src = `https://drive.google.com/file/d/${mediaInfo.id}/preview`;
         }
       }
     }
@@ -483,14 +508,14 @@ const SingleMediaPlayer = ({
   return (
     <div
       ref={cardRef}
-      className="relative mx-auto my-3 animate-in fade-in slide-in-from-bottom-2 duration-300"
-      style={{
+      className={`relative mx-auto my-3 animate-in fade-in slide-in-from-bottom-2 duration-300 bg-white dark:bg-gray-900 ${isFullscreen ? 'fixed inset-0 m-0 w-screen h-screen z-[10000]' : ''}`}
+      style={isFullscreen ? {} : {
         width: cardWidth ? `${cardWidth}px` : '100%',
         maxWidth: `${MAX_WIDTH}px`,
         minWidth: `${MIN_WIDTH}px`,
       }}
     >
-      <div className={`bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-2xl shadow-lg border border-gray-200/60 dark:border-gray-700/60 overflow-hidden ${isMinimized ? '' : 'ring-1 ring-black/5 dark:ring-white/5'}`}>
+      <div className={`bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl ${isFullscreen ? 'h-full rounded-none' : 'rounded-2xl'} shadow-lg border border-gray-200/60 dark:border-gray-700/60 overflow-hidden ${isFullscreen ? '' : isMinimized ? '' : 'ring-1 ring-black/5 dark:ring-white/5'} flex flex-col transition-all duration-300`}>
         {/* Header */}
         <div className={`flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-${vibeAccent}-50/80 dark:from-${vibeAccent}-950/40 to-transparent border-b border-gray-200/50 dark:border-gray-700/50`}>
           <div className="flex items-center gap-2.5 min-w-0">
@@ -517,12 +542,21 @@ const SingleMediaPlayer = ({
           <div className="flex items-center gap-1 flex-shrink-0">
             <button
               onClick={() => setIsMinimized(!isMinimized)}
-              className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className={`p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors ${isFullscreen ? 'hidden' : ''}`}
               title={isMinimized ? 'Restore' : 'Minimize'}
             >
               {isMinimized
                 ? <Maximize2 className="w-3.5 h-3.5 text-gray-500" />
                 : <Minimize2 className="w-3.5 h-3.5 text-gray-500" />}
+            </button>
+            <button
+              onClick={handleToggleFullscreen}
+              className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+            >
+              {isFullscreen
+                ? <Shrink className="w-3.5 h-3.5 text-gray-500" />
+                : <Maximize className="w-3.5 h-3.5 text-gray-500" />}
             </button>
             <button
               onClick={() => window.open(mediaInfo.url, '_blank')}
@@ -575,7 +609,7 @@ const SingleMediaPlayer = ({
           style={isMinimized ? { position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' } : {}}
         >
           <div
-            className={`relative w-full ${mediaInfo.type === 'figma' ? 'aspect-square sm:aspect-[4/3]' : 'aspect-video'} bg-black group`}
+            className={`relative w-full ${isFullscreen ? 'h-full flex-1' : mediaInfo.type === 'figma' ? 'aspect-square sm:aspect-[4/3]' : 'aspect-video'} bg-black group`}
             ref={playerContainerRef}
             onMouseEnter={() => {
               if (controlsHideTimerRef.current) clearTimeout(controlsHideTimerRef.current);
