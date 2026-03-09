@@ -21,8 +21,8 @@ import { withJitter } from '../crypto/traffic-padding';
 // ─── URL Detection Helpers ────────────────────────────────────────────
 const YT_REGEX = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
 const SC_REGEX = /soundcloud\.com\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+/;
-const FIGMA_REGEX = /figma\.com\/(file|proto|design)\/([a-zA-Z0-9]+)/;
-const GDRIVE_REGEX = /drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)(?:\/view|\/edit)?/;
+const FIGMA_REGEX = /figma\.com\/(file|proto|design)\/([a-zA-Z0-9_-]+)/;
+const GDRIVE_REGEX = /drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)([^\s]*)/;
 const DOCS_REGEX = /docs\.google\.com\/(document|spreadsheets|presentation|forms)\/d\/([a-zA-Z0-9_-]+)(?:\/edit|\/view)?/;
 
 // Security: URL origin whitelist (must match server-side validation)
@@ -73,7 +73,7 @@ export function detectMediaUrl(text) {
   if (driveMatch) {
     const url = text.match(/https?:\/\/[^\s]+/)?.[0] || text;
     if (!isSafeMediaUrl(url, 'gdrive')) return null;
-    return { type: 'gdrive', id: driveMatch[1], url };
+    return { type: 'gdrive', id: driveMatch[1], query: driveMatch[2] || '', url };
   }
 
   const docsMatch = text.match(DOCS_REGEX);
@@ -404,10 +404,9 @@ const SingleMediaPlayer = ({
     } else if (mediaInfo.type === 'figma') {
       const iframe = document.getElementById(embedId);
       if (iframe) {
-        // Add show_ui=1 for better interactivity
-        const figmaUrl = new URL(mediaInfo.url);
-        figmaUrl.searchParams.set('show_ui', '1');
-        iframe.src = `https://www.figma.com/embed?embed_host=ephemeral_chat&url=${encodeURIComponent(figmaUrl.toString())}`;
+        // Simpler construction to avoid potential URL parsing issues
+        const baseUrl = mediaInfo.url.includes('?') ? `${mediaInfo.url}&show_ui=1` : `${mediaInfo.url}?show_ui=1`;
+        iframe.src = `https://www.figma.com/embed?embed_host=share&url=${encodeURIComponent(baseUrl)}`;
       }
     } else if (mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs') {
       const iframe = document.getElementById(embedId);
@@ -415,10 +414,13 @@ const SingleMediaPlayer = ({
         if (mediaInfo.type === 'docs') {
           // Use native Google preview endpoint which is cleaner and more compatible
           const service = mediaInfo.service || 'document';
-          iframe.src = `https://docs.google.com/${service}/d/${mediaInfo.id}/preview`;
+          iframe.src = `https://docs.google.com/${service}/d/${mediaInfo.id}/preview?embedded=true`;
         } else {
           // Use native Drive preview endpoint to avoid "No Preview" errors
-          iframe.src = `https://drive.google.com/file/d/${mediaInfo.id}/preview`;
+          // Pass through query params (like timestamps)
+          const query = mediaInfo.query || '';
+          const hasQuery = query.includes('?');
+          iframe.src = `https://drive.google.com/file/d/${mediaInfo.id}/preview${query}${hasQuery ? '&' : '?'}embedded=true`;
         }
       }
     }
@@ -508,8 +510,8 @@ const SingleMediaPlayer = ({
   return (
     <div
       ref={cardRef}
-      className={`relative mx-auto my-3 animate-in fade-in slide-in-from-bottom-2 duration-300 bg-white dark:bg-gray-900 ${isFullscreen ? 'fixed inset-0 m-0 w-screen h-screen z-[10000]' : ''}`}
-      style={isFullscreen ? {} : {
+      className={`relative animate-in fade-in slide-in-from-bottom-2 duration-300 bg-white dark:bg-gray-900 ${isFullscreen ? 'fixed inset-0 m-0 w-screen h-screen z-[10000]' : 'mx-auto my-3'}`}
+      style={isFullscreen ? { width: '100vw', height: '100vh', maxWidth: 'none', margin: 0 } : {
         width: cardWidth ? `${cardWidth}px` : '100%',
         maxWidth: `${MAX_WIDTH}px`,
         minWidth: `${MIN_WIDTH}px`,
@@ -631,11 +633,11 @@ const SingleMediaPlayer = ({
               <iframe
                 id={embedId}
                 className="w-full h-full"
-                scrolling={mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs' ? 'yes' : 'no'}
+                scrolling={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs' || mediaInfo.type === 'figma') ? 'yes' : 'no'}
                 frameBorder="no"
                 allow="autoplay; fullscreen"
-                sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-                referrerPolicy="no-referrer"
+                sandbox={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs' || mediaInfo.type === 'figma') ? undefined : "allow-scripts allow-same-origin allow-popups allow-forms"}
+                referrerPolicy="strict-origin-when-cross-origin"
               />
             )}
 
@@ -783,6 +785,8 @@ const SharedMediaPlayer = ({
           mediaId,
           type,
           id: parsed.id || null,
+          service: parsed.service || null,
+          query: parsed.query || null,
           url: parsed.url,
           sharedBy: typeof parsed.sharedBy === 'string' ? parsed.sharedBy.substring(0, 30) : 'Room',
         });
@@ -828,6 +832,8 @@ const SharedMediaPlayer = ({
           mediaId,
           type,
           id: parsed.id || null,
+          service: parsed.service || null,
+          query: parsed.query || null,
           url: parsed.url,
           sharedBy: typeof parsed.sharedBy === 'string' ? parsed.sharedBy.substring(0, 30) : 'Someone',
         }];
