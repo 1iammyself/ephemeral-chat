@@ -23,7 +23,7 @@ const YT_REGEX = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([
 const SC_REGEX = /soundcloud\.com\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+/;
 const FIGMA_REGEX = /figma\.com\/(file|proto|design)\/([a-zA-Z0-9_-]+)/;
 const GDRIVE_REGEX = /drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)([^\s]*)/;
-const DOCS_REGEX = /docs\.google\.com\/(document|spreadsheets|presentation|forms)\/d\/([a-zA-Z0-9_-]+)(?:\/edit|\/view)?/;
+const DOCS_REGEX = /docs\.google\.com\/(document|spreadsheets|spreadsheet|presentation|forms)\/d\/([a-zA-Z0-9_-]+)([^\s]*)/;
 
 // Security: URL origin whitelist (must match server-side validation)
 const SAFE_YT_ORIGIN = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)\//;
@@ -80,7 +80,7 @@ export function detectMediaUrl(text) {
   if (docsMatch) {
     const url = text.match(/https?:\/\/[^\s]+/)?.[0] || text;
     if (!isSafeMediaUrl(url, 'docs')) return null;
-    return { type: 'docs', service: docsMatch[1], id: docsMatch[2], url };
+    return { type: 'docs', service: docsMatch[1], id: docsMatch[2], query: docsMatch[3] || '', url };
   }
 
   return null;
@@ -404,9 +404,7 @@ const SingleMediaPlayer = ({
     } else if (mediaInfo.type === 'figma') {
       const iframe = document.getElementById(embedId);
       if (iframe) {
-        // Simpler construction to avoid potential URL parsing issues
-        const baseUrl = mediaInfo.url.includes('?') ? `${mediaInfo.url}&show_ui=1` : `${mediaInfo.url}?show_ui=1`;
-        iframe.src = `https://www.figma.com/embed?embed_host=share&url=${encodeURIComponent(baseUrl)}`;
+        iframe.src = `https://www.figma.com/embed?embed_host=share&url=${encodeURIComponent(mediaInfo.url)}`;
       }
     } else if (mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs') {
       const iframe = document.getElementById(embedId);
@@ -414,7 +412,9 @@ const SingleMediaPlayer = ({
         if (mediaInfo.type === 'docs') {
           // Use native Google preview endpoint which is cleaner and more compatible
           const service = mediaInfo.service || 'document';
-          iframe.src = `https://docs.google.com/${service}/d/${mediaInfo.id}/preview?embedded=true`;
+          const query = mediaInfo.query || '';
+          const hasQuery = query.includes('?');
+          iframe.src = `https://docs.google.com/${service}/d/${mediaInfo.id}/preview${query}${hasQuery ? '&' : '?'}embedded=true`;
         } else {
           // Use native Drive preview endpoint to avoid "No Preview" errors
           // Pass through query params (like timestamps)
@@ -607,8 +607,8 @@ const SingleMediaPlayer = ({
 
         {/* Full / small player (kept in DOM when minimized but pushed off-screen) */}
         <div
-          className={isMinimized ? 'sr-only' : ''}
-          style={isMinimized ? { position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' } : {}}
+          className={isMinimized ? 'sr-only' : isFullscreen ? 'flex-1 flex flex-col h-full' : ''}
+          style={isMinimized ? { position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' } : isFullscreen ? { height: '100%' } : {}}
         >
           <div
             className={`relative w-full ${isFullscreen ? 'h-full flex-1' : mediaInfo.type === 'figma' ? 'aspect-square sm:aspect-[4/3]' : 'aspect-video'} bg-black group`}
@@ -633,10 +633,10 @@ const SingleMediaPlayer = ({
               <iframe
                 id={embedId}
                 className="w-full h-full"
-                scrolling={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs' || mediaInfo.type === 'figma') ? 'yes' : 'no'}
+                scrolling={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs') ? 'yes' : 'no'}
                 frameBorder="no"
                 allow="autoplay; fullscreen"
-                sandbox={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs' || mediaInfo.type === 'figma') ? undefined : "allow-scripts allow-same-origin allow-popups allow-forms"}
+                sandbox={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs') ? undefined : "allow-scripts allow-same-origin allow-popups allow-forms"}
                 referrerPolicy="strict-origin-when-cross-origin"
               />
             )}
