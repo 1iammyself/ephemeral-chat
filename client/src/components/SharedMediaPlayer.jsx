@@ -21,7 +21,7 @@ import { withJitter } from '../crypto/traffic-padding';
 // ─── URL Detection Helpers ────────────────────────────────────────────
 const YT_REGEX = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
 const SC_REGEX = /soundcloud\.com\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+/;
-const FIGMA_REGEX = /figma\.com\/(file|proto|design)\/([a-zA-Z0-9]+)/;
+const FIGMA_REGEX = /figma\.com\/(file|proto|design)\/([a-zA-Z0-9_-]+)/;
 const GDRIVE_REGEX = /drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)([^\s]*)/;
 const DOCS_REGEX = /docs\.google\.com\/(document|spreadsheets|spreadsheet|presentation|forms)\/d\/([a-zA-Z0-9_-]+)(?:\/(?:edit|view))?([^\s]*)/;
 
@@ -408,7 +408,9 @@ const SingleMediaPlayer = ({
     } else if (mediaInfo.type === 'figma') {
       const iframe = document.getElementById(embedId);
       if (iframe) {
-        iframe.src = `https://www.figma.com/embed?embed_host=ephemeral_chat&url=${encodeURIComponent(mediaInfo.url)}`;
+        // Add show_ui=1 for better interactivity
+        const baseUrl = mediaInfo.url.includes('?') ? `${mediaInfo.url}&show_ui=1` : `${mediaInfo.url}?show_ui=1`;
+        iframe.src = `https://www.figma.com/embed?embed_host=share&url=${encodeURIComponent(baseUrl)}`;
       }
     } else if (mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs') {
       const iframe = document.getElementById(embedId);
@@ -637,7 +639,7 @@ const SingleMediaPlayer = ({
               <iframe
                 id={embedId}
                 className="w-full h-full"
-                scrolling={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs') ? 'yes' : 'no'}
+                scrolling={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs' || mediaInfo.type === 'figma') ? 'yes' : 'no'}
                 frameBorder="no"
                 allow="autoplay; fullscreen"
                 sandbox={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs' || mediaInfo.type === 'figma') ? undefined : "allow-scripts allow-same-origin allow-popups allow-forms"}
