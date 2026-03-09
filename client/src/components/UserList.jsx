@@ -30,13 +30,28 @@ const UserList = ({
       roomVibe === 'focus' ? 'orange' : 'primary';
 
   const getInitials = (nickname) => {
-    return nickname
+    if (!nickname) return '';
+
+    // Use Intl.Segmenter for robust Unicode-aware string splitting (grapheme clusters)
+    // Electron/Chromium support this natively.
+    const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
+    const initials = nickname
       .split(' ')
       .filter(word => word.length > 0)
-      .map(word => [...word][0])
+      .map(word => {
+        const segments = [...segmenter.segment(word)];
+        return segments.length > 0 ? segments[0].segment : '';
+      })
+      .join('');
+
+    // Ensure we only take first two graphemes total and handle any casing
+    const finalSegments = [...segmenter.segment(initials)];
+    return finalSegments
+      .slice(0, 2)
+      .map(s => s.segment)
       .join('')
-      .toUpperCase()
-      .slice(0, 2);
+      .toUpperCase();
   };
 
   const getAvatarColor = (nickname) => {
