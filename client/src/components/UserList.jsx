@@ -32,7 +32,8 @@ const UserList = ({
   const getInitials = (nickname) => {
     return nickname
       .split(' ')
-      .map(word => word[0])
+      .filter(word => word.length > 0)
+      .map(word => [...word][0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
