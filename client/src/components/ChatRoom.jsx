@@ -2466,7 +2466,7 @@ const ChatRoom = () => {
           </div>
         </div>
       )}
-      <div className={`${getVibeById(roomVibe).panelClass} backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50 px-4 py-2 sm:py-3 sticky top-0 z-50 shrink-0`}>
+      <div className={`${getVibeById(roomVibe).panelClass} backdrop-blur-md px-4 py-2 sm:py-3 sticky top-0 z-50 shrink-0`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 sm:space-x-4">
             <button onClick={() => navigate('/')} className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
@@ -2543,41 +2543,6 @@ const ChatRoom = () => {
         </div>
       </div>
 
-      {/* ── Compact info bar: only visible when topic, timer, or vibe mood is active ── */}
-      {(getVibeById(roomVibe)?.moodSound || roomTopic || activeTimer) && (
-        <div className={`flex items-center gap-2 px-3 py-1.5 border border-gray-200/50 dark:border-gray-700/50 rounded-full mx-4 my-2 shadow-sm w-fit max-w-[calc(100%-2rem)] ${getVibeById(roomVibe).panelClass} backdrop-blur-md overflow-x-auto scrollbar-none shrink-0 animate-in fade-in slide-in-from-top-2 duration-300`}>
-          {/* Ambient Player / Mood DJ */}
-          {getVibeById(roomVibe)?.moodSound && (
-            <div className="shrink-0">
-              <AmbientPlayer moodSound={getVibeById(roomVibe).moodSound} isActive={true} />
-            </div>
-          )}
-          {/* Topic Pill */}
-          {roomTopic && (
-            <div className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full bg-${vibeAccent}-100/30 dark:bg-${vibeAccent}-900/20 border border-${vibeAccent}-200/30 dark:border-${vibeAccent}-500/20`}>
-              <span className={`text-[10px] font-bold text-${vibeAccent}-600 dark:text-${vibeAccent}-400 uppercase tracking-wider`}>Topic</span>
-              <span className="text-xs font-medium text-gray-700 dark:text-gray-200 truncate max-w-[120px] sm:max-w-[200px]">{roomTopic}</span>
-              {canManageRoom(currentUserRole) && (
-                <button onClick={() => setShowTopicEditor(true)} className={`p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 hover:text-${vibeAccent}-500 transition-colors`}>
-                  <Edit2 className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          )}
-          {/* Timer Pill */}
-          {activeTimer && (
-            <div className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full bg-${vibeAccent}-600/90 text-white border border-${vibeAccent}-500/50`}>
-              <Clock className={`w-3 h-3 ${timeLeft === '00:00' ? 'animate-bounce text-red-300' : 'animate-pulse'}`} />
-              <span className={`font-mono text-xs font-bold tracking-wider ${timeLeft === '00:00' ? 'text-red-100' : ''}`}>{timeLeft || '00:00'}</span>
-              {canManageRoom(currentUserRole) && (
-                <button onClick={handleStopTimer} className="p-0.5 hover:bg-white/20 rounded-full transition-colors" title="Stop Timer">
-                  <X className="w-3 h-3 text-red-300" />
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
 
       {error && (
         <div className="mx-4 mt-2 bg-red-100 dark:bg-red-900/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-2 rounded-lg text-sm flex items-center justify-between md:w-fit md:mx-auto shadow-sm animate-in fade-in slide-in-from-top-2 z-[60] relative">
@@ -2594,6 +2559,41 @@ const ChatRoom = () => {
 
       <div className={`flex-1 flex overflow-hidden min-h-0 ${sidebarPosition === 'left' ? 'flex-row-reverse' : ''}`}>
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
+          {/* ── Compact info bar: now inside the center column for better sidebar alignment ── */}
+          {(getVibeById(roomVibe)?.moodSound || roomTopic || activeTimer) && (
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full mx-4 my-2 shadow-sm w-fit max-w-[calc(100%-2rem)] ${getVibeById(roomVibe).panelClass} backdrop-blur-md overflow-x-auto scrollbar-none shrink-0 animate-in fade-in slide-in-from-top-2 duration-300`}>
+              {/* Ambient Player / Mood DJ */}
+              {getVibeById(roomVibe)?.moodSound && (
+                <div className="shrink-0">
+                  <AmbientPlayer moodSound={getVibeById(roomVibe).moodSound} isActive={true} />
+                </div>
+              )}
+              {/* Topic Pill */}
+              {roomTopic && (
+                <div className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full bg-${vibeAccent}-100/30 dark:bg-${vibeAccent}-900/20`}>
+                  <span className={`text-[10px] font-bold text-${vibeAccent}-600 dark:text-${vibeAccent}-400 uppercase tracking-wider`}>Topic</span>
+                  <span className="text-xs font-medium text-gray-700 dark:text-gray-200 truncate max-w-[120px] sm:max-w-[200px]">{roomTopic}</span>
+                  {canManageRoom(currentUserRole) && (
+                    <button onClick={() => setShowTopicEditor(true)} className={`p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 hover:text-${vibeAccent}-500 transition-colors`}>
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              )}
+              {/* Timer Pill */}
+              {activeTimer && (
+                <div className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full bg-${vibeAccent}-100 dark:bg-${vibeAccent}-600/90 transition-colors`}>
+                  <Clock className={`w-3 h-3 ${timeLeft === '00:00' ? 'animate-bounce text-red-500 dark:text-red-300' : `animate-pulse text-${vibeAccent}-600 dark:text-white`}`} />
+                  <span className={`font-mono text-xs font-bold tracking-wider ${timeLeft === '00:00' ? 'text-red-600 dark:text-red-100' : `text-${vibeAccent}-700 dark:text-white`}`}>{timeLeft || '00:00'}</span>
+                  {canManageRoom(currentUserRole) && (
+                    <button onClick={handleStopTimer} className={`p-0.5 rounded-full transition-colors hover:bg-black/5 dark:hover:bg-white/20`} title="Stop Timer">
+                      <X className={`w-3 h-3 ${timeLeft === '00:00' ? 'text-red-500 dark:text-red-300' : `text-${vibeAccent}-400 dark:text-red-300`}`} />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           <div className="flex-1 min-h-0 overflow-y-auto pl-4 lg:pl-10 pr-2 scrollbar-thin overscroll-contain touch-pan-y chat-messages-area">
             {/* Watch Party Player — renders as a message-like card in the chat flow */}
             {showMediaPlayer && (
@@ -2636,10 +2636,10 @@ const ChatRoom = () => {
             />
             <div ref={messagesEndRef} />
           </div>
-          <div className={`border-t border-gray-200/50 dark:border-gray-700/50 ${getVibeById(roomVibe).panelClass} backdrop-blur-md sticky bottom-0 z-50 shrink-0 chat-input-area`}>
+          <div className={`${getVibeById(roomVibe).panelClass} backdrop-blur-md sticky bottom-0 z-50 shrink-0 chat-input-area`}>
             {/* Active Security Indicators */}
             {(isStealthMode || overrideTtl || isAnonymousMode) && (
-              <div className="px-4 py-1.5 flex items-center gap-3 border-b border-gray-200/50 dark:border-gray-700/50 bg-white/50 dark:bg-black/20 overflow-x-auto scrollbar-none">
+              <div className="px-4 py-1.5 flex items-center gap-3 bg-white/50 dark:bg-black/20 overflow-x-auto scrollbar-none">
                 {isStealthMode && (
                   <div className="flex items-center gap-1.5 text-[10px] font-black tracking-tighter text-gray-500 dark:text-gray-400 bg-gray-100/80 dark:bg-gray-800/80 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-gray-200/50 dark:border-white/10 shadow-sm shrink-0">
                     <EyeOff className="w-3 h-3" />
@@ -2662,12 +2662,12 @@ const ChatRoom = () => {
             )}
 
             {typingUsers.size > 0 && !isStealthMode && (
-              <div className="px-4 py-1 text-xs text-gray-500 dark:text-gray-400 italic animate-pulse bg-black/5 dark:bg-white/5 border-b border-gray-200/50 dark:border-gray-700/50">
+              <div className="px-4 py-1 text-xs text-gray-500 dark:text-gray-400 italic animate-pulse bg-black/5 dark:bg-white/5">
                 {Array.from(typingUsers.values()).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
               </div>
             )}
             {replyingTo && (
-              <div className="px-4 py-2 bg-black/5 dark:bg-white/5 border-b border-gray-200/50 dark:border-gray-700/50 flex items-center justify-between animate-in slide-in-from-bottom-2">
+              <div className="px-4 py-2 bg-black/5 dark:bg-white/5 flex items-center justify-between animate-in slide-in-from-bottom-2">
                 <div className="flex items-center space-x-2 overflow-hidden">
                   <Reply className={`w-4 h-4 text-${vibeAccent}-500`} />
                   <div className={`flex flex-col text-xs border-l-2 border-${vibeAccent}-500 pl-2`}>
@@ -2683,7 +2683,7 @@ const ChatRoom = () => {
               </div>
             )}
             {selectedRecipients.length > 0 && (
-              <div className={`px-4 py-2 bg-${vibeAccent}-50/50 dark:bg-${vibeAccent}-900/20 border-b border-${vibeAccent}-100/50 dark:border-${vibeAccent}-800/50 flex items-center justify-between`}>
+              <div className={`px-4 py-2 bg-${vibeAccent}-50/50 dark:bg-${vibeAccent}-900/20 flex items-center justify-between`}>
                 <span className={`text-xs text-${vibeAccent}-600 dark:text-${vibeAccent}-300 font-medium flex items-center`}><Users className="w-3 h-3 mr-1.5" />Sending to {selectedRecipients.length} specific user{selectedRecipients.length !== 1 ? 's' : ''}</span>
                 <button onClick={() => setSelectedRecipients([])} className={`text-xs text-${vibeAccent}-500 hover:text-${vibeAccent}-700 dark:hover:text-${vibeAccent}-200 underline`}>Clear selection</button>
               </div>
@@ -3019,7 +3019,7 @@ const ChatRoom = () => {
         {/* Desktop Sidebar */}
         {showDesktopSidebar && (
           <div
-            className={`hidden lg:flex flex-col relative ${getVibeById(roomVibe).sidebarClass} backdrop-blur-md ${sidebarPosition === 'right' ? 'border-l' : 'border-r'} border-gray-200/50 dark:border-gray-700/50 transition-all duration-75`}
+            className={`hidden lg:flex flex-col relative ${getVibeById(roomVibe).sidebarClass} backdrop-blur-md transition-all duration-75`}
             style={{ width: `${sidebarWidth}px` }}
             ref={sidebarRef}
           >
@@ -3177,7 +3177,7 @@ const ChatRoom = () => {
                   });
                   setChessApprovalRequest(null);
                 }}
-                className="flex-1 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors"
+                className={`flex-1 py-2.5 ${getVibeById(roomVibe).accentClass} rounded-xl text-sm font-bold transition-all hover:scale-[1.02] active:scale-95`}
               >
                 Approve
               </button>
@@ -3189,7 +3189,7 @@ const ChatRoom = () => {
                   });
                   setChessApprovalRequest(null);
                 }}
-                className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-bold transition-colors"
+                className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-red-500 hover:text-white text-gray-600 dark:text-gray-400 rounded-xl text-sm font-bold transition-all"
               >
                 Decline
               </button>

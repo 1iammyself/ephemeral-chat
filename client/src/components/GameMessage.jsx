@@ -143,24 +143,18 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
     };
 
     // Dynamic classes based on vibe
-    const accentColor = vibe.id === 'party' ? 'indigo' :
-        vibe.id === 'chill' ? 'teal' :
-            vibe.id === 'focus' ? 'orange' : 'primary';
-
-    // Explicit hex colors for buttons — prevents Tailwind JIT purge in Focus light mode
-    const vibeColorMap = {
-        party: '#6366f1', chill: '#14b8a6', focus: '#f97316', default: '#3b82f6'
-    };
-    const vibeBtnColor = vibeColorMap[vibe.id] || vibeColorMap.default;
+    // Explicit hex colors for buttons
+    const vibeBtnColor = vibe.colors?.primary || '#3b82f6';
 
     const headerClass = vibe.accentClass;
-    const cardBorderClass = `border-${accentColor}-200 dark:border-${accentColor}-800`;
-    const footerBorderClass = `border-${accentColor}-100 dark:border-${accentColor}-800/50`;
-    const selectedOutlineClass = `border-${accentColor}-500 bg-${accentColor}-50 dark:bg-${accentColor}-900/20`;
-    const hoverBorderClass = `hover:border-${accentColor}-400 dark:hover:border-${accentColor}-600`;
-    const statTextClass = `text-${accentColor}-600 dark:text-${accentColor}-400`;
-    const progressFillClass = `bg-${accentColor}-500/10`;
-    const optionDotClass = `bg-${accentColor}-500 text-white`;
+    const cardBorderClass = `border-${vibe.accent || 'primary'}-200 dark:border-${vibe.accent || 'primary'}-800`;
+    const footerBorderClass = `border-${vibe.accent || 'primary'}-100 dark:border-${vibe.accent || 'primary'}-800/50`;
+    const selectedOutlineClass = `border-${vibe.accent || 'primary'}-500 bg-${vibe.accent || 'primary'}-50 dark:bg-${vibe.accent || 'primary'}-900/20`;
+    const hoverBorderClass = `hover:border-${vibe.accent || 'primary'}-400 dark:hover:border-${vibe.accent || 'primary'}-600`;
+    const statTextClass = `text-${vibe.accent || 'primary'}-600 dark:text-${vibe.accent || 'primary'}-400`;
+    const progressFillClass = `bg-${vibe.accent || 'primary'}-500/10`;
+    const optionDotClass = `bg-${vibe.accent || 'primary'}-500 text-white`;
+    const accentColor = vibe.accent || 'primary';
 
     // ── Tic-Tac-Toe ──
     if (isTicTacToe) {

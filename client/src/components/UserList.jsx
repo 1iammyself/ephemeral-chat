@@ -98,7 +98,7 @@ const UserList = ({
     <div className="h-full flex flex-col">
       {/* Pending Guests Section (Host and Tier1 Only) */}
       {canManageGuestsCheck && pendingGuests.length > 0 && (
-        <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-yellow-50 dark:bg-yellow-900/20 transition-colors duration-200">
+        <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 transition-colors duration-200">
           <h3 className="font-black text-yellow-800 dark:text-yellow-400 mb-2 text-[10px] uppercase tracking-widest flex items-center">
             <Users className="w-3 h-3 mr-1.5" />
             Waiting Room ({pendingGuests.length})
@@ -115,7 +115,7 @@ const UserList = ({
                 <div className="flex space-x-1 sm:space-x-2 flex-shrink-0">
                   <button
                     onClick={() => onApprove(guest.socketId)}
-                    className="p-1.5 sm:p-2 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg sm:rounded-full hover:bg-green-200 dark:hover:bg-green-900/50 transition-all shadow-sm active:scale-95"
+                    className={`p-1.5 sm:p-2 ${vibe.accentClass} text-white rounded-lg sm:rounded-full hover:shadow-md transition-all shadow-sm active:scale-95`}
                     title="Approve"
                   >
                     <Check className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -135,7 +135,7 @@ const UserList = ({
       )}
 
       {/* Header */}
-      <div className="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 transition-colors duration-200 flex items-center justify-between bg-black/5 dark:bg-white/5 backdrop-blur-sm">
+      <div className="p-3 sm:p-4 transition-colors duration-200 flex items-center justify-between bg-black/5 dark:bg-white/5 backdrop-blur-sm">
         <div className="flex items-center space-x-2">
           <Users className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
           <h3 className="font-black text-sm sm:text-base text-gray-900 dark:text-white tracking-tight">
@@ -293,7 +293,7 @@ const UserList = ({
 
       {/* Watch Party Button */}
       {onWatchParty && (
-        <div className="p-3 border-t border-gray-200/50 dark:border-gray-700/50 shrink-0">
+        <div className="p-3 shrink-0">
           <button
             onClick={onWatchParty}
             className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-${vibeAccent}-50 dark:from-${vibeAccent}-950/30 to-transparent border border-${vibeAccent}-200/50 dark:border-${vibeAccent}-700/30 rounded-xl hover:shadow-md hover:border-${vibeAccent}-300 dark:hover:border-${vibeAccent}-600 transition-all active:scale-[0.98] group`}
