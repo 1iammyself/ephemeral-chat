@@ -2648,13 +2648,14 @@ const ChatRoom = () => {
                             <>
                               <div className="h-px bg-gray-100 dark:bg-gray-700/50 sm:mx-1" />
                               {/* Mobile: single compact row */}
-                              <div className="flex sm:hidden items-center gap-1 px-0.5">
-                                <div className="flex gap-0.5 flex-1">
+                              <div className="flex sm:hidden items-center gap-1 px-0.5 min-w-0">
+                                {/* Vibe selection with horizontal scroll */}
+                                <div className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-nowrap flex-1 min-w-0">
                                   {getAllVibes().map(vibe => (
                                     <button
                                       key={vibe.id}
                                       onClick={() => handleUpdateVibe(vibe.id)}
-                                      className={`w-5 h-5 rounded flex items-center justify-center text-[10px] transition-all ${roomVibe === vibe.id ? 'bg-primary-500 text-white shadow-lg' : 'bg-white/10 dark:bg-white/5 hover:bg-white/20'}`}
+                                      className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs transition-all flex-shrink-0 ${roomVibe === vibe.id ? 'bg-primary-500 text-white shadow-lg scale-110' : 'bg-white/10 dark:bg-white/5 hover:bg-white/20'}`}
                                       title={vibe.name}
                                     >
                                       {vibe.emoji}
@@ -2672,12 +2673,12 @@ const ChatRoom = () => {
                               <div className="hidden sm:block space-y-2">
                                 <div className="flex items-center justify-between px-1">
                                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Admin</p>
-                                  <div className="flex gap-1">
+                                  <div className="flex gap-1 overflow-x-auto scrollbar-none flex-nowrap py-1">
                                     {getAllVibes().map(vibe => (
                                       <button
                                         key={vibe.id}
                                         onClick={() => handleUpdateVibe(vibe.id)}
-                                        className={`w-6 h-6 rounded-md flex items-center justify-center text-xs transition-all ${roomVibe === vibe.id ? 'bg-primary-500 text-white shadow-lg' : 'bg-white/10 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10'}`}
+                                        className={`w-7 h-7 rounded-md flex items-center justify-center text-xs transition-all flex-shrink-0 ${roomVibe === vibe.id ? 'bg-primary-500 text-white shadow-lg' : 'bg-white/10 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10'}`}
                                         title={vibe.name}
                                       >
                                         {vibe.emoji}
@@ -2861,42 +2862,44 @@ const ChatRoom = () => {
         </div>
 
         {/* Desktop Sidebar */}
-        {showDesktopSidebar && (
-          <div
-            className={`hidden lg:flex flex-col relative ${getVibeById(roomVibe).sidebarClass} backdrop-blur-md ${sidebarPosition === 'right' ? 'border-l' : 'border-r'} border-gray-200/50 dark:border-gray-700/50 transition-all duration-75`}
-            style={{ width: `${sidebarWidth}px` }}
-            ref={sidebarRef}
-          >
-            {/* Resize Handle */}
+        {
+          showDesktopSidebar && (
             <div
-              className={`absolute top-0 bottom-0 w-1.5 cursor-col-resize z-50 hover:bg-blue-500/50 transition-colors flex items-center justify-center opacity-0 hover:opacity-100 ${sidebarPosition === 'right' ? '-left-0.5' : '-right-0.5'}`}
-              onMouseDown={() => setIsResizingSidebar(true)}
+              className={`hidden lg:flex flex-col relative ${getVibeById(roomVibe).sidebarClass} backdrop-blur-md ${sidebarPosition === 'right' ? 'border-l' : 'border-r'} border-gray-200/50 dark:border-gray-700/50 transition-all duration-75`}
+              style={{ width: `${sidebarWidth}px` }}
+              ref={sidebarRef}
             >
-              <div className="w-0.5 h-8 bg-gray-300 dark:bg-gray-600 rounded-full" />
-            </div>
+              {/* Resize Handle */}
+              <div
+                className={`absolute top-0 bottom-0 w-1.5 cursor-col-resize z-50 hover:bg-blue-500/50 transition-colors flex items-center justify-center opacity-0 hover:opacity-100 ${sidebarPosition === 'right' ? '-left-0.5' : '-right-0.5'}`}
+                onMouseDown={() => setIsResizingSidebar(true)}
+              >
+                <div className="w-0.5 h-8 bg-gray-300 dark:bg-gray-600 rounded-full" />
+              </div>
 
-            <UserList
-              users={users}
-              currentUser={currentUser}
-              pendingGuests={pendingGuests}
-              isHost={isHost}
-              onApprove={handleApproveGuest}
-              onDeny={handleDenyGuest}
-              selectedRecipients={selectedRecipients}
-              onToggleRecipient={toggleRecipient}
-              onSetUserRole={handleSetUserRole}
-              onKickUser={handleKickUser}
-              currentUserRole={currentUserRole}
-              onShowActivityLogs={() => { setShowActivityLogs(true); setHasNewLogs(false); }}
-              hasNewLogs={hasNewLogs}
-              verbalCode={verbalCode}
-              roomVibe={roomVibe}
-              nowPlayingMap={nowPlayingMap}
-              onWatchParty={() => setShowWatchPartyModal(true)}
-            />
-          </div>
-        )}
-      </div>
+              <UserList
+                users={users}
+                currentUser={currentUser}
+                pendingGuests={pendingGuests}
+                isHost={isHost}
+                onApprove={handleApproveGuest}
+                onDeny={handleDenyGuest}
+                selectedRecipients={selectedRecipients}
+                onToggleRecipient={toggleRecipient}
+                onSetUserRole={handleSetUserRole}
+                onKickUser={handleKickUser}
+                currentUserRole={currentUserRole}
+                onShowActivityLogs={() => { setShowActivityLogs(true); setHasNewLogs(false); }}
+                hasNewLogs={hasNewLogs}
+                verbalCode={verbalCode}
+                roomVibe={roomVibe}
+                nowPlayingMap={nowPlayingMap}
+                onWatchParty={() => setShowWatchPartyModal(true)}
+              />
+            </div>
+          )
+        }
+      </div >
 
       {
         showMobileMenu && (
@@ -2993,54 +2996,56 @@ const ChatRoom = () => {
       />
 
       {/* Chess Swap/Replace Approval Dialog */}
-      {chessApprovalRequest && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => {
-            socketManager.emit(chessApprovalRequest.type === 'swap' ? 'chess-swap-response' : 'chess-replace-response', {
-              messageId: chessApprovalRequest.messageId,
-              approved: false
-            });
-            setChessApprovalRequest(null);
-          }} />
-          <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-sm w-full border border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-black text-gray-900 dark:text-white mb-2">
-              {chessApprovalRequest.type === 'swap' ? '♟ Swap Request' : '♟ Replace Request'}
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              {chessApprovalRequest.type === 'swap'
-                ? `${chessApprovalRequest.requestedBy} wants to swap White and Black sides. Do you approve?`
-                : `${chessApprovalRequest.requestedBy} wants to replace you with ${chessApprovalRequest.newPlayerName}. Do you approve?`
-              }
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  socketManager.emit(chessApprovalRequest.type === 'swap' ? 'chess-swap-response' : 'chess-replace-response', {
-                    messageId: chessApprovalRequest.messageId,
-                    approved: true
-                  });
-                  setChessApprovalRequest(null);
-                }}
-                className="flex-1 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors"
-              >
-                Approve
-              </button>
-              <button
-                onClick={() => {
-                  socketManager.emit(chessApprovalRequest.type === 'swap' ? 'chess-swap-response' : 'chess-replace-response', {
-                    messageId: chessApprovalRequest.messageId,
-                    approved: false
-                  });
-                  setChessApprovalRequest(null);
-                }}
-                className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-bold transition-colors"
-              >
-                Decline
-              </button>
+      {
+        chessApprovalRequest && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => {
+              socketManager.emit(chessApprovalRequest.type === 'swap' ? 'chess-swap-response' : 'chess-replace-response', {
+                messageId: chessApprovalRequest.messageId,
+                approved: false
+              });
+              setChessApprovalRequest(null);
+            }} />
+            <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-sm w-full border border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-black text-gray-900 dark:text-white mb-2">
+                {chessApprovalRequest.type === 'swap' ? '♟ Swap Request' : '♟ Replace Request'}
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                {chessApprovalRequest.type === 'swap'
+                  ? `${chessApprovalRequest.requestedBy} wants to swap White and Black sides. Do you approve?`
+                  : `${chessApprovalRequest.requestedBy} wants to replace you with ${chessApprovalRequest.newPlayerName}. Do you approve?`
+                }
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    socketManager.emit(chessApprovalRequest.type === 'swap' ? 'chess-swap-response' : 'chess-replace-response', {
+                      messageId: chessApprovalRequest.messageId,
+                      approved: true
+                    });
+                    setChessApprovalRequest(null);
+                  }}
+                  className="flex-1 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors"
+                >
+                  Approve
+                </button>
+                <button
+                  onClick={() => {
+                    socketManager.emit(chessApprovalRequest.type === 'swap' ? 'chess-swap-response' : 'chess-replace-response', {
+                      messageId: chessApprovalRequest.messageId,
+                      approved: false
+                    });
+                    setChessApprovalRequest(null);
+                  }}
+                  className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-bold transition-colors"
+                >
+                  Decline
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
       <DragDropOverlay isDragging={isDragging} />
       <PrivacyOverlay />
 
