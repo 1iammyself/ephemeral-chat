@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Link, Radio, Play, Music, Youtube, Figma, FileText } from 'lucide-react';
 import { detectMediaUrl } from './SharedMediaPlayer';
+import { getVibeById } from '../utils/vibes';
 
 /**
  * WatchPartyModal — Centered popup for pasting a YouTube/SoundCloud URL
@@ -10,24 +11,10 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
   const [urlInput, setUrlInput] = useState('');
   const inputRef = useRef(null);
 
-  const vibeAccent = roomVibe === 'party' ? 'indigo' :
-    roomVibe === 'chill' ? 'teal' :
-      roomVibe === 'focus' ? 'orange' : 'blue';
-
-  // Explicit hex values to avoid Tailwind JIT purging dynamic class names
-  const vibeColor = {
-    party: '#6366f1',
-    chill: '#14b8a6',
-    focus: '#f97316',
-    default: '#3b82f6',
-  }[roomVibe] || '#3b82f6';
-
-  const vibeColorHover = {
-    party: '#4f46e5',
-    chill: '#0d9488',
-    focus: '#ea580c',
-    default: '#2563eb',
-  }[roomVibe] || '#2563eb';
+  const vibe = getVibeById(roomVibe);
+  const vibeAccent = vibe.accent || 'primary';
+  const vibeColor = vibe.colors?.primary || '#3b82f6';
+  const vibeColorHover = vibe.colors?.primary + 'cc';
 
   const detected = urlInput.trim() ? detectMediaUrl(urlInput.trim()) : null;
 
@@ -66,10 +53,10 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
       {/* Modal */}
       <div className="relative w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden animate-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className={`flex items-center justify-between px-5 py-4 border-b border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-r from-${vibeAccent}-50/50 dark:from-${vibeAccent}-950/30 to-transparent`}>
+        <div className={`flex items - center justify - between px - 5 py - 4 border - b border - gray - 200 / 50 dark: border - gray - 700 / 50 bg - gradient - to - r from - ${vibeAccent} -50 / 50 dark: from - ${vibeAccent} -950 / 30 to - transparent`}>
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 flex items-center justify-center`}>
-              <Radio className={`w-5 h-5 text-${vibeAccent}-500`} />
+            <div className={`w - 10 h - 10 rounded - xl bg - ${vibeAccent} -100 dark: bg - ${vibeAccent} -900 / 40 flex items - center justify - center`}>
+              <Radio className={`w - 5 h - 5 text - ${vibeAccent} -500`} />
             </div>
             <div>
               <h3 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">Watch Party</h3>
@@ -87,8 +74,8 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
         {/* Body */}
         <div className="p-5 space-y-4">
           {/* URL Input */}
-          <div className={`flex items-center gap-3 bg-gray-50 dark:bg-gray-800/80 border-2 rounded-xl px-4 py-3 transition-colors ${detected ? `border-${vibeAccent}-400 dark:border-${vibeAccent}-500` : 'border-gray-200 dark:border-gray-700 focus-within:border-gray-300 dark:focus-within:border-gray-600'}`}>
-            <Link className={`w-5 h-5 flex-shrink-0 ${detected ? `text-${vibeAccent}-500` : 'text-gray-400'}`} />
+          <div className={`flex items - center gap - 3 bg - gray - 50 dark: bg - gray - 800 / 80 border - 2 rounded - xl px - 4 py - 3 transition - colors ${detected ? `border-${vibeAccent}-400 dark:border-${vibeAccent}-500` : 'border-gray-200 dark:border-gray-700 focus-within:border-gray-300 dark:focus-within:border-gray-600'} `}>
+            <Link className={`w - 5 h - 5 flex - shrink - 0 ${detected ? `text-${vibeAccent}-500` : 'text-gray-400'} `} />
             <input
               ref={inputRef}
               type="text"
@@ -108,11 +95,11 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
 
           {/* Detection Feedback */}
           {detected && (
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg bg-${vibeAccent}-50 dark:bg-${vibeAccent}-950/30 border border-${vibeAccent}-200/50 dark:border-${vibeAccent}-700/30 animate-in slide-in-from-bottom-2 duration-200`}>
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${detected.type === 'youtube' ? 'bg-red-500/10' :
-                detected.type === 'soundcloud' ? 'bg-orange-500/10' :
-                  detected.type === 'figma' ? 'bg-pink-500/10' : 'bg-blue-500/10'
-                }`}>
+            <div className={`flex items - center gap - 2 px - 3 py - 2 rounded - lg bg - ${vibeAccent} -50 dark: bg - ${vibeAccent} -950 / 30 border border - ${vibeAccent} -200 / 50 dark: border - ${vibeAccent} -700 / 30 animate -in slide -in -from - bottom - 2 duration - 200`}>
+              <div className={`w - 8 h - 8 rounded - lg flex items - center justify - center ${detected.type === 'youtube' ? 'bg-red-500/10' :
+                  detected.type === 'soundcloud' ? 'bg-orange-500/10' :
+                    detected.type === 'figma' ? 'bg-pink-500/10' : 'bg-blue-500/10'
+                } `}>
                 {detected.type === 'youtube' && <Youtube className="w-4 h-4 text-red-500" />}
                 {detected.type === 'soundcloud' && <Music className="w-4 h-4 text-orange-500" />}
                 {detected.type === 'figma' && <Figma className="w-4 h-4 text-pink-500" />}
@@ -166,10 +153,10 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
             style={detected ? { backgroundColor: vibeColor } : undefined}
             onMouseOver={e => { if (detected) e.currentTarget.style.backgroundColor = vibeColorHover; }}
             onMouseOut={e => { if (detected) e.currentTarget.style.backgroundColor = vibeColor; }}
-            className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${detected
-              ? `text-white active:scale-95 shadow-lg`
-              : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-              }`}
+            className={`px - 5 py - 2 rounded - xl text - sm font - bold transition - all ${detected
+                ? `text-white active:scale-95 shadow-lg`
+                : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+              } `}
           >
             Share to Room
           </button>

@@ -1,20 +1,7 @@
 import React, { useState } from 'react';
 import { X, Plus, Trash2, Send, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { getVibeById } from '../utils/vibes';
 
-/**
- * PollModal – creates a poll with optional follow-up sub-options per answer.
- *
- * Data shape sent to onSend:
- *   {
- *     question: string,
- *     options: [
- *       { text: string, followUps: string[] },  // followUps may be empty []
- *       ...
- *     ],
- *     allowMultiple: boolean,
- *     allowCustomAnswers: boolean
- *   }
- */
 const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
     const [question, setQuestion] = useState('');
     // Each option: { text: string, followUps: string[], showFollowUp: boolean }
@@ -27,24 +14,10 @@ const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
 
     if (!isOpen) return null;
 
-    const vibeAccent = roomVibe === 'party' ? 'indigo' :
-        roomVibe === 'chill' ? 'teal' :
-            roomVibe === 'focus' ? 'orange' : 'primary';
-
-    // Explicit hex values to avoid Tailwind JIT purging dynamic class names (especially focus/orange)
-    const vibeColor = {
-        party: '#6366f1',
-        chill: '#14b8a6',
-        focus: '#f97316',
-        default: '#3b82f6',
-    }[roomVibe] || '#3b82f6';
-
-    const vibeColorHover = {
-        party: '#4f46e5',
-        chill: '#0d9488',
-        focus: '#ea580c',
-        default: '#2563eb',
-    }[roomVibe] || '#2563eb';
+    const vibe = getVibeById(roomVibe);
+    const vibeAccent = vibe.accent || 'primary';
+    const vibeColor = vibe.colors?.primary || '#3b82f6';
+    const vibeColorHover = vibe.colors?.primary + 'cc';
 
     // ── Option helpers ──────────────────────────────────────────────
     const addOption = () => {

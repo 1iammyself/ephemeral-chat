@@ -323,9 +323,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
         }
 
         // Dynamic accent color for UI elements
-        const uiAccentColor = roomVibe === 'party' ? 'purple' :
-          roomVibe === 'chill' ? 'teal' :
-            roomVibe === 'focus' ? 'orange' : 'primary';
+        const uiAccentColor = currentVibe.accent || 'primary';
 
         return (
           <div
@@ -365,7 +363,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                     } ${message.messageType === 'game' ? '' :
                       (isOwnMessage
                         ? currentVibe.messageClass
-                        : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 dark:text-gray-100 rounded-tl-none')
+                        : `bg-white dark:bg-gray-800 border border-${uiAccentColor}-100 dark:border-${uiAccentColor}-500/10 dark:text-gray-100 rounded-tl-none`)
                     }`}
                 >
                   {/* Content Container */}

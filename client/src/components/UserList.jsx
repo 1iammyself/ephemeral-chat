@@ -3,6 +3,7 @@ import { Users, Crown, User, Check, X, ChevronDown, Shield, UserX, Info, Zap, Mu
 import { ROLES, ROLE_INFO, canKick, canChangeRole, canManageGuests, getAssignableRoles } from '../utils/roles';
 import { hapticSuccess } from '../utils/platform';
 import NowPlayingBadge from './NowPlayingBadge';
+import { getVibeById } from '../utils/vibes';
 
 const UserList = ({
   users,
@@ -25,9 +26,8 @@ const UserList = ({
 }) => {
   const [expandedUser, setExpandedUser] = useState(null);
 
-  const vibeAccent = roomVibe === 'party' ? 'indigo' :
-    roomVibe === 'chill' ? 'teal' :
-      roomVibe === 'focus' ? 'orange' : 'primary';
+  const vibe = getVibeById(roomVibe);
+  const vibeAccent = vibe.accent || 'primary';
 
   const getInitials = (nickname) => {
     if (!nickname) return '';

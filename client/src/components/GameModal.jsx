@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Send, Dices, Sparkles, HelpCircle, ChevronLeft, Hash, Trophy } from 'lucide-react';
 import { GAME_TYPES, getRandomWYR, getRandomTrivia, WYR_TOPIC_LIST, TRIVIA_TOPIC_LIST } from '../utils/games';
+import { getVibeById } from '../utils/vibes';
 
 const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL }) => {
     const [gameType, setGameType] = useState(null); // null = select game, then select topic
@@ -113,23 +114,10 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
         }
     };
 
-    const vibeAccent = roomVibe === 'party' ? 'indigo' :
-        roomVibe === 'chill' ? 'teal' :
-            roomVibe === 'focus' ? 'orange' : 'primary';
-
-    // Explicit colors for vibe send buttons — avoids Tailwind JIT purge issues in Focus light mode
-    const vibeColor = {
-        party: '#6366f1',
-        chill: '#14b8a6',
-        focus: '#f97316',
-        default: '#3b82f6'
-    }[roomVibe] || '#3b82f6';
-    const vibeColorHover = {
-        party: '#4f46e5',
-        chill: '#0d9488',
-        focus: '#ea580c',
-        default: '#2563eb'
-    }[roomVibe] || '#2563eb';
+    const vibe = getVibeById(roomVibe);
+    const vibeAccent = vibe.accent || 'primary';
+    const vibeColor = vibe.colors?.primary || '#3b82f6';
+    const vibeColorHover = vibe.colors?.primary + 'cc';
 
     const currentTopicList = gameType === GAME_TYPES.WYR ? WYR_TOPIC_LIST : TRIVIA_TOPIC_LIST;
 

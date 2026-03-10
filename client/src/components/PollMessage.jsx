@@ -142,17 +142,11 @@ const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
     };
 
     // Dynamic classes based on vibe
-    const accentColor = vibe.id === 'party' ? 'indigo' :
-        vibe.id === 'chill' ? 'teal' :
-            vibe.id === 'focus' ? 'orange' : 'primary';
+    const accentColor = vibe.accent || 'primary';
 
-    // Explicit hex values to avoid Tailwind JIT purging dynamic class names
-    const vibeBtnColor = {
-        party: '#6366f1', chill: '#14b8a6', focus: '#f97316', default: '#3b82f6'
-    }[vibe.id] || '#3b82f6';
-    const vibeBtnColorHover = {
-        party: '#4f46e5', chill: '#0d9488', focus: '#ea580c', default: '#2563eb'
-    }[vibe.id] || '#2563eb';
+    // Hex values from vibe config
+    const vibeBtnColor = vibe.colors?.primary || '#3b82f6';
+    const vibeBtnColorHover = vibe.colors?.primary + 'cc'; // Slightly transparent for hover
 
     const headerClass = vibe.accentClass;
     const selectedOptionClass = `border-${accentColor}-500 bg-${accentColor}-50 dark:bg-${accentColor}-900/20`;

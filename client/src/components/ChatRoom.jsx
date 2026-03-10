@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { generateInviteLink } from '../utils/api'; // Import API utility
 import CapacitorNowPlaying, { sanitizeNowPlaying } from '../plugins/nowPlaying';
@@ -186,27 +186,156 @@ const VibeEffects = ({ effectType }) => {
   if (effectType === 'fireflies') {
     return (
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 bg-emerald-500/5 dark:bg-green-950/20">
-        {[...Array(25)].map((_, i) => (
+        {[...Array(30)].map((_, i) => (
           <div
             key={i}
-            className="absolute rounded-full blur-[1px]"
+            className="absolute rounded-full"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
-              width: `${2 + Math.random() * 2}px`,
-              height: `${2 + Math.random() * 2}px`,
-              backgroundColor: i % 2 === 0 ? '#4ade80' : '#facc15',
-              boxShadow: `0 0 8px ${i % 2 === 0 ? '#4ade80' : '#facc15'}80`,
-              animation: `float-slow ${4 + Math.random() * 4}s ease-in-out infinite`,
-              animationDelay: `${Math.random() * 4}s`,
-              opacity: 0.6
+              width: `${Math.random() * 3 + 1.5}px`,
+              height: `${Math.random() * 3 + 1.5}px`,
+              backgroundColor: i % 3 === 0 ? '#bef264' : (i % 3 === 1 ? '#4ade80' : '#facc15'),
+              boxShadow: `0 0 ${Math.random() * 10 + 5}px ${i % 3 === 0 ? '#bef264' : (i % 3 === 1 ? '#4ade80' : '#facc15')}`,
+              animation: `firefly-drift ${5 + Math.random() * 10}s ease-in-out infinite, firefly-flash ${2 + Math.random() * 3}s ease-in-out infinite`,
+              animationDelay: `${Math.random() * 10}s`,
+              opacity: 0.8
             }}
           />
         ))}
         <style>{`
-          @keyframes float-slow {
-            0%, 100% { transform: translateY(0) translateX(0) scale(1); opacity: 0.3; }
-            50% { transform: translateY(-20px) translateX(10px) scale(1.1); opacity: 0.8; }
+          @keyframes firefly-drift {
+            0%, 100% { transform: translate(0, 0); }
+            33% { transform: translate(${Math.random() * 30 - 15}px, ${Math.random() * 30 - 15}px); }
+            66% { transform: translate(${Math.random() * 30 - 15}px, ${Math.random() * 30 - 15}px); }
+          }
+          @keyframes firefly-flash {
+            0%, 100% { opacity: 0.2; transform: scale(0.8); }
+            50% { opacity: 0.9; transform: scale(1.2); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  if (effectType === 'embers') {
+    return (
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 bg-orange-900/5 dark:bg-red-950/10">
+        {[...Array(40)].map((_, i) => {
+          const size = Math.random() * 3 + 1;
+          const drift = Math.random() * 120 - 60;
+          return (
+            <div
+              key={i}
+              className="absolute rounded-sm blur-[0.3px]"
+              style={{
+                left: `${Math.random() * 110 - 5}%`,
+                bottom: `-5%`,
+                width: `${size}px`,
+                height: `${size}px`,
+                backgroundColor: i % 2 === 0 ? '#f97316' : '#ea580c',
+                boxShadow: `0 0 ${size * 3}px ${i % 2 === 0 ? '#fba11b' : '#f97316'}`,
+                animation: `embers-rise ${4 + Math.random() * 6}s ease-out infinite`,
+                animationDelay: `${Math.random() * 8}s`,
+              }}
+            />
+          );
+        })}
+        <style>{`
+          @keyframes embers-rise {
+            0% { transform: translateY(0) translateX(0) rotate(0deg) scale(1); opacity: 0; }
+            15% { opacity: 1; transform: translateY(-15vh) translateX(5px) rotate(45deg) scale(1.2); }
+            100% { transform: translateY(-110vh) translateX(${Math.random() * 200 - 100}px) rotate(720deg) scale(0.2); opacity: 0; }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  if (effectType === 'bubbles') {
+    return (
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 bg-sky-900/5 dark:bg-blue-950/10">
+        {[...Array(25)].map((_, i) => {
+          const size = Math.random() * 20 + 4;
+          return (
+            <div
+              key={i}
+              className="absolute border border-white/30 dark:border-white/20 rounded-full dark:bg-sky-400/5 bg-white/10 backdrop-blur-sm"
+              style={{
+                left: `${Math.random() * 100}%`,
+                bottom: `-10%`,
+                width: `${size}px`,
+                height: `${size}px`,
+                animation: `bubbles-wiggle ${8 + Math.random() * 10}s ease-in-out infinite`,
+                animationDelay: `${Math.random() * 10}s`,
+              }}
+            />
+          );
+        })}
+        <style>{`
+          @keyframes bubbles-wiggle {
+            0% { transform: translateY(0) translateX(0) scale(0.5); opacity: 0; }
+            10% { opacity: 0.6; }
+            50% { transform: translateY(-55vh) translateX(${Math.random() * 40 - 20}px) scale(1); }
+            90% { opacity: 0.6; }
+            100% { transform: translateY(-110vh) translateX(0) scale(1.3); opacity: 0; }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  if (effectType === 'steam') {
+    return (
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 bg-amber-900/5 dark:bg-stone-900/10">
+        {[...Array(15)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute bg-white/10 dark:bg-white/5 blur-xl rounded-full"
+            style={{
+              left: `${20 + Math.random() * 60}%`,
+              bottom: `-20%`,
+              width: `${60 + Math.random() * 100}px`,
+              height: `${60 + Math.random() * 100}px`,
+              animation: `steam-rise ${8 + Math.random() * 8}s ease-in-out infinite`,
+              animationDelay: `${Math.random() * 8}s`,
+            }}
+          />
+        ))}
+        <style>{`
+          @keyframes steam-rise {
+            0% { transform: translateY(0) scale(1) translateX(0); opacity: 0; }
+            30% { opacity: 0.4; }
+            100% { transform: translateY(-120vh) scale(2) translateX(${Math.random() * 100 - 50}px); opacity: 0; }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  if (effectType === 'jazz-notes') {
+    return (
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 bg-zinc-900/5 dark:bg-black/20">
+        {[...Array(12)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute text-yellow-500/20 dark:text-yellow-500/10 font-serif text-2xl select-none"
+            style={{
+              left: `${Math.random() * 100}%`,
+              bottom: `-10%`,
+              animation: `notes-float ${10 + Math.random() * 10}s linear infinite`,
+              animationDelay: `${Math.random() * 10}s`,
+            }}
+          >
+            {['♩', '♪', '♫', '♬'][i % 4]}
+          </div>
+        ))}
+        <style>{`
+          @keyframes notes-float {
+            0% { transform: translateY(0) rotate(0deg) scale(0.8); opacity: 0; }
+            15% { opacity: 0.8; }
+            85% { opacity: 0.8; }
+            100% { transform: translateY(-110vh) rotate(360deg) scale(1.2); opacity: 0; }
           }
         `}</style>
       </div>
@@ -2267,14 +2396,8 @@ const ChatRoom = () => {
   }, [showCallModal]);
 
   const currentVibe = getVibeById(roomVibe);
-  const vibeAccent = roomVibe === 'party' ? 'indigo' :
-    roomVibe === 'chill' ? 'teal' :
-      roomVibe === 'focus' ? 'orange' : 'primary';
-
-  const vibeHex = roomVibe === 'party' ? '#6366f1' : // indigo-500
-    roomVibe === 'chill' ? '#14b8a6' : // teal-500
-      roomVibe === 'focus' ? '#f97316' : // orange-500
-        '#3b82f6'; // blue-500 (primary)
+  const vibeAccent = currentVibe.accent || 'primary';
+  const vibeHex = currentVibe.colors?.primary || '#3b82f6';
 
   const getTTLDisplay = () => {
     if (!room?.settings?.messageTTL) return null;
@@ -2422,7 +2545,7 @@ const ChatRoom = () => {
 
       {/* ── Compact info bar: only visible when topic, timer, or vibe mood is active ── */}
       {(getVibeById(roomVibe)?.moodSound || roomTopic || activeTimer) && (
-        <div className={`flex items-center gap-2 px-3 py-1.5 border-b border-gray-200/50 dark:border-gray-700/50 ${getVibeById(roomVibe).panelClass} backdrop-blur-md overflow-x-auto scrollbar-none shrink-0`}>
+        <div className={`flex items-center gap-2 px-3 py-1.5 border border-gray-200/50 dark:border-gray-700/50 rounded-full mx-4 my-2 shadow-sm w-fit max-w-[calc(100%-2rem)] ${getVibeById(roomVibe).panelClass} backdrop-blur-md overflow-x-auto scrollbar-none shrink-0 animate-in fade-in slide-in-from-top-2 duration-300`}>
           {/* Ambient Player / Mood DJ */}
           {getVibeById(roomVibe)?.moodSound && (
             <div className="shrink-0">
@@ -2604,7 +2727,7 @@ const ChatRoom = () => {
                       </button>
 
                       {showFeatureMenu && (
-                        <div className="absolute bottom-full mb-2 sm:mb-3 left-0 z-50 bg-white/30 dark:bg-black/20 rounded-2xl sm:rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] border border-white/20 dark:border-white/10 p-1.5 sm:p-3 flex flex-col space-y-1 sm:space-y-2 w-[70vw] max-w-[220px] sm:w-[85vw] sm:max-w-[320px] animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-2xl ring-1 ring-white/10 dark:ring-white/5">
+                        <div className={`absolute bottom-full mb-2 sm:mb-3 left-0 z-50 ${getVibeById(roomVibe).panelClass} rounded-2xl sm:rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] border border-white/20 dark:border-white/10 p-1.5 sm:p-3 flex flex-col space-y-1 sm:space-y-2 w-[70vw] max-w-[220px] sm:w-[85vw] sm:max-w-[320px] animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-3xl ring-1 ring-white/10 dark:ring-white/5`}>
                           {/* Reaction Row */}
                           <div className="flex items-center gap-0.5 sm:gap-1 bg-white/40 dark:bg-white/5 rounded-xl sm:rounded-2xl p-0.5 sm:p-1 px-1 sm:px-1.5 border border-white/10 shadow-inner">
                             <div className="flex items-center flex-1 overflow-x-auto scrollbar-none gap-0.5 sm:gap-1 sm:py-0.5 no-scrollbar">
@@ -2679,12 +2802,12 @@ const ChatRoom = () => {
                               <div className="h-px bg-gray-100 dark:bg-gray-700/50 sm:mx-1" />
                               {/* Mobile: single compact row */}
                               <div className="flex sm:hidden items-center gap-1 px-0.5 overflow-hidden">
-                                <div className="flex items-center w-[102px] flex-shrink-0 overflow-x-auto scrollbar-none gap-0.5 sm:gap-1 sm:py-0.5 no-scrollbar">
+                                <div className="flex items-center w-[102px] flex-shrink-0 overflow-x-auto scrollbar-none gap-0.5 sm:gap-1 sm:py-0.5 no-scrollbar bg-black/5 dark:bg-black/20 rounded-lg px-0.5 border border-white/5 shadow-inner">
                                   {getAllVibes().map(vibe => (
                                     <button
                                       key={vibe.id}
                                       onClick={() => handleUpdateVibe(vibe.id)}
-                                      className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 text-xs transition-all ${roomVibe === vibe.id ? 'bg-primary-500 text-white shadow-lg' : 'bg-white/10 dark:bg-white/5 hover:bg-white/20'}`}
+                                      className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs transition-all ${roomVibe === vibe.id ? `bg-${vibeAccent}-500 text-white shadow-lg` : 'hover:bg-white/10'}`}
                                       title={vibe.name}
                                     >
                                       {vibe.emoji}
@@ -2701,15 +2824,15 @@ const ChatRoom = () => {
                               </div>
                               {/* Desktop: full admin section with labels */}
                               <div className="hidden sm:block space-y-2">
-                                <div className="flex items-center gap-2 px-1">
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex-shrink-0">Admin</p>
-                                  <div className="w-[146px] overflow-x-auto scrollbar-none no-scrollbar flex-shrink-0">
+                                <div className="flex items-center justify-between px-1">
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex-shrink-0 mr-4">Admin</p>
+                                  <div className="w-[146px] overflow-x-auto scrollbar-none no-scrollbar flex-shrink-0 ml-auto bg-black/10 dark:bg-black/20 rounded-full px-1 border border-white/5 shadow-inner group/vibes">
                                     <div className="flex gap-1.5 py-1">
                                       {getAllVibes().map(vibe => (
                                         <button
                                           key={vibe.id}
                                           onClick={() => handleUpdateVibe(vibe.id)}
-                                          className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center text-sm transition-all ${roomVibe === vibe.id ? 'bg-primary-500 text-white shadow-lg scale-110' : 'bg-white/10 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 hover:scale-105'}`}
+                                          className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm transition-all ${roomVibe === vibe.id ? `bg-${vibeAccent}-500 text-white shadow-lg scale-110` : 'hover:bg-white/10 dark:hover:bg-white/10 hover:scale-105'}`}
                                           title={vibe.name}
                                         >
                                           {vibe.emoji}

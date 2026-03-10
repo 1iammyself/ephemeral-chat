@@ -4,6 +4,7 @@ import {
   ExternalLink, Users, Radio,
 } from 'lucide-react';
 import socketManager from '../socket';
+import { getVibeById } from '../utils/vibes';
 import {
   encryptMLSMessage, decryptMLSMessage, isMLSReady,
 } from '../utils/security';
@@ -209,9 +210,8 @@ const SingleMediaPlayer = ({
   // Unique DOM ID per card — critical so multiple embeds can coexist
   const embedId = `shared-media-embed-${mediaId}`;
 
-  const vibeAccent = roomVibe === 'party' ? 'indigo' :
-    roomVibe === 'chill' ? 'teal' :
-      roomVibe === 'focus' ? 'orange' : 'blue';
+  const vibe = getVibeById(roomVibe);
+  const vibeAccent = vibe.accent || 'primary';
 
   // Keep mediaInfoRef in sync
   useEffect(() => { mediaInfoRef.current = mediaInfo; }, [mediaInfo]);
