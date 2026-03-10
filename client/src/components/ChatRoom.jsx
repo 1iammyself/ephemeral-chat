@@ -2679,7 +2679,7 @@ const ChatRoom = () => {
                               <div className="h-px bg-gray-100 dark:bg-gray-700/50 sm:mx-1" />
                               {/* Mobile: single compact row */}
                               <div className="flex sm:hidden items-center gap-1 px-0.5 overflow-hidden">
-                                <div className="flex items-center flex-1 overflow-x-auto scrollbar-none gap-0.5 sm:gap-1 sm:py-0.5 no-scrollbar">
+                                <div className="flex items-center w-[102px] flex-shrink-0 overflow-x-auto scrollbar-none gap-0.5 sm:gap-1 sm:py-0.5 no-scrollbar">
                                   {getAllVibes().map(vibe => (
                                     <button
                                       key={vibe.id}
@@ -2703,7 +2703,7 @@ const ChatRoom = () => {
                               <div className="hidden sm:block space-y-2">
                                 <div className="flex items-center gap-2 px-1">
                                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex-shrink-0">Admin</p>
-                                  <div className="flex-1 overflow-x-auto scrollbar-none no-scrollbar">
+                                  <div className="w-[146px] overflow-x-auto scrollbar-none no-scrollbar flex-shrink-0">
                                     <div className="flex gap-1.5 py-1">
                                       {getAllVibes().map(vibe => (
                                         <button

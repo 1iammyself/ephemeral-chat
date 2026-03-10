@@ -1186,7 +1186,7 @@ io.on('connection', (socket) => {
     if (!canChange) return;
 
     // Valid vibes
-    const validVibes = ['default', 'party', 'chill', 'focus'];
+    const validVibes = ['default', 'party', 'chill', 'focus', 'campfire', 'ocean', 'forest', 'cafe', 'jazz'];
     if (!validVibes.includes(vibeId)) return;
 
     // Store vibe on room

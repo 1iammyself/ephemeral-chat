@@ -83,7 +83,7 @@ export const VIBES = {
     },
     ocean: {
         id: 'ocean',
-        name: 'Deep Blue',
+        name: 'Deep',
         emoji: '🐋',
         bgClass: 'bg-gradient-to-br from-blue-50 via-sky-100 to-blue-100 dark:from-blue-950 dark:via-slate-950 dark:to-black',
         messageClass: 'bg-blue-600 dark:bg-blue-700 text-white rounded-tr-none',
@@ -99,7 +99,7 @@ export const VIBES = {
     forest: {
         id: 'forest',
         name: 'Wildwood',
-        emoji: '�',
+        emoji: '🌳',
         bgClass: 'bg-gradient-to-br from-lime-50 via-green-100 to-emerald-50 dark:from-lime-950 dark:via-green-950 dark:to-black',
         messageClass: 'bg-green-600 dark:bg-green-700 text-white rounded-tr-none',
         sidebarClass: 'bg-green-100/15 dark:bg-green-950/20',
@@ -114,7 +114,7 @@ export const VIBES = {
     cafe: {
         id: 'cafe',
         name: 'Bistro',
-        emoji: '🍽️',
+        emoji: '☕',
         bgClass: 'bg-gradient-to-br from-stone-200 via-orange-100 to-stone-300 dark:from-stone-900 dark:via-orange-950/40 dark:to-black',
         messageClass: 'bg-orange-900 dark:bg-orange-950 text-white rounded-tr-none border border-orange-800/30',
         sidebarClass: 'bg-stone-300/15 dark:bg-stone-950/20',
@@ -129,7 +129,7 @@ export const VIBES = {
     jazz: {
         id: 'jazz',
         name: 'After Hours',
-        emoji: '🕶️',
+        emoji: '🎺',
         bgClass: 'bg-gradient-to-br from-slate-300 via-zinc-400 to-slate-400 dark:from-slate-950 dark:via-zinc-950 dark:to-black',
         messageClass: 'bg-zinc-800 dark:bg-zinc-900 text-white rounded-tr-none border border-yellow-500/20',
         sidebarClass: 'bg-slate-400/15 dark:bg-slate-950/20',
