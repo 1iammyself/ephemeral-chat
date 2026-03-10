@@ -101,7 +101,7 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, currentNickname, 
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-3 sm:p-6 flex flex-col md:flex-row gap-4 sm:gap-6 items-center md:items-start justify-center">
+                <div className="flex-1 overflow-y-auto p-3 sm:p-6 flex flex-col md:flex-row gap-4 sm:gap-6 items-center md:items-start justify-start md:justify-center">
 
                     {/* Left: The Board */}
                     <div className="w-full max-w-[300px] sm:max-w-[380px] md:max-w-[420px] shrink-0">
