@@ -186,9 +186,9 @@ const Home = ({ children }) => {
   ];
 
   return (
-    <div style={{ height: '100vh', overflowY: 'auto' }} className="dark:bg-gray-900 transition-colors duration-200 no-scrollbar">
+    <div style={{ height: '100vh', overflowY: 'auto' }} className="bg-blue-50 dark:bg-gray-900 transition-colors duration-200 no-scrollbar">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm transition-colors duration-200">
+      <header className="bg-blue-50/80 dark:bg-gray-800 shadow-sm border-b border-blue-200 dark:border-gray-700 transition-colors duration-200 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 py-4 sm:py-6 sm:px-6 lg:px-8 flex justify-between items-center">
           <h1 className="text-xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400 flex items-center">
             <img src="/logo.svg" alt="Logo" className="h-8 w-8 sm:h-10 sm:w-10 mr-2 sm:mr-3" />
@@ -217,7 +217,7 @@ const Home = ({ children }) => {
 
             {/* Hero Action Card */}
             <div className="mt-8 sm:mt-10 max-w-lg mx-auto space-y-4">
-              <div className="bg-white dark:bg-[#1e293b] rounded-2xl p-5 sm:p-8 shadow-xl transition-colors duration-200">
+              <div className="bg-white/90 dark:bg-[#1e293b] rounded-2xl p-5 sm:p-8 shadow-xl border border-blue-200 dark:border-gray-700 transition-colors duration-200">
                 <button
                   onClick={() => setShowCreateModal(true)}
                   className="w-full flex justify-center items-center px-4 py-2.5 sm:py-4 text-sm sm:text-lg font-bold rounded-xl text-white bg-[#22c55e] hover:bg-[#16a34a] transition-all transform active:scale-[0.98] shadow-lg shadow-green-500/20"
@@ -235,8 +235,8 @@ const Home = ({ children }) => {
                 </button>
 
                 {/* Ephemeral Drops Section */}
-                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-                  <p className="text-center text-xs font-medium text-purple-600 dark:text-purple-400 mb-3 flex items-center justify-center gap-1">
+                <div className="mt-4 pt-4 border-t border-blue-200 dark:border-gray-700">
+                  <p className="text-center text-xs font-medium text-purple-700 dark:text-purple-400 mb-3 flex items-center justify-center gap-1">
                     <Package className="w-3.5 h-3.5" />
                     Ephemeral Drops — Encrypted Dead Drops
                   </p>
@@ -265,8 +265,8 @@ const Home = ({ children }) => {
                 </div>
 
                 {/* Nearby Transfer Section */}
-                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-                  <p className="text-center text-xs font-medium text-emerald-600 dark:text-emerald-400 mb-3 flex items-center justify-center gap-1">
+                <div className="mt-4 pt-4 border-t border-blue-200 dark:border-gray-700">
+                  <p className="text-center text-xs font-medium text-emerald-700 dark:text-emerald-400 mb-3 flex items-center justify-center gap-1">
                     <Radio className="w-3.5 h-3.5" />
                     Nearby Transfer — P2P File Sharing
                   </p>
@@ -277,14 +277,14 @@ const Home = ({ children }) => {
                     <Radio className="-ml-1 mr-2 h-4 w-4" />
                     Nearby Transfer
                   </button>
-                  <p className="text-center text-[10px] text-gray-400 dark:text-gray-500 mt-1.5">
+                  <p className="text-center text-[10px] text-gray-600 dark:text-gray-500 mt-1.5">
                     Send files & messages to devices on the same network
                   </p>
                 </div>
 
                 {/* Verbal Join Section */}
-                <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-700">
-                  <p className="text-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                <div className="mt-6 pt-6 border-t border-blue-200 dark:border-gray-700">
+                  <p className="text-center text-sm font-semibold text-gray-800 dark:text-gray-300 mb-3">
                     Have a join code?
                   </p>
                   <form onSubmit={handleVerbalJoin} className="flex gap-2">
@@ -296,7 +296,7 @@ const Home = ({ children }) => {
                         onChange={(e) => setVerbalCode(e.target.value)}
                         placeholder="clarity compass journey peace"
                         data-allow-copy="true"
-                        className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-blue-300 dark:border-gray-600 bg-blue-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                         disabled={isJoiningVerbal}
                       />
                     </div>
@@ -319,14 +319,14 @@ const Home = ({ children }) => {
                   )}
                 </div>
 
-                <p className="mt-4 text-center text-xs text-gray-400 dark:text-gray-500">
+                <p className="mt-4 text-center text-xs text-gray-600 dark:text-gray-500">
                   Or use an invite link shared by the host
                 </p>
               </div>
 
               <button
                 onClick={() => setShowTraceModal(true)}
-                className="w-full flex justify-center items-center px-4 py-3 text-sm font-semibold rounded-xl text-gray-600 dark:text-gray-400 bg-white/50 dark:bg-gray-800/50 hover:bg-white dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 transition-all transform active:scale-[0.98]"
+                className="w-full flex justify-center items-center px-4 py-3 text-sm font-semibold rounded-xl text-gray-700 dark:text-gray-400 bg-white/80 dark:bg-gray-800/50 hover:bg-white dark:hover:bg-gray-800 border border-blue-200 dark:border-gray-700 transition-all transform active:scale-[0.98]"
               >
                 <Shield className="mr-2 h-4 w-4" />
                 Trace Forensic Hash
@@ -334,15 +334,15 @@ const Home = ({ children }) => {
             </div>
 
             {/* Features - Info Section */}
-            <div className="mt-12 opacity-75">
-              <p className="text-center text-xs text-gray-500 dark:text-gray-400 mb-4">
+            <div className="mt-12">
+              <p className="text-center text-xs text-gray-600 dark:text-gray-400 mb-4 font-medium">
                 Why use Ephemeral Chat?
               </p>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5 sm:gap-2 max-w-lg mx-auto">
                 {features.map((feature, index) => (
-                  <div key={index} className="flex items-center space-x-1.5 p-1.5 sm:p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs transition-colors duration-200">
-                    <feature.icon className="w-3 h-3 text-gray-400 dark:text-gray-500 flex-shrink-0" />
-                    <span className="text-gray-600 dark:text-gray-300 truncate">{feature.title}</span>
+                  <div key={index} className="flex items-center space-x-1.5 p-1.5 sm:p-2 bg-blue-100/80 dark:bg-gray-800 rounded text-xs transition-colors duration-200 border border-blue-200/60 dark:border-gray-700">
+                    <feature.icon className="w-3 h-3 text-blue-500 dark:text-gray-500 flex-shrink-0" />
+                    <span className="text-gray-700 dark:text-gray-300 truncate font-medium">{feature.title}</span>
                   </div>
                 ))}
               </div>
@@ -411,9 +411,9 @@ const Home = ({ children }) => {
       </main >
 
       {/* Footer */}
-      < footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 py-6 transition-colors duration-200" >
+      < footer className="bg-blue-50/80 dark:bg-gray-800 border-t border-blue-200 dark:border-gray-700 py-6 transition-colors duration-200" >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col items-center space-y-2 text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex flex-col items-center space-y-2 text-sm text-gray-600 dark:text-gray-400">
             <p>Ephemeral Chat offers a fast, secure, and private experience</p>
             <button
               onClick={() => navigate('/privacy')}

@@ -65,7 +65,7 @@ const TraceHashModal = ({ onClose }) => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 ml-0">
             <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
 
-            <div className="relative w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-700 transition-all duration-300">
+            <div className="relative w-full max-w-md bg-gray-50 dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-300 dark:border-gray-700 transition-all duration-300">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-sky-400 to-cyan-500 px-5 py-4">
                     <div className="flex justify-between items-center text-white">

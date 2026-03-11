@@ -123,8 +123,8 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm z-[100]">
-            <div className={`bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-[85vw] max-w-[300px] sm:max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 border border-${vibeAccent}-500/20 flex flex-col max-h-[85vh] sm:max-h-[90vh]`}>
-                <div className={`flex items-center justify-between px-3 py-2 sm:p-4 border-b border-gray-200 dark:border-gray-700 bg-${vibeAccent}-50/30 dark:bg-${vibeAccent}-900/10 shrink-0`}>
+            <div className={`bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-[85vw] max-w-[300px] sm:max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 border border-gray-300 dark:border-${vibeAccent}-500/20 flex flex-col max-h-[85vh] sm:max-h-[90vh]`}>
+                <div className={`flex items-center justify-between px-3 py-2 sm:p-4 border-b border-gray-200 dark:border-gray-700 bg-${vibeAccent}-100/50 dark:bg-${vibeAccent}-900/10 shrink-0`}>
                     <div className="flex items-center">
                         {gameType && (
                             <button onClick={handleBack} className="mr-1 p-0.5 sm:p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded-full text-gray-500 transition-colors">
@@ -147,35 +147,35 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                         <div className="grid grid-cols-2 gap-1.5 sm:gap-3">
                             <button
                                 onClick={() => handlePickGame(GAME_TYPES.WYR)}
-                                className={`flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl border-2 border-dashed border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:border-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group active:scale-95`}
+                                className={`flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl border-2 border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:bg-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group active:scale-95`}
                             >
                                 <Sparkles className={`w-4 h-4 sm:w-6 sm:h-6 text-${vibeAccent}-500 mb-1 sm:mb-2 group-hover:scale-110 transition-transform`} />
                                 <span className="font-bold text-gray-900 dark:text-white text-[10px] sm:text-xs text-center leading-tight">Would You Rather</span>
-                                <span className="hidden sm:block text-[9px] text-gray-500 dark:text-gray-400 mt-0.5 text-center">Impossible choices</span>
+                                <span className="hidden sm:block text-[9px] text-gray-600 dark:text-gray-400 mt-0.5 text-center">Impossible choices</span>
                             </button>
                             <button
                                 onClick={() => handlePickGame(GAME_TYPES.TRIVIA)}
-                                className={`flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl border-2 border-dashed border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:border-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group active:scale-95`}
+                                className={`flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl border-2 border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:bg-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group active:scale-95`}
                             >
                                 <HelpCircle className={`w-4 h-4 sm:w-6 sm:h-6 text-${vibeAccent}-500 mb-1 sm:mb-2 group-hover:scale-110 transition-transform`} />
                                 <span className="font-bold text-gray-900 dark:text-white text-[10px] sm:text-xs text-center leading-tight">Trivia</span>
-                                <span className="hidden sm:block text-[9px] text-gray-500 dark:text-gray-400 mt-0.5 text-center">Test your knowledge</span>
+                                <span className="hidden sm:block text-[9px] text-gray-600 dark:text-gray-400 mt-0.5 text-center">Test your knowledge</span>
                             </button>
                             <button
                                 onClick={() => handlePickGame(GAME_TYPES.TIC_TAC_TOE)}
-                                className={`flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl border-2 border-dashed border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:border-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group active:scale-95`}
+                                className={`flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl border-2 border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:bg-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group active:scale-95`}
                             >
                                 <Hash className={`w-4 h-4 sm:w-6 sm:h-6 text-${vibeAccent}-500 mb-1 sm:mb-2 group-hover:scale-110 transition-transform`} />
                                 <span className="font-bold text-gray-900 dark:text-white text-[10px] sm:text-xs text-center leading-tight">Tic-Tac-Toe</span>
-                                <span className="hidden sm:block text-[9px] text-gray-500 dark:text-gray-400 mt-0.5 text-center">Classic 3x3 game</span>
+                                <span className="hidden sm:block text-[9px] text-gray-600 dark:text-gray-400 mt-0.5 text-center">Classic 3x3 game</span>
                             </button>
                             <button
                                 onClick={() => handlePickGame(GAME_TYPES.ROCK_PAPER_SCISSORS)}
-                                className={`flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl border-2 border-dashed border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:border-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group active:scale-95`}
+                                className={`flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl border-2 border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:bg-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group active:scale-95`}
                             >
                                 <Dices className={`w-4 h-4 sm:w-6 sm:h-6 text-${vibeAccent}-500 mb-1 sm:mb-2 group-hover:scale-110 transition-transform`} />
                                 <span className="font-bold text-gray-900 dark:text-white text-[10px] sm:text-xs text-center leading-tight">RPS</span>
-                                <span className="hidden sm:block text-[9px] text-gray-500 dark:text-gray-400 mt-0.5 text-center">Classic Showdown</span>
+                                <span className="hidden sm:block text-[9px] text-gray-600 dark:text-gray-400 mt-0.5 text-center">Classic Showdown</span>
                             </button>
                             <button
                                 onClick={() => handlePickGame(GAME_TYPES.CHESS)}
@@ -183,7 +183,7 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                             >
                                 <Trophy className={`w-4 h-4 sm:w-6 sm:h-6 text-${vibeAccent}-500 mb-1 sm:mb-2 group-hover:scale-110 transition-transform`} />
                                 <span className="font-bold text-gray-900 dark:text-white text-[10px] sm:text-xs text-center leading-tight">Chess</span>
-                                <span className="hidden sm:block text-[9px] text-gray-500 dark:text-gray-400 mt-0.5 text-center">Classic Strategy</span>
+                                <span className="hidden sm:block text-[9px] text-gray-600 dark:text-gray-400 mt-0.5 text-center">Classic Strategy</span>
                             </button>
                         </div>
                     ) : !selectedTopic && !(wyrData || triviaData) ? (
@@ -192,7 +192,7 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                             <div className="grid grid-cols-1 gap-1 sm:gap-2">
                                 <button
                                     onClick={() => handlePickTopic('Any')}
-                                    className={`flex items-center p-2 sm:p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 text-left font-semibold text-xs sm:text-sm text-gray-700 dark:text-gray-200`}
+                                    className={`flex items-center p-2 sm:p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 text-left font-semibold text-xs sm:text-sm text-gray-700 dark:text-gray-200`}
                                 >
                                     ✨ Any Topic (Shuffle All)
                                 </button>
@@ -200,7 +200,7 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                                     <button
                                         key={topic}
                                         onClick={() => handlePickTopic(topic)}
-                                        className={`flex items-center p-2 sm:p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 text-left text-xs sm:text-sm text-gray-700 dark:text-gray-200`}
+                                        className={`flex items-center p-2 sm:p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 text-left text-xs sm:text-sm text-gray-700 dark:text-gray-200`}
                                     >
                                         {topic}
                                     </button>

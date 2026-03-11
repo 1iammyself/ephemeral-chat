@@ -232,7 +232,7 @@ const ChessGame = ({ gameData, currentUserId, currentNickname, onMove, vibe: vib
                                 ? '#ff444488'
                                 : (isLastMoveSrc || isLastMoveDst)
                                     ? vibe.colors.primary + '44'
-                                    : (isDark ? vibe.colors.primary + '22' : 'transparent'),
+                                    : (isDark ? vibe.colors.primary + '33' : 'transparent'),
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -312,11 +312,11 @@ const ChessGame = ({ gameData, currentUserId, currentNickname, onMove, vibe: vib
                 width: '100%',
                 borderRadius: '12px',
                 overflow: 'hidden',
-                border: `2px solid ${vibe.colors.primary}44`,
+                border: `2px solid ${vibe.colors.primary}66`,
                 aspectRatio: '1/1',
                 display: 'flex',
                 flexWrap: 'wrap',
-                background: vibe.id === 'party' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.05)',
+                background: vibe.id === 'party' ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.05)',
                 boxShadow: `0 8px 32px ${vibe.colors.primary}22`,
                 position: 'relative'
             }}>
@@ -345,7 +345,7 @@ const ChessGame = ({ gameData, currentUserId, currentNickname, onMove, vibe: vib
                 alignItems: 'center',
                 padding: '4px 8px',
                 borderRadius: '8px',
-                background: `${vibe.colors.primary}11`,
+                background: `${vibe.colors.primary}22`,
                 fontSize: '0.85rem',
                 fontWeight: '500'
             }}>

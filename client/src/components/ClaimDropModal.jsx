@@ -231,9 +231,9 @@ const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCo
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md relative shadow-2xl overflow-hidden">
+      <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl w-full max-w-md relative shadow-2xl overflow-hidden border border-gray-300 dark:border-gray-700">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <Package className="w-5 h-5 text-purple-500" />
             <h2 className="text-lg font-bold dark:text-white">Claim Drop</h2>
@@ -459,7 +459,7 @@ const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCo
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <button
             type="button"
             onClick={step === 1 ? onClose : () => { setStep(1); setError(''); setDropInfo(null); }}

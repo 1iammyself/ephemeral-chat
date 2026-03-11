@@ -197,13 +197,13 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                 </div>
 
                 {!isExpanded ? (
-                    <div className="p-4 bg-white dark:bg-gray-900 flex flex-col items-center gap-3">
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900 flex flex-col items-center gap-3">
                         <div className="flex items-center gap-4">
                             <div className="flex flex-col items-center">
                                 <X className="w-6 h-6 text-indigo-500" />
                                 <span className="text-[10px] font-bold text-gray-500">{gameData.players.X.name}</span>
                             </div>
-                            <span className="text-gray-300 font-bold italic">VS</span>
+                            <span className="text-gray-400 dark:text-gray-300 font-bold italic">VS</span>
                             <div className="flex flex-col items-center">
                                 <Circle className="w-6 h-6 text-rose-500" />
                                 <span className="text-[10px] font-bold text-gray-500">{gameData.players.O.name || '???'}</span>
@@ -218,20 +218,20 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                         </button>
                     </div>
                 ) : (
-                    <div className="p-4 bg-white dark:bg-gray-900 flex flex-col items-center">
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900 flex flex-col items-center">
                         <div className="w-full flex justify-between items-center mb-4 px-2">
                             <div className={`flex flex-col items-center p-2 rounded-xl border-2 transition-all ${gameData.turn === 'X' && !gameData.winner ? `border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20` : 'border-transparent opacity-60'}`}>
                                 <X className={`w-5 h-5 ${gameData.turn === 'X' && !gameData.winner ? 'text-indigo-500' : 'text-gray-400'}`} />
                                 <span className="text-[10px] font-bold mt-1 max-w-[60px] truncate">{gameData.players.X.name}</span>
                             </div>
-                            <div className="text-gray-300 dark:text-gray-700 font-black text-xl italic">VS</div>
+                            <div className="text-gray-400 dark:text-gray-700 font-black text-xl italic">VS</div>
                             <div className={`flex flex-col items-center p-2 rounded-xl border-2 transition-all ${gameData.turn === 'O' && !gameData.winner ? `border-rose-500 bg-rose-50 dark:bg-rose-900/20` : 'border-transparent opacity-60'}`}>
                                 <Circle className={`w-5 h-5 ${gameData.turn === 'O' && !gameData.winner ? 'text-rose-500' : 'text-gray-400'}`} />
                                 <span className="text-[10px] font-bold mt-1 max-w-[60px] truncate">{gameData.players.O.name || '???'}</span>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2 w-full aspect-square bg-gray-100 dark:bg-gray-800 p-2 rounded-xl border border-gray-200 dark:border-gray-700 shadow-inner">
+                        <div className="grid grid-cols-3 gap-2 w-full aspect-square bg-gray-200 dark:bg-gray-800 p-2 rounded-xl border border-gray-300 dark:border-gray-700 shadow-inner">
                             {gameData.board.map((cell, i) => {
                                 const isWinningCell = gameData.winningLine?.includes(i);
                                 return (
@@ -239,7 +239,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                                         key={i}
                                         onClick={() => handleTTTMove(i)}
                                         disabled={!!cell || !isMyTurn || !!gameData.winner}
-                                        className={`relative flex items-center justify-center bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 transition-all active:scale-90 ${!cell && isMyTurn ? `hover:bg-${accentColor}-50 dark:hover:bg-${accentColor}-900/10 cursor-pointer` : 'cursor-default'} ${isWinningCell ? `ring-4 ring-${gameData.winner === 'X' ? 'indigo' : 'rose'}-500/50 ttt-win-pulse` : ''}`}
+                                        className={`relative flex items-center justify-center bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-300 dark:border-gray-800 transition-all active:scale-90 ${!cell && isMyTurn ? `hover:bg-${accentColor}-50 dark:hover:bg-${accentColor}-900/10 cursor-pointer` : 'cursor-default'} ${isWinningCell ? `ring-4 ring-${gameData.winner === 'X' ? 'indigo' : 'rose'}-500/50 ttt-win-pulse` : ''}`}
                                     >
                                         {cell === 'X' && <X className={`w-8 h-8 text-indigo-500 ttt-piece-pop ${isWinningCell ? 'ttt-win-pulse' : ''}`} />}
                                         {cell === 'O' && <Circle className={`w-8 h-8 text-rose-500 ttt-piece-pop ${isWinningCell ? 'ttt-win-pulse' : ''}`} />}
@@ -285,7 +285,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                 </div>
 
                 {!isExpanded ? (
-                    <div className="p-4 bg-white dark:bg-gray-800 flex flex-col items-center">
+                    <div className="p-4 bg-gray-50 dark:bg-gray-800 flex flex-col items-center">
                         <p className="text-sm text-gray-500 mb-3 text-center truncate w-full">
                             {gameData.optionA ? `${gameData.optionA} or ${gameData.optionB}?` : 'Loading question...'}
                         </p>
@@ -299,7 +299,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                     </div>
                 ) : (
                     <>
-                        <div className="p-3 space-y-2 bg-white dark:bg-gray-800 min-h-[140px] flex flex-col justify-center">
+                        <div className="p-3 space-y-2 bg-gray-50 dark:bg-gray-800 min-h-[140px] flex flex-col justify-center">
                             {gameData.optionA ? (
                                 <>
                                     <button
@@ -308,8 +308,8 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                                         className={`w-full text-left p-3 rounded-lg border-2 transition-all duration-200 relative overflow-hidden ${hasAnswered
                                             ? myAnswer === 'A'
                                                 ? selectedOutlineClass
-                                                : 'border-gray-100 dark:border-gray-700 opacity-60'
-                                            : `border-gray-100 dark:border-gray-700 ${hoverBorderClass} cursor-pointer active:scale-[0.98]`
+                                                : 'border-gray-200 dark:border-gray-700 opacity-60'
+                                            : `border-gray-200 dark:border-gray-700 ${hoverBorderClass} cursor-pointer active:scale-[0.98]`
                                             }`}
                                     >
                                         {hasAnswered && (
@@ -331,8 +331,8 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                                         className={`w-full text-left p-3 rounded-lg border-2 transition-all duration-200 relative overflow-hidden ${hasAnswered
                                             ? myAnswer === 'B'
                                                 ? selectedOutlineClass
-                                                : 'border-gray-100 dark:border-gray-700 opacity-60'
-                                            : `border-gray-100 dark:border-gray-700 ${hoverBorderClass} cursor-pointer active:scale-[0.98]`
+                                                : 'border-gray-200 dark:border-gray-700 opacity-60'
+                                            : `border-gray-200 dark:border-gray-700 ${hoverBorderClass} cursor-pointer active:scale-[0.98]`
                                             }`}
                                     >
                                         {hasAnswered && (
@@ -356,7 +356,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                                 </div>
                             )}
                         </div>
-                        <div className={`px-3 py-2 bg-gray-50 dark:bg-gray-700/50 border-t ${footerBorderClass} flex items-center justify-between`}>
+                        <div className={`px-3 py-2 bg-gray-100 dark:bg-gray-700/50 border-t ${footerBorderClass} flex items-center justify-between`}>
                             <div className="flex items-center gap-3">
                                 <div className="flex items-center">
                                     <Users className="w-3.5 h-3.5 mr-1 text-gray-500 dark:text-gray-400" />
@@ -383,7 +383,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Vote Details</p>
                                 <div className="space-y-1.5">
                                     {Object.entries(answers).map(([uid, choice]) => (
-                                        <div key={uid} className="flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 px-2.5 py-1.5 rounded-lg border border-gray-100 dark:border-gray-800">
+                                        <div key={uid} className="flex items-center justify-between bg-gray-100 dark:bg-gray-900/50 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800">
                                             <span className="text-xs font-bold text-gray-600 dark:text-gray-400 truncate max-w-[120px]">
                                                 {uid === currentUserId ? 'You' : (gameData.answerNicknames?.[uid] || 'Member')}
                                             </span>
@@ -421,7 +421,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                     )}
                 </div>
                 {!isExpanded ? (
-                    <div className="p-4 bg-white dark:bg-gray-800 flex flex-col items-center">
+                    <div className="p-4 bg-gray-50 dark:bg-gray-800 flex flex-col items-center">
                         <p className="text-sm font-bold text-gray-500 mb-3 text-center">
                             {gameData.question ? "Trivia Time! 🤔" : 'Loading trivia...'}
                         </p>
@@ -435,7 +435,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                     </div>
                 ) : (
                     <>
-                        <div className="p-3 bg-white dark:bg-gray-800 min-h-[160px] flex flex-col justify-center">
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800 min-h-[160px] flex flex-col justify-center">
                             {gameData.question ? (
                                 <>
                                     <p className="text-sm font-bold text-gray-900 dark:text-white mb-3">{gameData.question}</p>
@@ -457,8 +457,8 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                                                             ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
                                                             : isMyPick && !isCorrect
                                                                 ? 'border-red-400 bg-red-50 dark:bg-red-900/20'
-                                                                : 'border-gray-100 dark:border-gray-700 opacity-50'
-                                                        : `border-gray-100 dark:border-gray-700 ${hoverBorderClass} cursor-pointer active:scale-[0.98]`
+                                                                : 'border-gray-200 dark:border-gray-700 opacity-50'
+                                                        : `border-gray-200 dark:border-gray-700 ${hoverBorderClass} cursor-pointer active:scale-[0.98]`
                                                         }`}
                                                 >
                                                     {showResult && (
@@ -488,7 +488,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                                 </div>
                             )}
                         </div>
-                        <div className={`px-3 py-2 bg-gray-50 dark:bg-gray-700/50 border-t ${footerBorderClass} flex items-center justify-between`}>
+                        <div className={`px-3 py-2 bg-gray-100 dark:bg-gray-700/50 border-t ${footerBorderClass} flex items-center justify-between`}>
                             <div className="flex items-center gap-3">
                                 <div className="flex items-center">
                                     <Users className="w-3.5 h-3.5 mr-1 text-gray-500 dark:text-gray-400" />
@@ -515,7 +515,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Detailed Results</p>
                                 <div className="space-y-1.5">
                                     {Object.entries(answers).map(([uid, choiceIdx]) => (
-                                        <div key={uid} className="flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 px-2.5 py-1.5 rounded-lg border border-gray-100 dark:border-gray-800">
+                                        <div key={uid} className="flex items-center justify-between bg-gray-100 dark:bg-gray-900/50 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800">
                                             <span className="text-xs font-bold text-gray-600 dark:text-gray-400 truncate max-w-[120px]">
                                                 {uid === currentUserId ? 'You' : (gameData.answerNicknames?.[uid] || 'Member')}
                                             </span>
@@ -592,7 +592,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                 </div>
 
                 {!isExpanded ? (
-                    <div className="p-4 bg-white dark:bg-gray-900 flex flex-col items-center gap-3">
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900 flex flex-col items-center gap-3">
                         <div className="flex items-center gap-4">
                             <div className="flex flex-col items-center">
                                 <div className="text-2xl mb-1">👤</div>
@@ -603,7 +603,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                                     ))}
                                 </div>
                             </div>
-                            <span className="text-gray-300 font-bold italic text-xs">VS</span>
+                            <span className="text-gray-400 dark:text-gray-300 font-bold italic text-xs">VS</span>
                             <div className="flex flex-col items-center">
                                 <div className="text-2xl mb-1">👤</div>
                                 <span className="text-[10px] font-bold text-gray-500 truncate max-w-[60px]">{gameData.players.P2.name || '???'}</span>
@@ -623,7 +623,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                         </button>
                     </div>
                 ) : (
-                    <div className="p-4 bg-white dark:bg-gray-900 flex flex-col items-center">
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900 flex flex-col items-center">
                         <div className="w-full flex justify-between items-center mb-4 px-2">
                             <div className={`flex flex-col items-center p-2 rounded-xl border-2 transition-all ${isP1 ? selectedOutlineClass : 'border-transparent opacity-60'}`}>
                                 <div className="text-3xl mb-1">{myMove && isP1 ? getMoveIcon(myMove) : (gameData.winner && p1Move ? getMoveIcon(p1Move) : '❓')}</div>
@@ -634,7 +634,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                                     ))}
                                 </div>
                             </div>
-                            <div className="text-gray-300 dark:text-gray-700 font-black text-xl italic">VS</div>
+                            <div className="text-gray-400 dark:text-gray-700 font-black text-xl italic">VS</div>
                             <div className={`flex flex-col items-center p-2 rounded-xl border-2 transition-all ${isP2 ? selectedOutlineClass : 'border-transparent opacity-60'}`}>
                                 <div className="text-3xl mb-1">{myMove && isP2 ? getMoveIcon(myMove) : (gameData.winner && p2Move ? getMoveIcon(p2Move) : '❓')}</div>
                                 <span className="text-[10px] font-bold mt-1 max-w-[60px] truncate">{gameData.players.P2.name || '???'}</span>
@@ -647,7 +647,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                         </div>
 
                         {gameData.rounds?.length > 0 && (
-                            <div className="w-full mb-4 px-2 py-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                            <div className="w-full mb-4 px-2 py-2 bg-gray-100 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
                                 <div className="text-[9px] font-black text-gray-400 uppercase mb-1 tracking-wider">Round History</div>
                                 <div className="flex flex-col gap-1">
                                     {gameData.rounds.map((round, idx) => (
@@ -691,7 +691,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                             </button>
                         )}
 
-                        <div className={`w-full p-2.5 rounded-xl text-center font-bold text-sm transition-all ${gameData.winner ? `bg-green-500 text-white shadow-lg` : `text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800`}`}>
+                        <div className={`w-full p-2.5 rounded-xl text-center font-bold text-sm transition-all ${gameData.winner ? `bg-green-500 text-white shadow-lg` : `text-gray-700 dark:text-gray-400 bg-gray-100 dark:bg-gray-800`}`}>
                             {getRPSStatus()}
                         </div>
 
@@ -724,7 +724,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                     )}
                 </div>
 
-                <div className="p-4 bg-white dark:bg-gray-900 flex flex-col items-center gap-4">
+                <div className="p-4 bg-gray-50 dark:bg-gray-900 flex flex-col items-center gap-4">
                     <div className="flex items-center gap-4 w-full justify-center">
                         <div className="flex flex-col items-center">
                             <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xl shadow-inner border border-gray-200 dark:border-gray-700">♔</div>

@@ -275,7 +275,7 @@ Verbal Code: ${verbalCode || 'N/A'}`;
     return (
       <>
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md relative">
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg w-full max-w-md relative border border-gray-300 dark:border-gray-700">
             <div className="p-6">
               <h2 className="text-2xl font-bold mb-4 text-green-600 dark:text-green-400">
                 Room Created Successfully!
@@ -403,7 +403,7 @@ Verbal Code: ${verbalCode || 'N/A'}`;
   // Show the room creation form
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md relative shadow-2xl overflow-hidden">
+      <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl w-full max-w-md relative shadow-2xl overflow-hidden border border-gray-300 dark:border-gray-700">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
@@ -612,7 +612,7 @@ Verbal Code: ${verbalCode || 'N/A'}`;
                     type="button"
                     onClick={() => setSettings(prev => ({ ...prev, maxUsers: Math.max(1, prev.maxUsers - 1) }))}
                     disabled={roomSettings.maxUsers <= 1}
-                    className="w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-300 dark:disabled:text-gray-600 rounded-full text-xl font-bold transition-colors dark:text-white"
+                    className="w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 rounded-full text-xl font-bold transition-colors dark:text-white"
                   >
                     −
                   </button>
@@ -623,7 +623,7 @@ Verbal Code: ${verbalCode || 'N/A'}`;
                     type="button"
                     onClick={() => setSettings(prev => ({ ...prev, maxUsers: Math.min(10, prev.maxUsers + 1) }))}
                     disabled={roomSettings.maxUsers >= 10}
-                    className="w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-300 dark:disabled:text-gray-600 rounded-full text-xl font-bold transition-colors dark:text-white"
+                    className="w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 rounded-full text-xl font-bold transition-colors dark:text-white"
                   >
                     +
                   </button>

@@ -14,7 +14,7 @@ const PairingCodeModal = ({ code, peerName, onConfirm, onReject }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-300 dark:border-gray-700">
         {/* Header */}
         <div className="bg-gradient-to-r from-cyan-500 to-blue-600 px-6 py-4">
           <div className="flex items-center gap-3">

@@ -78,7 +78,7 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, currentNickname, 
             />
 
             {/* Modal Container — full-height scroll on mobile */}
-            <div className={`relative w-full max-w-2xl bg-white dark:bg-gray-950 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-white/10 flex flex-col max-h-[95vh] sm:max-h-[90vh] animate-in zoom-in-95 duration-300`}>
+            <div className={`relative w-full max-w-2xl bg-gray-50 dark:bg-gray-950 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-gray-300 dark:border-white/10 flex flex-col max-h-[95vh] sm:max-h-[90vh] animate-in zoom-in-95 duration-300`}>
 
                 {/* Header */}
                 <div className={`p-3 sm:p-4 ${headerClass} flex items-center justify-between shrink-0`}>
@@ -117,7 +117,7 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, currentNickname, 
                     {/* Right: Game Info Panel — compact on mobile */}
                     <div className="flex-1 w-full space-y-3 sm:space-y-6">
                         {/* Status Card */}
-                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-gray-100 dark:border-gray-800">
+                        <div className="bg-gray-100 dark:bg-gray-900/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-gray-200 dark:border-gray-800">
                             <div className="flex items-center gap-2 mb-3 text-gray-400">
                                 <Info className="w-3.5 h-3.5" />
                                 <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">Match Status</span>
@@ -161,7 +161,7 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, currentNickname, 
                         </div>
 
                         {/* Move History */}
-                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl p-4 border border-gray-100 dark:border-gray-800">
+                        <div className="bg-gray-100 dark:bg-gray-900/50 rounded-2xl p-4 border border-gray-200 dark:border-gray-800">
                             <div className="flex items-center gap-2 mb-3 text-gray-400">
                                 <History className="w-4 h-4" />
                                 <span className="text-[10px] font-black uppercase tracking-widest">Move History</span>
@@ -170,7 +170,7 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, currentNickname, 
                             <div className="grid grid-cols-2 gap-2 max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
                                 {gameData.history && gameData.history.length > 0 ? (
                                     gameData.history.map((move, i) => (
-                                        <div key={i} className="flex items-center gap-2 bg-white dark:bg-gray-800 px-2 py-1.5 rounded-lg border border-gray-100 dark:border-gray-700">
+                                        <div key={i} className="flex items-center gap-2 bg-white dark:bg-gray-800 px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
                                             <span className="text-[9px] font-black text-gray-400 w-4">{Math.floor(i / 2) + 1}{i % 2 ? '...' : '.'}</span>
                                             <span className="text-xs font-mono font-bold text-gray-700 dark:text-gray-300">{move}</span>
                                         </div>
@@ -196,7 +196,7 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, currentNickname, 
                         )}
                         {/* Player Management (Host Only) */}
                         {isHost && !gameData.winner && (
-                            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl p-4 border border-gray-100 dark:border-gray-800">
+                            <div className="bg-gray-100 dark:bg-gray-900/50 rounded-2xl p-4 border border-gray-200 dark:border-gray-800">
                                 <div className="flex items-center gap-2 mb-4 text-gray-400">
                                     <Shield className="w-4 h-4 text-primary-500" />
                                     <span className="text-[10px] font-black uppercase tracking-widest text-primary-500">Host Management</span>
@@ -253,7 +253,7 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, currentNickname, 
                 </div>
 
                 {/* Footer Info */}
-                <div className="p-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                <div className="p-4 bg-gray-100 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex justify-between items-center text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
                     <span>{amPlaying ? 'You are Playing' : 'Spectating Mode'}</span>
                     <span className="flex items-center gap-1.5">
                         <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />

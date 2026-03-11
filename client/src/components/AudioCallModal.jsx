@@ -157,7 +157,7 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
 
     return (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden">
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden border border-gray-300 dark:border-gray-700">
                 {/* Close Button */}
                 <button
                     onClick={handleEndCall}

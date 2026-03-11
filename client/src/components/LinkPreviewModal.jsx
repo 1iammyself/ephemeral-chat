@@ -96,7 +96,7 @@ const LinkPreviewModal = ({ url, onClose }) => {
 
     return (
         <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-300 dark:border-gray-700">
 
                 {/* Header */}
                 <div className={`px-5 py-4 flex items-center justify-between border-b ${analysis.isSuspicious
