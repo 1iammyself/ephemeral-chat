@@ -28,7 +28,7 @@ const UserList = ({
 
   const vibe = getVibeById(roomVibe);
   const vibeAccent = vibe.accent || 'primary';
-  const useTransparentDarkBorder = ['default', 'party', 'jazz'].includes(roomVibe);
+  const useTransparentDarkStyle = ['default', 'party', 'jazz'].includes(roomVibe);
 
   const getInitials = (nickname) => {
     if (!nickname) return '';
@@ -192,9 +192,9 @@ const UserList = ({
                 <div key={user.socketId || user.id || index} className="relative">
                   <div
                     className={`flex items-center space-x-2.5 p-1.5 sm:p-2 rounded-xl transition-all duration-200 cursor-pointer ${isCurrentUser
-                      ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 shadow-sm border border-${vibeAccent}-200 ${useTransparentDarkBorder ? 'dark:border-transparent' : `dark:border-${vibeAccent}-800/30`}`
+                      ? `bg-${vibeAccent}-100 ${useTransparentDarkStyle ? 'dark:bg-transparent' : `dark:bg-${vibeAccent}-900/40`} shadow-sm border border-${vibeAccent}-200 ${useTransparentDarkStyle ? 'dark:border-transparent' : `dark:border-${vibeAccent}-800/30`}`
                       : selectedRecipients.includes(user.socketId)
-                        ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 border border-${vibeAccent}-400 ${useTransparentDarkBorder ? 'dark:border-transparent' : `dark:border-${vibeAccent}-600`}`
+                        ? `bg-${vibeAccent}-100 ${useTransparentDarkStyle ? 'dark:bg-transparent' : `dark:bg-${vibeAccent}-900/40`} border border-${vibeAccent}-400 ${useTransparentDarkStyle ? 'dark:border-transparent' : `dark:border-${vibeAccent}-600`} shadow-sm`
                         : `hover:bg-${vibeAccent}-50 dark:hover:bg-gray-800/80 border border-transparent`
                       }`}
                     onClick={() => {
