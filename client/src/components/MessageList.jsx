@@ -363,7 +363,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                     } ${message.messageType === 'game' ? '' :
                       (isOwnMessage
                         ? currentVibe.messageClass
-                        : `bg-white dark:bg-gray-800 border border-${uiAccentColor}-100 dark:border-${uiAccentColor}-500/10 dark:text-gray-100 rounded-tl-none`)
+                        : `bg-blue-50 dark:bg-gray-800 border border-${uiAccentColor}-300 dark:border-${uiAccentColor}-500/10 dark:text-gray-100 rounded-tl-none`)
                     }`}
                 >
                   {/* Content Container */}

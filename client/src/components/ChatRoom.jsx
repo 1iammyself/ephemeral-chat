@@ -2466,7 +2466,7 @@ const ChatRoom = () => {
           </div>
         </div>
       )}
-      <div className={`${getVibeById(roomVibe).panelClass} backdrop-blur-md px-4 py-2 sm:py-3 sticky top-0 z-50 shrink-0`}>
+      <div className={`${getVibeById(roomVibe).panelClass} px-4 py-2 sm:py-3 sticky top-0 z-50 shrink-0`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 sm:space-x-4">
             <button onClick={() => navigate('/')} className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
@@ -2561,7 +2561,7 @@ const ChatRoom = () => {
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           {/* ── Compact info bar: now inside the center column for better sidebar alignment ── */}
           {(getVibeById(roomVibe)?.moodSound || roomTopic || activeTimer) && (
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full mx-4 my-2 shadow-sm w-fit max-w-[calc(100%-2rem)] ${getVibeById(roomVibe).panelClass} backdrop-blur-md overflow-x-auto scrollbar-none shrink-0 animate-in fade-in slide-in-from-top-2 duration-300`}>
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full mx-4 my-2 shadow-sm w-fit max-w-[calc(100%-2rem)] ${getVibeById(roomVibe).panelClass} overflow-x-auto scrollbar-none shrink-0 animate-in fade-in slide-in-from-top-2 duration-300`}>
               {/* Ambient Player / Mood DJ */}
               {getVibeById(roomVibe)?.moodSound && (
                 <div className="shrink-0">
@@ -2636,10 +2636,10 @@ const ChatRoom = () => {
             />
             <div ref={messagesEndRef} />
           </div>
-          <div className={`${getVibeById(roomVibe).panelClass} backdrop-blur-md sticky bottom-0 z-50 shrink-0 chat-input-area`}>
+          <div className={`${getVibeById(roomVibe).panelClass} sticky bottom-0 z-50 shrink-0 chat-input-area`}>
             {/* Active Security Indicators */}
             {(isStealthMode || overrideTtl || isAnonymousMode) && (
-              <div className="px-4 py-1.5 flex items-center gap-3 bg-white/50 dark:bg-black/20 overflow-x-auto scrollbar-none">
+              <div className="px-4 py-1.5 flex items-center gap-3 bg-transparent dark:bg-black/20 overflow-x-auto scrollbar-none">
                 {isStealthMode && (
                   <div className="flex items-center gap-1.5 text-[10px] font-black tracking-tighter text-gray-500 dark:text-gray-400 bg-gray-100/80 dark:bg-gray-800/80 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-gray-200/50 dark:border-white/10 shadow-sm shrink-0">
                     <EyeOff className="w-3 h-3" />
@@ -2969,7 +2969,7 @@ const ChatRoom = () => {
                         onCut={(e) => e.preventDefault()}
                         onPaste={(e) => e.preventDefault()}
                         placeholder={isAnonymousMode ? "Confess anonymously..." : "Type message..."}
-                        className="w-full bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white text-[15px] sm:text-base px-2 py-2.5 min-w-0 placeholder:text-gray-400"
+                        className="w-full bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white text-[15px] sm:text-base px-2 py-2.5 min-w-0 placeholder:text-gray-500 dark:placeholder:text-gray-400"
                         disabled={!isConnected}
                         maxLength={500}
                         style={{ boxShadow: 'none' }}
@@ -3019,7 +3019,7 @@ const ChatRoom = () => {
         {/* Desktop Sidebar */}
         {showDesktopSidebar && (
           <div
-            className={`hidden lg:flex flex-col relative ${getVibeById(roomVibe).sidebarClass} backdrop-blur-md transition-all duration-75`}
+            className={`hidden lg:flex flex-col relative ${getVibeById(roomVibe).sidebarClass} backdrop-blur-md transition-all duration-75 ${sidebarPosition === 'right' ? 'border-l border-gray-300/80 dark:border-white/5' : 'border-r border-gray-300/80 dark:border-white/5'}`}
             style={{ width: `${sidebarWidth}px` }}
             ref={sidebarRef}
           >

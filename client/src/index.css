@@ -184,7 +184,7 @@
   }
 
   .input-field {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    @apply w-full px-3 py-2 border border-blue-400 bg-blue-50 text-gray-900 placeholder-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400;
   }
 
   /* Hide browser search/reveal icons for passwords */
@@ -394,8 +394,8 @@
 
   /* THEME AGNOSTIC: Automatically inverts based on background color */
   mix-blend-mode: difference;
-  color: rgba(255, 255, 255, 0.12);
-  text-shadow: 0 0 2px rgba(0, 0, 0, 0.25);
+  color: rgba(255, 255, 255, 0.22);
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.35);
 
   font-family: 'JetBrains Mono', 'Courier New', monospace;
   font-size: 13px;
@@ -669,35 +669,36 @@ input[type="range"] {
 input[type="range"]::-webkit-slider-runnable-track {
   height: 6px;
   border-radius: 9999px;
-  background: #d1d5db;
+  background: #9ca3af; /* gray-400 for better contrast in light mode */
 }
 
 .dark input[type="range"]::-webkit-slider-runnable-track {
-  background: #374151;
+  background: #374151; /* gray-700 for dark mode */
 }
 
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  background: #3b82f6;
-  border: 2px solid #fff;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
-  margin-top: -6px;
+  background: #2563eb; /* blue-600 */
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  margin-top: -7px;
   cursor: pointer;
-  transition: transform 0.15s ease;
+  transition: all 0.15s ease;
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
+  transform: scale(1.2);
+  background: #1d4ed8; /* blue-700 */
 }
 
 input[type="range"]::-moz-range-track {
   height: 6px;
   border-radius: 9999px;
-  background: #d1d5db;
+  background: #9ca3af;
 }
 
 .dark input[type="range"]::-moz-range-track {
@@ -705,11 +706,11 @@ input[type="range"]::-moz-range-track {
 }
 
 input[type="range"]::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  background: #3b82f6;
-  border: 2px solid #fff;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  background: #2563eb;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
   cursor: pointer;
 }

@@ -231,7 +231,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2 w-full aspect-square bg-gray-200 dark:bg-gray-800 p-2 rounded-xl border border-gray-300 dark:border-gray-700 shadow-inner">
+                        <div className="grid grid-cols-3 gap-2 w-full aspect-square bg-gray-500 dark:bg-gray-800 p-2 rounded-xl border border-gray-500 dark:border-gray-700 shadow-inner">
                             {gameData.board.map((cell, i) => {
                                 const isWinningCell = gameData.winningLine?.includes(i);
                                 return (
@@ -239,7 +239,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                                         key={i}
                                         onClick={() => handleTTTMove(i)}
                                         disabled={!!cell || !isMyTurn || !!gameData.winner}
-                                        className={`relative flex items-center justify-center bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-300 dark:border-gray-800 transition-all active:scale-90 ${!cell && isMyTurn ? `hover:bg-${accentColor}-50 dark:hover:bg-${accentColor}-900/10 cursor-pointer` : 'cursor-default'} ${isWinningCell ? `ring-4 ring-${gameData.winner === 'X' ? 'indigo' : 'rose'}-500/50 ttt-win-pulse` : ''}`}
+                                        className={`relative flex items-center justify-center bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-600 dark:border-gray-800 transition-all active:scale-90 ${!cell && isMyTurn ? `hover:bg-${accentColor}-50 dark:hover:bg-${accentColor}-900/10 cursor-pointer` : 'cursor-default'} ${isWinningCell ? `ring-4 ring-${gameData.winner === 'X' ? 'indigo' : 'rose'}-500/50 ttt-win-pulse` : ''}`}
                                     >
                                         {cell === 'X' && <X className={`w-8 h-8 text-indigo-500 ttt-piece-pop ${isWinningCell ? 'ttt-win-pulse' : ''}`} />}
                                         {cell === 'O' && <Circle className={`w-8 h-8 text-rose-500 ttt-piece-pop ${isWinningCell ? 'ttt-win-pulse' : ''}`} />}

@@ -105,7 +105,7 @@ const UserList = ({
           </h3>
           <div className="space-y-1.5 max-h-40 overflow-y-auto scrollbar-thin">
             {pendingGuests.map(guest => (
-              <div key={guest.socketId} className="flex items-center justify-between bg-white dark:bg-gray-800 p-1.5 sm:p-2 rounded-xl border border-yellow-100 dark:border-yellow-900/30 shadow-sm transition-colors duration-200">
+              <div key={guest.socketId} className="flex items-center justify-between bg-white dark:bg-gray-800 p-1.5 sm:p-2 rounded-xl border border-yellow-300 dark:border-yellow-900/30 shadow-sm transition-colors duration-200">
                 <div className="flex items-center space-x-2 overflow-hidden">
                   <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-[10px] sm:text-xs text-white font-black tracking-tighter ${getAvatarColor(guest.nickname)}`}>
                     {getInitials(guest.nickname)}
@@ -135,7 +135,7 @@ const UserList = ({
       )}
 
       {/* Header */}
-      <div className="p-3 sm:p-4 transition-colors duration-200 flex items-center justify-between bg-black/5 dark:bg-white/5 backdrop-blur-sm">
+      <div className="p-3 sm:p-4 transition-colors duration-200 flex items-center justify-between bg-black/10 dark:bg-white/5 backdrop-blur-sm border-b border-black/5 dark:border-white/5">
         <div className="flex items-center space-x-2">
           <Users className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
           <h3 className="font-black text-sm sm:text-base text-gray-900 dark:text-white tracking-tight">
@@ -191,10 +191,10 @@ const UserList = ({
                 <div key={user.socketId || user.id || index} className="relative">
                   <div
                     className={`flex items-center space-x-2.5 p-1.5 sm:p-2 rounded-xl transition-all duration-200 cursor-pointer ${isCurrentUser
-                      ? `bg-${vibeAccent}-50/80 dark:bg-${vibeAccent}-900/20 shadow-sm border border-${vibeAccent}-100 dark:border-${vibeAccent}-800/30`
+                      ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 shadow-sm border border-${vibeAccent}-200 dark:border-${vibeAccent}-800/30`
                       : selectedRecipients.includes(user.socketId)
-                        ? `bg-${vibeAccent}-50/80 dark:bg-${vibeAccent}-900/20 border border-${vibeAccent}-300 dark:border-${vibeAccent}-600 shadow-sm`
-                        : 'hover:bg-gray-50/80 dark:hover:bg-gray-800/80 border border-transparent'
+                        ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 border border-${vibeAccent}-400 dark:border-${vibeAccent}-600 shadow-sm`
+                        : `hover:bg-${vibeAccent}-50 dark:hover:bg-gray-800/80 border border-transparent`
                       }`}
                     onClick={() => {
                       if (!isCurrentUser && onToggleRecipient) {
@@ -248,7 +248,7 @@ const UserList = ({
 
                   {/* Admin Actions Menu */}
                   {showAdminMenu && (
-                    <div className="mt-1 ml-11 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 space-y-2">
+                    <div className="mt-1 ml-11 p-2 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 space-y-2">
                       {/* Role Selection */}
                       {canChangeUserRole && assignableRoles.length > 0 && (
                         <div>
@@ -262,8 +262,8 @@ const UserList = ({
                                 key={role}
                                 onClick={() => handleRoleChange(user.socketId, role)}
                                 className={`text-xs px-2 py-1 rounded-full transition-colors ${userRole === role
-                                  ? `${ROLE_INFO[role].bgColor} ${ROLE_INFO[role].color} ring-2 ring-offset-1 ring-gray-300 dark:ring-gray-600`
-                                  : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                                  ? `${ROLE_INFO[role].bgColor} ${ROLE_INFO[role].color} ring-2 ring-offset-1 ring-gray-400 dark:ring-gray-600`
+                                  : 'bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-400 dark:hover:bg-gray-600'
                                   }`}
                               >
                                 {ROLE_INFO[role].badge} {ROLE_INFO[role].label}
@@ -296,7 +296,7 @@ const UserList = ({
         <div className="p-3 shrink-0">
           <button
             onClick={onWatchParty}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-${vibeAccent}-50 dark:from-${vibeAccent}-950/30 to-transparent border border-${vibeAccent}-200/50 dark:border-${vibeAccent}-700/30 rounded-xl hover:shadow-md hover:border-${vibeAccent}-300 dark:hover:border-${vibeAccent}-600 transition-all active:scale-[0.98] group`}
+            className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-${vibeAccent}-100 dark:from-${vibeAccent}-950/30 to-transparent border border-${vibeAccent}-300/50 dark:border-${vibeAccent}-700/30 rounded-xl hover:shadow-md hover:border-${vibeAccent}-400 dark:hover:border-${vibeAccent}-600 transition-all active:scale-[0.98] group`}
           >
             <Radio className={`w-4 h-4 text-${vibeAccent}-500 group-hover:animate-pulse`} />
             <span className={`text-sm font-bold text-${vibeAccent}-700 dark:text-${vibeAccent}-300 tracking-tight`}>Watch Party</span>
