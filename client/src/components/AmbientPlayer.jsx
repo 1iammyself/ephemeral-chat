@@ -41,6 +41,7 @@ function createRainSound(audioCtx) {
     lowpass.frequency.value = 1200;
     
     source.connect(lowpass);
+    source.start();
     return { source, output: lowpass };
 }
 
@@ -90,6 +91,7 @@ function createWhiteNoise(audioCtx) {
     filter.type = 'bandpass';
     filter.frequency.value = 1000;
     source.connect(filter);
+    source.start();
 
     return { source, output: filter };
 }

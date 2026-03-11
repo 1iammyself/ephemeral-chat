@@ -667,9 +667,9 @@ input[type="range"] {
 }
 
 input[type="range"]::-webkit-slider-runnable-track {
-  height: 6px;
+  height: 4px; /* Slightly thinner track */
   border-radius: 9999px;
-  background: #9ca3af; /* gray-400 for better contrast in light mode */
+  background: #d1d5db; /* gray-300 for light mode */
 }
 
 .dark input[type="range"]::-webkit-slider-runnable-track {
@@ -679,26 +679,32 @@ input[type="range"]::-webkit-slider-runnable-track {
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 20px;
-  height: 20px;
+  width: 15px; /* Reduced size */
+  height: 15px; /* Reduced size */
   border-radius: 50%;
-  background: #2563eb; /* blue-600 */
-  border: 3px solid #fff;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-  margin-top: -7px;
+  background: #f9fafb; /* Darker white for light theme */
+  border: 1.5px solid #9ca3af; /* gray-400 border */
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  margin-top: -5.5px; /* Centering for 4px track/15px thumb */
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
+.dark input[type="range"]::-webkit-slider-thumb {
+  background: #4b5563; /* White gray (gray-600) for darker theme */
+  border: 1.5px solid #9ca3af; /* gray-400 border for visibility */
+}
+
 input[type="range"]::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
-  background: #1d4ed8; /* blue-700 */
+  transform: scale(1.1);
+  background: #fff;
+  border-color: #3b82f6; /* Subtle blue hint on hover only */
 }
 
 input[type="range"]::-moz-range-track {
-  height: 6px;
+  height: 4px;
   border-radius: 9999px;
-  background: #9ca3af;
+  background: #d1d5db;
 }
 
 .dark input[type="range"]::-moz-range-track {
@@ -706,11 +712,16 @@ input[type="range"]::-moz-range-track {
 }
 
 input[type="range"]::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
-  background: #2563eb;
-  border: 3px solid #fff;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  background: #f9fafb;
+  border: 1.5px solid #9ca3af;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
   cursor: pointer;
+}
+
+.dark input[type="range"]::-moz-range-thumb {
+  background: #4b5563;
+  border: 1.5px solid #9ca3af;
 }

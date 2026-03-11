@@ -2758,14 +2758,14 @@ const ChatRoom = () => {
 
                           {/* Actions Grid — mobile: 4-col icon-only, desktop: 3-col with labels */}
                           <div className="grid grid-cols-4 sm:grid-cols-3 gap-1 sm:gap-1.5">
-                            <button type="button" onClick={() => { setShowFileModal(true); setShowFeatureMenu(false); const recipientNames = selectedRecipients.length > 0 ? `targeting ${selectedRecipients.map(id => users.find(u => u.socketId === id)?.nickname || id).join(', ')}` : 'as a broadcast'; setActivityLogs(prev => [{ id: `log_ft_init_${Date.now()}`, type: 'system', content: `You initiated a secure file transfer intent ${recipientNames}`, timestamp: new Date().toISOString() }, ...prev].slice(0, 50)); }} disabled={!isConnected} className={`flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/20 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`} title="Files">
-                              <div className={`sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/40 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm`}>
+                            <button type="button" onClick={() => { setShowFileModal(true); setShowFeatureMenu(false); const recipientNames = selectedRecipients.length > 0 ? `targeting ${selectedRecipients.map(id => users.find(u => u.socketId === id)?.nickname || id).join(', ')}` : 'as a broadcast'; setActivityLogs(prev => [{ id: `log_ft_init_${Date.now()}`, type: 'system', content: `You initiated a secure file transfer intent ${recipientNames}`, timestamp: new Date().toISOString() }, ...prev].slice(0, 50)); }} disabled={!isConnected} className={`flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`} title="Files">
+                              <div className={`sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/10 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm`}>
                                 <FileText className={`w-4 h-4 text-${vibeAccent}-500`} />
                               </div>
                               <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Files</span>
                             </button>
-                            <button type="button" onClick={() => { setShowCameraModal(true); setShowFeatureMenu(false); }} disabled={!isConnected} className={`flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/20 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`} title="Camera">
-                              <div className={`sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/40 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm`}>
+                            <button type="button" onClick={() => { setShowCameraModal(true); setShowFeatureMenu(false); }} disabled={!isConnected} className={`flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`} title="Camera">
+                              <div className={`sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/10 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm`}>
                                 <Camera className={`w-4 h-4 text-${vibeAccent}-500`} />
                               </div>
                               <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Camera</span>
@@ -2776,8 +2776,8 @@ const ChatRoom = () => {
                               </div>
                               <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">{users.length > 7 ? 'Disabled' : 'Call'}</span>
                             </button>
-                            <button type="button" onClick={() => { setShowPollModal(true); setShowFeatureMenu(false); }} disabled={!isConnected} className={`flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/20 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`} title="Poll">
-                              <div className={`sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/40 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm`}>
+                            <button type="button" onClick={() => { setShowPollModal(true); setShowFeatureMenu(false); }} disabled={!isConnected} className={`flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`} title="Poll">
+                              <div className={`sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/10 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm`}>
                                 <BarChart2 className={`w-4 h-4 text-${vibeAccent}-500`} />
                               </div>
                               <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Poll</span>
@@ -3019,7 +3019,7 @@ const ChatRoom = () => {
         {/* Desktop Sidebar */}
         {showDesktopSidebar && (
           <div
-            className={`hidden lg:flex flex-col relative ${getVibeById(roomVibe).sidebarClass} backdrop-blur-md transition-all duration-75 ${sidebarPosition === 'right' ? 'border-l border-gray-300/80 dark:border-white/5' : 'border-r border-gray-300/80 dark:border-white/5'}`}
+            className={`hidden lg:flex flex-col relative ${getVibeById(roomVibe).sidebarClass} transition-all duration-75 ${sidebarPosition === 'right' ? 'border-l border-gray-300 dark:border-white/5' : 'border-r border-gray-300 dark:border-white/5'}`}
             style={{ width: `${sidebarWidth}px` }}
             ref={sidebarRef}
           >
