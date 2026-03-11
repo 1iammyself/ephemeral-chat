@@ -8,14 +8,14 @@ import { Volume2, VolumeX, ChevronRight } from 'lucide-react';
  */
 
 const SOUND_CONFIG = {
-    rain: { label: '🌧️ Rain', color: 'text-cyan-400' },
-    lofi: { label: '🎵 Lo-fi', color: 'text-purple-400' },
-    whitenoise: { label: '📻 White Noise', color: 'text-gray-400' },
-    campfire: { label: '🔥 Solace', color: 'text-rose-400' },
-    ocean: { label: '🌊 Abyss', color: 'text-sky-400' },
-    forest: { label: '🌿 Verdant', color: 'text-emerald-400' },
-    cafe: { label: '☕ Moka', color: 'text-[#d7ccc8]' },
-    jazz: { label: '🎷 Noire', color: 'text-yellow-400' },
+    rain: { label: '🌧️ Rain', color: 'text-cyan-600 dark:text-cyan-400' },
+    lofi: { label: '🎵 Lo-fi', color: 'text-purple-600 dark:text-purple-400' },
+    whitenoise: { label: '📻 White Noise', color: 'text-gray-600 dark:text-gray-400' },
+    campfire: { label: '🔥 Solace', color: 'text-rose-600 dark:text-rose-400' },
+    ocean: { label: '🌊 Abyss', color: 'text-sky-600 dark:text-sky-400' },
+    forest: { label: '🌿 Verdant', color: 'text-emerald-600 dark:text-emerald-400' },
+    cafe: { label: '☕ Moka', color: 'text-[#8d6e63] dark:text-[#d7ccc8]' },
+    jazz: { label: '🎷 Noire', color: 'text-yellow-600 dark:text-yellow-400' },
 };
 
 function createRainSound(audioCtx) {
@@ -392,7 +392,7 @@ const AmbientPlayer = ({ moodSound, isActive = true }) => {
                 {isMuted ? <VolumeX className="w-3.5 h-3.5 text-gray-500" /> : <Volume2 className="w-3.5 h-3.5 text-gray-700 dark:text-gray-300" />}
             </button>
             <input type="range" min="0" max="1" step="0.05" value={isMuted ? 0 : volume} onChange={(e) => { setVolume(parseFloat(e.target.value)); setIsMuted(false); }}
-                   className="w-12 h-1 bg-transparent rounded-lg appearance-none cursor-pointer accent-gray-600" />
+                   className="w-10 h-1 bg-transparent rounded-lg appearance-none cursor-pointer accent-gray-600" />
             <div className="w-px h-3 bg-gray-500/30 mx-0.5" />
             <button onClick={() => setIsMinimized(true)} className="p-0.5 rounded-full hover:bg-black/10"><ChevronRight className="w-4 h-4 text-gray-400" /></button>
         </div>
