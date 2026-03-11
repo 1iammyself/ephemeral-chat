@@ -39,7 +39,7 @@ function createRainSound(audioCtx) {
     const lowpass = audioCtx.createBiquadFilter();
     lowpass.type = 'lowpass';
     lowpass.frequency.value = 1200;
-    
+
     source.connect(lowpass);
     source.start();
     return { source, output: lowpass };
@@ -330,8 +330,8 @@ const AmbientPlayer = ({ moodSound, isActive = true }) => {
     const touchStartRef = useRef(null);
 
     const cleanup = useCallback(() => {
-        try { sourceRef.current?.source.stop?.(); } catch (e) {}
-        try { audioCtxRef.current?.close(); } catch (e) {}
+        try { sourceRef.current?.source.stop?.(); } catch (e) { }
+        try { audioCtxRef.current?.close(); } catch (e) { }
         sourceRef.current = null;
         audioCtxRef.current = null;
         gainNodeRef.current = null;
@@ -383,8 +383,8 @@ const AmbientPlayer = ({ moodSound, isActive = true }) => {
 
     return (
         <div className="flex items-center space-x-2 px-3 py-1.5 bg-black/10 dark:bg-white/5 backdrop-blur-sm rounded-full text-xs transition-transform touch-none select-none"
-             style={{ transform: `translateX(${dragX}px)`, opacity: Math.max(0, 1 - Math.abs(dragX) / 100) }}
-             onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+            style={{ transform: `translateX(${dragX}px)`, opacity: Math.max(0, 1 - Math.abs(dragX) / 100) }}
+            onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
             <div className="cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setIsMinimized(true)}>
                 <span className={config.color}>{config.label}</span>
             </div>
@@ -392,7 +392,7 @@ const AmbientPlayer = ({ moodSound, isActive = true }) => {
                 {isMuted ? <VolumeX className="w-3.5 h-3.5 text-gray-500" /> : <Volume2 className="w-3.5 h-3.5 text-gray-700 dark:text-gray-300" />}
             </button>
             <input type="range" min="0" max="1" step="0.05" value={isMuted ? 0 : volume} onChange={(e) => { setVolume(parseFloat(e.target.value)); setIsMuted(false); }}
-                   className="w-10 h-1 bg-transparent rounded-lg appearance-none cursor-pointer accent-gray-600" />
+                className="w-8 h-1 bg-transparent rounded-lg appearance-none cursor-pointer accent-gray-600" />
             <div className="w-px h-3 bg-gray-500/30 mx-0.5" />
             <button onClick={() => setIsMinimized(true)} className="p-0.5 rounded-full hover:bg-black/10"><ChevronRight className="w-4 h-4 text-gray-400" /></button>
         </div>
