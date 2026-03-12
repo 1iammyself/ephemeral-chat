@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Sparkles, HelpCircle, Users, CheckCircle2, XCircle, Clock, Hash, Circle, X, Trophy, Swords } from 'lucide-react';
+import confetti from 'canvas-confetti';
 import { GAME_TYPES } from '../utils/games';
 import { getVibeById } from '../utils/vibes';
 import ChessGame from './games/ChessGame';
@@ -105,6 +106,22 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
     const handleAnswer = (answer) => {
         if (hasAnswered) return;
         if (isTrivia && triviaRevealed) return; // Too late
+
+        // Celebration for correct trivia answer
+        if (isTrivia && answer === gameData.answer) {
+            confetti({
+                particleCount: 150,
+                spread: 100,
+                origin: { y: 0.8 },
+                colors: vibe.colors?.primary ? [vibe.colors.primary, '#ffffff'] : ['#3b82f6', '#ffffff', '#10b981'],
+                gravity: 1.2,
+                scalar: 0.8,
+                drift: 0,
+                ticks: 200,
+                zIndex: 9999
+            });
+        }
+
         onGameAnswer(message.id, answer);
     };
 
@@ -141,6 +158,52 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
         if (!isChess || (gameData.players.white?.id && gameData.players.black?.id)) return;
         onTicTacToeMove(message.id, 'chess-join');
     };
+
+    // Celebration for winning games
+    useEffect(() => {
+        if (gameData.winner && gameData.winner !== 'draw') {
+            let amWinner = false;
+            if (isTicTacToe) {
+                const winningPlayer = gameData.players[gameData.winner];
+                if (winningPlayer?.id === currentUserId || (currentNickname && winningPlayer?.name === currentNickname)) {
+                    amWinner = true;
+                }
+            } else if (isRPS) {
+                const winningPlayer = gameData.players[gameData.winner];
+                if (winningPlayer?.id === currentUserId || (currentNickname && winningPlayer?.name === currentNickname)) {
+                    amWinner = true;
+                }
+            } else if (isChess) {
+                const winningPlayer = gameData.players[gameData.winner];
+                if (winningPlayer?.id === currentUserId || (currentNickname && winningPlayer?.name === currentNickname)) {
+                    amWinner = true;
+                }
+            }
+
+            if (amWinner) {
+                // Triple burst for winning the whole game
+                const count = 200;
+                const defaults = {
+                    origin: { y: 0.9 },
+                    zIndex: 9999
+                };
+
+                const fire = (particleRatio, opts) => {
+                    confetti({
+                        ...defaults,
+                        ...opts,
+                        particleCount: Math.floor(count * particleRatio)
+                    });
+                };
+
+                fire(0.25, { spread: 26, startVelocity: 55 });
+                fire(0.2, { spread: 60 });
+                fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+                fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+                fire(0.1, { spread: 120, startVelocity: 45 });
+            }
+        }
+    }, [gameData.winner, isTicTacToe, isRPS, isChess, currentUserId, currentNickname]);
 
     // Dynamic classes based on vibe
     // Explicit hex colors for buttons
@@ -454,7 +517,7 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                                                     disabled={hasAnswered || triviaRevealed}
                                                     className={`w-full text-left p-2.5 rounded-lg border-2 transition-all duration-200 relative overflow-hidden ${showResult
                                                         ? isCorrect
-                                                            ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                                                            ? `border-green-500 bg-green-50 dark:bg-green-900/20 ${isMyPick ? 'trivia-correct-anim' : ''}`
                                                             : isMyPick && !isCorrect
                                                                 ? 'border-red-400 bg-red-50 dark:bg-red-900/20'
                                                                 : 'border-gray-200 dark:border-gray-700 opacity-50'

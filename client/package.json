@@ -30,6 +30,7 @@
     "agora-rtc-sdk-ng": "^4.19.3",
     "autoprefixer": "^10.4.23",
     "axios": "^1.11.0",
+    "canvas-confetti": "^1.9.4",
     "capacitor-secure-storage-plugin": "^0.13.0",
     "emoji-picker-react": "^4.16.1",
     "gh-pages": "^6.0.0",
