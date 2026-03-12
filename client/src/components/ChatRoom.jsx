@@ -28,7 +28,8 @@ import {
   Ghost,
   EyeOff,
   Snowflake,
-  RefreshCw
+  RefreshCw,
+  ArrowDown
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -583,6 +584,8 @@ const ChatRoom = () => {
   const [activityLogs, setActivityLogs] = useState([]);
   const [showActivityLogs, setShowActivityLogs] = useState(false);
   const [hasNewLogs, setHasNewLogs] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const messagesContainerRef = useRef(null);
   const [offsets, setOffsets] = useState({ topic: 0, timer: 0 });
   const [showDesktopSidebar, setShowDesktopSidebar] = useState(true);
   const [dragState, setDragState] = useState(null); // { type: 'topic' | 'timer', startX: number, startOffset: number }
@@ -1557,8 +1560,30 @@ const ChatRoom = () => {
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    if (!messagesContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 250;
+    
+    // Auto-scroll only if already near bottom or if the last message was from the current user
+    const lastMessage = messages[messages.length - 1];
+    const isOwnMessage = lastMessage && currentUser && (
+      lastMessage.sender.socketId === currentUser.socketId ||
+      lastMessage.sender.id === currentUser.id
+    );
+
+    if (isNearBottom || isOwnMessage) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    }
   }, [messages]);
+
+  const handleScroll = useCallback(() => {
+    if (!messagesContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+    
+    // Show button if we are more than 300px away from the bottom
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    setShowScrollBottom(distanceFromBottom > 300);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -2594,7 +2619,21 @@ const ChatRoom = () => {
               )}
             </div>
           )}
-          <div className="flex-1 min-h-0 overflow-y-auto pl-4 lg:pl-10 pr-2 scrollbar-thin overscroll-contain touch-pan-y chat-messages-area">
+          <div 
+            ref={messagesContainerRef}
+            onScroll={handleScroll}
+            className="flex-1 min-h-0 overflow-y-auto pl-4 lg:pl-10 pr-2 scrollbar-thin overscroll-contain touch-pan-y chat-messages-area relative"
+          >
+            {/* Scroll to Bottom Button */}
+            {showScrollBottom && (
+              <button
+                onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                className={`fixed sm:absolute bottom-24 sm:bottom-28 right-6 sm:right-10 z-[55] p-3 rounded-full shadow-2xl transition-all duration-300 transform hover:scale-110 active:scale-95 animate-in fade-in zoom-in slide-in-from-bottom-4 ${getVibeById(roomVibe).accentClass} text-white group`}
+                title="Scroll to bottom"
+              >
+                <ArrowDown className="w-5 h-5 group-hover:animate-bounce" />
+              </button>
+            )}
             {/* Watch Party Player — renders as a message-like card in the chat flow */}
             {showMediaPlayer && (
               <SharedMediaPlayer
