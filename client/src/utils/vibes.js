@@ -74,7 +74,7 @@ export const VIBES = {
         id: 'campfire',
         name: 'Solace',
         emoji: '🏕️',
-        bgClass: 'bg-gradient-to-br from-rose-400 via-rose-300 to-rose-400 dark:bg-none dark:bg-[#050202]',
+        bgClass: 'bg-gradient-to-br from-rose-400 via-rose-300 to-rose-400 dark:bg-none dark:bg-[#0e0707]',
         messageClass: 'bg-rose-600 dark:bg-rose-900/60 text-white rounded-tr-none border border-rose-500/20 shadow-lg shadow-rose-500/10',
         sidebarClass: 'bg-transparent dark:bg-transparent',
         panelClass: 'bg-transparent dark:bg-transparent dark:border-b dark:border-rose-800/20',
