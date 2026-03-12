@@ -2628,10 +2628,10 @@ const ChatRoom = () => {
             {showScrollBottom && (
               <button
                 onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })}
-                className={`fixed sm:absolute bottom-24 sm:bottom-28 right-6 sm:right-10 z-[55] p-3 rounded-full shadow-2xl transition-all duration-300 transform hover:scale-110 active:scale-95 animate-in fade-in zoom-in slide-in-from-bottom-4 ${getVibeById(roomVibe).accentClass} text-white group`}
+                className={`fixed sm:absolute bottom-20 sm:bottom-6 right-4 sm:right-6 z-[55] p-2.5 sm:p-3 rounded-full shadow-2xl transition-all duration-300 transform hover:scale-110 active:scale-95 animate-in fade-in zoom-in slide-in-from-bottom-4 ${getVibeById(roomVibe).accentClass} text-white group`}
                 title="Scroll to bottom"
               >
-                <ArrowDown className="w-5 h-5 group-hover:animate-bounce" />
+                <ArrowDown className="w-4 h-4 sm:w-5 sm:h-5 group-hover:animate-bounce" />
               </button>
             )}
             {/* Watch Party Player — renders as a message-like card in the chat flow */}
