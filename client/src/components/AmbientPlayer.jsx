@@ -320,7 +320,7 @@ const GENERATORS = {
 const AmbientPlayer = ({ moodSound, isActive = true }) => {
     const [volume, setVolume] = useState(0.3);
     const [isMuted, setIsMuted] = useState(true);
-    const [isMinimized, setIsMinimized] = useState(false);
+    const [isMinimized, setIsMinimized] = useState(true);
     const [dragX, setDragX] = useState(0);
 
     const audioCtxRef = useRef(null);
@@ -392,7 +392,7 @@ const AmbientPlayer = ({ moodSound, isActive = true }) => {
                 {isMuted ? <VolumeX className="w-3 h-3 text-gray-500" /> : <Volume2 className="w-3 h-3 text-gray-700 dark:text-gray-300" />}
             </button>
             <input type="range" min="0" max="1" step="0.05" value={isMuted ? 0 : volume} onChange={(e) => { setVolume(parseFloat(e.target.value)); setIsMuted(false); }}
-                className="w-6 h-1 bg-transparent rounded-lg appearance-none cursor-pointer accent-gray-600" />
+                className="w-4 h-1 bg-transparent rounded-lg appearance-none cursor-pointer accent-gray-600" />
             <div className="w-px h-2.5 bg-gray-500/30 mx-0.5" />
             <button onClick={() => setIsMinimized(true)} className="p-0.5 rounded-full hover:bg-black/10"><ChevronRight className="w-3.5 h-3.5 text-gray-400" /></button>
         </div>
