@@ -146,10 +146,12 @@
     box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
     transform: scale(1);
   }
+
   50% {
     box-shadow: 0 0 20px 10px rgba(34, 197, 94, 0.2);
     transform: scale(1.02);
   }
+
   100% {
     box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
     transform: scale(1);
@@ -415,12 +417,14 @@
 
   /* THEME AGNOSTIC: Automatically inverts based on background color */
   mix-blend-mode: difference;
-  color: rgba(255, 255, 255, 0.35); /* Increased opacity from 0.22 */
+  color: rgba(255, 255, 255, 0.30);
+  /* Increased opacity from 0.22 */
   text-shadow: 0 0 2px rgba(0, 0, 0, 0.35);
 
   font-family: 'JetBrains Mono', 'Courier New', monospace;
   font-size: 13px;
-  letter-spacing: 0.5px; /* Reduced from 1.5px to fix separation */
+  letter-spacing: 0.5px;
+  /* Reduced from 1.5px to fix separation */
   font-weight: 600;
 
   /* THE DRIFT: Slow, constant movement to deter AI removal */
@@ -680,7 +684,7 @@ cap-widget {
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
-  width: 100%;
+  /* width: 100%; -- Removed to allow custom widths via Tailwind classes */
   height: 6px;
   border-radius: 9999px;
   outline: none;
@@ -690,11 +694,13 @@ input[type="range"] {
 input[type="range"]::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 9999px;
-  background: #94a3b8; /* Darker slate-400 for better light-mode visibility */
+  background: #94a3b8;
+  /* Darker slate-400 for better light-mode visibility */
 }
 
 .dark input[type="range"]::-webkit-slider-runnable-track {
-  background: #374151; /* gray-700 for dark mode */
+  background: #374151;
+  /* gray-700 for dark mode */
 }
 
 input[type="range"]::-webkit-slider-thumb {
@@ -703,10 +709,13 @@ input[type="range"]::-webkit-slider-thumb {
   width: 15px;
   height: 15px;
   border-radius: 50%;
-  background: #e2e8f0; /* Darker white (slate-200) for better visibility */
-  border: 1.5px solid #64748b; /* Sharper slate-500 border */
-  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-  margin-top: -5.5px; /* Centering for 4px track/15px thumb */
+  background: #e2e8f0;
+  /* Darker white (slate-200) for better visibility */
+  border: 1.5px solid #64748b;
+  /* Sharper slate-500 border */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  margin-top: -5.5px;
+  /* Centering for 4px track/15px thumb */
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -719,7 +728,8 @@ input[type="range"]::-webkit-slider-thumb {
 input[type="range"]::-webkit-slider-thumb:hover {
   transform: scale(1.1);
   background: #fff;
-  border-color: #3b82f6; /* Subtle blue hint on hover only */
+  border-color: #3b82f6;
+  /* Subtle blue hint on hover only */
 }
 
 input[type="range"]::-moz-range-track {
@@ -738,7 +748,7 @@ input[type="range"]::-moz-range-thumb {
   border-radius: 50%;
   background: #e2e8f0;
   border: 1.5px solid #64748b;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
   cursor: pointer;
 }
 
