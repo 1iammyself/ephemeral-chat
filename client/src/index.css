@@ -506,7 +506,7 @@
   bottom: env(safe-area-inset-bottom, 16px);
   left: 50%;
   /* Center start point, logic will adjust via --x */
-  font-size: 38px;
+  font-size: 28px;
   animation: floatUp 3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   will-change: transform, opacity;
   pointer-events: none;
@@ -514,6 +514,13 @@
   z-index: 9999;
   filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
 }
+
+@media (min-width: 640px) {
+  .floating-reaction {
+    font-size: 38px;
+  }
+}
+
 
 /* Cap.js widget dark mode styling */
 .dark cap-widget,
@@ -777,4 +784,8 @@ input[type="range"]::-moz-range-thumb {
   border-bottom-color: rgba(0, 0, 0, 0.08) !important;
 }
 
+/* Hide emoji category names/headings in the picker */
+.EmojiPickerReact .epr-emoji-category-label {
+  display: none !important;
+}
 
