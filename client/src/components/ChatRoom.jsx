@@ -2759,7 +2759,7 @@ const ChatRoom = () => {
                         type="button"
                         onClick={() => setShowFeatureMenu(!showFeatureMenu)}
                         disabled={!isConnected}
-                        className={`p-1.5 sm:p-2.5 rounded-full transition-all duration-200 ${showFeatureMenu ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 text-${vibeAccent}-500` : `hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400`}`}
+                        className={`p-1.5 sm:p-2.5 rounded-full transition-all duration-200 border-none outline-none focus:outline-none focus:ring-0 ${showFeatureMenu ? `bg-transparent hover:bg-transparent dark:bg-transparent dark:hover:bg-transparent text-${vibeAccent}-500 shadow-none` : `hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400`}`}
                         title="Features"
                       >
                         <Plus className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300 ${showFeatureMenu ? 'rotate-45' : ''}`} />
@@ -2936,7 +2936,7 @@ const ChatRoom = () => {
                           setShowEmojiPicker(!showEmojiPicker);
                         }}
                         disabled={!isConnected}
-                        className={`p-1.5 sm:p-2.5 rounded-full transition-colors ${showEmojiPicker ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 text-${vibeAccent}-500` : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'}`}
+                        className={`p-1.5 sm:p-2.5 rounded-full transition-colors border-none outline-none focus:outline-none focus:ring-0 ${showEmojiPicker ? `bg-transparent hover:bg-transparent dark:bg-transparent dark:hover:bg-transparent text-${vibeAccent}-500 shadow-none` : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'}`}
                         title="Emoji"
                       >
                         <Smile className="w-4 h-4 sm:w-5 sm:h-5" />

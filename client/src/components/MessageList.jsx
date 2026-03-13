@@ -509,7 +509,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                             onOpenEmojiPicker(message.id);
                             setActiveReactionId(null);
                           }}
-                          className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 hover:text-primary-500 transition-all duration-200 flex-shrink-0"
+                          className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 hover:text-primary-500 transition-all duration-200 flex-shrink-0 border-none outline-none focus:outline-none focus:ring-0 shadow-none"
                         >
                           <Plus className="w-5 h-5" />
                         </button>
@@ -553,7 +553,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                           setShowFullPicker(false);
                         }
                       }}
-                      className={`p-1.5 rounded-lg transition-all duration-200 ${activeReactionId === message.id ? 'bg-primary-500 text-white shadow-lg scale-110' : 'text-gray-400 hover:text-primary-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                      className={`p-1.5 rounded-lg transition-all duration-200 border-none outline-none focus:outline-none focus:ring-0 shadow-none ${activeReactionId === message.id ? 'bg-primary-500 text-white scale-110' : 'text-gray-400 hover:text-primary-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                       title="React"
                     >
                       <Smile className="w-4 h-4" />
