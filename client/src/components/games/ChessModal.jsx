@@ -123,39 +123,41 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, currentNickname, 
                                 <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">Match Status</span>
                             </div>
 
-                            <div className="space-y-2 sm:space-y-4">
-                                <div className={`flex items-center justify-between p-2 sm:p-3 rounded-lg sm:rounded-xl border-2 transition-all ${gameData.turn === 'w' ? `border-${accentColor}-500 bg-${accentColor}-50 dark:bg-${accentColor}-900/20` : 'border-transparent opacity-60'}`}>
+                            <div className="grid grid-cols-2 sm:grid-cols-1 gap-2 sm:gap-4">
+                                <div className={`flex items-center justify-between p-2 sm:p-3 rounded-lg sm:rounded-xl border-2 transition-all ${gameData.turn === 'w' ? `border-${accentColor}-500 bg-white dark:bg-gray-800 shadow-sm` : 'border-transparent opacity-60'}`}>
                                     <div className="flex items-center gap-2">
                                         <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center text-base sm:text-xl shadow-sm">♔</div>
                                         <div>
-                                            <p className="text-[10px] sm:text-xs font-bold text-gray-900 dark:text-white">{gameData.players.white?.name || 'Waiting...'}</p>
-                                            <div className="flex gap-0.5 mt-0.5 min-h-[10px]">
-                                                {capturedByWhite.map((p, idx) => (
+                                            <p className={`text-[10px] sm:text-xs font-bold truncate max-w-[70px] sm:max-w-none ${gameData.turn === 'w' ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>{gameData.players.white?.name || 'Waiting...'}</p>
+                                            <div className="flex gap-0.5 mt-0.5 min-h-[10px] overflow-hidden">
+                                                {capturedByWhite.slice(0, 4).map((p, idx) => (
                                                     <span key={idx} className="text-[9px] text-gray-400">{getPieceIcon(p.type, 'b')}</span>
                                                 ))}
+                                                {capturedByWhite.length > 4 && <span className="text-[8px] text-gray-400">+{capturedByWhite.length - 4}</span>}
                                             </div>
                                         </div>
                                     </div>
-                                    {isWhite && <Shield className={`w-3.5 h-3.5 sm:w-4 sm:h-4 text-${accentColor}-500`} />}
+                                    {isWhite && <Shield className={`w-3.5 h-3.5 sm:w-4 sm:h-4 text-${accentColor}-500 shrink-0`} />}
                                 </div>
 
-                                <div className="flex justify-center -my-1 opacity-30">
+                                <div className="hidden sm:flex justify-center -my-1 opacity-30">
                                     <Swords className="w-4 h-4 text-gray-400" />
                                 </div>
 
-                                <div className={`flex items-center justify-between p-2 sm:p-3 rounded-lg sm:rounded-xl border-2 transition-all ${gameData.turn === 'b' ? `border-${accentColor}-500 bg-${accentColor}-50 dark:bg-${accentColor}-900/20` : 'border-transparent opacity-60'}`}>
+                                <div className={`flex items-center justify-between p-2 sm:p-3 rounded-lg sm:rounded-xl border-2 transition-all ${gameData.turn === 'b' ? `border-${accentColor}-500 bg-white dark:bg-gray-800 shadow-sm` : 'border-transparent opacity-60'}`}>
                                     <div className="flex items-center gap-2">
                                         <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-gray-900 border-2 border-gray-700 flex items-center justify-center text-base sm:text-xl text-white shadow-sm font-light">♚</div>
                                         <div>
-                                            <p className="text-[10px] sm:text-xs font-bold text-gray-900 dark:text-white">{gameData.players.black?.name || 'Waiting...'}</p>
-                                            <div className="flex gap-0.5 mt-0.5 min-h-[10px]">
-                                                {capturedByBlack.map((p, idx) => (
+                                            <p className={`text-[10px] sm:text-xs font-bold truncate max-w-[70px] sm:max-w-none ${gameData.turn === 'b' ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>{gameData.players.black?.name || 'Waiting...'}</p>
+                                            <div className="flex gap-0.5 mt-0.5 min-h-[10px] overflow-hidden">
+                                                {capturedByBlack.slice(0, 4).map((p, idx) => (
                                                     <span key={idx} className="text-[9px] text-gray-400">{getPieceIcon(p.type, 'w')}</span>
                                                 ))}
+                                                {capturedByBlack.length > 4 && <span className="text-[8px] text-gray-400">+{capturedByBlack.length - 4}</span>}
                                             </div>
                                         </div>
                                     </div>
-                                    {isBlack && <Shield className={`w-3.5 h-3.5 sm:w-4 sm:h-4 text-${accentColor}-500`} />}
+                                    {isBlack && <Shield className={`w-3.5 h-3.5 sm:w-4 sm:h-4 text-${accentColor}-500 shrink-0`} />}
                                 </div>
                             </div>
                         </div>
@@ -198,14 +200,14 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, currentNickname, 
                         {isHost && !gameData.winner && (
                             <div className="bg-gray-100 dark:bg-gray-900/50 rounded-2xl p-4 border border-gray-200 dark:border-gray-800">
                                 <div className="flex items-center gap-2 mb-4 text-gray-400">
-                                    <Shield className="w-4 h-4 text-primary-500" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-primary-500">Host Management</span>
+                                    <Shield className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Host Management</span>
                                 </div>
 
                                 <div className="space-y-4">
                                     <button
                                         onClick={() => onMove(message.id, 'chess-swap')}
-                                        className="w-full py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
+                                        className="w-full py-2.5 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-700 rounded-xl text-[11px] font-black uppercase tracking-widest shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2"
                                     >
                                         <Swords className="w-3.5 h-3.5" />
                                         Swap White / Black

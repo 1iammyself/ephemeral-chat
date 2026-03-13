@@ -155,7 +155,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 flex flex-col items-center max-w-md w-full text-center border border-gray-300 dark:border-gray-700">
           <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
           <h3 className="text-xl font-bold mb-2 dark:text-white">Waiting for Host</h3>
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
+          <p className="text-gray-700 dark:text-gray-300 mb-6">
             The host has been notified of your arrival. Please wait for them to let you in.
           </p>
           <button
@@ -174,7 +174,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 flex flex-col items-center border border-gray-300 dark:border-gray-700">
           <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-2" />
-          <p className="text-gray-600 dark:text-gray-300">Loading room info...</p>
+          <p className="text-gray-700 dark:text-gray-300">Loading room info...</p>
         </div>
       </div>
     );
@@ -201,12 +201,12 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
             {/* Room Code display removed for security */}
             {roomInfo && (
               <>
-                <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mb-1">
+                <div className="flex items-center text-sm text-gray-700 dark:text-gray-300 mb-1">
                   <Users className="w-4 h-4 mr-2" />
                   {roomInfo.activeUsers} / {roomInfo.maxUsers} Users
                 </div>
                 {roomInfo.expiresAt && (
-                  <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                  <div className="flex items-center text-sm text-gray-700 dark:text-gray-300">
                     <Clock className="w-4 h-4 mr-2" />
                     Expires in {formatTimeRemaining(roomInfo.expiresAt)}
                   </div>

@@ -27,7 +27,7 @@ const SubPollInline = ({ subPoll, parentOptionId, messageId, currentUserId, acce
             {expanded && (
                 <div className="mt-1 space-y-1">
                     {!hasVotedParent && (
-                        <p className="text-[10px] text-gray-400 dark:text-gray-500 italic px-2 py-0.5">
+                        <p className="text-[10px] text-gray-500 dark:text-gray-500 italic px-2 py-0.5">
                             Vote for this option first to unlock follow-up choices
                         </p>
                     )}
@@ -37,10 +37,10 @@ const SubPollInline = ({ subPoll, parentOptionId, messageId, currentUserId, acce
                             <button key={so.id} onClick={() => handleSubVote(so.id)}
                                 disabled={!hasVotedParent}
                                 className={`w-full text-left px-2 py-1 rounded text-[11px] sm:text-xs border transition-colors ${!hasVotedParent
-                                    ? 'border-gray-100 dark:border-gray-700 text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-50'
+                                    ? 'border-gray-100 dark:border-gray-700 text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
                                     : voted
                                         ? `border-${accentColor}-400 bg-${accentColor}-50 dark:bg-${accentColor}-900/20 font-semibold text-${accentColor}-700 dark:text-${accentColor}-300`
-                                        : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/40'
+                                        : 'border-gray-100 dark:border-gray-700 text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/40'
                                     }`}
                             >
                                 {voted ? <CheckCircle2 className="w-3 h-3 inline mr-1" /> : <Circle className="w-3 h-3 inline mr-1" />}
@@ -193,7 +193,7 @@ const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
                                         <span className={`text-[13px] sm:text-sm ${isVoted ? `font-semibold ${selectedTextClass}` : 'text-gray-700 dark:text-gray-300'}`}>
                                             {option.text}
                                             {option.isCustom && (
-                                                <span className="ml-1.5 text-[10px] text-gray-400 dark:text-gray-500 italic">
+                                                <span className="ml-1.5 text-[10px] text-gray-500 dark:text-gray-500 italic">
                                                     (by {option.addedByNickname || 'someone'})
                                                 </span>
                                             )}
@@ -234,7 +234,7 @@ const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
                                 {!option.subPoll && creatingSubPollFor !== option.id && canAddFollowUp && (
                                     <button
                                         onClick={(e) => { e.stopPropagation(); setCreatingSubPollFor(option.id); }}
-                                        className="ml-5 mt-0.5 flex items-center text-[10px] text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors opacity-0 group-hover:opacity-100"
+                                        className="ml-5 mt-0.5 flex items-center text-[10px] text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors opacity-0 group-hover:opacity-100"
                                     >
                                         <MessageSquarePlus className="w-3 h-3 mr-0.5" />
                                         Add follow-up

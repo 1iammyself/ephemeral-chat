@@ -2491,7 +2491,7 @@ const ChatRoom = () => {
           </div>
         </div>
       )}
-      <div className={`${getVibeById(roomVibe).panelClass} px-4 py-2 sm:py-3 sticky top-0 z-50 shrink-0`}>
+      <div className={`${getVibeById(roomVibe).panelClass} px-4 pt-10 pb-2 sm:py-3 sticky top-0 z-50 shrink-0`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 sm:space-x-4">
             <button onClick={() => navigate('/')} className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
@@ -2680,7 +2680,7 @@ const ChatRoom = () => {
             {(isStealthMode || overrideTtl || isAnonymousMode) && (
               <div className="px-4 py-1.5 flex items-center gap-3 bg-transparent dark:bg-black/20 overflow-x-auto scrollbar-none">
                 {isStealthMode && (
-                  <div className="flex items-center gap-1.5 text-[10px] font-black tracking-tighter text-gray-500 dark:text-gray-400 bg-gray-100/80 dark:bg-gray-800/80 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-gray-200/50 dark:border-white/10 shadow-sm shrink-0">
+                  <div className="flex items-center gap-1.5 text-[10px] font-black tracking-tighter text-gray-600 dark:text-gray-400 bg-gray-100/80 dark:bg-gray-800/80 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-gray-200/50 dark:border-white/10 shadow-sm shrink-0">
                     <EyeOff className="w-3 h-3" />
                     GHOST MODE
                   </div>
@@ -2701,7 +2701,7 @@ const ChatRoom = () => {
             )}
 
             {typingUsers.size > 0 && !isStealthMode && (
-              <div className="px-4 py-1 text-xs text-gray-500 dark:text-gray-400 italic animate-pulse bg-black/5 dark:bg-white/5">
+              <div className="px-4 py-1 text-xs text-gray-600 dark:text-gray-400 italic animate-pulse bg-black/5 dark:bg-white/5">
                 {Array.from(typingUsers.values()).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
               </div>
             )}
@@ -2711,7 +2711,7 @@ const ChatRoom = () => {
                   <Reply className={`w-4 h-4 text-${vibeAccent}-500`} />
                   <div className={`flex flex-col text-xs border-l-2 border-${vibeAccent}-500 pl-2`}>
                     <span className={`font-semibold text-${vibeAccent}-500`}>Replying to {replyingTo.sender.nickname}</span>
-                    <span className="text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
+                    <span className="text-gray-600 dark:text-gray-400 truncate max-w-[200px]">
                       {replyingTo.messageType === 'image' ? 'Image' : replyingTo.messageType === 'audio' ? 'Voice Note' : replyingTo.content}
                     </span>
                   </div>
@@ -2759,7 +2759,7 @@ const ChatRoom = () => {
                         type="button"
                         onClick={() => setShowFeatureMenu(!showFeatureMenu)}
                         disabled={!isConnected}
-                        className={`p-1.5 sm:p-2.5 rounded-full transition-all duration-200 ${showFeatureMenu ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 text-${vibeAccent}-500` : `hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400`}`}
+                        className={`p-1.5 sm:p-2.5 rounded-full transition-all duration-200 ${showFeatureMenu ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 text-${vibeAccent}-500` : `hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400`}`}
                         title="Features"
                       >
                         <Plus className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300 ${showFeatureMenu ? 'rotate-45' : ''}`} />
@@ -2936,7 +2936,7 @@ const ChatRoom = () => {
                           setShowEmojiPicker(!showEmojiPicker);
                         }}
                         disabled={!isConnected}
-                        className={`p-1.5 sm:p-2.5 rounded-full transition-colors ${showEmojiPicker ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 text-${vibeAccent}-500` : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
+                        className={`p-1.5 sm:p-2.5 rounded-full transition-colors ${showEmojiPicker ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 text-${vibeAccent}-500` : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'}`}
                         title="Emoji"
                       >
                         <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -3019,7 +3019,7 @@ const ChatRoom = () => {
                         onCut={(e) => e.preventDefault()}
                         onPaste={(e) => e.preventDefault()}
                         placeholder={isAnonymousMode ? "Confess anonymously..." : "Type message..."}
-                        className="w-full bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white text-[15px] sm:text-base px-2 py-2.5 min-w-0 placeholder:text-gray-500 dark:placeholder:text-gray-400"
+                        className={`w-full bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white text-[15px] sm:text-base py-2.5 min-w-0 placeholder:text-gray-500 dark:placeholder:text-gray-400 ${newMessage.startsWith('🧊 ') ? 'pl-2 pr-10' : 'px-2'}`}
                         disabled={!isConnected}
                         maxLength={500}
                         style={{ boxShadow: 'none' }}

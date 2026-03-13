@@ -289,7 +289,7 @@ const NearbyTransfer = () => {
     <div className="h-screen flex flex-col bg-gradient-to-br from-cyan-50 to-blue-100 dark:from-gray-900 dark:to-gray-800">
       {/* Header */}
       <header className="flex-shrink-0 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 pt-10 pb-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('/')}
@@ -452,10 +452,10 @@ const NearbyTransfer = () => {
                 {peers.length === 0 ? (
                   <div className="p-8 text-center">
                     <Radio className="w-10 h-10 mx-auto text-gray-300 dark:text-gray-600 mb-3 animate-pulse" />
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-700 dark:text-gray-400">
                       Scanning for nearby devices...
                     </p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    <p className="text-xs text-gray-600 dark:text-gray-500 mt-1">
                       Make sure other devices have Nearby Transfer open
                     </p>
                   </div>
@@ -553,7 +553,7 @@ const NearbyTransfer = () => {
                       {offlineStep === 'creating' || offlineStep === 'generating-answer' ? (
                         <div className="flex flex-col items-center justify-center p-8 space-y-3">
                           <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
-                          <p className="text-sm font-medium text-gray-500 dark:text-gray-300">
+                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                             {offlineStep === 'creating' ? 'Generating secure offline payload...' : 'Generating encrypted response...'}
                           </p>
                         </div>
@@ -573,7 +573,7 @@ const NearbyTransfer = () => {
                               <p className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-1">
                                 Wait for the peer to scan this...
                               </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
                                 Once they do, they will show you a Reply QR.
                               </p>
                               <button
@@ -589,7 +589,7 @@ const NearbyTransfer = () => {
                               <p className="text-sm font-bold text-green-600 dark:text-green-400 mb-1">
                                 Successfully generated reply!
                               </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-300 mb-3">
+                              <p className="text-xs text-gray-600 dark:text-gray-300 mb-3">
                                 Show this reply QR to the first device so they can scan it.
                               </p>
                               <button

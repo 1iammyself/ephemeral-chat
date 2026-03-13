@@ -173,7 +173,7 @@ const UserList = ({
       {/* User List */}
       <div className="flex-1 overflow-y-auto p-2 sm:p-4 pb-16 scrollbar-thin">
         {users.length === 0 ? (
-          <div className="text-center text-gray-500 dark:text-gray-400 py-8">
+          <div className="text-center text-gray-600 dark:text-gray-400 py-8">
             <User className="w-8 h-8 mx-auto mb-2 opacity-30" />
             <p className="text-sm font-semibold">No users online</p>
           </div>
@@ -242,7 +242,7 @@ const UserList = ({
                         }}
                         className="p-1 sm:p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-all active:scale-95"
                       >
-                        <ChevronDown className={`w-4 h-4 sm:w-5 sm:h-5 text-gray-500 transition-transform ${showAdminMenu ? 'rotate-180' : ''}`} />
+                        <ChevronDown className={`w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400 transition-transform ${showAdminMenu ? 'rotate-180' : ''}`} />
                       </button>
                     )}
                   </div>
@@ -253,7 +253,7 @@ const UserList = ({
                       {/* Role Selection */}
                       {canChangeUserRole && assignableRoles.length > 0 && (
                         <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 flex items-center">
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1 flex items-center">
                             <Shield className="w-3 h-3 mr-1" />
                             Change Role
                           </p>

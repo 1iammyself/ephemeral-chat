@@ -186,10 +186,10 @@ const Home = ({ children }) => {
   ];
 
   return (
-    <div style={{ height: '100vh', overflowY: 'auto' }} className="bg-white dark:bg-gray-900 transition-colors duration-200 no-scrollbar">
+    <div style={{ height: '100vh', overflowY: 'auto' }} className="bg-slate-50 dark:bg-gray-900 transition-colors duration-200 no-scrollbar">
       {/* Header */}
       <header className="bg-white/80 dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 transition-colors duration-200 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 pt-10 pb-4 sm:py-6 sm:px-6 lg:px-8 flex justify-between items-center">
+        <div className="max-w-7xl mx-auto px-4 pt-14 pb-4 sm:py-6 sm:px-6 lg:px-8 flex justify-between items-center">
           <h1 className="text-xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 flex items-center">
             <img src="/logo.svg" alt="Logo" className="h-8 w-8 sm:h-10 sm:w-10 mr-2 sm:mr-3" />
             Ephemeral Chat
@@ -228,7 +228,7 @@ const Home = ({ children }) => {
 
                 <button
                   onClick={() => navigate('/my-rooms')}
-                  className="w-full flex justify-center items-center px-4 py-2.5 sm:py-3.5 text-sm sm:text-lg font-semibold rounded-xl text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800/80 transition-all transform active:scale-[0.98] border border-gray-200 dark:border-gray-700 mt-3"
+                  className="w-full flex justify-center items-center px-4 py-2.5 sm:py-3.5 text-sm sm:text-lg font-semibold rounded-xl text-gray-700 dark:text-gray-300 bg-slate-100 dark:bg-gray-800/50 hover:bg-slate-200 dark:hover:bg-gray-800/80 transition-all transform active:scale-[0.98] border border-slate-200 dark:border-gray-700 mt-3"
                 >
                   <Timer className="-ml-1 mr-2 h-5 w-5" />
                   My Rooms

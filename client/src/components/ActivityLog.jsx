@@ -43,7 +43,7 @@ const ActivityLog = ({ isOpen, onClose, logs }) => {
                     {logs.length === 0 ? (
                         <div className="py-10 text-center space-y-3">
                             <div className="w-12 h-12 bg-gray-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center mx-auto">
-                                <Info className="w-6 h-6 text-gray-200 dark:text-gray-700" />
+                                <Info className="w-6 h-6 text-gray-400 dark:text-gray-400" />
                             </div>
                             <p className="text-sm text-gray-400 font-medium">No activity recorded yet</p>
                         </div>

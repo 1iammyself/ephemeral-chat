@@ -87,7 +87,7 @@ const MyDrops = () => {
     <div style={{ height: '100vh', overflowY: 'auto' }} className="dark:bg-gray-900 transition-colors duration-200 no-scrollbar">
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm transition-colors duration-200 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 pt-10 pb-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('/')}
