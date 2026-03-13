@@ -2840,7 +2840,7 @@ const ChatRoom = () => {
                             <>
                               <div className="h-px bg-gray-100 dark:bg-gray-700/50 sm:mx-1" />
                               {/* Mobile: single compact row */}
-                              <div className="flex sm:hidden items-center gap-1 px-0.5 overflow-hidden">
+                              <div className="flex sm:hidden items-center justify-between w-full px-0.5 overflow-hidden">
                                 <div className="flex items-center w-[102px] flex-shrink-0 overflow-x-auto scrollbar-none gap-0.5 sm:gap-1 sm:py-0.5 no-scrollbar bg-black/5 dark:bg-black/20 rounded-lg px-0.5 border border-white/5 shadow-inner">
                                   {getAllVibes().map(vibe => (
                                     <button
@@ -2853,13 +2853,14 @@ const ChatRoom = () => {
                                     </button>
                                   ))}
                                 </div>
-                                <div className="w-px h-5 bg-gray-200 dark:bg-gray-700/50 mx-0.5 flex-shrink-0" />
-                                <button type="button" onClick={() => { setShowTopicEditor(true); setShowFeatureMenu(false); }} className="p-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10 flex-shrink-0" title="Topic">
-                                  <Edit2 className="w-3.5 h-3.5 text-orange-500" />
-                                </button>
-                                <button type="button" onClick={() => { if (activeTimer) handleStopTimer(); else setShowTimerModal(true); setShowFeatureMenu(false); }} className={`p-1 rounded-lg border border-white/10 transition-all flex-shrink-0 ${activeTimer ? 'bg-red-500/10 hover:bg-red-500/20' : 'bg-white/5 hover:bg-white/10'}`} title={activeTimer ? 'Stop Timer' : 'Timer'}>
-                                  {activeTimer ? <X className="w-3.5 h-3.5 text-red-500" /> : <Clock className={`w-3.5 h-3.5 text-${vibeAccent}-500`} />}
-                                </button>
+                                <div className="flex items-center gap-1">
+                                  <button type="button" onClick={() => { setShowTopicEditor(true); setShowFeatureMenu(false); }} className="p-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10 flex-shrink-0" title="Topic">
+                                    <Edit2 className="w-3.5 h-3.5 text-orange-500" />
+                                  </button>
+                                  <button type="button" onClick={() => { if (activeTimer) handleStopTimer(); else setShowTimerModal(true); setShowFeatureMenu(false); }} className={`p-1 rounded-lg border border-white/10 transition-all flex-shrink-0 ${activeTimer ? 'bg-red-500/10 hover:bg-red-500/20' : 'bg-white/5 hover:bg-white/10'}`} title={activeTimer ? 'Stop Timer' : 'Timer'}>
+                                    {activeTimer ? <X className="w-3.5 h-3.5 text-red-500" /> : <Clock className={`w-3.5 h-3.5 text-${vibeAccent}-500`} />}
+                                  </button>
+                                </div>
                               </div>
                               {/* Desktop: full admin section with labels */}
                               <div className="hidden sm:block space-y-2">
