@@ -2966,7 +2966,7 @@ const ChatRoom = () => {
                       {suggestions.show && (
                         <div
                           ref={suggestionRef}
-                          className="absolute bottom-full left-0 -ml-12 sm:ml-0 mb-3 w-[85vw] sm:w-full max-w-[280px] sm:max-w-none bg-white/60 dark:bg-black/40 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] overflow-hidden z-[60] animate-in slide-in-from-bottom-2 duration-300 ring-1 ring-white/10"
+                          className="absolute bottom-full left-0 -ml-12 sm:ml-0 mb-3 w-[85vw] sm:w-full max-w-[280px] sm:max-w-none bg-white/10 dark:bg-black/20 backdrop-blur-2xl border border-white/20 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] overflow-hidden z-[60] animate-in slide-in-from-bottom-2 duration-300 ring-1 ring-white/10"
                         >
                           <div className="max-h-48 overflow-y-auto p-1.5 sm:p-2 space-y-0.5">
                             {suggestions.items.map((item, idx) => (
@@ -2974,16 +2974,16 @@ const ChatRoom = () => {
                                 key={idx}
                                 onClick={() => applySuggestion(item)}
                                 onMouseEnter={() => setSuggestions(prev => ({ ...prev, index: idx }))}
-                                className={`w-full flex items-center space-x-2 sm:space-x-3 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl transition-all text-left ${idx === suggestions.index ? `bg-${vibeAccent}-50/80 dark:bg-${vibeAccent}-900/20 text-${vibeAccent}-600 dark:text-${vibeAccent}-400 shadow-sm border border-${vibeAccent}-100 dark:border-${vibeAccent}-800/30` : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300 border border-transparent'}`}
+                                className={`w-full flex items-center space-x-2 sm:space-x-3 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl transition-all text-left ${idx === suggestions.index ? `bg-${vibeAccent}-500/20 dark:bg-${vibeAccent}-400/20 shadow-sm border border-${vibeAccent}-500/30` : 'hover:bg-white/5 dark:hover:bg-white/5 border border-transparent'}`}
                               >
                                 {suggestions.type === 'command' ? (
                                   <>
-                                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shadow-sm ${idx === suggestions.index ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40` : 'bg-gray-100 dark:bg-gray-700'}`}>
+                                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shadow-sm ${idx === suggestions.index ? `bg-${vibeAccent}-500/30 dark:bg-${vibeAccent}-400/30` : 'bg-white/10 dark:bg-white/5'}`}>
                                       <item.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                       <div className="font-bold text-[11px] sm:text-sm tracking-tight">{item.value}</div>
-                                      <div className="text-[9px] sm:text-[10px] font-medium opacity-70 truncate">{item.desc}</div>
+                                      <div className="text-[10px] sm:text-[11px] font-semibold text-gray-800 dark:text-gray-100 truncate">{item.desc}</div>
                                     </div>
                                   </>
                                 ) : (
