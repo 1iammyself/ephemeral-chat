@@ -2770,7 +2770,7 @@ const ChatRoom = () => {
                           {/* Reaction Row */}
                           <div className="flex items-center gap-0.5 sm:gap-1 bg-white/40 dark:bg-white/5 rounded-xl sm:rounded-2xl p-0.5 sm:p-1 px-1 sm:px-1.5 border border-white/10 shadow-inner">
                             <div className="flex items-center flex-1 overflow-x-auto scrollbar-none gap-0.5 sm:gap-1 sm:py-0.5 no-scrollbar">
-                              {['❤️', '🔥', '👏', '😂', '😮', '💯', '😍', '😘', '✨', '⚡', '🎉', '👍', '🙏', '👀', '🤔', '😎', '🥳', '🤯', '💎', '🎨', '💦', '🍆'].map(emoji => (
+                              {['❤️', '🔥', '👏', '😂', '😮', '💯', '😍', '😘', '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '🥰', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '😏', '🙄', '😬', '🤥', '😌', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵', '🤩', '🥳', '🤡', '🤠', '✨', '⚡', '🎉', '👍', '🙏', '👀', '🤔', '😎', '🥳', '🤯', '💎', '🎨', '💦', '🍆', '💀', '💩', '🌈', '🍦', '🍕', '🎸', '🎮', '🚀', '🛸', '👻', '👾', '👑', '💸', '💪', '🙌', '🤝', '🤤', '😈', '🥺'].map(emoji => (
                                 <button
                                   key={emoji}
                                   type="button"
@@ -2875,7 +2875,7 @@ const ChatRoom = () => {
                               {/* Desktop: full admin section with labels */}
                               <div className="hidden sm:block space-y-2">
                                 <div className="flex items-center justify-between px-1">
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex-shrink-0 mr-4">Admin</p>
+                                  <p className="text-[10px] font-bold text-gray-800 dark:text-gray-400 uppercase tracking-widest flex-shrink-0 mr-4">Admin</p>
                                   <div className="w-[146px] overflow-x-auto scrollbar-none no-scrollbar flex-shrink-0 ml-auto bg-black/10 dark:bg-black/20 rounded-full px-1 border border-white/5 shadow-inner group/vibes">
                                     <div className="flex gap-1.5 py-1">
                                       {getAllVibes().map(vibe => (

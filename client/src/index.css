@@ -417,7 +417,7 @@
 
   /* THEME AGNOSTIC: Automatically inverts based on background color */
   mix-blend-mode: difference;
-  color: rgba(255, 255, 255, 0.30);
+  color: rgba(255, 255, 255, 0.25);
   /* Increased opacity from 0.22 */
   text-shadow: 0 0 2px rgba(0, 0, 0, 0.35);
 

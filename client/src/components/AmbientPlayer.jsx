@@ -386,13 +386,13 @@ const AmbientPlayer = ({ moodSound, isActive = true }) => {
             style={{ transform: `translateX(${dragX}px)`, opacity: Math.max(0, 1 - Math.abs(dragX) / 100) }}
             onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
             <div className="cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setIsMinimized(true)}>
-                <span className={config.color}>{config.label}</span>
+                <span className={config.color}>{emoji}</span>
             </div>
             <button onClick={() => setIsMuted(!isMuted)} className="p-0.5 rounded-full hover:bg-black/10 transition-colors">
                 {isMuted ? <VolumeX className="w-3 h-3 text-gray-500" /> : <Volume2 className="w-3 h-3 text-gray-700 dark:text-gray-300" />}
             </button>
             <input type="range" min="0" max="1" step="0.05" value={isMuted ? 0 : volume} onChange={(e) => { setVolume(parseFloat(e.target.value)); setIsMuted(false); }}
-                className="w-6 h-1 bg-transparent rounded-lg appearance-none cursor-pointer accent-gray-600" />
+                className="w-12 h-1 bg-transparent rounded-lg appearance-none cursor-pointer accent-gray-600" />
             <div className="w-px h-2.5 bg-gray-500/30 mx-0.5" />
             <button onClick={() => setIsMinimized(true)} className="p-0.5 rounded-full hover:bg-black/10"><ChevronRight className="w-3.5 h-3.5 text-gray-400" /></button>
         </div>
