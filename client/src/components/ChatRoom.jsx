@@ -1563,7 +1563,7 @@ const ChatRoom = () => {
     if (!messagesContainerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
     const isNearBottom = scrollHeight - scrollTop - clientHeight < 250;
-    
+
     // Auto-scroll only if already near bottom or if the last message was from the current user
     const lastMessage = messages[messages.length - 1];
     const isOwnMessage = lastMessage && currentUser && (
@@ -1579,7 +1579,7 @@ const ChatRoom = () => {
   const handleScroll = useCallback(() => {
     if (!messagesContainerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
-    
+
     // Show button if we are more than 300px away from the bottom
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
     setShowScrollBottom(distanceFromBottom > 300);
@@ -2619,7 +2619,7 @@ const ChatRoom = () => {
               )}
             </div>
           )}
-          <div 
+          <div
             ref={messagesContainerRef}
             onScroll={handleScroll}
             className="flex-1 min-h-0 overflow-y-auto pl-4 lg:pl-10 pr-2 scrollbar-thin overscroll-contain touch-pan-y chat-messages-area relative"
@@ -2770,14 +2770,14 @@ const ChatRoom = () => {
                           {/* Reaction Row */}
                           <div className="flex items-center gap-0.5 sm:gap-1 bg-white/40 dark:bg-white/5 rounded-xl sm:rounded-2xl p-0.5 sm:p-1 px-1 sm:px-1.5 border border-white/10 shadow-inner">
                             <div className="flex items-center flex-1 overflow-x-auto scrollbar-none gap-0.5 sm:gap-1 sm:py-0.5 no-scrollbar">
-                              {['❤️', '🔥', '👏', '😂', '😮', '💯', '😍', '😘', '✨', '⚡', '🎉', '👍', '🙏', '👀', '🤔', '😎', '🥳', '🤯', '💎', '🎨'].map(emoji => (
+                              {['❤️', '🔥', '👏', '😂', '😮', '💯', '😍', '😘', '✨', '⚡', '🎉', '👍', '🙏', '👀', '🤔', '😎', '🥳', '🤯', '💎', '🎨', '💦', '🍆'].map(emoji => (
                                 <button
                                   key={emoji}
                                   type="button"
                                   onClick={() => sendRoomReaction(emoji)}
                                   className="p-0.5 sm:p-1 hover:bg-white dark:hover:bg-gray-700 rounded sm:rounded-lg transition-all hover:scale-110 sm:hover:scale-125 active:scale-95 flex-shrink-0"
                                 >
-                                  <span className="text-base sm:text-xl leading-none">{emoji}</span>
+                                  <span className="text-sm sm:text-xl leading-none">{emoji}</span>
                                 </button>
                               ))}
                             </div>
@@ -2832,6 +2832,16 @@ const ChatRoom = () => {
                                 <Snowflake className="w-4 h-4 text-cyan-500" />
                               </div>
                               <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Icebreaker</span>
+                            </button>
+                            <button type="button" onClick={() => { setShowGameModal(true); setShowFeatureMenu(false); }} disabled={!isConnected} className="flex sm:hidden items-center justify-center p-1.5 rounded-lg bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group" title="Games">
+                              <div className="flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <Dices className="w-4 h-4 text-orange-500" />
+                              </div>
+                            </button>
+                            <button type="button" onClick={() => { setShowWatchPartyModal(true); setShowFeatureMenu(false); }} disabled={!isConnected} className="flex sm:hidden items-center justify-center p-1.5 rounded-lg bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group" title="Watch Party">
+                              <div className="flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <Activity className="w-4 h-4 text-purple-400" />
+                              </div>
                             </button>
                           </div>
 
