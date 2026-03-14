@@ -2833,7 +2833,7 @@ const ChatRoom = () => {
                 <button onClick={() => setSelectedRecipients([])} className={`text-xs text-${vibeAccent}-500 hover:text-${vibeAccent}-700 dark:hover:text-${vibeAccent}-200 underline`}>Clear selection</button>
               </div>
             )}
-            <div className="px-2 pt-2 sm:px-4 sm:pt-4 pb-0 sm:pb-4 w-full">
+            <div className="px-2 pt-2 sm:px-4 sm:pt-4 pb-0 sm:pb-4 w-full relative z-10 bg-transparent">
               <form onSubmit={handleSendMessage} className="flex items-center w-full">
                 {isRecording ? (
                   <div className="flex-1 flex flex-col space-y-2 w-full">
@@ -3199,7 +3199,7 @@ const ChatRoom = () => {
             {/* Bottom-Docked Emoji Drawer (Mobile Only) */}
             <div
               id="emoji-drawer"
-              className={`mobile-emoji-drawer sm:hidden w-full transition-all duration-300 ease-in-out bg-white/50 dark:bg-gray-900/50 backdrop-blur-md overflow-hidden relative ${showEmojiPicker ? 'h-[320px] opacity-100 pointer-events-auto border-t border-gray-200 dark:border-gray-800' : 'h-0 opacity-0 pointer-events-none border-t-0'}`}
+              className={`mobile-emoji-drawer sm:hidden w-full transition-all duration-300 ease-in-out bg-white/50 dark:bg-gray-900/50 backdrop-blur-md overflow-hidden relative ${showEmojiPicker ? 'h-[320px] opacity-100 pointer-events-auto -mt-3 z-0' : 'h-0 opacity-0 pointer-events-none mt-0'}`}
             >
               <div className="w-full h-full pb-[calc(env(safe-area-inset-bottom,16px)+36px)]">
                 <EmojiPicker

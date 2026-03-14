@@ -704,6 +704,8 @@ cap-widget {
   padding: 4px 12px 2px 12px !important;
   width: 100% !important;
   box-sizing: border-box !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
 }
 
 /* 2. Emoji Scroll Area in the middle */
