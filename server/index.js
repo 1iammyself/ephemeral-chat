@@ -593,7 +593,7 @@ app.post('/api/verbal-join', async (req, res) => {
 
 app.post('/api/rooms', async (req, res) => {
   try {
-    const { messageTTL, password, maxUsers, capToken, creatorId, persistenceMode, customCode, hp_email, hp_website, hp_timestamp } = req.body;
+    const { messageTTL, password, maxUsers, capToken, creatorId, persistenceMode, customCode, hp_email, hp_website, hp_timestamp, autoApprove, preApprovedList } = req.body;
 
     logger.info('HTTP room creation request:', { messageTTL, password, maxUsers, hasCapToken: !!capToken, creatorId: !!creatorId, persistenceMode });
 
@@ -645,6 +645,26 @@ app.post('/api/rooms', async (req, res) => {
     }
 
     const roomCode = await roomManager.createRoom(settings);
+
+    // Store auto-approve and pre-approved list in roomData for this room
+    if (!roomData[roomCode]) {
+      roomData[roomCode] = { hostId: null, lobbyLimit: 100, lobbyCount: 0, userRoles: {} };
+    }
+    roomData[roomCode].autoApprove = !!autoApprove;
+    if (Array.isArray(preApprovedList)) {
+      roomData[roomCode].preApprovedList = preApprovedList
+        .filter(entry => entry && typeof entry.name === 'string' && entry.name.trim().length > 0)
+        .map(entry => ({
+          name: sanitizeInput(entry.name.trim()).substring(0, 20),
+          role: ['admin', 'mod', 'tier1', 'tier2', 'none', 'user'].includes((entry.role || '').toLowerCase())
+            ? entry.role.toLowerCase()
+            : 'none'
+        }))
+        .slice(0, 100);
+    } else {
+      roomData[roomCode].preApprovedList = [];
+    }
+
     res.json({ success: true, roomCode });
   } catch (error) {
     logger.error('Error creating room via HTTP:', error);
@@ -979,12 +999,16 @@ io.on('connection', (socket) => {
 
     // 3. If room is empty (no live sockets), user becomes host automatically
     if (liveUserCount === 0) {
-      // Initialize or reset roomData
+      // Initialize or reset roomData (preserve preApprovedList if it was set during room creation)
+      const existingPreApproved = room?.preApprovedList || [];
+      const existingAutoApprove = room?.autoApprove || false;
       roomData[roomCode] = {
         hostId: socket.id,
         lobbyLimit: 100,
         lobbyCount: 0,
-        userRoles: {}
+        userRoles: {},
+        autoApprove: existingAutoApprove,
+        preApprovedList: existingPreApproved
       };
 
       logger.info(`👑 Room ${roomCode} is empty, ${nickname} auto-approved as host`);
@@ -998,9 +1022,47 @@ io.on('connection', (socket) => {
         hostId: firstUser,
         lobbyLimit: 100,
         lobbyCount: 0,
-        userRoles: {}
+        userRoles: {},
+        autoApprove: false,
+        preApprovedList: []
       };
       roomData[roomCode] = room;
+    }
+
+    // 4b. Check auto-approve mode — skip the knock/waiting lobby entirely
+    if (room.autoApprove) {
+      logger.info(`✅ Auto-approve enabled for room ${roomCode}, auto-approving ${nickname}`);
+      return socket.emit('knock-approved', { isHost: false });
+    }
+
+    // 4c. Check pre-approved user list — auto-approve if nickname matches
+    if (room.preApprovedList && room.preApprovedList.length > 0) {
+      const normalizedNickname = (nickname || '').toLowerCase().trim();
+      const matchedEntry = room.preApprovedList.find(
+        entry => entry.name.toLowerCase().trim() === normalizedNickname
+      );
+
+      if (matchedEntry) {
+        // Check if the nickname is already taken by someone in the room
+        const managedRoom = await roomManager.getRoom(roomCode);
+        const nicknameTaken = managedRoom?.users?.some(
+          u => (u.nickname || '').toLowerCase().trim() === normalizedNickname
+        );
+
+        if (!nicknameTaken) {
+          // Assign role if specified in the pre-approved entry
+          if (matchedEntry.role && matchedEntry.role !== 'none') {
+            if (!room.userRoles) room.userRoles = {};
+            // Map friendly role names to internal roles
+            const roleMap = { admin: 'tier1', mod: 'tier2', tier1: 'tier1', tier2: 'tier2', user: 'user' };
+            const internalRole = roleMap[matchedEntry.role.toLowerCase()] || 'user';
+            room.userRoles[socket.id] = internalRole;
+          }
+
+          logger.info(`✅ Pre-approved user "${nickname}" auto-approved for room ${roomCode} with role: ${matchedEntry.role || 'user'}`);
+          return socket.emit('knock-approved', { isHost: false });
+        }
+      }
     }
 
     // 5. Check Lobby Limit
@@ -1052,6 +1114,64 @@ io.on('connection', (socket) => {
     }
 
     socket.emit('knock-pending');
+  });
+
+  // Screenshot attempt notification — relay to other users in the room
+  socket.on('screenshot-attempt', ({ roomCode: ssRoomCode }) => {
+    if (!ssRoomCode || !socket.roomCode || socket.roomCode !== ssRoomCode) return;
+    const senderNickname = socket.nickname || 'Someone';
+    // Notify all OTHER users in the room (not the sender)
+    socket.to(ssRoomCode).emit('screenshot-detected', {
+      nickname: senderNickname,
+      timestamp: new Date().toISOString()
+    });
+    logger.info(`📸 Screenshot attempt detected from ${senderNickname} in room ${ssRoomCode}`);
+  });
+
+  // Auto-approve toggle — host or tier1 can enable/disable
+  socket.on('toggle-auto-approve', ({ roomCode: aaRoomCode, enabled }) => {
+    const aaRoom = roomData[aaRoomCode];
+    if (!aaRoom) return;
+    const requesterRole = aaRoom.userRoles?.[socket.id] || (aaRoom.hostId === socket.id ? 'host' : 'user');
+    if (requesterRole !== 'host' && requesterRole !== 'tier1') return;
+
+    aaRoom.autoApprove = !!enabled;
+    logger.info(`🔓 Auto-approve ${enabled ? 'enabled' : 'disabled'} for room ${aaRoomCode} by ${socket.nickname}`);
+
+    // Notify all users in the room about the change
+    io.to(aaRoomCode).emit('auto-approve-updated', {
+      enabled: aaRoom.autoApprove,
+      updatedBy: socket.nickname
+    });
+  });
+
+  // Update pre-approved user list — host or tier1 can modify
+  socket.on('update-pre-approved-list', ({ roomCode: palRoomCode, list }) => {
+    const palRoom = roomData[palRoomCode];
+    if (!palRoom) return;
+    const requesterRole = palRoom.userRoles?.[socket.id] || (palRoom.hostId === socket.id ? 'host' : 'user');
+    if (requesterRole !== 'host' && requesterRole !== 'tier1') return;
+
+    // Validate and sanitize the list
+    if (!Array.isArray(list)) return;
+    const sanitizedList = list
+      .filter(entry => entry && typeof entry.name === 'string' && entry.name.trim().length > 0)
+      .map(entry => ({
+        name: sanitizeInput(entry.name.trim()).substring(0, 20),
+        role: ['admin', 'mod', 'tier1', 'tier2', 'none', 'user'].includes((entry.role || '').toLowerCase())
+          ? entry.role.toLowerCase()
+          : 'none'
+      }))
+      .slice(0, 100); // Max 100 pre-approved users
+
+    palRoom.preApprovedList = sanitizedList;
+    logger.info(`📋 Pre-approved list updated for room ${palRoomCode}: ${sanitizedList.length} users by ${socket.nickname}`);
+
+    // Notify all users in the room about the update
+    io.to(palRoomCode).emit('pre-approved-list-updated', {
+      list: sanitizedList,
+      updatedBy: socket.nickname
+    });
   });
 
   socket.on('deny-guest', ({ guestId, roomCode }) => {
@@ -1766,7 +1886,9 @@ io.on('connection', (socket) => {
           userRoles: roomData[roomCode].userRoles || {},
           vibe: roomData[roomCode].vibe || 'default',
           topic: roomData[roomCode].topic || '',
-          timer: roomData[roomCode].timer || null
+          timer: roomData[roomCode].timer || null,
+          autoApprove: roomData[roomCode].autoApprove || false,
+          preApprovedList: roomData[roomCode].preApprovedList || []
         };
 
         const enrichedUsers = getEnrichedUsers(roomCode);

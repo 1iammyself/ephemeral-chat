@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { hapticSuccess } from '../utils/platform';
-import { X, Check, Copy, Users, Lock, Unlock, Timer, Zap, PartyPopper, Sun, Sunset, Settings, Clock, Shield, Share2, Hash } from 'lucide-react';
+import { X, Check, Copy, Users, Lock, Unlock, Timer, Zap, PartyPopper, Sun, Sunset, Settings, Clock, Shield, Share2, Hash, ToggleLeft, ToggleRight, Upload, Plus, Trash2, ClipboardList } from 'lucide-react';
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
 import ShareSheet from './ShareSheet';
@@ -44,6 +44,10 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const [useCustomCode, setUseCustomCode] = useState(false);
   const [customCode, setCustomCode] = useState('');
   const [customCodeError, setCustomCodeError] = useState('');
+  const [autoApproveEnabled, setAutoApproveEnabled] = useState(false);
+  const [preApprovedText, setPreApprovedText] = useState('');
+  const [preApprovedEntries, setPreApprovedEntries] = useState([]);
+  const preApprovedFileRef = useRef(null);
   const navigate = useNavigate();
 
   // Set timestamp when component mounts (for timing-based bot detection)
@@ -137,7 +141,9 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
               hp_website: honeypot.hp_website,
               hp_timestamp: honeypot.hp_timestamp,
               creatorId: creatorId, // NEW: Include creator ID
-              persistenceMode: roomSettings.persistenceMode // NEW: Include persistence mode
+              persistenceMode: roomSettings.persistenceMode, // NEW: Include persistence mode
+              autoApprove: autoApproveEnabled,
+              preApprovedList: preApprovedEntries.length > 0 ? preApprovedEntries : undefined
             }),
           });
           if (response.ok) break; // Success, exit retry loop
@@ -643,6 +649,104 @@ Verbal Code: ${verbalCode || 'N/A'}`;
                     <span>1</span>
                     <span>10</span>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Auto-Approve & Pre-Approved List */}
+            <div>
+              <div className="flex items-center space-x-2 mb-2 sm:mb-3">
+                <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
+                <label className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">
+                  Access Control
+                </label>
+              </div>
+
+              {/* Auto-Approve Toggle */}
+              <div className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 mb-3">
+                <div>
+                  <div className="font-medium text-sm dark:text-white">Auto-Approve Users</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Skip the waiting room for all joiners</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAutoApproveEnabled(!autoApproveEnabled)}
+                  className={`flex-shrink-0 transition-all active:scale-95 ${autoApproveEnabled ? 'text-green-500' : 'text-gray-400 dark:text-gray-500'}`}
+                >
+                  {autoApproveEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
+                </button>
+              </div>
+
+              {/* Pre-Approved List */}
+              <div className="p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2 mb-2">
+                  <ClipboardList className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <span className="font-medium text-sm dark:text-white">Pre-Approved List</span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  Users on this list bypass the waiting room. Assign optional roles.
+                </p>
+                <textarea
+                  value={preApprovedText}
+                  onChange={(e) => {
+                    setPreApprovedText(e.target.value);
+                    // Parse as they type
+                    const entries = e.target.value.split(',')
+                      .map(s => s.trim())
+                      .filter(s => s.length > 0)
+                      .map(s => {
+                        const match = s.match(/^([^(]+?)(?:\(([^)]+)\))?$/);
+                        if (!match) return null;
+                        return { name: match[1].trim(), role: (match[2] || 'none').trim().toLowerCase() };
+                      })
+                      .filter(Boolean);
+                    setPreApprovedEntries(entries);
+                  }}
+                  placeholder="user1(admin), user2, user3(mod)"
+                  className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  rows={2}
+                />
+                <div className="flex items-center justify-between mt-2">
+                  <button
+                    type="button"
+                    onClick={() => preApprovedFileRef.current?.click()}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-gray-100 dark:bg-gray-700 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-500 transition-all active:scale-[0.98]"
+                  >
+                    <Upload className="w-3 h-3" />
+                    Import .txt
+                  </button>
+                  <input
+                    ref={preApprovedFileRef}
+                    type="file"
+                    accept=".txt"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        const text = ev.target.result;
+                        setPreApprovedText(text);
+                        const entries = text.split(',')
+                          .map(s => s.trim())
+                          .filter(s => s.length > 0)
+                          .map(s => {
+                            const match = s.match(/^([^(]+?)(?:\(([^)]+)\))?$/);
+                            if (!match) return null;
+                            return { name: match[1].trim(), role: (match[2] || 'none').trim().toLowerCase() };
+                          })
+                          .filter(Boolean);
+                        setPreApprovedEntries(entries);
+                      };
+                      reader.readAsText(file);
+                      e.target.value = '';
+                    }}
+                    className="hidden"
+                  />
+                  {preApprovedEntries.length > 0 && (
+                    <span className="text-[10px] text-green-600 dark:text-green-400 font-semibold">
+                      {preApprovedEntries.length} user{preApprovedEntries.length !== 1 ? 's' : ''} added
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

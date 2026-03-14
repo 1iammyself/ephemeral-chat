@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Info, User, LogOut, Zap, Clock, Hash, Palette, Activity } from 'lucide-react';
+import { X, Info, User, LogOut, Zap, Clock, Hash, Palette, Activity, Camera } from 'lucide-react';
 
 const ActivityLog = ({ isOpen, onClose, logs }) => {
     if (!isOpen) return null;
@@ -12,6 +12,7 @@ const ActivityLog = ({ isOpen, onClose, logs }) => {
             case 'topic': return <Hash className="w-4 h-4 text-blue-500" />;
             case 'timer': return <Clock className="w-4 h-4 text-orange-500" />;
             case 'pulse': return <Zap className="w-4 h-4 text-yellow-500" />;
+            case 'screenshot': return <Camera className="w-4 h-4 text-amber-500" />;
             case 'system': return <Info className="w-4 h-4 text-primary-500" />;
             default: return <Info className="w-4 h-4 text-gray-400" />;
         }

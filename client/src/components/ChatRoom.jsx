@@ -592,6 +592,8 @@ const ChatRoom = () => {
   const [sessionToken, setSessionToken] = useState(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [verbalCode, setVerbalCode] = useState(null); // State for verbal code display
+  const [autoApprove, setAutoApprove] = useState(false); // Auto-approve mode
+  const [preApprovedList, setPreApprovedList] = useState([]); // Pre-approved users list
 
   // ─── Capacitor Keyboard State ────────────────────────────────
   // With Keyboard.resize: "body" + adjustResize, the WebView resizes natively.
@@ -799,6 +801,8 @@ const ChatRoom = () => {
         setRoomVibe(response.room.vibe || 'default');
         setRoomTopic(response.room.topic || '');
         setActiveTimer(response.room.timer);
+        setAutoApprove(response.room.autoApprove || false);
+        setPreApprovedList(response.room.preApprovedList || []);
         socketManager.setRoomType(response.room.settings?.persistenceMode || 'ephemeral');
 
         setCurrentUser({ id: persistentUserId, socketId: socketManager.socket?.id, nickname: response.nickname, isAdmin: myRole === 'host' || myRole === 'tier1' });
@@ -1317,6 +1321,49 @@ const ChatRoom = () => {
     socketManager.on('chess-replace-declined', handleChessReplaceDeclined);
     socketManager.on('chess-swap-pending', handleChessSwapPending);
     socketManager.on('chess-replace-pending', handleChessReplacePending);
+
+    // Screenshot detection handler
+    const handleScreenshotDetected = ({ nickname, timestamp }) => {
+      const log = {
+        id: `log_ss_${Date.now()}_${Math.random()}`,
+        type: 'screenshot',
+        content: `📸 ${nickname} may have attempted a screenshot`,
+        timestamp: timestamp || new Date().toISOString()
+      };
+      setActivityLogs(prev => [log, ...prev].slice(0, 50));
+      if (!showActivityLogs) setHasNewLogs(true);
+      triggerPulse();
+    };
+    socketManager.on('screenshot-detected', handleScreenshotDetected);
+
+    // Auto-approve update handler
+    const handleAutoApproveUpdated = ({ enabled, updatedBy }) => {
+      setAutoApprove(enabled);
+      const log = {
+        id: `log_aa_${Date.now()}`,
+        type: 'system',
+        content: `${updatedBy} ${enabled ? 'enabled' : 'disabled'} auto-approve`,
+        timestamp: new Date().toISOString()
+      };
+      setActivityLogs(prev => [log, ...prev].slice(0, 50));
+      if (!showActivityLogs) setHasNewLogs(true);
+    };
+    socketManager.on('auto-approve-updated', handleAutoApproveUpdated);
+
+    // Pre-approved list update handler
+    const handlePreApprovedListUpdated = ({ list, updatedBy }) => {
+      setPreApprovedList(list || []);
+      const log = {
+        id: `log_pal_${Date.now()}`,
+        type: 'system',
+        content: `${updatedBy} updated the pre-approved list (${(list || []).length} users)`,
+        timestamp: new Date().toISOString()
+      };
+      setActivityLogs(prev => [log, ...prev].slice(0, 50));
+      if (!showActivityLogs) setHasNewLogs(true);
+    };
+    socketManager.on('pre-approved-list-updated', handlePreApprovedListUpdated);
+
     socketManager.on('messages-cleared', () => {
       setMessages([]);
       setLinkPreviews({});
@@ -1467,6 +1514,9 @@ const ChatRoom = () => {
       socketManager.off('chess-replace-declined', handleChessReplaceDeclined);
       socketManager.off('chess-swap-pending', handleChessSwapPending);
       socketManager.off('chess-replace-pending', handleChessReplacePending);
+      socketManager.off('screenshot-detected', handleScreenshotDetected);
+      socketManager.off('auto-approve-updated', handleAutoApproveUpdated);
+      socketManager.off('pre-approved-list-updated', handlePreApprovedListUpdated);
       socketManager.off('messages-cleared');
       socketManager.off('link-preview-update', handleLinkPreviewUpdate);
       socketManager.off('now-playing-update', handleNowPlayingUpdate);
@@ -1730,6 +1780,56 @@ const ChatRoom = () => {
 
   const handleKickUser = (targetUserId) => {
     socketManager.emit('kick-user', { targetUserId, roomCode });
+  };
+
+  const handleToggleAutoApprove = () => {
+    const newValue = !autoApprove;
+    socketManager.emit('toggle-auto-approve', { roomCode, enabled: newValue });
+  };
+
+  const handleUpdatePreApprovedList = (list) => {
+    socketManager.emit('update-pre-approved-list', { roomCode, list });
+  };
+
+  // Parse pre-approved list from text (comma-separated, optional roles in parentheses)
+  // Format: user1(admin),user2,user3(mod),user4
+  const parsePreApprovedText = (text) => {
+    if (!text || !text.trim()) return [];
+    return text.split(',')
+      .map(entry => entry.trim())
+      .filter(entry => entry.length > 0)
+      .map(entry => {
+        const match = entry.match(/^([^(]+?)(?:\(([^)]+)\))?$/);
+        if (!match) return null;
+        return {
+          name: match[1].trim(),
+          role: (match[2] || 'none').trim().toLowerCase()
+        };
+      })
+      .filter(Boolean);
+  };
+
+  // Handle .txt file upload for pre-approved list
+  const handlePreApprovedFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.endsWith('.txt')) {
+      setError('Only .txt files are supported');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      const parsed = parsePreApprovedText(text);
+      if (parsed.length > 0) {
+        handleUpdatePreApprovedList(parsed);
+      } else {
+        setError('Could not parse any users from the file');
+      }
+    };
+    reader.readAsText(file);
+    // Reset file input
+    e.target.value = '';
   };
 
   // Core send logic — called directly (no event needed)
@@ -3099,6 +3199,12 @@ const ChatRoom = () => {
               roomVibe={roomVibe}
               nowPlayingMap={nowPlayingMap}
               onWatchParty={() => setShowWatchPartyModal(true)}
+              autoApprove={autoApprove}
+              onToggleAutoApprove={handleToggleAutoApprove}
+              preApprovedList={preApprovedList}
+              onUpdatePreApprovedList={handleUpdatePreApprovedList}
+              onPreApprovedFileUpload={handlePreApprovedFileUpload}
+              parsePreApprovedText={parsePreApprovedText}
             />
           </div>
         )}
@@ -3129,6 +3235,12 @@ const ChatRoom = () => {
                   roomVibe={roomVibe}
                   nowPlayingMap={nowPlayingMap}
                   onWatchParty={() => { setShowMobileMenu(false); setShowWatchPartyModal(true); }}
+                  autoApprove={autoApprove}
+                  onToggleAutoApprove={handleToggleAutoApprove}
+                  preApprovedList={preApprovedList}
+                  onUpdatePreApprovedList={handleUpdatePreApprovedList}
+                  onPreApprovedFileUpload={handlePreApprovedFileUpload}
+                  parsePreApprovedText={parsePreApprovedText}
                 />
               </div>
             </div>

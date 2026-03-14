@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { ShieldAlert, X } from 'lucide-react';
+import socketManager from '../socket';
 
 /**
  * DesktopSecurityGuard Component
@@ -25,6 +26,15 @@ const DesktopSecurityGuard = () => {
     setShowWarning(true);
   }, []);
 
+  // Emit screenshot-attempt to notify other room members
+  const notifyScreenshotAttempt = useCallback(() => {
+    // Extract roomCode from current URL path: /room/:roomCode
+    const match = window.location.pathname.match(/\/room\/([^/]+)/);
+    if (match && match[1] && socketManager.isConnected) {
+      socketManager.emit('screenshot-attempt', { roomCode: match[1] });
+    }
+  }, []);
+
   // DevTools detection using window size difference
   const detectDevToolsBySize = useCallback(() => {
     const widthThreshold = window.outerWidth - window.innerWidth > 160;
@@ -45,6 +55,20 @@ const DesktopSecurityGuard = () => {
         e.preventDefault();
         showSecurityWarning('Developer tools access has been blocked for security reasons.');
         return false;
+      }
+
+      // PrintScreen - Screenshot attempt
+      if (e.key === 'PrintScreen') {
+        notifyScreenshotAttempt();
+        showSecurityWarning('Screenshot attempt detected. Other users in the room have been notified.');
+        return;
+      }
+
+      // Win+Shift+S - Snipping Tool (Windows)
+      if (e.metaKey && e.shiftKey && (e.key === 'S' || e.key === 's')) {
+        notifyScreenshotAttempt();
+        showSecurityWarning('Screenshot attempt detected. Other users in the room have been notified.');
+        return;
       }
 
       // Ctrl+Shift+I or Cmd+Shift+I - DevTools
@@ -131,6 +155,7 @@ const DesktopSecurityGuard = () => {
     if (navigator.mediaDevices && originalGetDisplayMedia) {
       navigator.mediaDevices.getDisplayMedia = function(...args) {
         showSecurityWarning('Screen capture has been detected. Your chat content may be at risk.');
+        notifyScreenshotAttempt();
         return originalGetDisplayMedia.apply(this, args);
       };
     }
