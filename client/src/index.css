@@ -721,6 +721,8 @@ cap-widget {
   margin: 0 !important;
   width: 100% !important;
   border-top: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
 }
 
 /* ── Light Mode Range Input Slider Visibility ── */
