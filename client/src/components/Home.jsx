@@ -188,7 +188,7 @@ const Home = ({ children }) => {
   return (
     <div style={{ height: '100vh', overflowY: 'auto' }} className="bg-slate-50 dark:bg-gray-900 transition-colors duration-200 no-scrollbar">
       {/* Header */}
-      <header className="bg-white/80 dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 transition-colors duration-200 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 bg-white/80 dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 transition-colors duration-200 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 pt-[clamp(8px,env(safe-area-inset-top),32px)] pb-4 sm:py-6 sm:px-6 lg:px-8 flex justify-between items-center">
           <h1 className="text-xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 flex items-center">
             <img src="/logo.svg" alt="Logo" className="h-8 w-8 sm:h-10 sm:w-10 mr-2 sm:mr-3" />

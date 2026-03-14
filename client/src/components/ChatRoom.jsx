@@ -2597,7 +2597,7 @@ const ChatRoom = () => {
           </div>
         </div>
       )}
-      <div className={`${getVibeById(roomVibe).panelClass} px-4 pt-[clamp(8px,env(safe-area-inset-top),32px)] sm:pt-3 pb-2 sm:py-3 sticky top-0 z-50 shrink-0`}>
+      <div className={`${getVibeById(roomVibe).panelClass} px-4 pt-1 sm:pt-3 pb-2 sm:py-3 sticky top-0 z-50 shrink-0`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 sm:space-x-4">
             <button onClick={() => navigate('/')} className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
