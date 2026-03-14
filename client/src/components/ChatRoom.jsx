@@ -30,7 +30,7 @@ import {
   Snowflake,
   RefreshCw,
   ArrowDown,
-  Keyboard
+  Keyboard as KeyboardIcon
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -3233,7 +3233,7 @@ const ChatRoom = () => {
                   className="p-1.5 active:scale-95 hover:bg-black/5 dark:hover:bg-white/5 rounded-full text-gray-500 dark:text-gray-400 transition-all flex items-center justify-center pointer-events-auto"
                   title="Keyboard"
                 >
-                  <Keyboard className="w-5 h-5" />
+                  <KeyboardIcon className="w-5 h-5" />
                 </button>
                 <button
                   type="button"
