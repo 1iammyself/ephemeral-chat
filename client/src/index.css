@@ -718,8 +718,9 @@ cap-widget {
 .mobile-emoji-drawer .EmojiPickerReact .epr-category-nav {
   order: 3 !important;
   padding: 0 !important;
+  margin: 0 !important;
   width: 100% !important;
-  border-top: 1px solid rgba(128,128,128,0.2) !important;
+  border-top: none !important;
 }
 
 /* ── Light Mode Range Input Slider Visibility ── */

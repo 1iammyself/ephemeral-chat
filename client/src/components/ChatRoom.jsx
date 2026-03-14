@@ -2833,7 +2833,7 @@ const ChatRoom = () => {
                 <button onClick={() => setSelectedRecipients([])} className={`text-xs text-${vibeAccent}-500 hover:text-${vibeAccent}-700 dark:hover:text-${vibeAccent}-200 underline`}>Clear selection</button>
               </div>
             )}
-            <div className="px-2 pt-2 sm:px-4 sm:pt-4 pb-0 sm:pb-4 w-full relative z-10 bg-transparent">
+            <div className="px-0 pt-2 sm:px-4 sm:pt-4 pb-0 sm:pb-4 w-full relative z-10 bg-transparent">
               <form onSubmit={handleSendMessage} className="flex items-center w-full">
                 {isRecording ? (
                   <div className="flex-1 flex flex-col space-y-2 w-full">
@@ -3201,7 +3201,7 @@ const ChatRoom = () => {
               id="emoji-drawer"
               className={`mobile-emoji-drawer sm:hidden w-full transition-all duration-300 ease-in-out bg-transparent overflow-hidden relative ${showEmojiPicker ? 'h-[260px] opacity-100 pointer-events-auto z-0' : 'h-0 opacity-0 pointer-events-none mt-0'}`}
             >
-              <div className="w-full h-full pb-7">
+              <div className="w-full h-full pb-5">
                 <EmojiPicker
                   onEmojiClick={onEmojiClick}
                   theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
@@ -3225,7 +3225,7 @@ const ChatRoom = () => {
                 />
               </div>
               <div 
-                className={`absolute bottom-[-4px] left-0 right-0 w-full flex items-center justify-between px-6 pb-2 pt-0 pointer-events-none transition-opacity duration-300 ${showEmojiPicker ? 'opacity-100' : 'opacity-0'}`}
+                className={`absolute bottom-[-8px] left-0 right-0 w-full flex items-center justify-between px-6 pb-2 pt-0 pointer-events-none transition-opacity duration-300 ${showEmojiPicker ? 'opacity-100' : 'opacity-0'}`}
               >
                 <button
                   type="button"
