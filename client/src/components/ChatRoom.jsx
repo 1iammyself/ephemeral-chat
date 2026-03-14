@@ -3238,7 +3238,7 @@ const ChatRoom = () => {
                 />
               </div>
               <div 
-                className={`absolute bottom-[-8px] left-0 right-0 w-full flex items-center justify-between px-6 pb-2 pt-0 pointer-events-none transition-opacity duration-300 ${showEmojiPicker ? 'opacity-100' : 'opacity-0'}`}
+                className={`absolute bottom-[-6px] left-0 right-0 w-full flex items-center justify-between px-6 pb-2 pt-0 pointer-events-none transition-opacity duration-300 ${showEmojiPicker ? 'opacity-100' : 'opacity-0'}`}
               >
                 <button
                   type="button"
