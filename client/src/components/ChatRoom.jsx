@@ -3199,9 +3199,9 @@ const ChatRoom = () => {
             {/* Bottom-Docked Emoji Drawer (Mobile Only) */}
             <div
               id="emoji-drawer"
-              className={`mobile-emoji-drawer sm:hidden w-full transition-all duration-300 ease-in-out bg-white/50 dark:bg-gray-900/50 backdrop-blur-md overflow-hidden flex flex-col ${showEmojiPicker ? 'h-[300px] opacity-100 pointer-events-auto border-t border-gray-200 dark:border-gray-800' : 'h-0 opacity-0 pointer-events-none border-t-0'}`}
+              className={`mobile-emoji-drawer sm:hidden w-full transition-all duration-300 ease-in-out bg-white/50 dark:bg-gray-900/50 backdrop-blur-md overflow-hidden relative ${showEmojiPicker ? 'h-[320px] opacity-100 pointer-events-auto border-t border-gray-200 dark:border-gray-800' : 'h-0 opacity-0 pointer-events-none border-t-0'}`}
             >
-              <div className="w-full flex-1 min-h-0">
+              <div className="w-full h-full pb-[calc(env(safe-area-inset-bottom,16px)+36px)]">
                 <EmojiPicker
                   onEmojiClick={onEmojiClick}
                   theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
@@ -3220,18 +3220,17 @@ const ChatRoom = () => {
                     '--epr-hover-bg-color': `${vibeHex}10`,
                     '--epr-focus-bg-color': `${vibeHex}20`,
                     '--epr-search-input-bg-color': 'rgba(128,128,128,0.15)',
-                    '--epr-header-padding': '2px 8px 4px',
+                    '--epr-header-padding': '0px 8px 0px',
                   }}
                 />
               </div>
               <div 
-                className="w-full flex items-center justify-between px-6 pt-1 shrink-0"
-                style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 12px) + 4px)' }}
+                className={`absolute bottom-0 left-0 right-0 w-full flex items-center justify-between px-6 pb-[env(safe-area-inset-bottom,8px)] pt-1 pointer-events-none transition-opacity duration-300 ${showEmojiPicker ? 'opacity-100' : 'opacity-0'}`}
               >
                 <button
                   type="button"
                   onClick={(e) => { e.preventDefault(); setShowEmojiPicker(false); setTimeout(() => messageInputRef.current?.focus(), 50); }}
-                  className="p-1.5 active:scale-95 hover:bg-black/5 dark:hover:bg-white/5 rounded-full text-gray-500 dark:text-gray-400 transition-all flex items-center justify-center"
+                  className="p-1.5 active:scale-95 hover:bg-black/5 dark:hover:bg-white/5 rounded-full text-gray-500 dark:text-gray-400 transition-all flex items-center justify-center pointer-events-auto"
                   title="Keyboard"
                 >
                   <Keyboard className="w-5 h-5" />
@@ -3239,7 +3238,7 @@ const ChatRoom = () => {
                 <button
                   type="button"
                   onClick={(e) => { e.preventDefault(); setShowEmojiPicker(false); setTimeout(() => setShowWatchPartyModal(true), 50); }}
-                  className={`p-1.5 active:scale-95 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-all flex items-center justify-center`}
+                  className={`p-1.5 active:scale-95 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-all flex items-center justify-center pointer-events-auto`}
                   style={{ color: vibeHex }}
                   title="Watch Party"
                 >
