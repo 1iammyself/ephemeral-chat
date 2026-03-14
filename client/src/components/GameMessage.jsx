@@ -210,8 +210,8 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
     const vibeBtnColor = vibe.colors?.primary || '#3b82f6';
 
     const headerClass = vibe.accentClass;
-    const cardBorderClass = `border-${vibe.accent || 'primary'}-200 dark:border-${vibe.accent || 'primary'}-800`;
-    const footerBorderClass = `border-${vibe.accent || 'primary'}-100 dark:border-${vibe.accent || 'primary'}-800/50`;
+    const cardBorderClass = `border-black/10 dark:border-white/10`;
+    const footerBorderClass = `border-black/5 dark:border-white/5`;
     const selectedOutlineClass = `border-${vibe.accent || 'primary'}-500 bg-${vibe.accent || 'primary'}-50 dark:bg-${vibe.accent || 'primary'}-900/20`;
     const hoverBorderClass = `hover:border-${vibe.accent || 'primary'}-400 dark:hover:border-${vibe.accent || 'primary'}-600`;
     const statTextClass = `text-${vibe.accent || 'primary'}-600 dark:text-${vibe.accent || 'primary'}-400`;

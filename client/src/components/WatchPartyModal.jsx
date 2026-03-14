@@ -51,12 +51,12 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-black/10 dark:border-white/10 overflow-hidden animate-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className={`flex items - center justify - between px - 5 py - 4 border - b border - gray - 200 / 50 dark: border - gray - 700 / 50 bg - gradient - to - r from - ${vibeAccent} -50 / 50 dark: from - ${vibeAccent} -950 / 30 to - transparent`}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b border-black/10 dark:border-white/10 bg-gradient-to-r from-${vibeAccent}-50/50 dark:from-${vibeAccent}-950/30 to-transparent`}>
           <div className="flex items-center gap-3">
-            <div className={`w - 10 h - 10 rounded - xl bg - ${vibeAccent} -100 dark: bg - ${vibeAccent} -900 / 40 flex items - center justify - center`}>
-              <Radio className={`w - 5 h - 5 text - ${vibeAccent} -500`} />
+            <div className={`w-10 h-10 rounded-xl bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 flex items-center justify-center`}>
+              <Radio className={`w-5 h-5 text-${vibeAccent}-500`} />
             </div>
             <div>
               <h3 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">Watch Party</h3>
@@ -74,8 +74,8 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
         {/* Body */}
         <div className="p-5 space-y-4">
           {/* URL Input */}
-          <div className={`flex items - center gap - 3 bg - gray - 50 dark: bg - gray - 800 / 80 border - 2 rounded - xl px - 4 py - 3 transition - colors ${detected ? `border-${vibeAccent}-400 dark:border-${vibeAccent}-500` : 'border-gray-200 dark:border-gray-700 focus-within:border-gray-300 dark:focus-within:border-gray-600'} `}>
-            <Link className={`w - 5 h - 5 flex - shrink - 0 ${detected ? `text-${vibeAccent}-500` : 'text-gray-400'} `} />
+          <div className={`flex items-center gap-3 bg-gray-50 dark:bg-gray-800/80 border-2 rounded-xl px-4 py-3 transition-colors ${detected ? `border-${vibeAccent}-400 dark:border-${vibeAccent}-500` : 'border-gray-200 dark:border-gray-700 focus-within:border-gray-300 dark:focus-within:border-gray-600'} `}>
+            <Link className={`w-5 h-5 flex-shrink-0 ${detected ? `text-${vibeAccent}-500` : 'text-gray-500 dark:text-gray-400'}`} />
             <input
               ref={inputRef}
               type="text"
@@ -84,7 +84,7 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
               onKeyDown={(e) => e.key === 'Enter' && handleShare()}
               data-allow-copy="true"
               placeholder="Paste YouTube or SoundCloud URL..."
-              className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 outline-none min-w-0"
+              className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 outline-none min-w-0"
             />
             {urlInput && (
               <button onClick={() => setUrlInput('')} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors">
@@ -95,8 +95,8 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
 
           {/* Detection Feedback */}
           {detected && (
-            <div className={`flex items - center gap - 2 px - 3 py - 2 rounded - lg bg - ${vibeAccent} -50 dark: bg - ${vibeAccent} -950 / 30 border border - ${vibeAccent} -200 / 50 dark: border - ${vibeAccent} -700 / 30 animate -in slide -in -from - bottom - 2 duration - 200`}>
-              <div className={`w - 8 h - 8 rounded - lg flex items - center justify - center ${detected.type === 'youtube' ? 'bg-red-500/10' :
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg bg-${vibeAccent}-50 dark:bg-${vibeAccent}-950/30 border border-${vibeAccent}-200/50 dark:border-${vibeAccent}-700/30 animate-in slide-in-from-bottom-2 duration-200`}>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${detected.type === 'youtube' ? 'bg-red-500/10' :
                   detected.type === 'soundcloud' ? 'bg-orange-500/10' :
                     detected.type === 'figma' ? 'bg-pink-500/10' : 'bg-blue-500/10'
                 } `}>
@@ -118,29 +118,29 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
 
           {/* Supported platforms hint */}
           {!detected && !urlInput && (
-            <div className="grid grid-cols-2 gap-3 py-2 border-t border-gray-100 dark:border-gray-800 pt-4">
-              <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500 hover:text-red-500 transition-colors cursor-default">
+            <div className="grid grid-cols-2 gap-3 py-2 border-t border-gray-200 dark:border-gray-800 pt-4">
+              <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 hover:text-red-500 transition-colors cursor-default">
                 <Youtube className="w-4 h-4" />
-                <span className="text-[10px] font-medium">YouTube</span>
+                <span className="text-[11px] font-medium">YouTube</span>
               </div>
-              <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500 hover:text-orange-500 transition-colors cursor-default">
+              <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 hover:text-orange-500 transition-colors cursor-default">
                 <Music className="w-4 h-4" />
-                <span className="text-[10px] font-medium">SoundCloud</span>
+                <span className="text-[11px] font-medium">SoundCloud</span>
               </div>
-              <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500 hover:text-pink-500 transition-colors cursor-default">
+              <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 hover:text-pink-500 transition-colors cursor-default">
                 <Figma className="w-4 h-4" />
-                <span className="text-[10px] font-medium">Figma</span>
+                <span className="text-[11px] font-medium">Figma</span>
               </div>
-              <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-500 transition-colors cursor-default">
+              <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 hover:text-blue-500 transition-colors cursor-default">
                 <FileText className="w-4 h-4" />
-                <span className="text-[10px] font-medium">GDrive / Docs</span>
+                <span className="text-[11px] font-medium">GDrive / Docs</span>
               </div>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-gray-200/50 dark:border-gray-700/50 flex items-center justify-end gap-3">
+        <div className="px-5 py-4 border-t border-black/10 dark:border-white/10 flex items-center justify-end gap-3">
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
@@ -153,10 +153,10 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
             style={detected ? { backgroundColor: vibeColor } : undefined}
             onMouseOver={e => { if (detected) e.currentTarget.style.backgroundColor = vibeColorHover; }}
             onMouseOut={e => { if (detected) e.currentTarget.style.backgroundColor = vibeColor; }}
-            className={`px - 5 py - 2 rounded - xl text - sm font - bold transition - all ${detected
+            className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${detected
                 ? `text-white active:scale-95 shadow-lg`
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-              } `}
+                : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+              }`}
           >
             Share to Room
           </button>

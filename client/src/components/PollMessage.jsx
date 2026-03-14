@@ -154,7 +154,7 @@ const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
     const selectedTextClass = `text-${accentColor}-700 dark:text-${accentColor}-300`;
     const progressBarClass = `bg-${accentColor}-500/10 dark:bg-${accentColor}-400/10`;
     const footerLinkClass = `text-${accentColor}-600 dark:text-${accentColor}-400`;
-    const cardBorderClass = `border-gray-200 dark:border-gray-700`;
+    const cardBorderClass = `border-black/10 dark:border-white/10`;
 
     return (
         <>
@@ -281,7 +281,7 @@ const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
                     )}
                 </div>
 
-                <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border-t border-black/5 dark:border-white/5 flex items-center justify-between">
                     <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
                         <Users className="w-3.5 h-3.5 mr-1" />
                         <span>{totalVotes} vote{totalVotes !== 1 ? 's' : ''}</span>
