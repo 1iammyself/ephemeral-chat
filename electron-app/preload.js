@@ -142,10 +142,12 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Block print screen
+// Block print screen and notify renderer of screenshot attempt
 document.addEventListener('keyup', (e) => {
   if (e.key === 'PrintScreen') {
     navigator.clipboard.writeText('');
+    // Dispatch a custom event so the renderer's DesktopSecurityGuard can detect this
+    window.dispatchEvent(new CustomEvent('electron-screenshot-attempt'));
   }
 });
 

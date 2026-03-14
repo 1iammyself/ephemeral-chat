@@ -794,7 +794,7 @@ const ChatRoom = () => {
           return msg;
         }));
         setMessages(msgs);
-        setUsers(response.room?.users || []);
+        setUsers(response.users || []);
 
         const myRole = response.room.userRoles?.[socketManager.socket?.id] || (response.room.hostId === socketManager.socket?.id ? 'host' : 'user');
         setCurrentUserRole(myRole);

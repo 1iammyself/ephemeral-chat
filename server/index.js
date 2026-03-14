@@ -1118,14 +1118,25 @@ io.on('connection', (socket) => {
 
   // Screenshot attempt notification — relay to other users in the room
   socket.on('screenshot-attempt', ({ roomCode: ssRoomCode }) => {
-    if (!ssRoomCode || !socket.roomCode || socket.roomCode !== ssRoomCode) return;
+    // Determine room: prefer socket.roomCode, fall back to the provided roomCode if socket is in that room
+    const effectiveRoom = socket.roomCode || ssRoomCode;
+    if (!effectiveRoom) {
+      logger.warn(`📸 Screenshot attempt from ${socket.id} but no room association found`);
+      return;
+    }
+    // Verify the socket is actually in this room (via Socket.IO room membership)
+    const socketRooms = [...(socket.rooms || [])];
+    if (!socketRooms.includes(effectiveRoom)) {
+      logger.warn(`📸 Screenshot attempt from ${socket.id} for room ${effectiveRoom} but socket not in room (rooms: ${socketRooms.join(',')})`);
+      return;
+    }
     const senderNickname = socket.nickname || 'Someone';
     // Notify all OTHER users in the room (not the sender)
-    socket.to(ssRoomCode).emit('screenshot-detected', {
+    socket.to(effectiveRoom).emit('screenshot-detected', {
       nickname: senderNickname,
       timestamp: new Date().toISOString()
     });
-    logger.info(`📸 Screenshot attempt detected from ${senderNickname} in room ${ssRoomCode}`);
+    logger.info(`📸 Screenshot attempt detected from ${senderNickname} in room ${effectiveRoom}`);
   });
 
   // Auto-approve toggle — host or tier1 can enable/disable

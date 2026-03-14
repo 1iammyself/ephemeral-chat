@@ -167,6 +167,13 @@ const DesktopSecurityGuard = () => {
     window.addEventListener('beforeprint', handleBeforePrint);
     window.addEventListener('afterprint', handleAfterPrint);
 
+    // Listen for Electron preload's screenshot detection (more reliable than keydown in Electron)
+    const handleElectronScreenshot = () => {
+      notifyScreenshotAttempt();
+      showSecurityWarning('Screenshot attempt detected. Other users in the room have been notified.');
+    };
+    window.addEventListener('electron-screenshot-attempt', handleElectronScreenshot);
+
     // DevTools size detection (runs periodically)
     const sizeDetectionInterval = setInterval(detectDevToolsBySize, 2000);
 
@@ -177,6 +184,7 @@ const DesktopSecurityGuard = () => {
       document.removeEventListener('dragstart', handleDragStart);
       window.removeEventListener('beforeprint', handleBeforePrint);
       window.removeEventListener('afterprint', handleAfterPrint);
+      window.removeEventListener('electron-screenshot-attempt', handleElectronScreenshot);
       clearInterval(sizeDetectionInterval);
       
       // Restore original getDisplayMedia
@@ -184,7 +192,7 @@ const DesktopSecurityGuard = () => {
         navigator.mediaDevices.getDisplayMedia = originalGetDisplayMedia;
       }
     };
-  }, [isMobile, detectDevToolsBySize, showSecurityWarning]);
+  }, [isMobile, detectDevToolsBySize, showSecurityWarning, notifyScreenshotAttempt]);
 
   // Don't render anything on mobile
   if (isMobile) return null;
