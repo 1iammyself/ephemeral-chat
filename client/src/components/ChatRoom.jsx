@@ -2597,7 +2597,7 @@ const ChatRoom = () => {
           </div>
         </div>
       )}
-      <div className={`${getVibeById(roomVibe).panelClass} px-4 pt-10 pb-2 sm:py-3 sticky top-0 z-50 shrink-0`}>
+      <div className={`${getVibeById(roomVibe).panelClass} px-4 pt-4 sm:pt-3 pb-2 sm:py-3 sticky top-0 z-50 shrink-0`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 sm:space-x-4">
             <button onClick={() => navigate('/')} className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
@@ -2860,8 +2860,8 @@ const ChatRoom = () => {
                   <div className={`relative flex items-center w-full ${getVibeById(roomVibe).inputClass} rounded-none sm:rounded-xl px-1 py-0.5 sm:py-1 transition-all ${isAnonymousMode ? 'border-purple-400 dark:border-purple-600 ring-4 ring-purple-500/20' : ''}`}>
                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" id="image-upload" />
 
-                    <div 
-                      className="relative flex-shrink-0" 
+                    <div
+                      className="relative flex-shrink-0"
                       ref={featureMenuRef}
                       onMouseEnter={() => {
                         if (window.electronAPI) {
@@ -3046,8 +3046,8 @@ const ChatRoom = () => {
                       )}
                     </div>
 
-                    <div 
-                      className="relative flex-shrink-0" 
+                    <div
+                      className="relative flex-shrink-0"
                       ref={emojiPickerRef}
                       onMouseEnter={() => {
                         if (window.electronAPI) {
@@ -3212,7 +3212,7 @@ const ChatRoom = () => {
             {/* Bottom-Docked Emoji Drawer (Mobile Only) */}
             <div
               id="emoji-drawer"
-              className={`mobile-emoji-drawer sm:hidden w-full transition-all duration-300 ease-in-out bg-transparent overflow-hidden relative ${showEmojiPicker ? 'h-[260px] opacity-100 pointer-events-auto z-0 mt-0.5' : 'h-0 opacity-0 pointer-events-none mt-0'}`}
+              className={`mobile-emoji-drawer sm:hidden w-full transition-all duration-300 ease-in-out bg-transparent overflow-hidden relative ${showEmojiPicker ? 'h-[260px] opacity-100 pointer-events-auto z-0 mt-0.8' : 'h-0 opacity-0 pointer-events-none mt-0'}`}
             >
               <div className="w-full h-full pb-5">
                 <EmojiPicker
@@ -3237,7 +3237,7 @@ const ChatRoom = () => {
                   }}
                 />
               </div>
-              <div 
+              <div
                 className={`absolute bottom-[-8px] left-0 right-0 w-full flex items-center justify-between px-6 pb-2 pt-0 pointer-events-none transition-opacity duration-300 ${showEmojiPicker ? 'opacity-100' : 'opacity-0'}`}
               >
                 <button
