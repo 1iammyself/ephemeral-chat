@@ -3178,19 +3178,32 @@ const ChatRoom = () => {
                     >
                       👻
                     </button>
-                    <button
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onTouchStart={(e) => {
-                        e.preventDefault();
-                        doSendMessage();
-                      }}
-                      onClick={doSendMessage}
-                      disabled={!newMessage.trim() || !isConnected}
-                      className={`flex-shrink-0 ml-1 sm:ml-2 ${getVibeById(roomVibe).accentClass} h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      <Send className="w-4 h-4 sm:w-5 sm:h-5 -ml-0.5" />
-                    </button>
+                    {newMessage.trim() ? (
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onTouchStart={(e) => {
+                          e.preventDefault();
+                          doSendMessage();
+                        }}
+                        onClick={doSendMessage}
+                        disabled={!isConnected}
+                        className={`flex-shrink-0 ml-1 sm:ml-2 ${getVibeById(roomVibe).accentClass} h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        <Send className="w-4 h-4 sm:w-5 sm:h-5 -ml-0.5" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={startRecording}
+                        disabled={!isConnected}
+                        className={`flex-shrink-0 ml-1 sm:ml-2 ${getVibeById(roomVibe).accentClass} h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
+                        title="Voice Note"
+                      >
+                        <Mic className="w-4 h-4 sm:w-5 sm:h-5" />
+                      </button>
+                    )}
                   </div>
                 )}
               </form>
