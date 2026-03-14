@@ -29,7 +29,8 @@ import {
   EyeOff,
   Snowflake,
   RefreshCw,
-  ArrowDown
+  ArrowDown,
+  Keyboard
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -2832,7 +2833,7 @@ const ChatRoom = () => {
                 <button onClick={() => setSelectedRecipients([])} className={`text-xs text-${vibeAccent}-500 hover:text-${vibeAccent}-700 dark:hover:text-${vibeAccent}-200 underline`}>Clear selection</button>
               </div>
             )}
-            <div className="px-2 pt-2 sm:px-4 sm:pt-4 pb-1 sm:pb-4 w-full">
+            <div className="px-2 pt-2 sm:px-4 sm:pt-4 pb-0 sm:pb-4 w-full">
               <form onSubmit={handleSendMessage} className="flex items-center w-full">
                 {isRecording ? (
                   <div className="flex-1 flex flex-col space-y-2 w-full">
@@ -3198,9 +3199,9 @@ const ChatRoom = () => {
             {/* Bottom-Docked Emoji Drawer (Mobile Only) */}
             <div
               id="emoji-drawer"
-              className={`mobile-emoji-drawer sm:hidden w-full transition-all duration-300 ease-in-out bg-white/50 dark:bg-gray-900/50 backdrop-blur-md overflow-hidden ${showEmojiPicker ? 'h-[300px] opacity-100 pointer-events-auto border-t border-gray-200 dark:border-gray-800' : 'h-0 opacity-0 pointer-events-none border-t-0'}`}
+              className={`mobile-emoji-drawer sm:hidden w-full transition-all duration-300 ease-in-out bg-white/50 dark:bg-gray-900/50 backdrop-blur-md overflow-hidden flex flex-col ${showEmojiPicker ? 'h-[300px] opacity-100 pointer-events-auto border-t border-gray-200 dark:border-gray-800' : 'h-0 opacity-0 pointer-events-none border-t-0'}`}
             >
-              <div className="w-full h-full pb-[env(safe-area-inset-bottom)]">
+              <div className="w-full flex-1 min-h-0">
                 <EmojiPicker
                   onEmojiClick={onEmojiClick}
                   theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
@@ -3219,9 +3220,31 @@ const ChatRoom = () => {
                     '--epr-hover-bg-color': `${vibeHex}10`,
                     '--epr-focus-bg-color': `${vibeHex}20`,
                     '--epr-search-input-bg-color': 'rgba(128,128,128,0.15)',
-                    '--epr-header-padding': '8px 8px 4px',
+                    '--epr-header-padding': '2px 8px 4px',
                   }}
                 />
+              </div>
+              <div 
+                className="w-full flex items-center justify-between px-6 pt-1 shrink-0"
+                style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 12px) + 4px)' }}
+              >
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); setShowEmojiPicker(false); setTimeout(() => messageInputRef.current?.focus(), 50); }}
+                  className="p-1.5 active:scale-95 hover:bg-black/5 dark:hover:bg-white/5 rounded-full text-gray-500 dark:text-gray-400 transition-all flex items-center justify-center"
+                  title="Keyboard"
+                >
+                  <Keyboard className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); setShowEmojiPicker(false); setTimeout(() => setShowWatchPartyModal(true), 50); }}
+                  className={`p-1.5 active:scale-95 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-all flex items-center justify-center`}
+                  style={{ color: vibeHex }}
+                  title="Watch Party"
+                >
+                  <Activity className="w-5 h-5" />
+                </button>
               </div>
             </div>
           </div>

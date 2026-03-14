@@ -701,7 +701,7 @@ cap-widget {
 /* 1. Search Bar at the very top */
 .mobile-emoji-drawer .EmojiPickerReact .epr-search-container {
   order: 1 !important;
-  padding: 8px 12px 4px 12px !important;
+  padding: 4px 12px 2px 12px !important;
   width: 100% !important;
   box-sizing: border-box !important;
 }
@@ -715,7 +715,7 @@ cap-widget {
 /* 3. Category Nav at the very bottom */
 .mobile-emoji-drawer .EmojiPickerReact .epr-category-nav {
   order: 3 !important;
-  padding: 8px 0 8px 0 !important;
+  padding: 4px 0 4px 0 !important;
   width: 100% !important;
   border-top: 1px solid rgba(128,128,128,0.2) !important;
 }
