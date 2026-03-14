@@ -687,6 +687,39 @@ cap-widget {
   border: 1px solid rgba(255, 255, 255, 0.15) !important;
 }
 
+/* ── WhatsApp-Style Mobile Emoji Drawer Reordering ── */
+.mobile-emoji-drawer .EmojiPickerReact {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Use display: contents to break the search and nav out of the header flexbox so they can be reordered relative to the body */
+.mobile-emoji-drawer .EmojiPickerReact .epr-header {
+  display: contents !important; 
+}
+
+/* 1. Search Bar at the very top */
+.mobile-emoji-drawer .EmojiPickerReact .epr-search-container {
+  order: 1 !important;
+  padding: 8px 12px 4px 12px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* 2. Emoji Scroll Area in the middle */
+.mobile-emoji-drawer .EmojiPickerReact .epr-body {
+  order: 2 !important;
+  flex: 1 1 auto !important;
+}
+
+/* 3. Category Nav at the very bottom */
+.mobile-emoji-drawer .EmojiPickerReact .epr-category-nav {
+  order: 3 !important;
+  padding: 8px 0 8px 0 !important;
+  width: 100% !important;
+  border-top: 1px solid rgba(128,128,128,0.2) !important;
+}
+
 /* ── Light Mode Range Input Slider Visibility ── */
 input[type="range"] {
   -webkit-appearance: none;

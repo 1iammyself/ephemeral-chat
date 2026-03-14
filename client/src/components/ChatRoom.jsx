@@ -681,6 +681,8 @@ const ChatRoom = () => {
 
   const emojiPickerRef = useRef(null);
   const featureMenuRef = useRef(null);
+  const emojiHoverTimeoutRef = useRef(null);
+  const featureHoverTimeoutRef = useRef(null);
 
   const mediaRecorderRef = useRef(null);
   const mp3RecorderRef = useRef(null);
@@ -2857,7 +2859,21 @@ const ChatRoom = () => {
                   <div className={`relative flex items-center w-full ${getVibeById(roomVibe).inputClass} rounded-full px-1 py-0.5 sm:py-1 transition-all ${isAnonymousMode ? 'border-purple-400 dark:border-purple-600 ring-4 ring-purple-500/20' : ''}`}>
                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" id="image-upload" />
 
-                    <div className="relative flex-shrink-0" ref={featureMenuRef}>
+                    <div 
+                      className="relative flex-shrink-0" 
+                      ref={featureMenuRef}
+                      onMouseEnter={() => {
+                        if (window.electronAPI) {
+                          clearTimeout(featureHoverTimeoutRef.current);
+                          setShowFeatureMenu(true);
+                        }
+                      }}
+                      onMouseLeave={() => {
+                        if (window.electronAPI) {
+                          featureHoverTimeoutRef.current = setTimeout(() => setShowFeatureMenu(false), 300);
+                        }
+                      }}
+                    >
                       <button
                         type="button"
                         onClick={() => setShowFeatureMenu(!showFeatureMenu)}
@@ -3029,7 +3045,21 @@ const ChatRoom = () => {
                       )}
                     </div>
 
-                    <div className="relative flex-shrink-0" ref={emojiPickerRef}>
+                    <div 
+                      className="relative flex-shrink-0" 
+                      ref={emojiPickerRef}
+                      onMouseEnter={() => {
+                        if (window.electronAPI) {
+                          clearTimeout(emojiHoverTimeoutRef.current);
+                          setShowEmojiPicker(true);
+                        }
+                      }}
+                      onMouseLeave={() => {
+                        if (window.electronAPI) {
+                          emojiHoverTimeoutRef.current = setTimeout(() => setShowEmojiPicker(false), 300);
+                        }
+                      }}
+                    >
                       <button
                         type="button"
                         onClick={() => {
@@ -3044,6 +3074,34 @@ const ChatRoom = () => {
                       >
                         <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
+                      <div
+                        className={`hidden sm:block absolute bottom-full mb-2 left-0 sm:left-auto z-[60] animate-in fade-in zoom-in slide-in-from-bottom-2 duration-200 themed-emoji-picker sm:w-[320px] ${showEmojiPicker ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+                        style={{
+                          '--epr-highlight-color': vibeHex,
+                          '--epr-focus-bg-color': `${vibeHex}20`,
+                          '--epr-hover-bg-color': `${vibeHex}10`,
+                          '--epr-bg-color': 'transparent',
+                          '--epr-category-label-bg-color': 'transparent',
+                          '--epr-picker-border-radius': '1.25rem',
+                          '--epr-search-input-bg-color': 'rgba(128,128,128,0.15)',
+                          '--epr-category-navigation-button-size': '18px',
+                          '--epr-emoji-size': '22px',
+                          '--epr-header-padding': '8px 8px 4px',
+                        }}
+                      >
+                        <div className="absolute inset-0 bg-white/40 dark:bg-white/[0.06] backdrop-blur-2xl rounded-[1.25rem] shadow-2xl border border-white/20 dark:border-white/10 -z-10" />
+                        <EmojiPicker
+                          onEmojiClick={onEmojiClick}
+                          theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
+                          lazyLoadEmojis={true}
+                          skinTonesDisabled
+                          autoFocusSearch={false}
+                          searchPlaceholder="Search emojis..."
+                          width="100%"
+                          height={350}
+                          previewConfig={{ showPreview: false }}
+                        />
+                      </div>
                     </div>
                     <div className="relative flex-1 min-w-0">
                       {suggestions.show && (
@@ -3137,10 +3195,10 @@ const ChatRoom = () => {
               </form>
             </div>
 
-            {/* Bottom-Docked Emoji Drawer */}
+            {/* Bottom-Docked Emoji Drawer (Mobile Only) */}
             <div
               id="emoji-drawer"
-              className={`w-full transition-all duration-300 ease-in-out bg-white/50 dark:bg-gray-900/50 backdrop-blur-md overflow-hidden ${showEmojiPicker ? 'h-[300px] sm:h-[350px] opacity-100 pointer-events-auto border-t border-gray-200 dark:border-gray-800' : 'h-0 opacity-0 pointer-events-none border-t-0'}`}
+              className={`mobile-emoji-drawer sm:hidden w-full transition-all duration-300 ease-in-out bg-white/50 dark:bg-gray-900/50 backdrop-blur-md overflow-hidden ${showEmojiPicker ? 'h-[300px] opacity-100 pointer-events-auto border-t border-gray-200 dark:border-gray-800' : 'h-0 opacity-0 pointer-events-none border-t-0'}`}
             >
               <div className="w-full h-full pb-[env(safe-area-inset-bottom)]">
                 <EmojiPicker
