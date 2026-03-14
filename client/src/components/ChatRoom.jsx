@@ -3201,7 +3201,7 @@ const ChatRoom = () => {
               id="emoji-drawer"
               className={`mobile-emoji-drawer sm:hidden w-full transition-all duration-300 ease-in-out bg-transparent overflow-hidden relative ${showEmojiPicker ? 'h-[260px] opacity-100 pointer-events-auto z-0' : 'h-0 opacity-0 pointer-events-none mt-0'}`}
             >
-              <div className="w-full h-full pb-[calc(env(safe-area-inset-bottom,0px)+30px)]">
+              <div className="w-full h-full pb-7">
                 <EmojiPicker
                   onEmojiClick={onEmojiClick}
                   theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
@@ -3225,7 +3225,7 @@ const ChatRoom = () => {
                 />
               </div>
               <div 
-                className={`absolute bottom-0 left-0 right-0 w-full flex items-center justify-between px-6 pb-0 pt-1 pointer-events-none transition-opacity duration-300 ${showEmojiPicker ? 'opacity-100' : 'opacity-0'}`}
+                className={`absolute bottom-[-4px] left-0 right-0 w-full flex items-center justify-between px-6 pb-2 pt-0 pointer-events-none transition-opacity duration-300 ${showEmojiPicker ? 'opacity-100' : 'opacity-0'}`}
               >
                 <button
                   type="button"

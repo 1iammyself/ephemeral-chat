@@ -717,7 +717,7 @@ cap-widget {
 /* 3. Category Nav at the very bottom */
 .mobile-emoji-drawer .EmojiPickerReact .epr-category-nav {
   order: 3 !important;
-  padding: 4px 0 0px 0 !important;
+  padding: 0 !important;
   width: 100% !important;
   border-top: 1px solid rgba(128,128,128,0.2) !important;
 }
