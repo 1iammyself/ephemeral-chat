@@ -2857,7 +2857,7 @@ const ChatRoom = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className={`relative flex items-center w-full ${getVibeById(roomVibe).inputClass} rounded-full px-1 py-0.5 sm:py-1 transition-all ${isAnonymousMode ? 'border-purple-400 dark:border-purple-600 ring-4 ring-purple-500/20' : ''}`}>
+                  <div className={`relative flex items-center w-full ${getVibeById(roomVibe).inputClass} rounded-none px-1 py-0.5 sm:py-1 transition-all ${isAnonymousMode ? 'border-purple-400 dark:border-purple-600 ring-4 ring-purple-500/20' : ''}`}>
                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" id="image-upload" />
 
                     <div 
@@ -3199,9 +3199,9 @@ const ChatRoom = () => {
             {/* Bottom-Docked Emoji Drawer (Mobile Only) */}
             <div
               id="emoji-drawer"
-              className={`mobile-emoji-drawer sm:hidden w-full transition-all duration-300 ease-in-out bg-white/50 dark:bg-gray-900/50 backdrop-blur-md overflow-hidden relative ${showEmojiPicker ? 'h-[260px] opacity-100 pointer-events-auto z-0' : 'h-0 opacity-0 pointer-events-none mt-0'}`}
+              className={`mobile-emoji-drawer sm:hidden w-full transition-all duration-300 ease-in-out bg-transparent overflow-hidden relative ${showEmojiPicker ? 'h-[260px] opacity-100 pointer-events-auto z-0' : 'h-0 opacity-0 pointer-events-none mt-0'}`}
             >
-              <div className="w-full h-full pb-[calc(env(safe-area-inset-bottom,4px)+32px)]">
+              <div className="w-full h-full pb-[calc(env(safe-area-inset-bottom,0px)+30px)]">
                 <EmojiPicker
                   onEmojiClick={onEmojiClick}
                   theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
@@ -3225,7 +3225,7 @@ const ChatRoom = () => {
                 />
               </div>
               <div 
-                className={`absolute bottom-0 left-0 right-0 w-full flex items-center justify-between px-6 pb-1 pt-1 pointer-events-none transition-opacity duration-300 ${showEmojiPicker ? 'opacity-100' : 'opacity-0'}`}
+                className={`absolute bottom-0 left-0 right-0 w-full flex items-center justify-between px-6 pb-0 pt-1 pointer-events-none transition-opacity duration-300 ${showEmojiPicker ? 'opacity-100' : 'opacity-0'}`}
               >
                 <button
                   type="button"
