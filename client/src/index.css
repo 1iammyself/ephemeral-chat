@@ -784,8 +784,15 @@ input[type="range"]::-moz-range-thumb {
   border-bottom-color: rgba(0, 0, 0, 0.08) !important;
 }
 
-/* Hide emoji category names/headings in the picker */
+/* Hide emoji category names/headings in the picker without breaking virtualization */
 .EmojiPickerReact .epr-emoji-category-label {
-  display: none !important;
+  height: 1px !important;
+  min-height: 1px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  font-size: 0 !important;
+  pointer-events: none !important;
 }
 

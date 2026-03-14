@@ -3041,36 +3041,34 @@ const ChatRoom = () => {
                       >
                         <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
-                      {showEmojiPicker && (
-                        <div
-                          className="absolute bottom-full mb-2 left-0 sm:left-auto z-50 animate-in fade-in zoom-in slide-in-from-bottom-2 duration-200 themed-emoji-picker w-[72vw] max-w-[280px] sm:max-w-[320px]"
-                          style={{
-                            '--epr-highlight-color': vibeHex,
-                            '--epr-focus-bg-color': `${vibeHex}20`,
-                            '--epr-hover-bg-color': `${vibeHex}10`,
-                            '--epr-bg-color': 'transparent',
-                            '--epr-category-label-bg-color': 'transparent',
-                            '--epr-picker-border-radius': '1.25rem',
-                            '--epr-search-input-bg-color': 'rgba(128,128,128,0.15)',
-                            '--epr-category-navigation-button-size': '18px',
-                            '--epr-emoji-size': '22px',
-                            '--epr-header-padding': '8px 8px 4px',
-                          }}
-                        >
-                          <div className="absolute inset-0 bg-white/40 dark:bg-white/[0.06] backdrop-blur-2xl rounded-[1.25rem] shadow-2xl border border-white/20 dark:border-white/10 -z-10" />
-                          <EmojiPicker
-                            onEmojiClick={onEmojiClick}
-                            theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
-                            lazyLoadEmojis={true}
-                            skinTonesDisabled
-                            autoFocusSearch={false}
-                            searchPlaceholder="Search..."
-                            width="100%"
-                            height={window.innerWidth < 640 ? 260 : 350}
-                            previewConfig={{ showPreview: false }}
-                          />
-                        </div>
-                      )}
+                      <div
+                        className={`absolute bottom-full mb-2 left-0 sm:left-auto z-50 animate-in fade-in zoom-in slide-in-from-bottom-2 duration-200 themed-emoji-picker w-[72vw] max-w-[280px] sm:max-w-[320px] ${showEmojiPicker ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+                        style={{
+                          '--epr-highlight-color': vibeHex,
+                          '--epr-focus-bg-color': `${vibeHex}20`,
+                          '--epr-hover-bg-color': `${vibeHex}10`,
+                          '--epr-bg-color': 'transparent',
+                          '--epr-category-label-bg-color': 'transparent',
+                          '--epr-picker-border-radius': '1.25rem',
+                          '--epr-search-input-bg-color': 'rgba(128,128,128,0.15)',
+                          '--epr-category-navigation-button-size': '18px',
+                          '--epr-emoji-size': '22px',
+                          '--epr-header-padding': '8px 8px 4px',
+                        }}
+                      >
+                        <div className="absolute inset-0 bg-white/40 dark:bg-white/[0.06] backdrop-blur-2xl rounded-[1.25rem] shadow-2xl border border-white/20 dark:border-white/10 -z-10" />
+                        <EmojiPicker
+                          onEmojiClick={onEmojiClick}
+                          theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
+                          lazyLoadEmojis={true}
+                          skinTonesDisabled
+                          autoFocusSearch={false}
+                          searchPlaceholder="Search..."
+                          width="100%"
+                          height={window.innerWidth < 640 ? 260 : 350}
+                          previewConfig={{ showPreview: false }}
+                        />
+                      </div>
                     </div>
                     <div className="relative flex-1 min-w-0">
                       {suggestions.show && (
