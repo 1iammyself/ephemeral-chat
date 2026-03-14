@@ -3199,9 +3199,9 @@ const ChatRoom = () => {
             {/* Bottom-Docked Emoji Drawer (Mobile Only) */}
             <div
               id="emoji-drawer"
-              className={`mobile-emoji-drawer sm:hidden w-full transition-all duration-300 ease-in-out bg-white/50 dark:bg-gray-900/50 backdrop-blur-md overflow-hidden relative ${showEmojiPicker ? 'h-[320px] opacity-100 pointer-events-auto -mt-3 z-0' : 'h-0 opacity-0 pointer-events-none mt-0'}`}
+              className={`mobile-emoji-drawer sm:hidden w-full transition-all duration-300 ease-in-out bg-white/50 dark:bg-gray-900/50 backdrop-blur-md overflow-hidden relative ${showEmojiPicker ? 'h-[260px] opacity-100 pointer-events-auto z-0' : 'h-0 opacity-0 pointer-events-none mt-0'}`}
             >
-              <div className="w-full h-full pb-[calc(env(safe-area-inset-bottom,16px)+36px)]">
+              <div className="w-full h-full pb-[calc(env(safe-area-inset-bottom,4px)+32px)]">
                 <EmojiPicker
                   onEmojiClick={onEmojiClick}
                   theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
@@ -3219,13 +3219,13 @@ const ChatRoom = () => {
                     '--epr-border-color': 'transparent',
                     '--epr-hover-bg-color': `${vibeHex}10`,
                     '--epr-focus-bg-color': `${vibeHex}20`,
-                    '--epr-search-input-bg-color': 'rgba(128,128,128,0.15)',
+                    '--epr-search-input-bg-color': 'transparent',
                     '--epr-header-padding': '0px 8px 0px',
                   }}
                 />
               </div>
               <div 
-                className={`absolute bottom-0 left-0 right-0 w-full flex items-center justify-between px-6 pb-[env(safe-area-inset-bottom,8px)] pt-1 pointer-events-none transition-opacity duration-300 ${showEmojiPicker ? 'opacity-100' : 'opacity-0'}`}
+                className={`absolute bottom-0 left-0 right-0 w-full flex items-center justify-between px-6 pb-1 pt-1 pointer-events-none transition-opacity duration-300 ${showEmojiPicker ? 'opacity-100' : 'opacity-0'}`}
               >
                 <button
                   type="button"
