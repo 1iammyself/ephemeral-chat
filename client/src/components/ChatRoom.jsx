@@ -2857,7 +2857,7 @@ const ChatRoom = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className={`relative flex items-center w-full ${getVibeById(roomVibe).inputClass} rounded-none px-1 py-0.5 sm:py-1 transition-all ${isAnonymousMode ? 'border-purple-400 dark:border-purple-600 ring-4 ring-purple-500/20' : ''}`}>
+                  <div className={`relative flex items-center w-full ${getVibeById(roomVibe).inputClass} rounded-none sm:rounded-xl px-1 py-0.5 sm:py-1 transition-all ${isAnonymousMode ? 'border-purple-400 dark:border-purple-600 ring-4 ring-purple-500/20' : ''}`}>
                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" id="image-upload" />
 
                     <div 

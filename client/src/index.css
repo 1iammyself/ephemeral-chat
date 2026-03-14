@@ -715,14 +715,17 @@ cap-widget {
 }
 
 /* 3. Category Nav at the very bottom */
+.mobile-emoji-drawer .EmojiPickerReact,
+.mobile-emoji-drawer .EmojiPickerReact * {
+  border: none !important;
+  box-shadow: none !important;
+}
+
 .mobile-emoji-drawer .EmojiPickerReact .epr-category-nav {
   order: 3 !important;
   padding: 0 !important;
   margin: 0 !important;
   width: 100% !important;
-  border-top: none !important;
-  border-bottom: none !important;
-  box-shadow: none !important;
 }
 
 /* ── Light Mode Range Input Slider Visibility ── */
