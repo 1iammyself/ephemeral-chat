@@ -554,7 +554,7 @@ public class ProximityPlugin extends Plugin {
 
         bleScanCallback = new ScanCallback() {
             @Override
-            public void onScanResult(int callbackType, ScanResult result) {
+            public void onScanResult(int callbackType, android.bluetooth.le.ScanResult result) {
                 try {
                     ScanRecord   record = result.getScanRecord();
                     if (record == null) return;
