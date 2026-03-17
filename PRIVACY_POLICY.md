@@ -24,10 +24,10 @@ The App requires the following permissions to function:
 
 ## 3. Data Encryption
 
-- All messages are encrypted client-side using **AES-GCM**.
-- The encryption keys are stored in the URL hash of your chat room and are **never sent to our servers**.
-- Only people with the specific room link can decrypt messages.
-- File transfers use end-to-end encryption.
+- All messages are encrypted client-side using a **Hybrid Post-Quantum architecture** (PQXDH combining X25519 and ML-KEM-768).
+- Sessions are secured using the **Double Ratchet** algorithm (for 1:1) and **Megolm-style Sender Keys** (for groups), ensuring perfect forward secrecy for every single message.
+- Your metadata (IP address and routing info) is masked using **Oblivious HTTP (OHTTP)** and **Privacy Pass**, preventing even network providers from tracking your activity.
+- The encryption keys are established peer-to-peer and are **never sent to our servers**.
 
 ## 4. Local Storage (Persistent Mode)
 
