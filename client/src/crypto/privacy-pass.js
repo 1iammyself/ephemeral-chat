@@ -88,6 +88,7 @@ function modPow(base, exp, mod) {
 }
 
 function buildFallback() {
+  console.error('[Privacy Pass] WARNING: Using non-blind fallback — tokens are NOT unlinkable. Install @noble/curves for production.');
   return {
     _fallback: true,
     ORDER: 2n ** 252n + 27742317777372353535851937790883648493n,

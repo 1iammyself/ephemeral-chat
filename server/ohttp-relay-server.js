@@ -58,7 +58,15 @@ function startOHTTPRelay() {
     });
 
     const chunks = [];
-    req.on('data', chunk => chunks.push(chunk));
+    let totalSize = 0;
+    req.on('data', chunk => {
+      totalSize += chunk.length;
+      if (totalSize > 1024 * 1024) { // 1MB max
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
     req.on('end', () => {
       const body = Buffer.concat(chunks);
 
@@ -80,7 +88,7 @@ function startOHTTPRelay() {
       const proxyReq = transport.request(options, (proxyRes) => {
         res.writeHead(proxyRes.statusCode, {
           'content-type': proxyRes.headers['content-type'] || 'message/ohttp-chunked-res',
-          'access-control-allow-origin': process.env.PUBLIC_URL || process.env.BASE_URL || '*',
+          'access-control-allow-origin': process.env.PUBLIC_URL || process.env.BASE_URL || 'null',
         });
         proxyRes.pipe(res);
       });

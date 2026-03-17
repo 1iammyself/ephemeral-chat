@@ -974,6 +974,16 @@ class RoomManager {
       }
     }
 
+    // Clean up any Redis message keys for this room
+    if (this.redis) {
+      try {
+        const keys = await this.redis.keys(`message:${roomCode}:*`);
+        if (keys.length > 0) await this.redis.del(keys);
+      } catch (e) {
+        // Best-effort cleanup
+      }
+    }
+
     // Delete from storage
     if (this.redis) {
       await this.redis.del(`room:${roomCode}`);
@@ -1485,7 +1495,7 @@ class RoomManager {
 
     // Create the new option
     const newOption = {
-      id: `opt_custom_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      id: `opt_custom_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`,
       text,
       votes: [],
       isCustom: true,

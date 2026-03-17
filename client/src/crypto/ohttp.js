@@ -417,16 +417,22 @@ async function hpkeEncrypt(plaintext, gatewayPublicKeyRaw, keyId) {
 }
 
 async function hpkeDecryptResponse(encryptedResponse, context) {
-  // Derive response key via HMAC-SHA256 matching the server's derivation:
-  // HMAC-SHA256(key=gatewayPublicKey, data=enc || "ohttp-response")
-  const gatewayKey = await crypto.subtle.importKey(
+  // Derive response key via HKDF (RFC 9458 §4.4 aligned)
+  // HKDF-Extract: salt = gatewayPublicKey, IKM = enc
+  const saltKey = await crypto.subtle.importKey(
     'raw', context.gatewayPublicKeyRaw, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
   );
-  const data = new Uint8Array(context.enc.length + 14); // 14 = "ohttp-response".length
-  data.set(context.enc, 0);
-  data.set(new TextEncoder().encode('ohttp-response'), context.enc.length);
-  const hash = await crypto.subtle.sign('HMAC', gatewayKey, data);
-  const aesKey = await crypto.subtle.importKey('raw', hash, 'AES-GCM', false, ['decrypt']);
+  const prk = await crypto.subtle.sign('HMAC', saltKey, context.enc);
+  // HKDF-Expand: info = "ohttp-response", length = 32
+  const prkKey = await crypto.subtle.importKey(
+    'raw', prk, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const info = new TextEncoder().encode('ohttp-response');
+  const expandInput = new Uint8Array(info.length + 1);
+  expandInput.set(info, 0);
+  expandInput[info.length] = 0x01;
+  const hash = await crypto.subtle.sign('HMAC', prkKey, expandInput);
+  const aesKey = await crypto.subtle.importKey('raw', new Uint8Array(hash).slice(0, 32), 'AES-GCM', false, ['decrypt']);
 
   // Extract nonce (12 bytes) + ciphertext from response
   const responseNonce = encryptedResponse.slice(0, 12);

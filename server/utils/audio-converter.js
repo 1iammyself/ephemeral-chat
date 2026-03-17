@@ -16,6 +16,18 @@ try {
     logger.warn('FFprobe not available in audio-converter.js');
 }
 
+// Track active temp directories for cleanup on unexpected process exit
+const activeTmpDirs = new Set();
+const cleanupOrphanedTmpDirs = () => {
+  for (const dir of activeTmpDirs) {
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) { /* best-effort */ }
+  }
+  activeTmpDirs.clear();
+};
+process.once('SIGTERM', cleanupOrphanedTmpDirs);
+process.once('SIGINT', cleanupOrphanedTmpDirs);
+process.once('exit', cleanupOrphanedTmpDirs);
+
 // Concurrency limit for low-RAM environments (Hetzner/Railway $5 tier)
 // This prevents multiple FFmpeg processes from crashing the server
 const MAX_CONCURRENT_CONVERSIONS = 2;
@@ -73,18 +85,18 @@ async function convertAudioToAAC(base64Audio) {
               privateTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ephchat-audio-'));
               fs.chmodSync(privateTmpDir, 0o700);
             } catch (_mkdirErr) {
-              privateTmpDir = os.tmpdir(); // fallback
+              return reject(new Error('Failed to create private temp directory for audio conversion'));
             }
             const inputPath = path.join(privateTmpDir, `${inputId}.input`);
             const outputPath = path.join(privateTmpDir, `${inputId}.m4a`);
+            activeTmpDirs.add(privateTmpDir);
 
             // Cleanup helper — removes files and the private temp directory
             const cleanupAll = () => {
-              fs.unlink(inputPath, () => {});
-              fs.unlink(outputPath, () => {});
-              if (privateTmpDir !== os.tmpdir()) {
-                fs.rmdir(privateTmpDir, () => {});
-              }
+              try { fs.unlinkSync(inputPath); } catch (_) { /* ignore */ }
+              try { fs.unlinkSync(outputPath); } catch (_) { /* ignore */ }
+              try { fs.rmSync(privateTmpDir, { recursive: true, force: true }); } catch (_) { /* ignore */ }
+              activeTmpDirs.delete(privateTmpDir);
             };
 
             // Write input buffer to file

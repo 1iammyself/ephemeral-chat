@@ -3,16 +3,18 @@
  */
 
 const sanitizeHtml = require('sanitize-html');
+const crypto = require('crypto');
 
 /**
- * Generate a unique 6-character room code
- * @returns {string} 6-character alphanumeric code
+ * Generate a unique 10-character room code using cryptographic randomness
+ * @returns {string} 10-character alphanumeric code
  */
 function generateRoomCode() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const bytes = crypto.randomBytes(10);
   let result = '';
   for (let i = 0; i < 10; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    result += chars[bytes[i] % chars.length];
   }
   return result;
 }

@@ -88,6 +88,19 @@ export function deserializeKeyBundle(data) {
   };
 }
 
+// ─── Key Validation ────────────────────────────────────────
+
+/**
+ * Reject all-zero X25519 public keys (small subgroup attack).
+ * @param {Uint8Array} key
+ * @returns {boolean}
+ */
+function isValidPublicKey(key) {
+  if (!key || key.length !== 32) return false;
+  // Reject all-zero key (small subgroup)
+  return key.some(b => b !== 0);
+}
+
 // ─── Key Agreement ─────────────────────────────────────────
 
 /**
@@ -108,7 +121,15 @@ export function deserializeKeyBundle(data) {
  */
 export async function pqxdhInitiator(ourBundle, peerPublicBundle) {
   const isNative = ourBundle.identityKey._native;
-  
+
+  // Validate remote public keys before DH to prevent small subgroup attacks
+  if (!isValidPublicKey(peerPublicBundle.identityKeyRaw)) {
+    throw new Error('PQXDH: invalid peer identity key (all-zero or wrong length)');
+  }
+  if (!isValidPublicKey(peerPublicBundle.ephemeralKeyRaw)) {
+    throw new Error('PQXDH: invalid peer ephemeral key (all-zero or wrong length)');
+  }
+
   // Classical DH components
   const dh1 = await x25519DH(
     ourBundle.identityKey.privateKey,
@@ -178,7 +199,15 @@ export async function pqxdhInitiator(ourBundle, peerPublicBundle) {
  */
 export async function pqxdhResponder(ourBundle, peerPublicBundle, pqCiphertext) {
   const isNative = ourBundle.identityKey._native;
-  
+
+  // Validate remote public keys before DH to prevent small subgroup attacks
+  if (!isValidPublicKey(peerPublicBundle.identityKeyRaw)) {
+    throw new Error('PQXDH: invalid peer identity key (all-zero or wrong length)');
+  }
+  if (!isValidPublicKey(peerPublicBundle.ephemeralKeyRaw)) {
+    throw new Error('PQXDH: invalid peer ephemeral key (all-zero or wrong length)');
+  }
+
   // Classical DH components (same as initiator but with swapped roles)
   const dh1 = await x25519DH(
     ourBundle.identityKey.privateKey,

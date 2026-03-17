@@ -63,6 +63,9 @@ async function getRoomKey(roomCode) {
             name: 'HKDF',
             hash: 'SHA-256',
             // Fixed salt & info — same for all clients on the same room
+            // NOTE: Static salt means rooms with identical codes derive identical keys.
+            // Room codes have sufficient entropy (10-char crypto random) to mitigate this.
+            // v5 (PQXDH+DR) provides proper forward secrecy and per-session keys.
             salt: new TextEncoder().encode('ephchat-aes-v4-salt'),
             info: new TextEncoder().encode('ephchat-room-message-key'),
         },

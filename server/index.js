@@ -4,6 +4,7 @@
  */
 
 require('dotenv').config();
+const nodeCrypto = require('crypto');
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -124,21 +125,6 @@ async function initializeServer() {
   // startRelayServer();
 
   logger.info('✅ Server initialized');
-}
-
-async function initializeRedis() {
-  try {
-    if (process.env.REDIS_URL) {
-      const redisClient = createClient({ url: process.env.REDIS_URL });
-      await redisClient.connect();
-      logger.info('✅ Connected to Redis');
-      return redisClient;
-    } else {
-      logger.info('⚠️  Redis not configured, using in-memory storage');
-    }
-  } catch (error) {
-    logger.error('⚠️  Redis connection failed, using in-memory storage:', error.message);
-  }
 }
 
 const app = express();
@@ -285,12 +271,15 @@ app.use('/api/drops', express.json({ limit: '50mb' }));
 // ─── Traffic Padding Middleware (RFC-compliant traffic analysis resistance) ──
 // Pads all JSON API responses to fixed bucket sizes so network observers
 // cannot infer content type or message length from packet sizes.
+// Intentional blanket coverage: uniform padding prevents traffic analysis across all /api routes.
 app.use('/api', padResponseMiddleware);
 
 // ─── Privacy Pass Auth Middleware (RFC 9578) ────────────────
 // Validates anonymous auth tokens on all /api routes.
 // If no token is present, the request proceeds normally (soft validation).
 // If a token IS present but invalid/spent, the request is rejected with 401.
+// Privacy Pass is soft-validation: requests without tokens proceed normally.
+// It serves as an anti-abuse signal, not access control.
 app.use('/api', privacyPassAuth);
 
 // Root endpoint for API status / health checks
@@ -525,6 +514,14 @@ app.get('/api/invite/:token', async (req, res) => {
 
 // Route to manually/on-demand start the relay server
 app.post('/api/start-relay', (req, res) => {
+  const { secret } = req.body;
+  const expected = String(process.env.CAP_SECRET);
+  if (!secret || String(secret).length !== expected.length || !nodeCrypto.timingSafeEqual(
+    Buffer.from(String(secret)),
+    Buffer.from(expected)
+  )) {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
   try {
     startRelayServer();
     res.json({ success: true, message: 'Relay server starting...' });
@@ -696,7 +693,7 @@ app.post('/api/rooms', async (req, res) => {
     if (hp_email || hp_website) {
       logger.warn('Honeypot triggered - bot detected', { hp_email: !!hp_email, hp_website: !!hp_website });
       // Return success to not alert the bot, but don't create the room
-      return res.json({ success: true, roomCode: 'bot-trap-' + Math.random().toString(36).substring(7) });
+      return res.json({ success: true, roomCode: 'bot-trap-' + nodeCrypto.randomBytes(6).toString('hex') });
     }
 
     // Timestamp validation - form should take at least 1 second to fill (bots are instant)
@@ -704,7 +701,7 @@ app.post('/api/rooms', async (req, res) => {
       const formTime = Date.now() - parseInt(hp_timestamp, 10);
       if (formTime < 1000) { // Less than 1 second
         logger.warn('Form submitted too quickly - likely bot', { formTime });
-        return res.json({ success: true, roomCode: 'bot-trap-' + Math.random().toString(36).substring(7) });
+        return res.json({ success: true, roomCode: 'bot-trap-' + nodeCrypto.randomBytes(6).toString('hex') });
       }
     }
 
@@ -828,7 +825,9 @@ app.post('/api/reveal-image', async (req, res) => {
     // content is base64 data URI: data:image/png;base64,...
     const base64Data = message.content.split(',')[1];
     const imgBuffer = Buffer.from(base64Data, 'base64');
-    const mimeType = message.content.split(';')[0].split(':')[1];
+    const ALLOWED_IMAGE_MIMES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml']);
+    const rawMime = message.content.split(';')[0].split(':')[1];
+    const mimeType = ALLOWED_IMAGE_MIMES.has(rawMime) ? rawMime : 'application/octet-stream';
     res.setHeader('Content-Type', mimeType);
     res.send(imgBuffer);
   } catch (error) {
@@ -880,7 +879,45 @@ app.get('/api/agora/token', (req, res) => {
 });
 
 // Get rooms by creator ID (My Rooms feature)
-app.get('/api/my-rooms', async (req, res) => {
+// Issue a creator token — HMAC(CAP_SECRET, creatorId + clientIP) for authenticated room management.
+// IP-bound: tokens issued from one IP cannot enumerate rooms created from another IP.
+const creatorTokenLimiter = RateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 5, // 5 token requests per IP per window
+  message: { error: 'Too many requests' },
+});
+app.post('/api/creator-token', creatorTokenLimiter, express.json(), (req, res) => {
+  const { creatorId } = req.body;
+  if (!creatorId || typeof creatorId !== 'string' || creatorId.length > 128) {
+    return res.status(400).json({ error: 'Invalid creator ID' });
+  }
+  // Bind token to creatorId + client IP to prevent cross-IP enumeration
+  const clientIp = req.ip || req.socket.remoteAddress || '';
+  const token = nodeCrypto.createHmac('sha256', process.env.CAP_SECRET)
+    .update(creatorId + ':' + clientIp)
+    .digest('hex');
+  res.json({ token });
+});
+
+// Creator token verification — prevents unauthenticated room enumeration.
+// The client must send X-Creator-Token header = HMAC-SHA256(CAP_SECRET, creatorId).
+function verifyCreatorToken(req, res, next) {
+  const creatorId = req.query.creatorId || req.body?.creatorId;
+  const token = req.headers['x-creator-token'];
+  if (!creatorId || !token) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  const clientIp = req.ip || req.socket.remoteAddress || '';
+  const expected = nodeCrypto.createHmac('sha256', process.env.CAP_SECRET)
+    .update(String(creatorId) + ':' + clientIp)
+    .digest('hex');
+  if (token.length !== expected.length || !nodeCrypto.timingSafeEqual(Buffer.from(token, 'hex'), Buffer.from(expected, 'hex'))) {
+    return res.status(403).json({ error: 'Invalid creator token' });
+  }
+  next();
+}
+
+app.get('/api/my-rooms', verifyCreatorToken, async (req, res) => {
   try {
     const { creatorId } = req.query;
 
@@ -935,7 +972,7 @@ app.get('/api/my-rooms', async (req, res) => {
 });
 
 // Delete room by creator (manual deletion)
-app.delete('/api/rooms/:roomCode/delete', async (req, res) => {
+app.delete('/api/rooms/:roomCode/delete', verifyCreatorToken, async (req, res) => {
   try {
     const { roomCode } = req.params;
     const { creatorId } = req.body;
@@ -957,27 +994,20 @@ app.delete('/api/rooms/:roomCode/delete', async (req, res) => {
 // messages. Also starts per-room server-originated chaff on room join.
 io.use(trafficPaddingMiddleware);
 
-// Per-room chaff tracking — keeps a setInterval per room
-const roomChaffIntervals = new Map();
-
 /**
  * Ensure server-originated chaff is running for a room.
  * Called after any successful join-room.
+ * Tracking is managed internally by traffic-padding.js.
  */
 function ensureRoomChaff(roomCode) {
-  if (roomChaffIntervals.has(roomCode)) return; // already running
   startServerChaff(io, roomCode);
-  roomChaffIntervals.set(roomCode, true);
 }
 
 /**
  * Stop chaff for a room (called when room empties).
  */
 function cleanupRoomChaff(roomCode) {
-  if (roomChaffIntervals.has(roomCode)) {
-    stopServerChaff(roomCode);
-    roomChaffIntervals.delete(roomCode);
-  }
+  stopServerChaff(roomCode);
 }
 
 io.on('connection', (socket) => {
@@ -1038,12 +1068,19 @@ io.on('connection', (socket) => {
 
       const roomCode = await roomManager.createRoom(settings);
 
-      // Generate TOTP secret if requested (returned to creator only — never stored in plaintext beyond room session)
+      // Generate TOTP secret if requested — persisted inside room settings
+      // so it survives server restarts for persistent rooms.
       let totpSecret = null;
       if (totpEnabled === true) {
         const { generateSecureToken } = authUtils;
         totpSecret = generateSecureToken(20); // 20 bytes = 160-bit secret
         logger.info(`[TOTP] Room ${roomCode} has TOTP enabled`);
+        // Persist inside the room object (survives restarts via RoomManager)
+        const createdRoom = await roomManager.getRoom(roomCode);
+        if (createdRoom) {
+          createdRoom.settings.totpSecret = totpSecret;
+          await roomManager.saveRoom(roomCode, createdRoom);
+        }
       }
 
       // Initialize room metadata for Lobby/Host logic
@@ -1107,18 +1144,32 @@ io.on('connection', (socket) => {
 
     let room = roomData[roomCode];
 
+    // Hydrate TOTP secret from persisted room if roomData lost it (e.g., after restart)
+    if (!room?.totpSecret) {
+      const persistedRoom = await roomManager.getRoom(roomCode);
+      if (persistedRoom?.settings?.totpSecret) {
+        if (!room) {
+          roomData[roomCode] = { hostId: null, lobbyLimit: 100, lobbyCount: 0, userRoles: {} };
+          room = roomData[roomCode];
+        }
+        room.totpSecret = persistedRoom.settings.totpSecret;
+      }
+    }
+
     // 3. If room is empty (no live sockets), user becomes host automatically
     if (liveUserCount === 0) {
-      // Initialize or reset roomData (preserve preApprovedList if it was set during room creation)
+      // Initialize or reset roomData (preserve preApprovedList and totpSecret if set)
       const existingPreApproved = room?.preApprovedList || [];
       const existingAutoApprove = room?.autoApprove || false;
+      const existingTotpSecret = room?.totpSecret;
       roomData[roomCode] = {
         hostId: socket.id,
         lobbyLimit: 100,
         lobbyCount: 0,
         userRoles: {},
         autoApprove: existingAutoApprove,
-        preApprovedList: existingPreApproved
+        preApprovedList: existingPreApproved,
+        totpSecret: existingTotpSecret,
       };
 
       logger.info(`👑 Room ${roomCode} is empty, ${nickname} auto-approved as host`);
@@ -1813,7 +1864,18 @@ io.on('connection', (socket) => {
       }
 
       // TOTP verification for rooms that require it
-      const joinRoomData = roomData[roomCode];
+      // Hydrate TOTP secret from persisted room if roomData lost it (e.g., after restart)
+      let joinRoomData = roomData[roomCode];
+      if (!joinRoomData?.totpSecret) {
+        const persistedJoinRoom = await roomManager.getRoom(roomCode);
+        if (persistedJoinRoom?.settings?.totpSecret) {
+          if (!joinRoomData) {
+            roomData[roomCode] = { hostId: null, lobbyLimit: 100, lobbyCount: 0, userRoles: {} };
+            joinRoomData = roomData[roomCode];
+          }
+          joinRoomData.totpSecret = persistedJoinRoom.settings.totpSecret;
+        }
+      }
       if (joinRoomData?.totpSecret) {
         if (!totpCode) {
           return callback({ success: false, error: 'This room requires a TOTP verification code', requiresTotp: true });
@@ -2174,25 +2236,21 @@ io.on('connection', (socket) => {
         }
       }
 
-      // For image messages, validate imageData (only if not encrypted)
+      // For image messages, validate imageData
       if (messageType === 'image') {
-        if (!isEncrypted) {
-          if (!imageData || typeof imageData !== 'string' || !imageData.startsWith('data:image/')) {
-            socket.emit('error', { message: 'Invalid image data' });
-            return;
-          }
-          // Check image size (max 5MB)
-          const base64Size = imageData.length * 0.75; // Approximate size in bytes
-          if (base64Size > 5 * 1024 * 1024) {
-            socket.emit('error', { message: 'Image too large. Maximum size is 5MB.' });
-            return;
-          }
-        } else {
-          // If encrypted, just ensure we have some data
-          if (!imageData || typeof imageData !== 'string') {
-            socket.emit('error', { message: 'Invalid encrypted image data' });
-            return;
-          }
+        if (!imageData || typeof imageData !== 'string') {
+          socket.emit('error', { message: 'Invalid image data' });
+          return;
+        }
+        if (!isEncrypted && !imageData.startsWith('data:image/')) {
+          socket.emit('error', { message: 'Invalid image data' });
+          return;
+        }
+        // Check image size (max 5MB) — applies to all images, encrypted or not
+        const base64Size = imageData.length * 0.75; // Approximate size in bytes
+        if (base64Size > 5 * 1024 * 1024) {
+          socket.emit('error', { message: 'Image too large. Maximum size is 5MB.' });
+          return;
         }
       }
 
@@ -2398,7 +2456,7 @@ io.on('connection', (socket) => {
       }
 
       const message = {
-        id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: `msg_${Date.now()}_${nodeCrypto.randomBytes(9).toString('base64url')}`,
         content: messageContent,
         messageType,
         isViewOnce,
@@ -2661,7 +2719,7 @@ io.on('connection', (socket) => {
   const SAFE_GDRIVE_URL = /^https?:\/\/(www\.|docs\.|drive\.)?google\.com\//;
 
   // Helper: generate a short unique mediaId (8 hex chars)
-  const genMediaId = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  const genMediaId = () => nodeCrypto.randomBytes(6).toString('hex');
 
   // Helper: ensure the room's media map exists
   const ensureMediaMap = (roomCode) => {

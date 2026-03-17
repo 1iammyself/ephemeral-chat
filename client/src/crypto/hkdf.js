@@ -119,6 +119,8 @@ export async function deriveChainKeys(chainKey) {
  * @returns {Promise<{rootKey: Uint8Array, chainKey: Uint8Array}>}
  */
 export async function deriveRootKeys(rootKey, dhOutput) {
+  // Per Signal DR spec: rootKey is used as HKDF salt, dhOutput as IKM
+  // hkdf(ikm=dhOutput, salt=rootKey, info, length)
   const info = new TextEncoder().encode('ephchat-ratchet');
   const derived = await hkdf(dhOutput, rootKey, info, 64);
   

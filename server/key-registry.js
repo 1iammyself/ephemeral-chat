@@ -29,6 +29,10 @@ function isValidBundle(bundle) {
     const raw = Buffer.from(v.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
     if (raw.length < 32 || raw.length > 512) return false;
   }
+  if (bundle.pq) {
+    const pqRaw = Buffer.from(bundle.pq, 'base64');
+    if (pqRaw.length !== 1184) return false; // ML-KEM-768 public key must be 1184 bytes
+  }
   return true;
 }
 

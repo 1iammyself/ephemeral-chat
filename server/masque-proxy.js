@@ -33,7 +33,7 @@ const _masquePublicHost = (() => {
   if (!process.env.PUBLIC_URL) return null;
   try { return new URL(process.env.PUBLIC_URL).hostname; } catch (_) { return null; }
 })();
-const _masqueDefaults = ['127.0.0.1', '::1', 'localhost', ...(_masquePublicHost ? [_masquePublicHost] : [])].join(',');
+const _masqueDefaults = ['::1', ...(_masquePublicHost ? [_masquePublicHost] : [])].join(',');
 const ALLOWED_HOSTS_ENV = process.env.MASQUE_ALLOWED_HOSTS || _masqueDefaults;
 const ALLOWED_HOSTS = new Set(ALLOWED_HOSTS_ENV.split(',').map(h => h.trim()));
 
@@ -42,6 +42,10 @@ const ALLOWED_HOSTS = new Set(ALLOWED_HOSTS_ENV.split(',').map(h => h.trim()));
 const CAPSULE_DATAGRAM = 0x00;
 const CAPSULE_CLOSE    = 0x01;
 
+// NOTE: RFC 9297 §3.2 specifies variable-length integer (VarInt) encoding for
+// the capsule length field. This implementation intentionally uses a fixed
+// 2-byte big-endian uint16 instead. This is an internal protocol deviation
+// — no external RFC 9297 interop is required or expected for this proxy.
 function encodeCapsule(type, payload) {
   const len = payload.length;
   const frame = Buffer.alloc(3 + len);

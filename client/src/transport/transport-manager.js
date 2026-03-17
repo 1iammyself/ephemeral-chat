@@ -54,7 +54,7 @@ export class TransportManager {
                         TRANSPORT.UNKNOWN;
       
       this.peerTransports.set(peerId, { type: transport });
-      console.log(`🔗 Transport selected for ${peerId}: ${transport}`);
+      if (import.meta.env.DEV) console.log(`🔗 Transport selected for ${peerId}: ${transport}`);
       
       if (this.onTransportSelected) {
         this.onTransportSelected(peerId, transport);
@@ -62,7 +62,7 @@ export class TransportManager {
     };
     
     this.ice.onConnectionFailed = (peerId, reason) => {
-      console.log(`P2P failed for ${peerId}: ${reason}, falling back to relay`);
+      if (import.meta.env.DEV) console.log(`P2P failed for ${peerId}: ${reason}, falling back to relay`);
       this.peerTransports.set(peerId, { type: TRANSPORT.RELAY });
       
       if (this.onTransportSelected) {
@@ -97,7 +97,7 @@ export class TransportManager {
       return transport;
       
     } catch (e) {
-      console.log(`P2P unavailable for ${peerId}, using relay: ${e.message}`);
+      if (import.meta.env.DEV) console.log(`P2P unavailable for ${peerId}, using relay: ${e.message}`);
       this.peerTransports.set(peerId, { type: TRANSPORT.RELAY });
       return TRANSPORT.RELAY;
     }
@@ -124,7 +124,7 @@ export class TransportManager {
           return { success: true, transport };
         }
       } catch (e) {
-        console.warn(`P2P send failed, falling back to relay: ${e.message}`);
+        if (import.meta.env.DEV) console.warn(`P2P send failed, falling back to relay: ${e.message}`);
       }
     }
     
@@ -134,7 +134,7 @@ export class TransportManager {
         const success = await this._sendViaRelay(peerId, file, encryptionMeta);
         return { success, transport: TRANSPORT.RELAY };
       } catch (e) {
-        console.error('Relay send also failed:', e);
+        if (import.meta.env.DEV) console.error('Relay send also failed:', e);
       }
     }
     
@@ -150,7 +150,7 @@ export class TransportManager {
         });
         return { success: true, transport: TRANSPORT.SOCKET };
       } catch (e) {
-        console.error('Socket.IO send failed:', e);
+        if (import.meta.env.DEV) console.error('Socket.IO send failed:', e);
       }
     }
     

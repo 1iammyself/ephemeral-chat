@@ -298,6 +298,15 @@ function attachWebAuthnRoutes(app) {
       if (!authData.flags.UP) {
         return res.status(400).json({ error: 'User presence flag not set' });
       }
+      if (!authData.flags.UV) {
+        return res.status(400).json({ error: 'User verification required' });
+      }
+
+      // Verify RP ID hash matches expected RP_ID (WebAuthn spec 7.1 step 13)
+      const expectedRpIdHash = crypto.createHash('sha256').update(RP_ID).digest();
+      if (!authData.rpIdHash.equals(expectedRpIdHash)) {
+        return res.status(400).json({ error: 'RP ID mismatch during registration' });
+      }
 
       if (!authData.attestedCredentialData) {
         return res.status(400).json({ error: 'No attested credential data' });
@@ -322,7 +331,7 @@ function attachWebAuthnRoutes(app) {
 
     } catch (e) {
       logger.error('[WebAuthn] Registration error:', e.message);
-      res.status(400).json({ error: 'Registration failed: ' + e.message });
+      res.status(400).json({ error: 'Registration failed. Please try again.' });
     }
   });
 
@@ -450,7 +459,7 @@ function attachWebAuthnRoutes(app) {
 
     } catch (e) {
       logger.error('[WebAuthn] Authentication error:', e.message);
-      res.status(400).json({ error: 'Authentication failed: ' + e.message });
+      res.status(400).json({ error: 'Authentication failed. Please try again.' });
     }
   });
 

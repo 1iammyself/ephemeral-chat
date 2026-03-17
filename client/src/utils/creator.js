@@ -7,7 +7,10 @@
  * the "zero-persistence" privacy model.
  */
 
+import { API_BASE } from './resolve-url.js';
+
 const CREATOR_ID_KEY = 'eph-creator-id';
+const CREATOR_TOKEN_KEY = 'eph-creator-token';
 
 /**
  * Get or create creator ID from sessionStorage.
@@ -48,4 +51,25 @@ export const clearCreatorId = () => {
  */
 export const hasCreatorId = () => {
     return sessionStorage.getItem(CREATOR_ID_KEY) !== null;
+};
+
+/**
+ * Get or fetch creator token for authenticated room management.
+ * Cached in sessionStorage per session.
+ * @returns {Promise<string>} HMAC token for X-Creator-Token header
+ */
+export const getCreatorToken = async () => {
+    const cached = sessionStorage.getItem(CREATOR_TOKEN_KEY);
+    if (cached) return cached;
+
+    const creatorId = getCreatorId();
+    const res = await fetch(`${API_BASE}/api/creator-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ creatorId }),
+    });
+    if (!res.ok) throw new Error('Failed to get creator token');
+    const { token } = await res.json();
+    sessionStorage.setItem(CREATOR_TOKEN_KEY, token);
+    return token;
 };

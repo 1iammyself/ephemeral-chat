@@ -45,11 +45,20 @@ function startRelayServer() {
         try {
             const cwd = e2ecpDir;
 
+            // Only pass safe env vars to the subprocess (no secrets)
+            const safeEnv = {
+                PATH: process.env.PATH,
+                HOME: process.env.HOME || process.env.USERPROFILE,
+                PORT: relayPort.toString(),
+                GOPATH: process.env.GOPATH || '',
+                GOROOT: process.env.GOROOT || '',
+            };
+
             relayProcess = spawn(cmd, args, {
                 cwd: cwd,
-                env: { ...process.env, PORT: relayPort.toString() },
+                env: safeEnv,
                 stdio: 'pipe',
-                shell: true
+                shell: false
             });
 
             relayProcess.stdout.on('data', (data) => {
@@ -74,12 +83,12 @@ function startRelayServer() {
                 logger.warn(`[e2ecp] process exited with code ${code}`);
                 relayProcess = null;
                 if (pendingStartPromise) {
-                    // If we were waiting for start and it closed, reject
-                    // However, usually close happens much later. 
-                    // If code != 0 and we are still pending, reject.
                     pendingStartPromise = null;
-                    // reject(new Error(`Process exited with code ${code}`)); 
-                    // Use resolve to avoid crashing the caller, but log error
+                    if (code !== 0) {
+                        reject(new Error(`e2ecp process exited with code ${code}`));
+                    } else {
+                        resolve();
+                    }
                 }
             });
 

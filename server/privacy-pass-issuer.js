@@ -1,3 +1,5 @@
+const { logger } = require('./utils');
+
 /**
  * Privacy Pass Issuer — Ristretto255-based VOPRF (RFC 9497 / RFC 9578)
  *
@@ -119,17 +121,17 @@ try {
     },
   };
 
-  console.log('[Privacy Pass] Using @noble/curves Ristretto255 (production grade)');
+  logger.info('[Privacy Pass] Using @noble/curves Ristretto255 (production grade)');
 } catch {
   // ── Fallback: Ed25519-based approximation ────────────────
-  // NOT cofactor-safe — block in production to prevent broken anonymity.
-  if (process.env.NODE_ENV === 'production') {
+  // NOT cofactor-safe — block unless explicitly in development mode.
+  if (process.env.NODE_ENV !== 'development') {
     throw new Error(
-      '[FATAL] @noble/curves is not installed. Privacy Pass requires it for real Ristretto255 VOPRF in production. ' +
-      'Run: npm install @noble/curves'
+      '[FATAL] @noble/curves is not installed. Privacy Pass requires it for real Ristretto255 VOPRF. ' +
+      'Run: npm install @noble/curves  (set NODE_ENV=development to use the unsafe fallback)'
     );
   }
-  console.warn('[Privacy Pass] @noble/curves not found — using DEV-ONLY fallback (NOT blind, NOT cofactor-safe)');
+  logger.warn('[Privacy Pass] @noble/curves not found — using DEV-ONLY fallback (NOT blind, NOT cofactor-safe)');
 
   const ORDER = 2n ** 252n + 27742317777372353535851937790883648493n;
 
@@ -173,8 +175,8 @@ try {
     dleqVerify() { return true; },
   };
 
-  console.warn('[Privacy Pass] ⚠️  @noble/curves not found — using DEV-ONLY fallback (NOT blind)');
-  console.warn('[Privacy Pass]    Run: npm install @noble/curves  for production Ristretto255');
+  logger.warn('[Privacy Pass] ⚠️  @noble/curves not found — using DEV-ONLY fallback (NOT blind)');
+  logger.warn('[Privacy Pass]    Run: npm install @noble/curves  for production Ristretto255');
 }
 
 // ─── Issuer State ──────────────────────────────────────────
@@ -198,9 +200,9 @@ function initIssuer() {
   issuerPublicPoint  = ristretto.scalarMul(ristretto.BASE, issuerSecretScalar);
   issuerKeyId        = crypto.randomBytes(8).toString('hex');
 
-  console.log(`[Privacy Pass] Issuer initialized — Ristretto255 VOPRF (keyId: ${issuerKeyId})`);
+  logger.info(`[Privacy Pass] Issuer initialized — Ristretto255 VOPRF (keyId: ${issuerKeyId})`);
   if (ristretto._fallback) {
-    console.warn('[Privacy Pass] ⚠️  DEV fallback active — tokens are NOT truly blind');
+    logger.warn('[Privacy Pass] ⚠️  DEV fallback active — tokens are NOT truly blind');
   }
   return { keyId: issuerKeyId };
 }
@@ -344,7 +346,7 @@ function startCleanup(intervalMs = 5 * 60 * 1000) {
     }
     
     if (cleaned > 0) {
-      console.log(`[Privacy Pass] Cleaned ${cleaned} spent tokens`);
+      logger.info(`[Privacy Pass] Cleaned ${cleaned} spent tokens`);
     }
   }, intervalMs);
 }
@@ -402,12 +404,12 @@ function attachPrivacyPassRoutes(app) {
       });
       
     } catch (e) {
-      console.error('[Privacy Pass] Issuance error:', e.message);
+      logger.error('[Privacy Pass] Issuance error:', e.message);
       res.status(400).json({ error: e.message });
     }
   });
   
-  console.log('[Privacy Pass] Routes attached (Ristretto255 VOPRF)');
+  logger.info('[Privacy Pass] Routes attached (Ristretto255 VOPRF)');
 }
 
 /**
@@ -445,14 +447,14 @@ function privacyPassAuth(req, res, next) {
     const sigMatch   = authMatch || authHeader.match(/signature="([^"]+)"/);
 
     if (!tokenMatch || !sigMatch) {
-      console.warn('[Privacy Pass] Malformed auth header — rejecting');
+      logger.warn('[Privacy Pass] Malformed auth header — rejecting');
       return res.status(401).json({ error: 'Malformed Privacy Pass token' });
     }
 
     const result = verifyToken(tokenMatch[1], sigMatch[1]);
 
     if (!result.valid) {
-      console.warn(`[Privacy Pass] Token verification failed: ${result.reason}`);
+      logger.warn(`[Privacy Pass] Token verification failed: ${result.reason}`);
       return res.status(401).json({ error: 'Invalid Privacy Pass token', reason: result.reason });
     }
 
@@ -460,7 +462,7 @@ function privacyPassAuth(req, res, next) {
     next();
 
   } catch (e) {
-    console.warn('[Privacy Pass] Auth error:', e.message);
+    logger.warn('[Privacy Pass] Auth error:', e.message);
     return res.status(401).json({ error: 'Privacy Pass verification error' });
   }
 }

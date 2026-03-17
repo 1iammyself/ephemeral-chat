@@ -13,6 +13,7 @@
  */
 
 const nodeCrypto = require('crypto');
+const { logger } = require('./utils');
 
 // ─── HPKE Setup ────────────────────────────────────────────
 
@@ -48,7 +49,7 @@ async function initGatewayKeys() {
     await cs.SerializePublicKey(gatewayKeyPair.publicKey)
   );
   gatewayKeyId = nodeCrypto.randomBytes(1)[0]; // 1-byte key ID per RFC 9458
-  console.log(`[OHTTP] Gateway HPKE key initialized (X25519, keyId: ${gatewayKeyId})`);
+  logger.info(`[OHTTP] Gateway HPKE key initialized (X25519, keyId: ${gatewayKeyId})`);
   return { publicKey: gatewayPublicKeyRaw, keyId: gatewayKeyId };
 }
 
@@ -138,11 +139,21 @@ async function decapsulateRequest(encapsulatedRequest) {
     // Parse the inner Binary HTTP request (RFC 9292 compatible)
     const innerRequest = parseBinaryHTTP(Buffer.from(plaintext));
 
-    // Derive response key via HKDF (RFC 9458 §4.4 aligned)
-    // Use HKDF-SHA256 with enc as IKM, gateway pk as salt, "ohttp-response" as info
-    const responseKey = nodeCrypto.createHmac('sha256', Buffer.from(gatewayPublicKeyRaw))
-      .update(Buffer.concat([enc, Buffer.from('ohttp-response')]))
+    // Derive response key via HKDF (RFC 9458 §4.4 deviation)
+    // NOTE: RFC 9458 §4.4 specifies deriving the response key from the HPKE
+    // recipient context's ExportSecret. The `hpke` npm package does not expose
+    // the recipient context after Open(), so we derive from enc + gateway pk.
+    // Both client and server use this identical derivation — no interop needed.
+    // HKDF-Extract: salt = gateway public key, IKM = enc
+    // HKDF-Expand: info = "ohttp-response", length = 32
+    const prk = nodeCrypto.createHmac('sha256', Buffer.from(gatewayPublicKeyRaw))
+      .update(enc)
       .digest();
+    const info = Buffer.from('ohttp-response');
+    const expandInput = Buffer.concat([info, Buffer.from([0x01])]);
+    const responseKey = Buffer.from(
+      nodeCrypto.createHmac('sha256', prk).update(expandInput).digest()
+    ).slice(0, 32);
 
     return {
       ...innerRequest,
@@ -278,13 +289,13 @@ function ohttpGatewayMiddleware(app) {
       res.send(encResponse);
 
     } catch (e) {
-      console.error('[OHTTP] Decapsulation error:', e.message);
+      logger.warn('[OHTTP] Decapsulation error:', e.message);
       // Return generic error (don't leak information)
       res.status(400).send('Bad Request');
     }
   });
 
-  console.log('[OHTTP] Gateway middleware attached');
+  logger.info('[OHTTP] Gateway middleware attached');
 }
 
 /**
@@ -351,7 +362,7 @@ let rotationInterval = null;
  */
 function startKeyRotation(intervalMs = 24 * 60 * 60 * 1000) {
   rotationInterval = setInterval(async () => {
-    console.log('[OHTTP] Rotating gateway keys...');
+    logger.info('[OHTTP] Rotating gateway keys...');
     await initGatewayKeys();
   }, intervalMs);
 }

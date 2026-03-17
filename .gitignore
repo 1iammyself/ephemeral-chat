@@ -121,3 +121,11 @@ nul
 # Issues
 issues/
 
+# Debug and build artifacts
+debug-*.js
+*.diff
+emits.txt
+build_log.txt
+bundle_*.log
+keystore_path/
+

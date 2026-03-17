@@ -94,6 +94,10 @@ function createDropRoutes(dropManager, options = {}) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
+      if (creatorId && !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(creatorId)) {
+        return res.status(400).json({ error: 'Invalid creator ID format' });
+      }
+
       const result = await dropManager.createDrop({
         encryptedPayload,
         iv,
@@ -333,6 +337,10 @@ function createDropRoutes(dropManager, options = {}) {
 
       if (!dropId || !creatorId) {
         return res.status(400).json({ error: 'Drop ID and creator ID are required' });
+      }
+
+      if (creatorId && !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(creatorId)) {
+        return res.status(400).json({ error: 'Invalid creator ID format' });
       }
 
       dropManager.deleteDrop(dropId, creatorId);

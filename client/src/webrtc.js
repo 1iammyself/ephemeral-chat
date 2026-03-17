@@ -56,12 +56,11 @@ class WebRTCService {
             console.warn('Failed to parse VITE_ICE_SERVERS', e);
         }
 
+        // TURN credentials must be provided via VITE_ICE_SERVERS env var.
+        // Fallback is STUN-only (works for most NAT types except symmetric).
         this.iceServers = configuredIceServers.length > 0 ? configuredIceServers : [
             { urls: "stun:stun.relay.metered.ca:80" },
-            // Free TURN fallback for symmetric NAT traversal
-            { urls: "turn:openrelay.metered.ca:80",  username: "openrelayproject", credential: "openrelayproject" },
-            { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
-            { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
+            { urls: "stun:stun.l.google.com:19302" },
         ];
 
         this.setupSocketHandlers();
@@ -71,8 +70,14 @@ class WebRTCService {
      * Set up Socket.IO event handlers for call signaling
      */
     setupSocketHandlers() {
+        let retries = 0;
+        const MAX_RETRIES = 50;
         const setupHandlers = () => {
             if (!socketManager.socket) {
+                if (retries++ >= MAX_RETRIES) {
+                    console.warn('WebRTC: Socket not available after max retries');
+                    return;
+                }
                 setTimeout(setupHandlers, 100);
                 return;
             }

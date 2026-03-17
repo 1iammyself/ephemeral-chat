@@ -49,12 +49,12 @@ const ICE_SERVERS = getIceServers();
 // ─── Utility Functions ──────────────────────────────────────
 
 function generateDeviceId() {
-  const stored = localStorage.getItem('ephchat-device-id');
+  const stored = sessionStorage.getItem('ephchat-device-id');
   if (stored) return stored;
   const id = Array.from(crypto.getRandomValues(new Uint8Array(4)))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
-  localStorage.setItem('ephchat-device-id', id);
+  sessionStorage.setItem('ephchat-device-id', id);
   return id;
 }
 

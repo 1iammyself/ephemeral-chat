@@ -14,7 +14,7 @@
  * @module crypto/double-ratchet
  */
 
-import { deriveChainKeys, deriveRootKeys, hkdf } from './hkdf.js';
+import { deriveChainKeys, deriveRootKeys, hkdf, constantTimeEqual } from './hkdf.js';
 import { generateX25519Keypair, x25519DH, serializePublicKey, publicKeyToBase64, base64ToPublicKey } from './x25519.js';
 
 // Maximum number of skipped message keys to store (prevents DoS)
@@ -149,8 +149,8 @@ export async function ratchetDecrypt(state, header, ciphertext, iv) {
     return plaintext;
   }
   
-  // Check if we need to advance the DH ratchet
-  if (!state.dhRemote || !arraysEqual(remoteDHKey, state.dhRemote)) {
+  // Check if we need to advance the DH ratchet (constant-time comparison)
+  if (!state.dhRemote || !constantTimeEqual(remoteDHKey, state.dhRemote)) {
     // Skip any remaining messages in the current receiving chain
     await skipMessageKeys(state, header.pn);
     
@@ -318,15 +318,6 @@ async function aesGcmDecrypt(ciphertextBase64, ivBase64, messageKey) {
 }
 
 // ─── Utilities ─────────────────────────────────────────────
-
-function arraysEqual(a, b) {
-  if (!a || !b) return false;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) return false;
-  }
-  return true;
-}
 
 /**
  * Destroy a ratchet state — zeroize all key material

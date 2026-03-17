@@ -101,14 +101,17 @@ export async function decryptWithSenderKey(state, payload) {
   // Derive the message key at targetCounter
   const messageKey = await _deriveSenderMessageKey(currentKey, targetCounter);
 
-  // Decrypt
+  // Pre-compute the next chain key before attempting decryption so that
+  // if decryption throws the stored state has not been partially advanced.
+  const nextChainKey = await _advanceChainKey(currentKey);
+
+  // Decrypt — if this throws, nextChainKey is discarded without touching state
   const cryptoKey = await crypto.subtle.importKey('raw', messageKey, 'AES-GCM', false, ['decrypt']);
   const cipherBytes = _fromBase64(payload.ct);
   const iv = _fromBase64(payload.iv);
   const plainBuffer = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, cipherBytes);
 
-  // Advance chain one more step and update stored state (discard used key)
-  const nextChainKey = await _advanceChainKey(currentKey);
+  // Decryption succeeded — now commit the new chain state
   currentKey.fill(0);
   messageKey.fill(0);
 
