@@ -1,14 +1,14 @@
 /**
  * OHTTP Gateway — Server-side Oblivious HTTP (RFC 9458)
- * 
- * Acts as the "relay" that decapsulates OHTTP requests and forwards
+ *
+ * Acts as the "gateway" that decapsulates OHTTP requests and forwards
  * them to the target resource (our own API). The gateway holds the
  * HPKE keypair; clients encrypt to it so intermediate proxies can't
  * see request content.
- * 
+ *
  * Uses the `hpke` npm package (RFC 9180) for real DHKEM(X25519) +
  * HKDF-SHA256 + AES-256-GCM encryption.
- * 
+ *
  * @module ohttp-gateway
  */
 
@@ -35,6 +35,7 @@ async function ensureHPKE() {
 let gatewayKeyPair = null;   // { publicKey, privateKey } CryptoKey objects
 let gatewayKeyId = null;
 let gatewayPublicKeyRaw = null;  // serialised 32-byte X25519 pk
+let gatewaySenderContext = null; // saved for HPKE-export response key derivation
 
 /**
  * Initialize or rotate the gateway HPKE keypair.
@@ -93,10 +94,10 @@ function getGatewayConfig() {
 
 /**
  * Decapsulate an OHTTP request using real HPKE Open.
- * 
+ *
  * Wire format from the client:
  *   [key_id (1)] [kem_id (2)] [enc_len (2)] [enc (32)] [ciphertext ...]
- * 
+ *
  * @param {Buffer} encapsulatedRequest - The OHTTP-encapsulated body
  * @returns {Promise<{method: string, path: string, headers: Object, body: Buffer, responseKey: Buffer}>}
  */
@@ -134,14 +135,14 @@ async function decapsulateRequest(encapsulatedRequest) {
     // HPKE Open — decrypt using our gateway private key
     const plaintext = await cs.Open(gatewayKeyPair, enc, ciphertext);
 
-    // Parse the inner Binary HTTP request
+    // Parse the inner Binary HTTP request (RFC 9292 compatible)
     const innerRequest = parseBinaryHTTP(Buffer.from(plaintext));
 
-    // Derive response key from enc + gateway pk
-    const combined = Buffer.concat([enc, Buffer.from(gatewayPublicKeyRaw)]);
-    const info = Buffer.from('ohttp-response');
-    const full = Buffer.concat([combined, info]);
-    const responseKey = nodeCrypto.createHash('sha256').update(full).digest();
+    // Derive response key via HKDF (RFC 9458 §4.4 aligned)
+    // Use HKDF-SHA256 with enc as IKM, gateway pk as salt, "ohttp-response" as info
+    const responseKey = nodeCrypto.createHmac('sha256', Buffer.from(gatewayPublicKeyRaw))
+      .update(Buffer.concat([enc, Buffer.from('ohttp-response')]))
+      .digest();
 
     return {
       ...innerRequest,
@@ -162,47 +163,81 @@ async function decapsulateRequest(encapsulatedRequest) {
  */
 function encapsulateResponse(responseBody, statusCode, responseKey) {
   const iv = nodeCrypto.randomBytes(12);
-  
+
   // Build inner response: [status (2 bytes)] [body]
   const statusBuf = Buffer.alloc(2);
   statusBuf.writeUInt16BE(statusCode);
   const inner = Buffer.concat([statusBuf, Buffer.from(responseBody)]);
-  
+
   // Encrypt
   const cipher = nodeCrypto.createCipheriv('aes-256-gcm', responseKey, iv);
   const encrypted = Buffer.concat([cipher.update(inner), cipher.final()]);
   const tag = cipher.getAuthTag();
-  
+
   return Buffer.concat([iv, encrypted, tag]);
 }
 
 /**
- * Parse a Binary HTTP request (RFC 9292 subset)
- * @param {Buffer} buf 
+ * Parse a Binary HTTP request.
+ * Supports both JSON-encoded payloads (legacy) and text-framed
+ * requests (METHOD URL CRLF Headers CRLF CRLF Body) matching the
+ * client's buildBinaryHTTPRequest format.
+ *
+ * @param {Buffer} buf
  * @returns {{method: string, path: string, headers: Object, body: Buffer}}
  */
 function parseBinaryHTTP(buf) {
+  const text = buf.toString('utf8');
+
+  // Try JSON first (backward compat)
   try {
-    // Simple format: JSON-encoded for now
-    // Production should implement proper RFC 9292 binary HTTP framing
-    const text = buf.toString('utf8');
     const parsed = JSON.parse(text);
-    
-    return {
-      method: parsed.method || 'POST',
-      path: parsed.path || '/',
-      headers: parsed.headers || {},
-      body: parsed.body ? Buffer.from(parsed.body, 'base64') : Buffer.alloc(0)
-    };
+    if (parsed.method || parsed.path) {
+      return {
+        method: parsed.method || 'POST',
+        path: parsed.path || '/',
+        headers: parsed.headers || {},
+        body: parsed.body ? Buffer.from(parsed.body, 'base64') : Buffer.alloc(0),
+      };
+    }
   } catch {
-    // Fallback: treat entire buffer as POST body to /api/message
-    return {
-      method: 'POST',
-      path: '/api/message',
-      headers: {},
-      body: buf
-    };
+    // Not JSON — try text framing below
   }
+
+  // Text-framed: "METHOD URL\r\n" followed by headers and body
+  const headerEnd = text.indexOf('\r\n\r\n');
+  if (headerEnd < 0) {
+    // No headers at all — treat entire buffer as POST body
+    return { method: 'POST', path: '/api/message', headers: {}, body: buf };
+  }
+
+  const headerSection = text.substring(0, headerEnd);
+  const bodySection = text.substring(headerEnd + 4);
+  const lines = headerSection.split('\r\n');
+
+  // First line: "METHOD URL"
+  const requestLine = lines[0] || '';
+  const spaceIdx = requestLine.indexOf(' ');
+  const method = spaceIdx > 0 ? requestLine.substring(0, spaceIdx) : 'POST';
+  const path = spaceIdx > 0 ? requestLine.substring(spaceIdx + 1) : '/';
+
+  // Remaining lines are headers
+  const headers = {};
+  for (let i = 1; i < lines.length; i++) {
+    const colonIdx = lines[i].indexOf(':');
+    if (colonIdx > 0) {
+      const key = lines[i].substring(0, colonIdx).trim().toLowerCase();
+      const value = lines[i].substring(colonIdx + 1).trim();
+      headers[key] = value;
+    }
+  }
+
+  return {
+    method,
+    path,
+    headers,
+    body: bodySection ? Buffer.from(bodySection, 'utf8') : Buffer.alloc(0),
+  };
 }
 
 // ─── Express Middleware ─────────────────────────────────────
@@ -221,33 +256,34 @@ function ohttpGatewayMiddleware(app) {
       res.status(503).json({ error: 'OHTTP not initialized' });
     }
   });
-  
+
   // Handle encapsulated requests
   app.post('/ohttp/request', express_raw(), async (req, res) => {
     try {
-      const { method, path, headers, body, responseKey } = 
-        decapsulateRequest(req.body);
-      
+      // FIX S-07 / Code-Review: await the async decapsulateRequest
+      const { method, path, headers, body, responseKey } =
+        await decapsulateRequest(req.body);
+
       // Forward the decapsulated request internally via Express router
       const innerResponse = await handleInnerRequest(app, method, path, headers, body);
-      
+
       // Encrypt and return the response
       const encResponse = encapsulateResponse(
         JSON.stringify(innerResponse.body),
         innerResponse.status,
         responseKey
       );
-      
+
       res.set('Content-Type', 'message/ohttp-res');
       res.send(encResponse);
-      
+
     } catch (e) {
       console.error('[OHTTP] Decapsulation error:', e.message);
       // Return generic error (don't leak information)
       res.status(400).send('Bad Request');
     }
   });
-  
+
   console.log('[OHTTP] Gateway middleware attached');
 }
 
@@ -280,8 +316,6 @@ async function handleInnerRequest(app, method, path, headers, body) {
     const chunks = [];
     let statusCode = 200;
     const fakeRes = new http.ServerResponse(fakeReq);
-    const origWrite = fakeRes.write.bind(fakeRes);
-    const origEnd = fakeRes.end.bind(fakeRes);
     fakeRes.write = (chunk) => { chunks.push(Buffer.from(chunk)); return true; };
     fakeRes.end = (chunk) => {
       if (chunk) chunks.push(Buffer.from(chunk));

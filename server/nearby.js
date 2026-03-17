@@ -41,6 +41,11 @@ function setupNearbyNamespace(io) {
 
     logger.info(`[Nearby] Peer connected: ${nickname} (${deviceId}) [${platform}/${deviceType}]`);
 
+    // Extract /24 subnet from peer IP for proximity filtering
+    const rawIp = socket.handshake.headers['x-forwarded-for']?.split(',')[0]?.trim()
+      || socket.handshake.address?.replace('::ffff:', '') || '';
+    const subnet = getSubnet24(rawIp);
+
     // Register this peer
     const peerInfo = {
       socketId: socket.id,
@@ -48,6 +53,8 @@ function setupNearbyNamespace(io) {
       nickname: sanitize(nickname),
       platform: platform || 'web',
       deviceType: deviceType || 'unknown',
+      ip: rawIp,
+      subnet,
       joinedAt: Date.now(),
       lastHeartbeat: Date.now()
     };
@@ -61,10 +68,10 @@ function setupNearbyNamespace(io) {
     nearbyPeers.set(socket.id, peerInfo);
     deviceToSocket.set(deviceId, socket.id);
 
-    // Send existing peers list to the new peer
+    // Send existing peers list — only peers on the same /24 subnet (proximity)
     const existingPeers = [];
     for (const [, peer] of nearbyPeers) {
-      if (peer.deviceId !== deviceId) {
+      if (peer.deviceId !== deviceId && isSameSubnet(subnet, peer.subnet)) {
         existingPeers.push({
           deviceId: peer.deviceId,
           nickname: peer.nickname,
@@ -87,26 +94,33 @@ function setupNearbyNamespace(io) {
       peer.deviceType = data.deviceType || peer.deviceType;
       peer.lastHeartbeat = Date.now();
 
-      // Broadcast to all other peers in the namespace
-      socket.broadcast.emit('peer-announced', {
-        deviceId: peer.deviceId,
-        nickname: peer.nickname,
-        platform: peer.platform,
-        deviceType: peer.deviceType
-      });
+      // Broadcast only to peers on the same /24 subnet
+      for (const [sid, otherPeer] of nearbyPeers) {
+        if (otherPeer.deviceId !== peer.deviceId && isSameSubnet(peer.subnet, otherPeer.subnet)) {
+          nearbyNs.to(sid).emit('peer-announced', {
+            deviceId: peer.deviceId,
+            nickname: peer.nickname,
+            platform: peer.platform,
+            deviceType: peer.deviceType
+          });
+        }
+      }
     });
 
     // ─── Heartbeat ──────────────────────────────────────────
 
     socket.on('heartbeat', (data) => {
       const peer = nearbyPeers.get(socket.id);
-      if (peer) {
-        peer.lastHeartbeat = Date.now();
-        // Broadcast heartbeat to others
-        socket.broadcast.emit('peer-heartbeat', {
-          deviceId: peer.deviceId,
-          timestamp: data.timestamp
-        });
+      if (!peer) return;
+      peer.lastHeartbeat = Date.now();
+      // Only broadcast to same-subnet peers (matches announce handler filtering)
+      for (const [sid, otherPeer] of nearbyPeers) {
+        if (otherPeer.deviceId !== peer.deviceId && isSameSubnet(peer.subnet, otherPeer.subnet)) {
+          nearbyNs.to(sid).emit('peer-heartbeat', {
+            deviceId: peer.deviceId,
+            timestamp: data.timestamp
+          });
+        }
       }
     });
 
@@ -184,10 +198,12 @@ function setupNearbyNamespace(io) {
         nearbyPeers.delete(socket.id);
         deviceToSocket.delete(peer.deviceId);
 
-        // Notify others
-        socket.broadcast.emit('peer-left', {
-          deviceId: peer.deviceId
-        });
+        // Only notify same-subnet peers (prevents device ID leaking across subnets)
+        for (const [sid, otherPeer] of nearbyPeers) {
+          if (isSameSubnet(peer.subnet, otherPeer.subnet)) {
+            nearbyNs.to(sid).emit('peer-left', { deviceId: peer.deviceId });
+          }
+        }
       }
     });
   });
@@ -224,6 +240,32 @@ function getNearbyPeerCount() {
 function sanitize(str) {
   if (typeof str !== 'string') return '';
   return str.replace(/[<>&"'/\\]/g, '').substring(0, 50);
+}
+
+/**
+ * Extract the /24 subnet prefix from an IPv4 address.
+ * Returns empty string for IPv6 or unparseable addresses (no filtering applied).
+ * @param {string} ip
+ * @returns {string} e.g. "192.168.1" or ""
+ */
+function getSubnet24(ip) {
+  if (!ip) return '';
+  const parts = ip.split('.');
+  if (parts.length !== 4) return ''; // IPv6 or invalid — skip subnet filter
+  return parts.slice(0, 3).join('.');
+}
+
+/**
+ * Two peers are "nearby" if they share the same /24 subnet.
+ * If either subnet is empty (IPv6 or localhost), allow the match so no peers
+ * are accidentally excluded in dev/test environments.
+ * @param {string} a
+ * @param {string} b
+ * @returns {boolean}
+ */
+function isSameSubnet(a, b) {
+  if (!a || !b) return true; // Can't determine → allow
+  return a === b;
 }
 
 module.exports = { setupNearbyNamespace, getNearbyPeerCount };

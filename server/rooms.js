@@ -1069,18 +1069,9 @@ class RoomManager {
     let usedBaseUrl = baseUrl;
 
     if (!usedBaseUrl) {
-      if (process.env.NODE_ENV === 'production') {
-        // In production, prefer BASE_URL (chat.kyere.me), fallback to Render only if Koyeb is down
-        usedBaseUrl = process.env.BASE_URL ||
-          (process.env.RENDER_EXTERNAL_HOSTNAME ? `https://${process.env.RENDER_EXTERNAL_HOSTNAME}` : null);
-      } else {
-        // In development, use localhost
-        usedBaseUrl = 'http://localhost:5173';
-      }
+      const { getClientBaseUrl } = require('./url-config');
+      usedBaseUrl = getClientBaseUrl();
     }
-
-    // Final fallback
-    usedBaseUrl = usedBaseUrl || 'http://localhost:5173';
 
     // Remove trailing slash if present
     usedBaseUrl = usedBaseUrl.replace(/\/$/, '');

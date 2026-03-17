@@ -42,7 +42,8 @@
       "proximity-native.js",
       "icons/**/*",
       "sounds/**/*",
-      "LICENSE-E2ECP.txt"
+      "LICENSE-E2ECP.txt",
+      "mdns-server.js"
     ],
     "publish": {
       "provider": "github",
@@ -160,6 +161,7 @@
   },
   "dependencies": {
     "electron-store": "^8.1.0",
-    "electron-updater": "^6.7.3"
+    "electron-updater": "^6.7.3",
+    "multicast-dns": "*"
   }
 }

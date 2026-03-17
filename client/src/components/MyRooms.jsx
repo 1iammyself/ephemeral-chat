@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { getCreatorId } from '../utils/creator';
 import { secureFetch } from '../utils/secure-fetch.js';
 import { ArrowLeft, Trash2, LogIn, Timer, Users, Zap, PartyPopper, Sun, Sunset, RefreshCw } from 'lucide-react';
+import { API_BASE } from '../utils/resolve-url.js';
 
 const MyRooms = () => {
     const [rooms, setRooms] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const navigate = useNavigate();
-    const API_BASE = import.meta.env.VITE_API_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '');
 
     useEffect(() => {
         fetchRooms();

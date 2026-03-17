@@ -24,8 +24,7 @@
  */
 
 import { secureFetch } from './secure-fetch.js';
-
-const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3001' : '');
+import { API_BASE } from './resolve-url.js';
 
 // ─── Hash Utilities ─────────────────────────────────────────
 

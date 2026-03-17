@@ -4,7 +4,6 @@
  */
 
 require('dotenv').config();
-console.log('[DEBUG] server/index.js loaded');
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -28,25 +27,32 @@ const {
 } = require('./utils');
 const { convertAudioToAAC } = require('./utils/audio-converter');
 
+const helmet = require('helmet');
 const { RtcTokenBuilder, RtcRole } = require('agora-token');
 const { createProxyMiddleware } = require('http-proxy-middleware');
-const { startRelayServer, registerTransfer, unregisterTransfer } = require('./relay-manager');
+const { startRelayServer, registerTransfer, unregisterTransfer, clearSocketTransfers } = require('./relay-manager');
 const { DropManager } = require('./drops');
 const { createDropRoutes } = require('./drops-routes');
 const { setupNearbyNamespace } = require('./nearby');
 
 // ─── Security Hardening Modules ────────────────────────────
+const keyRegistry = require('./key-registry');
 const { initGatewayKeys, ohttpGatewayMiddleware, startKeyRotation: startOHTTPKeyRotation, stopKeyRotation: stopOHTTPKeyRotation } = require('./ohttp-gateway');
 const { initIssuer, attachPrivacyPassRoutes, privacyPassAuth, startCleanup: startPPCleanup, stopCleanup: stopPPCleanup } = require('./privacy-pass-issuer');
 const { attachICESignaling } = require('./ice-signaling');
+const { startOHTTPRelay, stopOHTTPRelay } = require('./ohttp-relay-server');
+const { attachMASQUEProxy } = require('./masque-proxy');
+const { attachWebAuthnRoutes } = require('./webauthn');
 const { trafficPaddingMiddleware, startServerChaff, stopServerChaff, isChaff, stripPadding, padResponseMiddleware } = require('./traffic-padding');
 const { LinkPreviewService } = require('./link-preview');
 
 // Initialize Cap.js for proof-of-work CAPTCHA
+if (!process.env.CAP_SECRET) {
+  throw new Error('[FATAL] CAP_SECRET environment variable is required. Set it in your .env file.');
+}
 const cap = new Cap({
   tokens_per_challenge: 1,
-  // Use environment variable for secret in production
-  secret: process.env.CAP_SECRET || 'ephemeral-chat-cap-secret-change-in-production'
+  secret: process.env.CAP_SECRET,
 });
 
 // Initialize in-memory storage
@@ -57,8 +63,7 @@ const dropManager = new DropManager();
 logger.info('📦 Ephemeral Drops system initialized');
 
 async function initializeServer() {
-  console.log('[DEBUG] Inside initializeServer...');
-  logger.info('🚀 Starting server with in-memory storage...');
+  logger.info('Starting server with in-memory storage...');
   // Initialize Redis if configured
   await initializeRedis();
 
@@ -91,6 +96,28 @@ async function initializeServer() {
     logger.info('🕳️  ICE Signaling attached for P2P hole punching');
   } catch (e) {
     logger.warn('⚠️  ICE Signaling init failed (non-fatal):', e.message);
+  }
+
+  // OHTTP Relay — RFC 9458 separate-origin relay (PORT+1)
+  try {
+    startOHTTPRelay();
+  } catch (e) {
+    logger.warn('⚠️  OHTTP Relay start failed (non-fatal):', e.message);
+  }
+
+  // MASQUE CONNECT-UDP Proxy — RFC 9297/9298 (WebSocket transport)
+  try {
+    attachMASQUEProxy(server);
+    logger.info('🌀 MASQUE CONNECT-UDP proxy active');
+  } catch (e) {
+    logger.warn('⚠️  MASQUE proxy init failed (non-fatal):', e.message);
+  }
+
+  // WebAuthn / Passkeys — FIDO2 registration and authentication
+  try {
+    attachWebAuthnRoutes(app);
+  } catch (e) {
+    logger.warn('⚠️  WebAuthn routes init failed (non-fatal):', e.message);
   }
 
   // Start e2ecp relay process - REMOVED (Lazy loaded now)
@@ -160,10 +187,24 @@ app.use((req, res, next) => {
 
 // Detect environment
 
-// Always use a whitelist for CORS, even in development
+// Always use a whitelist for CORS, even in development.
+// When ALLOWED_ORIGINS is not set, default to localhost dev origins plus the
+// deployed PUBLIC_URL so local and production both work without manual config.
+const { isDev, getPublicUrl, getFileServerUrl } = require('./url-config');
+
+const _corsDefaults = [
+  ...(isDev() ? [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:5173',
+    'http://localhost:5174',
+  ] : []),
+  ...(process.env.PUBLIC_URL ? [process.env.PUBLIC_URL] : []),
+  ...(process.env.BASE_URL ? [process.env.BASE_URL] : []),
+];
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : [];
+  : _corsDefaults;
 
 const corsOptions = {
   origin: function (origin, callback) {
@@ -181,6 +222,24 @@ const corsOptions = {
   exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar', 'X-Padded'],
   maxAge: 86400 // 24 hours
 };
+
+// ─── Security Headers (OWASP baseline) ─────────────────────
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      connectSrc: ["'self'", 'wss:', 'https:'],
+      mediaSrc: ["'self'", 'blob:'],
+      workerSrc: ["'self'", 'blob:'],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // Allow SharedArrayBuffer for WebRTC
+}));
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
@@ -218,8 +277,10 @@ setupNearbyNamespace(io);
 
 const PORT = process.env.PORT || 3001
 
-// Apply JSON middleware (50MB limit for encrypted file drops sent as base64 in JSON)
-app.use(express.json({ limit: '50mb' }));
+// Global JSON limit — 1 MB for all routes
+app.use(express.json({ limit: '1mb' }));
+// Elevated limit only for the encrypted file drop endpoint (base64-encoded payloads)
+app.use('/api/drops', express.json({ limit: '50mb' }));
 
 // ─── Traffic Padding Middleware (RFC-compliant traffic analysis resistance) ──
 // Pads all JSON API responses to fixed bucket sizes so network observers
@@ -244,6 +305,40 @@ app.get('/', (req, res) => {
 
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
+});
+
+// Runtime configuration endpoint — consumed by Electron and Capacitor clients
+// that cannot rely on build-time VITE_ variables to discover service URLs.
+app.get('/api/config', (req, res) => {
+  // Derive the canonical public URL from env or from the incoming request
+  const publicUrl = process.env.PUBLIC_URL ||
+    `${req.protocol}://${req.get('host')}`;
+
+  // OHTTP relay: prefer explicit env var, then derive from relay port.
+  const { RELAY_PORT: ohttpRelayPort } = require('./ohttp-relay-server');
+  let ohttpRelayUrl;
+  if (process.env.OHTTP_RELAY_URL) {
+    ohttpRelayUrl = process.env.OHTTP_RELAY_URL;
+  } else {
+    // Strip any existing port from publicUrl then append relay port
+    try {
+      const _pu = new URL(publicUrl);
+      ohttpRelayUrl = `${_pu.protocol}//${_pu.hostname}:${ohttpRelayPort}/ohttp/request`;
+    } catch (_) {
+      ohttpRelayUrl = `${getPublicUrl()}/ohttp/request`.replace(`:${process.env.PORT || 3001}`, `:${ohttpRelayPort}`);
+    }
+  }
+
+  const wsBase = publicUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
+
+  res.json({
+    apiUrl:           publicUrl,
+    wsUrl:            wsBase,
+    ohttpRelayUrl,
+    ohttpGatewayUrl:  `${publicUrl}/ohttp/request`,
+    masqueBaseUrl:    `${wsBase}/.well-known/masque/udp/`,
+    privacyPassIssuerUrl: `${publicUrl}/privacy-pass`,
+  });
 });
 
 // Rate limiting storage
@@ -595,7 +690,7 @@ app.post('/api/rooms', async (req, res) => {
   try {
     const { messageTTL, password, maxUsers, capToken, creatorId, persistenceMode, customCode, hp_email, hp_website, hp_timestamp, autoApprove, preApprovedList } = req.body;
 
-    logger.info('HTTP room creation request:', { messageTTL, password, maxUsers, hasCapToken: !!capToken, creatorId: !!creatorId, persistenceMode });
+    logger.info('HTTP room creation request:', { messageTTL, password: password ? '[REDACTED]' : undefined, maxUsers, hasCapToken: !!capToken, creatorId: !!creatorId, persistenceMode });
 
     // Honeypot validation - bots fill these hidden fields, humans don't
     if (hp_email || hp_website) {
@@ -906,7 +1001,7 @@ io.on('connection', (socket) => {
       await registerTransfer(socket.id);
       // Tell client where the file server is
       // Hardcoded to 8080 for now as per architecture plan, or use env var
-      const fileServerUrl = process.env.VITE_FILE_SERVER_URL || 'http://localhost:8080';
+      const fileServerUrl = getFileServerUrl();
       socket.emit('file-server-ready', { url: fileServerUrl });
     } catch (error) {
       logger.error('Failed to start file server:', error);
@@ -915,12 +1010,12 @@ io.on('connection', (socket) => {
   });
 
   socket.on('file-transfer-end', () => {
-    unregisterTransfer(socket.id);
+    unregisterTransfer(socket.id); // decrement one transfer slot for this socket
   });
 
   socket.on('create-room', async (data, callback) => {
     try {
-      const { messageTTL, password, maxUsers, customCode } = data || {};
+      const { messageTTL, password, maxUsers, customCode, totpEnabled } = data || {};
 
       // logger.info('Creating room with data:', { messageTTL, password, maxUsers });
 
@@ -943,14 +1038,23 @@ io.on('connection', (socket) => {
 
       const roomCode = await roomManager.createRoom(settings);
 
+      // Generate TOTP secret if requested (returned to creator only — never stored in plaintext beyond room session)
+      let totpSecret = null;
+      if (totpEnabled === true) {
+        const { generateSecureToken } = authUtils;
+        totpSecret = generateSecureToken(20); // 20 bytes = 160-bit secret
+        logger.info(`[TOTP] Room ${roomCode} has TOTP enabled`);
+      }
+
       // Initialize room metadata for Lobby/Host logic
       roomData[roomCode] = {
         hostId: socket.id,
         lobbyLimit: (settings.maxUsers || 50) * 2, // Default 2x max users
-        lobbyCount: 0
+        lobbyCount: 0,
+        totpSecret: totpSecret || undefined, // undefined = TOTP not required
       };
 
-      callback({ success: true, roomCode });
+      callback({ success: true, roomCode, totpSecret }); // creator receives the secret to share
     } catch (error) {
       logger.error('Error creating room:', error);
       callback({ success: false, error: 'Failed to create room' });
@@ -958,7 +1062,7 @@ io.on('connection', (socket) => {
   });
 
   // Knock-to-Join Logic
-  socket.on('knock', async ({ roomCode, nickname, password, inviteToken, capToken }) => {
+  socket.on('knock', async ({ roomCode, nickname, password, inviteToken, capToken, totpCode }) => {
     // Reject clearly unsafe room codes that could lead to prototype pollution
     if (
       typeof roomCode !== 'string' ||
@@ -967,6 +1071,12 @@ io.on('connection', (socket) => {
       roomCode === 'prototype'
     ) {
       return socket.emit('knock-denied', { reason: 'Invalid room code' });
+    }
+
+    // Brute-force lockout check
+    const lockStatus = securityManager.isLocked(socket.id);
+    if (lockStatus.locked) {
+      return socket.emit('knock-denied', { reason: 'Too many failed attempts — try again later', lockedUntil: lockStatus.lockedUntil });
     }
 
     // 1. Clean stale users from roomManager (sockets that no longer exist)
@@ -1062,6 +1172,18 @@ io.on('connection', (socket) => {
           logger.info(`✅ Pre-approved user "${nickname}" auto-approved for room ${roomCode} with role: ${matchedEntry.role || 'user'}`);
           return socket.emit('knock-approved', { isHost: false });
         }
+      }
+    }
+
+    // 5a. TOTP verification — if room requires it
+    if (room.totpSecret) {
+      if (!totpCode) {
+        return socket.emit('knock-denied', { reason: 'This room requires a TOTP verification code', requiresTotp: true });
+      }
+      const isValidTotp = authUtils.verifyTOTP(String(totpCode), room.totpSecret);
+      if (!isValidTotp) {
+        securityManager.recordFailedAttempt(socket.id);
+        return socket.emit('knock-denied', { reason: 'Invalid TOTP code — check your authenticator app' });
       }
     }
 
@@ -1381,7 +1503,13 @@ io.on('connection', (socket) => {
 
   socket.on('join-room', async (data, callback) => {
     try {
-      const { roomCode, nickname, password, inviteToken, capToken, sessionToken, userId, hp_email, hp_website, hp_timestamp } = data;
+      const { roomCode, nickname, password, inviteToken, capToken, sessionToken, userId, hp_email, hp_website, hp_timestamp, totpCode } = data;
+
+      // Brute-force lockout check
+      const joinLockStatus = securityManager.isLocked(socket.id);
+      if (joinLockStatus.locked) {
+        return callback({ success: false, error: 'Too many failed attempts — try again later' });
+      }
 
       // Honeypot validation - bots fill these hidden fields, humans don't
       if (hp_email || hp_website) {
@@ -1684,6 +1812,19 @@ io.on('connection', (socket) => {
         return callback({ success: false, error: 'Invalid room code format' });
       }
 
+      // TOTP verification for rooms that require it
+      const joinRoomData = roomData[roomCode];
+      if (joinRoomData?.totpSecret) {
+        if (!totpCode) {
+          return callback({ success: false, error: 'This room requires a TOTP verification code', requiresTotp: true });
+        }
+        const isValidTotp = authUtils.verifyTOTP(String(totpCode), joinRoomData.totpSecret);
+        if (!isValidTotp) {
+          securityManager.recordFailedAttempt(socket.id);
+          return callback({ success: false, error: 'Invalid TOTP code — check your authenticator app' });
+        }
+      }
+
       // Validate and sanitize nickname
       let userNickname = nickname && isValidNickname(nickname)
         ? sanitizeInput(nickname)
@@ -1982,9 +2123,18 @@ io.on('connection', (socket) => {
       // ─── v2 ratchet fields (PQXDH + Double Ratchet encrypted payloads) ───
       // ─── v3 MLS fields (RFC 9420 MLS group encryption) ───
       // ─── v4 AES-GCM fields (room-key symmetric encryption) ───
+      // ─── v5 PQXDH + Double Ratchet / Megolm-style group encryption ───
       let { content, messageType = 'text', isViewOnce = false, imageData, pollData, recipients = [], replyTo, isEncrypted, iv, fileName, mimeType, fileSize, isAnonymous, overrideTtl,
         v: payloadVersion, header: ratchetHeader, ciphertext: ratchetCiphertext, ratchet: isRatchet, mls: mlsCiphertext,
-        ct: aesCiphertext } = data;
+        ct: aesCiphertext, dr: drPayload, sk: skPayload } = data;
+
+      // ─── v5 normalization: map DR ciphertext or sender-key ct → content ──────
+      const isV5 = payloadVersion === 5 && (drPayload || skPayload);
+      if (isV5) {
+        // Server never decrypts — just needs a non-empty content to pass validation
+        if (!content) content = drPayload?.ciphertext || skPayload?.ct || '';
+        if (messageType === 'image' && !imageData) imageData = content;
+      }
 
       // ─── v4 normalization: map AES-GCM ciphertext → content ─────────────────
       const isV4 = payloadVersion === 4 && aesCiphertext;
@@ -4042,14 +4192,66 @@ io.on('connection', (socket) => {
   });
 
   socket.on('leave-room', async () => {
+    keyRegistry.removeKeyBundle(socket.id);
     await handleUserDeparture(true);
   });
 
+  // ─── E2EE Key Registry Handlers ────────────────────────────
+
+  // Client registers their public key bundle on room join
+  socket.on('register-public-key', ({ roomCode, bundle }) => {
+    if (!roomCode || !bundle) return;
+    const ok = keyRegistry.registerKeyBundle(socket.id, bundle, roomCode);
+    if (!ok) {
+      logger.warn(`[E2EE] Invalid key bundle rejected from socket ${socket.id}`);
+      socket.emit('error', { code: 'INVALID_KEY_BUNDLE', message: 'Key bundle validation failed' });
+      return;
+    }
+    // Broadcast to other room members so they can initiate key exchange
+    socket.to(roomCode).emit('peer-key-bundle', { socketId: socket.id, bundle, roomCode });
+    logger.info(`🔑 Key bundle registered for socket ${socket.id} in room ${roomCode}`);
+  });
+
+  // Client requests bundles for all existing room members
+  socket.on('request-key-bundles', ({ roomCode }) => {
+    if (!roomCode) return;
+    const bundles = keyRegistry.getBundlesForRoom(roomCode, socket.id);
+    socket.emit('key-bundle-roster', { bundles, roomCode });
+  });
+
+  // Forward key-bundle-offer to a specific peer (Alice → Bob)
+  socket.on('key-bundle-offer', ({ roomCode, to, alicePublicBundle, pqCiphertext }) => {
+    if (!to || !alicePublicBundle) return;
+    const targetSocket = io.sockets.sockets.get(to);
+    if (targetSocket) {
+      targetSocket.emit('key-bundle-offer', { from: socket.id, alicePublicBundle, pqCiphertext, roomCode });
+    }
+  });
+
+  // Forward key-bundle-answer back to initiator (Bob → Alice)
+  socket.on('key-bundle-answer', ({ roomCode, to }) => {
+    if (!to) return;
+    const targetSocket = io.sockets.sockets.get(to);
+    if (targetSocket) {
+      targetSocket.emit('key-bundle-answer', { from: socket.id, roomCode });
+    }
+  });
+
+  // Forward DR-encrypted sender-key-distribution to a specific peer
+  socket.on('sender-key-distribution', ({ roomCode, to, encryptedKeyDist }) => {
+    if (!to || !encryptedKeyDist) return;
+    const targetSocket = io.sockets.sockets.get(to);
+    if (targetSocket) {
+      targetSocket.emit('sender-key-distribution', { from: socket.id, encryptedKeyDist, roomCode });
+    }
+  });
+
   socket.on('disconnect', async (reason) => {
+    keyRegistry.removeKeyBundle(socket.id);
     // logger.info(`🔌 User disconnected: ${socket.id} (Reason: ${reason})`);
 
-    // Cleanup file transfer tracking
-    unregisterTransfer(socket.id);
+    // Cleanup file transfer tracking (clear all transfers for this socket)
+    clearSocketTransfers(socket.id);
 
     // Note: Media watcher cleanup is handled inside handleUserDeparture
     // Note: Do NOT delete io._activeMedia on disconnect — media persists for the room
@@ -4103,9 +4305,8 @@ async function startServer() {
   }
 }
 
-console.log('[DEBUG] Calling startServer()...');
 startServer().catch(err => {
-  console.error('[DEBUG] startServer failed:', err);
+  logger.error('startServer failed:', err);
   logger.error(err);
 });
 

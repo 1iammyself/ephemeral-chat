@@ -46,12 +46,34 @@ let gatewayKeyId = null;
  */
 export function initOHTTP(config) {
   ohttpConfig = { ...ohttpConfig, ...config };
-  
+
   if (ohttpConfig.enabled) {
+    // Same-origin guard: relay and gateway must be different origins.
+    // If they're the same server the privacy guarantee is void — the
+    // gateway can correlate IP from the relay connection.
+    try {
+      const relayOrigin = new URL(ohttpConfig.relayUrl).origin;
+      const gatewayOrigin = new URL(ohttpConfig.gatewayUrl).origin;
+      if (relayOrigin === gatewayOrigin) {
+        console.error(
+          '[OHTTP] ❌ Relay and Gateway have the same origin (' + relayOrigin + '). ' +
+          'OHTTP provides no privacy benefit when relay === gateway. ' +
+          'Set VITE_OHTTP_RELAY_URL to a distinct origin (Cloudflare Worker, Fastly relay, etc.). ' +
+          'Disabling OHTTP.'
+        );
+        ohttpConfig.enabled = false;
+        return;
+      }
+    } catch (_) {
+      // URL parse error — likely empty/relative URLs, disable silently
+      ohttpConfig.enabled = false;
+      return;
+    }
+
     console.log('🔒 OHTTP enabled');
     console.log(`   Relay: ${ohttpConfig.relayUrl}`);
     console.log(`   Gateway: ${ohttpConfig.gatewayUrl}`);
-    
+
     // Fetch gateway key asynchronously
     fetchGatewayConfig().catch(e => {
       console.warn('Failed to fetch OHTTP gateway config:', e.message);
@@ -224,46 +246,45 @@ export async function decapsulateResponse(encapsulatedResponse, responseContext)
  * @returns {Promise<Response>} The response (unwrapped from OHTTP)
  */
 export async function ohttpFetch(method, url, options = {}) {
-  // Fallback to direct fetch if OHTTP not ready
+  // Callers must check isOHTTPReady() before calling.
+  // Refusing to silently fall back to a direct request preserves the
+  // privacy contract — a direct request exposes the client IP to the server.
   if (!isOHTTPReady()) {
-    return fetch(url, { method, ...options });
-  }
-  
-  try {
-    // Encapsulate the request
-    const { encapsulatedRequest, responseContext } = await encapsulateRequest(
-      method,
-      url,
-      options.headers || {},
-      options.body || null
+    throw new Error(
+      '[OHTTP] Not ready — requires a distinct relay server configured via VITE_OHTTP_RELAY_URL'
     );
-    
-    // Send to Relay
-    const relayResponse = await fetch(ohttpConfig.relayUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'message/ohttp-req'
-      },
-      body: encapsulatedRequest
-    });
-    
-    if (!relayResponse.ok) {
-      throw new Error(`OHTTP relay error: ${relayResponse.status}`);
-    }
-    
-    // Decapsulate the response
-    const encapsulatedResponse = new Uint8Array(await relayResponse.arrayBuffer());
-    const { status, headers, body } = await decapsulateResponse(
-      encapsulatedResponse,
-      responseContext
-    );
-    
-    // Wrap in a Response-like object
-    return new Response(body, { status, headers });
-  } catch (e) {
-    console.warn('OHTTP request failed, falling back to direct:', e.message);
-    return fetch(url, { method, ...options });
   }
+
+  // Encapsulate the request
+  const { encapsulatedRequest, responseContext } = await encapsulateRequest(
+    method,
+    url,
+    options.headers || {},
+    options.body || null
+  );
+
+  // Send to Relay
+  const relayResponse = await fetch(ohttpConfig.relayUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'message/ohttp-req'
+    },
+    body: encapsulatedRequest
+  });
+
+  if (!relayResponse.ok) {
+    throw new Error(`OHTTP relay error: ${relayResponse.status}`);
+  }
+
+  // Decapsulate the response
+  const encapsulatedResponse = new Uint8Array(await relayResponse.arrayBuffer());
+  const { status, headers, body } = await decapsulateResponse(
+    encapsulatedResponse,
+    responseContext
+  );
+
+  // Wrap in a Response-like object
+  return new Response(body, { status, headers });
 }
 
 // ─── Binary HTTP (RFC 9292) ────────────────────────────────
@@ -396,23 +417,15 @@ async function hpkeEncrypt(plaintext, gatewayPublicKeyRaw, keyId) {
 }
 
 async function hpkeDecryptResponse(encryptedResponse, context) {
-  // The response is encrypted by the gateway using a key derived from
-  // the same HPKE context.  In the OHTTP spec the gateway creates a
-  // one-shot response nonce.  For our implementation we use AES-GCM
-  // with a key derived from the enc + gateway public key so both sides
-  // can agree on the response key without a second HPKE handshake.
-  const combined = new Uint8Array(
-    context.enc.length + context.gatewayPublicKeyRaw.length
+  // Derive response key via HMAC-SHA256 matching the server's derivation:
+  // HMAC-SHA256(key=gatewayPublicKey, data=enc || "ohttp-response")
+  const gatewayKey = await crypto.subtle.importKey(
+    'raw', context.gatewayPublicKeyRaw, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
   );
-  combined.set(context.enc, 0);
-  combined.set(context.gatewayPublicKeyRaw, context.enc.length);
-
-  // Derive response key
-  const info = new TextEncoder().encode('ohttp-response');
-  const full = new Uint8Array(combined.length + info.length);
-  full.set(combined, 0);
-  full.set(info, combined.length);
-  const hash = await crypto.subtle.digest('SHA-256', full);
+  const data = new Uint8Array(context.enc.length + 14); // 14 = "ohttp-response".length
+  data.set(context.enc, 0);
+  data.set(new TextEncoder().encode('ohttp-response'), context.enc.length);
+  const hash = await crypto.subtle.sign('HMAC', gatewayKey, data);
   const aesKey = await crypto.subtle.importKey('raw', hash, 'AES-GCM', false, ['decrypt']);
 
   // Extract nonce (12 bytes) + ciphertext from response

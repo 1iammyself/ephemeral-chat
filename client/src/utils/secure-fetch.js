@@ -18,17 +18,7 @@
 
 import { ohttpFetch, isOHTTPReady } from '../crypto/ohttp.js';
 import { getAuthToken, isPrivacyPassReady, refreshTokensIfNeeded } from '../crypto/privacy-pass.js';
-
-/**
- * Get the server URL for Privacy Pass token refresh.
- */
-function getServerUrl() {
-  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-  if (typeof import.meta !== 'undefined' && import.meta.env?.PROD) return '';
-  return 'http://localhost:3001';
-}
+import { API_BASE } from './resolve-url.js';
 
 // ─── Response Unpadding ────────────────────────────────────
 // The server's padResponseMiddleware wraps JSON in a binary envelope:
@@ -111,7 +101,7 @@ export async function secureFetch(url, options = {}) {
   }
 
   // Refresh tokens in the background if running low
-  refreshTokensIfNeeded(getServerUrl()).catch(() => {});
+  refreshTokensIfNeeded(API_BASE).catch(() => {});
 
   const mergedOptions = { ...options, headers };
 

@@ -114,3 +114,10 @@ client/public/.well-known/apple-app-site-association
 # Chess reference repos
 chess-repos/
 nul
+
+# Claude AI
+.claude/
+
+# Issues
+issues/
+

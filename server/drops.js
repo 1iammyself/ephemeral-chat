@@ -126,7 +126,11 @@ class DropManager {
    * Get the HMAC secret used for .eph file signatures
    */
   _getEphSecret() {
-    return process.env.EPH_SECRET || process.env.CAP_SECRET || 'ephemeral-drop-default-secret-change-in-production';
+    const secret = process.env.EPH_SECRET || process.env.CAP_SECRET;
+    if (!secret) {
+      throw new Error('[FATAL] EPH_SECRET or CAP_SECRET environment variable is required for drop HMAC signing.');
+    }
+    return secret;
   }
 
   /**

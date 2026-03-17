@@ -18,6 +18,11 @@
 import { initTrafficPadding, stopTrafficPadding, padMessage, unpadMessage, withJitter } from '../crypto/traffic-padding.js';
 import { initOHTTP, ohttpFetch } from '../crypto/ohttp.js';
 import { initPrivacyPass, getAuthToken } from '../crypto/privacy-pass.js';
+import { initE2EE, destroyE2EESession, isE2EEReady, encryptE2EE, decryptE2EE, handleIncomingKeyBundle } from '../crypto/e2ee-manager.js';
+import { registerE2EEManager } from './aesEncryption.js';
+
+// Wire the E2EE manager into the AES shim so v5 routing works transparently
+registerE2EEManager({ isE2EEReady, encryptE2EE, decryptE2EE });
 
 // Re-export AES encryption functions using the same names ChatRoom uses
 export {
@@ -39,13 +44,31 @@ export {
   destroyRoomEncryption,
 } from './aesEncryption.js';
 
+// Re-export E2EE manager functions
+export { initE2EE, destroyE2EESession, handleIncomingKeyBundle };
+
 // ─── Password Hashing ────────────────────────────────────────────────────
 
+/**
+ * Hash a password using PBKDF2-SHA-256 with a fixed salt.
+ * The fixed salt is acceptable here because the server applies bcrypt on
+ * top. PBKDF2 prevents the server from receiving the raw plaintext while
+ * providing iterative hardening against brute-force of the transmitted hash.
+ *
+ * 100 000 iterations matches OWASP 2024 recommendation for PBKDF2-SHA-256.
+ */
 export async function hashPassword(password) {
   const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const salt = encoder.encode('ephchat-password-salt-v2');
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']
+  );
+  const derived = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 100000 },
+    keyMaterial,
+    256
+  );
+  const hashArray = Array.from(new Uint8Array(derived));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 

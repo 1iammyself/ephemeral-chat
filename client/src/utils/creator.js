@@ -1,38 +1,51 @@
 /**
- * Creator ID management for persistent rooms
- * Uses localStorage to maintain Private creator identity
+ * Creator ID management for persistent rooms.
+ *
+ * Uses sessionStorage instead of localStorage to limit the tracking
+ * surface — the ID is unique per browser session (tab lifetime) and
+ * is automatically cleared when the tab is closed. This aligns with
+ * the "zero-persistence" privacy model.
  */
 
 const CREATOR_ID_KEY = 'eph-creator-id';
 
 /**
- * Get or create creator ID from localStorage
+ * Get or create creator ID from sessionStorage.
+ * Falls back to localStorage for migration, but new IDs are always
+ * stored in sessionStorage.
  * @returns {string} Creator ID (UUID)
  */
 export const getCreatorId = () => {
-    let creatorId = localStorage.getItem(CREATOR_ID_KEY);
+    let creatorId = sessionStorage.getItem(CREATOR_ID_KEY);
 
     if (!creatorId) {
-        // Generate new UUID for creator
-        creatorId = crypto.randomUUID();
-        localStorage.setItem(CREATOR_ID_KEY, creatorId);
+        // Migrate any existing localStorage ID for continuity within this session
+        const legacyId = localStorage.getItem(CREATOR_ID_KEY);
+        if (legacyId) {
+            creatorId = legacyId;
+            sessionStorage.setItem(CREATOR_ID_KEY, creatorId);
+            localStorage.removeItem(CREATOR_ID_KEY); // clean up persistent store
+        } else {
+            creatorId = crypto.randomUUID();
+            sessionStorage.setItem(CREATOR_ID_KEY, creatorId);
+        }
     }
 
     return creatorId;
 };
 
 /**
- * Clear creator ID from localStorage
- * Used for resetting creator identity
+ * Clear creator ID
  */
 export const clearCreatorId = () => {
-    localStorage.removeItem(CREATOR_ID_KEY);
+    sessionStorage.removeItem(CREATOR_ID_KEY);
+    localStorage.removeItem(CREATOR_ID_KEY); // also clear any legacy entry
 };
 
 /**
  * Check if creator ID exists
- * @returns {boolean} True if creator ID exists in localStorage
+ * @returns {boolean}
  */
 export const hasCreatorId = () => {
-    return localStorage.getItem(CREATOR_ID_KEY) !== null;
+    return sessionStorage.getItem(CREATOR_ID_KEY) !== null;
 };

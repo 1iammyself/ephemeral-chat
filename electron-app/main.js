@@ -50,7 +50,7 @@ const store = new Store({
 });
 
 // Constants
-const CHAT_URL = 'https://chat.kyere.me';
+const CHAT_URL = process.env.CHAT_URL || 'https://chat.kyere.me';
 const isDev = !app.isPackaged || process.argv.includes('--dev');
 
 // Keep references to prevent garbage collection
@@ -1340,6 +1340,49 @@ function createBadgeIcon(count) {
   // Simple implementation - in production you'd want to render this properly
   return null; // Windows will use flash instead
 }
+
+// ==================== mDNS OFFLINE P2P IPC HANDLERS ====================
+
+const mdnsServer = require('./mdns-server');
+
+// Forward mDNS events to renderer
+mdnsServer.onEvent((event) => {
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('mdns-event', event);
+    }
+  } catch (_) {}
+});
+
+ipcMain.handle('mdns-start', async (event, options) => {
+  await mdnsServer.start(options);
+  return mdnsServer.getMyInfo();
+});
+
+ipcMain.handle('mdns-stop', async () => {
+  await mdnsServer.stop();
+  return { success: true };
+});
+
+ipcMain.handle('mdns-get-peers', () => {
+  return { peers: mdnsServer.getPeers() };
+});
+
+ipcMain.handle('mdns-get-my-info', () => {
+  return mdnsServer.getMyInfo();
+});
+
+ipcMain.handle('mdns-send-sdp', async (event, peerIp, peerPort, sdp) => {
+  try {
+    return await mdnsServer.sendSdpToPeer(peerIp, peerPort, sdp);
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('mdns-is-running', () => {
+  return { running: mdnsServer.isRunning() };
+});
 
 // ==================== PROXIMITY IPC HANDLERS ====================
 

@@ -66,11 +66,26 @@ async function convertAudioToAAC(base64Audio) {
                 return reject(new Error('Invalid base64 audio data'));
             }
 
-            // 2. Create temporary files
-            const tempDir = os.tmpdir();
+            // 2. Create temporary files in a private directory (0o700 permissions)
             const inputId = uuidv4();
-            const inputPath = path.join(tempDir, `${inputId}.input`);
-            const outputPath = path.join(tempDir, `${inputId}.m4a`);
+            let privateTmpDir;
+            try {
+              privateTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ephchat-audio-'));
+              fs.chmodSync(privateTmpDir, 0o700);
+            } catch (_mkdirErr) {
+              privateTmpDir = os.tmpdir(); // fallback
+            }
+            const inputPath = path.join(privateTmpDir, `${inputId}.input`);
+            const outputPath = path.join(privateTmpDir, `${inputId}.m4a`);
+
+            // Cleanup helper — removes files and the private temp directory
+            const cleanupAll = () => {
+              fs.unlink(inputPath, () => {});
+              fs.unlink(outputPath, () => {});
+              if (privateTmpDir !== os.tmpdir()) {
+                fs.rmdir(privateTmpDir, () => {});
+              }
+            };
 
             // Write input buffer to file
             fs.writeFile(inputPath, buffer, (err) => {
@@ -113,24 +128,20 @@ async function convertAudioToAAC(base64Audio) {
                         .on('end', () => {
                             // 4. Read output file
                             fs.readFile(outputPath, (err, data) => {
-                                // Cleanup input always
-                                fs.unlink(inputPath, () => { });
-
                                 if (err) {
-                                    fs.unlink(outputPath, () => { });
+                                    cleanupAll();
                                     return reject(new Error(`Failed to read converted file: ${err.message}`));
                                 }
 
                                 // 5. Cleanup and resolve
-                                fs.unlink(outputPath, () => { });
+                                cleanupAll();
                                 const base64Output = `data:audio/mp4;base64,${data.toString('base64')}`;
                                 resolve(base64Output);
                             });
                         })
                         .on('error', (err) => {
                             logger.error('[AudioConverter] Error:', err);
-                            fs.unlink(inputPath, () => { });
-                            fs.unlink(outputPath, () => { });
+                            cleanupAll();
                             reject(new Error(`FFmpeg conversion failed: ${err.message}`));
                         })
                         .save(outputPath);

@@ -1,17 +1,10 @@
 import axios from 'axios';
+import { API_BASE } from './resolve-url.js';
 
 // ---------------------------------------------------------------------------
 // 1.  Resolve the backend URL
 // ---------------------------------------------------------------------------
-function resolveBackendUrl() {
-  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-  return 'http://localhost:3001';
-}
-
-const BACKEND_URL = resolveBackendUrl();
-console.log('[api] Backend URL:', BACKEND_URL);
+const BACKEND_URL = API_BASE;
 
 // ---------------------------------------------------------------------------
 // 2.  Create the Axios instance

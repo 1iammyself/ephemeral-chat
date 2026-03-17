@@ -86,7 +86,6 @@ async function getRoomKey(roomCode) {
  */
 export async function initRoomEncryption(roomCode) {
     await getRoomKey(roomCode);
-    console.log('[AES-GCM] ✅ Room key ready for:', roomCode);
 }
 
 /**
@@ -147,7 +146,6 @@ export async function decryptMessage(payload, roomCode) {
  */
 export function destroyRoomEncryption(roomCode) {
     roomKeys.delete(roomCode);
-    console.log('[AES-GCM] Key cleared for room:', roomCode);
 }
 
 // ─── MLS compat shims ─────────────────────────────────────────────────────
@@ -165,38 +163,27 @@ export function isMLSCreator() { return false; }
 export function getMLSKeyPackage() { return null; }
 
 /**
- * Encrypt shim — wraps encryptMessage synchronously so ChatRoom.jsx can
- * keep calling encryptMLSMessage(text, roomCode) without async changes.
- * Since we need to derive the key first, we cache it eagerly on join.
- *
- * NOTE: This is intentionally synchronous-looking but returns a plain
- * object with a `_promise` field that ChatRoom resolves before sending.
- * We actually make this fully async by returning a Promise directly.
+ * Encrypt shim — routes to v5 (PQXDH + DR) when E2EE is ready,
+ * otherwise falls back to v4 AES-GCM.
  */
 export function encryptMLSMessage(text, roomCode) {
-    // Return an object that looks like the old MLS payload but uses AES
-    // We throw synchronously if the key isn't cached yet so callers catch it
+    // v5 path: PQXDH + Double Ratchet (or Megolm-style for groups)
+    // Lazy import to avoid circular deps; _e2eeManager is set by initE2EEForRoom.
+    if (_e2eeManager && _e2eeManager.isE2EEReady(roomCode)) {
+        return _e2eeManager.encryptE2EE(text, roomCode);
+    }
+    // v4 fallback: shared AES-256-GCM key (all room members can decrypt)
     const key = roomKeys.get(roomCode);
     if (!key) {
         throw new Error('[AES-GCM] Room key not initialised — call initRoomEncryption first');
     }
-    // We use a sync-looking wrapper that relies on the key already being cached
-    // The actual encrypt call is async; we wrap it in a structure ChatRoom understands
     return _encryptSync(text, roomCode, key);
 }
 
-// Internal: returns the MLS-compatible payload shape
-// Since we can't be truly sync with crypto.subtle, we return a temporary
-// placeholder and patch ChatRoom to await encryptMLSMessage.
-// Actually, the cleanest path: return a Promise that resolves to the payload,
-// and patch the send handler in ChatRoom to await it.
+// Internal: v4 AES-GCM encrypt (NEVER modified — backward-compat baseline)
 function _encryptSync(text, roomCode, key) {
-    // We use a trick: generate IV synchronously (getRandomValues is sync),
-    // then schedule the encrypt and return a thenable.
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const data = new TextEncoder().encode(text);
-
-    // Return a Promise since crypto.subtle.encrypt is always async
     return crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data).then(cipherBuffer => ({
         v: 4,
         ct: toBase64(cipherBuffer),
@@ -206,12 +193,34 @@ function _encryptSync(text, roomCode, key) {
 }
 
 /**
- * Decrypt shim — async wrapper matching the old decryptMLSMessage signature.
+ * Decrypt shim — routes v5 to E2EE manager, v4 to AES, v3 to warning.
  */
 export async function decryptMLSMessage(payload, roomCode) {
-    // Handle old MLS v3 messages gracefully during migration
+    // v5: PQXDH + Double Ratchet / Megolm
+    if (payload?.v === 5) {
+        if (_e2eeManager) {
+            return _e2eeManager.decryptE2EE(payload, roomCode);
+        }
+        return '⚠️ v5 message received but E2EE manager not initialized';
+    }
+    // v3: legacy MLS — cannot decrypt
     if (payload && payload.v === 3 && payload.mls) {
         return '⚠️ Message encrypted with old protocol — cannot decrypt';
     }
+    // v4: AES-256-GCM shared key — unchanged
     return decryptMessage(payload, roomCode);
+}
+
+// ─── E2EE Manager Integration ─────────────────────────────────────────────
+// Holds a reference to the e2ee-manager module once initE2EEForRoom is called.
+// This avoids a circular import: aesEncryption ← security ← ChatRoom → e2ee-manager.
+let _e2eeManager = null;
+
+/**
+ * Wire in the E2EE manager so encryptMLSMessage/decryptMLSMessage can use it.
+ * Called by security.js after importing e2ee-manager.
+ * @param {Object} manager - { isE2EEReady, encryptE2EE, decryptE2EE }
+ */
+export function registerE2EEManager(manager) {
+    _e2eeManager = manager;
 }

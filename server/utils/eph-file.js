@@ -39,7 +39,11 @@ const EPH_MAX_AGE_MS = 48 * 60 * 60 * 1000;
  * Uses dedicated env var, falls back to CAP_SECRET
  */
 function getEphSecret() {
-  return process.env.EPH_SECRET || process.env.CAP_SECRET || 'ephemeral-drop-default-secret-change-in-production';
+  const secret = process.env.EPH_SECRET || process.env.CAP_SECRET;
+  if (!secret) {
+    throw new Error('[FATAL] EPH_SECRET or CAP_SECRET environment variable is required for .eph file HMAC signing.');
+  }
+  return secret;
 }
 
 /**

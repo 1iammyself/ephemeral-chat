@@ -3,10 +3,10 @@ import { MessageCircle, Lock, Users, AlertCircle, Check, Loader2, Shield, Clock,
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { secureFetch } from '../utils/secure-fetch.js';
+import { API_BASE } from '../utils/resolve-url.js';
 // Removed @cap.js/widget - using honeypot instead
 
 const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite = false, isWaitingForHost = false }) => {
-  const API_BASE = import.meta.env.VITE_API_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '');
   const location = useLocation();
   const navigate = useNavigate();
   const { theme } = useTheme();

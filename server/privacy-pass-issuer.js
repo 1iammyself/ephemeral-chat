@@ -122,8 +122,14 @@ try {
   console.log('[Privacy Pass] Using @noble/curves Ristretto255 (production grade)');
 } catch {
   // ── Fallback: Ed25519-based approximation ────────────────
-  // NOT cofactor-safe — acceptable only during development.
-  // CI/CD must ensure @noble/curves is installed for production.
+  // NOT cofactor-safe — block in production to prevent broken anonymity.
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      '[FATAL] @noble/curves is not installed. Privacy Pass requires it for real Ristretto255 VOPRF in production. ' +
+      'Run: npm install @noble/curves'
+    );
+  }
+  console.warn('[Privacy Pass] @noble/curves not found — using DEV-ONLY fallback (NOT blind, NOT cofactor-safe)');
 
   const ORDER = 2n ** 252n + 27742317777372353535851937790883648493n;
 
@@ -413,42 +419,49 @@ function attachPrivacyPassRoutes(app) {
  * The authenticator is the unblinded VOPRF output W = r⁻¹ · (k · r · T) = k · T.
  * The server re-derives k · H(token) and checks equality.
  */
+/**
+ * Privacy Pass authentication middleware.
+ *
+ * Behavior:
+ *   - No Authorization header → proceed unauthenticated (req.privacyPassVerified = false)
+ *   - Valid token → proceed authenticated (req.privacyPassVerified = true)
+ *   - Invalid/malformed token → 401 Unauthorized (token was presented but bad)
+ *
+ * This ensures that when a client claims Privacy Pass auth, we enforce it.
+ * Routes that require PP should check req.privacyPassVerified === true.
+ */
 function privacyPassAuth(req, res, next) {
   const authHeader = req.headers.authorization;
-  
+
   if (!authHeader || !authHeader.startsWith('PrivacyPass ')) {
-    return next();  // No token — proceed without Privacy Pass
+    req.privacyPassVerified = false;
+    return next();  // No token presented — proceed without Privacy Pass
   }
-  
+
   try {
     const tokenMatch = authHeader.match(/token="([^"]+)"/);
     const authMatch  = authHeader.match(/authenticator="([^"]+)"/);
     // Also accept legacy "signature=" field for backward compat
     const sigMatch   = authMatch || authHeader.match(/signature="([^"]+)"/);
-    
+
     if (!tokenMatch || !sigMatch) {
-      // Malformed header — log and continue without Privacy Pass
-      // Don't reject the request; Privacy Pass is for anonymity, not access control
-      console.warn('[Privacy Pass] Malformed auth header — ignoring');
-      return next();
+      console.warn('[Privacy Pass] Malformed auth header — rejecting');
+      return res.status(401).json({ error: 'Malformed Privacy Pass token' });
     }
-    
+
     const result = verifyToken(tokenMatch[1], sigMatch[1]);
-    
+
     if (!result.valid) {
-      // Token invalid (key rotated, already spent, etc.) — log and continue
-      // The client will eventually refresh tokens from the new key
-      console.warn(`[Privacy Pass] Token verification failed: ${result.reason} — proceeding without PP`);
-      return next();
+      console.warn(`[Privacy Pass] Token verification failed: ${result.reason}`);
+      return res.status(401).json({ error: 'Invalid Privacy Pass token', reason: result.reason });
     }
-    
+
     req.privacyPassVerified = true;
     next();
-    
+
   } catch (e) {
-    // Verification error — proceed without Privacy Pass instead of blocking
-    console.warn('[Privacy Pass] Auth error:', e.message, '— proceeding without PP');
-    return next();
+    console.warn('[Privacy Pass] Auth error:', e.message);
+    return res.status(401).json({ error: 'Privacy Pass verification error' });
   }
 }
 

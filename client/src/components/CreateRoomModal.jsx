@@ -9,10 +9,10 @@ import { getCreatorId } from '../utils/creator';
 import { useTheme } from '../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import { secureFetch } from '../utils/secure-fetch.js';
+import { API_BASE } from '../utils/resolve-url.js';
 // Removed @cap.js/widget - using honeypot instead
 
 const CreateRoomModal = ({ onClose, onRoomCreated }) => {
-  const API_BASE = import.meta.env.VITE_API_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '');
 
   const { theme } = useTheme();
   const [roomSettings, setSettings] = useState({

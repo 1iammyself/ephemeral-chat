@@ -57,7 +57,11 @@ class WebRTCService {
         }
 
         this.iceServers = configuredIceServers.length > 0 ? configuredIceServers : [
-            { urls: "stun:stun.relay.metered.ca:80" }
+            { urls: "stun:stun.relay.metered.ca:80" },
+            // Free TURN fallback for symmetric NAT traversal
+            { urls: "turn:openrelay.metered.ca:80",  username: "openrelayproject", credential: "openrelayproject" },
+            { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+            { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
         ];
 
         this.setupSocketHandlers();
@@ -343,6 +347,20 @@ class WebRTCService {
 
                 if (this.peers.size === 0) {
                     this.endCall();
+                }
+            }
+        };
+
+        // ICE restart on failure — retries with TURN servers before giving up
+        pc.oniceconnectionstatechange = () => {
+            const iceState = pc.iceConnectionState;
+            console.log(`ICE state for ${socketId}: ${iceState}`);
+            if (iceState === 'failed') {
+                console.warn(`ICE failed for ${socketId} — attempting ICE restart`);
+                try {
+                    pc.restartIce();
+                } catch (e) {
+                    console.warn('ICE restart not supported, falling back to connection close:', e.message);
                 }
             }
         };

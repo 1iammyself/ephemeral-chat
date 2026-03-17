@@ -55,6 +55,9 @@ import {
   isMLSCreator,
   getMLSKeyPackage,
   initRoomEncryption,
+  initE2EE,
+  destroyE2EESession,
+  handleIncomingKeyBundle,
 } from '../utils/security';
 import { initTrafficPadding, stopTrafficPadding, withJitter } from '../crypto/traffic-padding';
 import { initOHTTP } from '../crypto/ohttp';
@@ -832,6 +835,64 @@ const ChatRoom = () => {
           console.warn('[ChatRoom] AES key setup failed:', e.message);
         }
 
+        // ─── PQXDH + Double Ratchet E2EE Setup ───────────
+        // Upgrade to v5 protocol when both sides support it.
+        // Falls back to v4 AES-GCM during key exchange (~200ms).
+        try {
+          await initE2EE(roomCode, socketManager);
+          console.log('[ChatRoom] 🔐 PQXDH E2EE initialized (v5)');
+        } catch (e) {
+          console.warn('[ChatRoom] E2EE v5 setup failed (v4 fallback active):', e.message);
+        }
+
+        // ─── Fetch runtime config (works on Electron + Capacitor) ─
+        // /api/config returns URLs that Vite build-time vars cannot know.
+        let _runtimeCfg = null;
+        try {
+          const _cfgBase = socketManager.getServerUrl().replace(/\/$/, '');
+          const _cfgRes = await fetch(`${_cfgBase}/api/config`);
+          if (_cfgRes.ok) _runtimeCfg = await _cfgRes.json();
+        } catch (_) { /* non-fatal */ }
+
+        // ─── OHTTP — metadata-protecting oblivious proxy ──────────
+        try {
+          const relayUrl = _runtimeCfg?.ohttpRelayUrl ||
+            import.meta.env.VITE_OHTTP_RELAY_URL || null;
+          const serverBase = socketManager.getServerUrl().replace(/\/$/, '');
+          const gatewayUrl = _runtimeCfg?.ohttpGatewayUrl || `${serverBase}/ohttp/request`;
+          const configUrl = `${serverBase}/ohttp/config`;
+          if (relayUrl) {
+            await initOHTTP({ relayUrl, gatewayUrl, configUrl, enabled: true });
+            console.log('[ChatRoom] OHTTP initialized');
+          }
+        } catch (e) {
+          console.warn('[ChatRoom] OHTTP init failed (non-fatal):', e.message);
+        }
+
+        // ─── Privacy Pass — anonymous auth tokens ─────────────────
+        try {
+          const issuerUrl = _runtimeCfg?.privacyPassIssuerUrl ||
+            `${socketManager.getServerUrl().replace(/\/$/, '')}/privacy-pass`;
+          await initPrivacyPass(issuerUrl);
+          console.log('[ChatRoom] 🎫 Privacy Pass initialized');
+        } catch (e) {
+          console.warn('[ChatRoom] Privacy Pass init failed (non-fatal):', e.message);
+        }
+
+        // ─── Traffic Padding — defeat traffic analysis ─────────────
+        try {
+          const _chaffSocket = socketManager.socket;
+          initTrafficPadding('medium', (_msg, isChaff) => {
+            // Chaff frames are emitted as no-op events (server has no handler → silent drop)
+            if (isChaff && _chaffSocket?.connected) {
+              _chaffSocket.emit('chaff', null);
+            }
+          });
+          console.log('[ChatRoom] 🔀 Traffic padding active');
+        } catch (e) {
+          console.warn('[ChatRoom] Traffic padding init failed (non-fatal):', e.message);
+        }
+
         // TransportManager init
         try {
           const tm = new TransportManager({
@@ -1029,17 +1090,12 @@ const ChatRoom = () => {
 
     // ─── MLS Key Exchange Handlers ───────────────────────────
     const handleMLSKeyPackage = ({ keyPackage, from }) => {
-      // Host receives a joiner's key package — add them to the group
-      if (!roomCode || !isMLSCreator(roomCode)) return;
-      console.log('[ChatRoom] MLS key package received from:', from);
-      try {
-        const { welcome, commit } = addMemberToGroup(roomCode, keyPackage);
-        // Send welcome + commit back to the joiner
-        socketManager.emit('mls-welcome', { roomCode, welcome, commit, to: from });
-        console.log('[ChatRoom] 🔐 MLS welcome sent to:', from);
-      } catch (e) {
-        console.warn('[ChatRoom] MLS add member failed:', e.message);
-      }
+      // Complete the PQXDH responder step when a joiner's key bundle arrives
+      if (!roomCode) return;
+      console.log('[ChatRoom] Key bundle received from:', from);
+      handleIncomingKeyBundle({ socketId: from, bundle: keyPackage }, roomCode).catch(e => {
+        console.warn('[ChatRoom] Key bundle handling failed:', e.message);
+      });
     };
 
     const handleMLSWelcome = ({ welcome, commit }) => {
@@ -1055,10 +1111,10 @@ const ChatRoom = () => {
       }
     };
 
-    // ─── AES-GCM Message Handler ────────────────────────────
+    // ─── AES-GCM / E2EE Message Handler ─────────────────────
     const handleNewMessage = async (message) => {
-      // AES-GCM v4 or legacy MLS v3 encrypted messages
-      if (message.isEncrypted && (message.v === 4 || (message.v === 3 && message.mls))) {
+      // v5 (PQXDH+DR), v4 (AES-GCM), or legacy v3 (MLS) encrypted messages
+      if (message.isEncrypted && (message.v === 5 || message.v === 4 || (message.v === 3 && message.mls))) {
         try {
           const decrypted = await decryptMLSMessage(message, roomCode);
           message.content = decrypted;
@@ -1531,6 +1587,7 @@ const ChatRoom = () => {
 
       // ─── MLS Security: Clean up session + padding ───
       destroyMLSSession(roomCode);
+      destroyE2EESession(roomCode);
       stopTrafficPadding();
       setMlsReady(false);
 
@@ -2272,13 +2329,22 @@ const ChatRoom = () => {
       // For other files, we send raw base64 as before
       let content = isImage ? e.target.result : e.target.result.split(',')[1];
 
-      // View-once images MUST stay unencrypted — the server stores raw bytes for the
-      // /api/reveal-image endpoint. AES encrypting them makes the reveal permanently fail.
+      // View-once images are encrypted just like all other content.
+      // The recipient decrypts client-side on reveal — the server never sees plaintext.
       if (isViewOnce && isImage) {
+        let voPayload;
+        try {
+          voPayload = await encryptMLSMessage(content, roomCode);
+        } catch (encErr) {
+          console.error('View-once encrypt failed:', encErr.message);
+          setError('Encryption failed. Please rejoin the room.');
+          setIsUploading(false);
+          return;
+        }
         socketManager.emit('send-message', {
           messageType: 'image',
-          imageData: content,
-          isEncrypted: false,
+          imageData: voPayload,
+          isEncrypted: true,
           isViewOnce: true,
           recipients: selectedRecipients,
           isAnonymous: isAnonymousMode

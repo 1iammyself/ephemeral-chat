@@ -13,10 +13,7 @@
  */
 
 import { isElectron, isCapacitor, isAndroid } from './platform';
-
-const API_BASE =
-  import.meta.env.VITE_API_URL ||
-  (import.meta.env.DEV ? 'http://localhost:3001' : '');
+import { API_BASE } from './resolve-url.js';
 
 // ─── Constants ──────────────────────────────────────────────
 
@@ -138,15 +135,11 @@ export function formatSpeed(bps) {
 }
 
 /**
- * Read a File/Blob chunk as ArrayBuffer
+ * Read a File/Blob chunk as ArrayBuffer.
+ * Uses native blob.arrayBuffer() (no FileReader object overhead).
  */
 function readChunkAsArrayBuffer(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error || new Error('FileReader failed'));
-    reader.readAsArrayBuffer(blob);
-  });
+  return blob.arrayBuffer();
 }
 
 /**
@@ -203,6 +196,8 @@ export class ProximityService {
     this.heartbeatTimer = null;
     this.cleanupTimer = null;
     this._destroyed = false;
+    this._offlineP2P = null;       // OfflineP2PManager instance
+    this._offlineP2PUnlisteners = []; // cleanup handles
   }
 
   // ─── Events ─────────────────────────────────────────────
@@ -230,6 +225,82 @@ export class ProximityService {
     this.nickname = nickname || 'Anonymous';
     this.isDiscovering = true;
 
+    // ── 1. Offline P2P (mDNS + BLE) — works even when server is unreachable ──
+    try {
+      const { default: offlineP2P } = await import('../nearby/offline-p2p-manager');
+      this._offlineP2P = offlineP2P;
+      await offlineP2P.start(this.nickname);
+
+      const onFound = (e) => {
+        const p = e.detail;
+        if (!p?.deviceId || p.deviceId === this.deviceId) return;
+        const info = {
+          id: p.deviceId,
+          nickname: p.nickname || p.deviceId,
+          platform: p.platform || 'unknown',
+          deviceType: 'phone',
+          lastSeen: Date.now(),
+          _offlineInfo: p,   // keep ip/port/transport for SDP routing
+        };
+        const isNew = !this.peers.has(p.deviceId);
+        this.peers.set(p.deviceId, info);
+        this.emit(isNew ? 'peer-discovered' : 'peer-updated', info);
+      };
+
+      const onLost = (e) => {
+        const { deviceId } = e.detail || {};
+        if (!deviceId) return;
+        if (this.peers.has(deviceId)) {
+          this.peers.delete(deviceId);
+          this._closeConnection(deviceId);
+          this.emit('peer-lost', { id: deviceId });
+        }
+      };
+
+      const onSdp = async (e) => {
+        const { fromPeerId, sdp } = e.detail || {};
+        if (!fromPeerId || !sdp) return;
+        try {
+          const parsed = typeof sdp === 'string' ? JSON.parse(sdp) : sdp;
+          if (parsed.type === 'offer') {
+            await this._handleOffer(fromPeerId, parsed.sdp ?? parsed);
+          } else if (parsed.type === 'answer') {
+            const conn = this.connections.get(fromPeerId);
+            if (conn?.pc) {
+              await conn.pc.setRemoteDescription(new RTCSessionDescription(parsed.sdp ?? parsed));
+              this._flushIceCandidates(fromPeerId);
+            }
+          } else if (parsed.type === 'candidate') {
+            const conn = this.connections.get(fromPeerId);
+            if (conn?.pc) {
+              const candidate = parsed.candidate;
+              if (!conn.pc.remoteDescription) {
+                if (!conn._pendingCandidates) conn._pendingCandidates = [];
+                conn._pendingCandidates.push(candidate);
+              } else {
+                await conn.pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => {});
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('[Proximity] offline SDP handling error:', err.message);
+        }
+      };
+
+      offlineP2P.addEventListener('peer-found', onFound);
+      offlineP2P.addEventListener('peer-lost', onLost);
+      offlineP2P.addEventListener('sdp-received', onSdp);
+      this._offlineP2PUnlisteners = [
+        () => offlineP2P.removeEventListener('peer-found', onFound),
+        () => offlineP2P.removeEventListener('peer-lost', onLost),
+        () => offlineP2P.removeEventListener('sdp-received', onSdp),
+      ];
+      console.log('[Proximity] Offline P2P started (mDNS + BLE)');
+    } catch (e) {
+      console.warn('[Proximity] Offline P2P unavailable:', e.message);
+    }
+
+    // ── 2. Socket.IO signaling (online / server fallback) ──────────────────
     try {
       const { io } = await import('socket.io-client');
       const serverUrl = API_BASE || window.location.origin;
@@ -269,13 +340,11 @@ export class ProximityService {
           }
         }
       }, PEER_TIMEOUT / 2);
-
-      this.emit('discovery-started');
     } catch (e) {
-      this.isDiscovering = false;
-      console.error('[Proximity] Discovery failed:', e);
-      throw e;
+      console.warn('[Proximity] Socket.IO signaling unavailable (offline mode active):', e.message);
     }
+
+    this.emit('discovery-started');
   }
 
   stopDiscovery() {
@@ -286,6 +355,13 @@ export class ProximityService {
     this.connections.clear();
     this.peers.clear();
     if (this.discoverySocket) { this.discoverySocket.disconnect(); this.discoverySocket = null; }
+    // Stop offline P2P
+    for (const fn of this._offlineP2PUnlisteners) fn();
+    this._offlineP2PUnlisteners = [];
+    if (this._offlineP2P) {
+      this._offlineP2P.stop().catch(() => {});
+      this._offlineP2P = null;
+    }
     this.emit('discovery-stopped');
   }
 
@@ -398,6 +474,39 @@ export class ProximityService {
     });
   }
 
+  // ─── Signal Routing ─────────────────────────────────────
+
+  /**
+   * Route a WebRTC signal (offer / answer / candidate) to a peer.
+   * Prefers the offline P2P path (mDNS / BLE) when the peer was
+   * discovered offline; falls back to Socket.IO when online.
+   */
+  async _sendSignal(peerId, type, payload) {
+    const peer = this.peers.get(peerId);
+    const offlinePeer = peer?._offlineInfo
+      || this._offlineP2P?.getPeers().find(p => p.deviceId === peerId);
+
+    if (offlinePeer && this._offlineP2P) {
+      // Pack into a unified envelope so the receiver can parse it
+      const envelope = JSON.stringify({ type, ...(type === 'candidate' ? { candidate: payload } : { sdp: payload }) });
+      try {
+        await this._offlineP2P.sendSdp(peerId, envelope);
+        return;
+      } catch (e) {
+        console.warn('[Proximity] Offline signal failed, falling back to Socket.IO:', e.message);
+      }
+    }
+
+    // Socket.IO fallback
+    if (type === 'offer') {
+      this.discoverySocket?.emit('rtc-offer', { to: peerId, offer: payload });
+    } else if (type === 'answer') {
+      this.discoverySocket?.emit('rtc-answer', { to: peerId, answer: payload });
+    } else if (type === 'candidate') {
+      this.discoverySocket?.emit('rtc-ice-candidate', { to: peerId, candidate: payload });
+    }
+  }
+
   // ─── WebRTC Connection ──────────────────────────────────
 
   async connectToPeer(peerId) {
@@ -418,11 +527,11 @@ export class ProximityService {
     const pc = new RTCPeerConnection({
       iceServers: strictStunServers,
       iceTransportPolicy: 'all',     // consider all local candidates
-      iceCandidatePoolSize: 10       // generate pre-flight local UDP host IPs
+      iceCandidatePoolSize: 4        // host + srflx candidates sufficient for LAN
     });
 
     // Create data channel BEFORE creating the offer
-    const dc = pc.createDataChannel(DATA_CHANNEL_LABEL, { ordered: true });
+    const dc = pc.createDataChannel(DATA_CHANNEL_LABEL, { ordered: false });
 
     const conn = {
       pc,
@@ -441,7 +550,7 @@ export class ProximityService {
     // Trickle ICE: create offer and send immediately
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    this.discoverySocket?.emit('rtc-offer', { to: peerId, offer: pc.localDescription });
+    await this._sendSignal(peerId, 'offer', pc.localDescription);
 
     // Wait for the data channel to open
     const code = await this._waitForConnection(peerId, CONNECT_TIMEOUT);
@@ -489,7 +598,7 @@ export class ProximityService {
 
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
-    this.discoverySocket?.emit('rtc-answer', { to: fromPeerId, answer: pc.localDescription });
+    await this._sendSignal(fromPeerId, 'answer', pc.localDescription);
   }
 
   // ─── True Offline Connection (QR Based) ─────────────────
@@ -505,7 +614,7 @@ export class ProximityService {
       iceTransportPolicy: 'all'
     });
 
-    const dc = pc.createDataChannel(DATA_CHANNEL_LABEL, { ordered: true });
+    const dc = pc.createDataChannel(DATA_CHANNEL_LABEL, { ordered: false });
     const peerId = 'offline-' + generateTransferId(); // Unique temp ID
 
     if (this.connections.has(peerId)) this._closeConnection(peerId);
@@ -640,7 +749,7 @@ export class ProximityService {
   _setupPeerConnection(peerId, pc) {
     pc.onicecandidate = (e) => {
       if (e.candidate) {
-        this.discoverySocket?.emit('rtc-ice-candidate', { to: peerId, candidate: e.candidate });
+        this._sendSignal(peerId, 'candidate', e.candidate).catch(() => {});
       }
     };
 
@@ -732,7 +841,7 @@ export class ProximityService {
 
       const offer = await pc.createOffer({ iceRestart: true });
       await pc.setLocalDescription(offer);
-      this.discoverySocket?.emit('rtc-offer', { to: peerId, offer: pc.localDescription });
+      await this._sendSignal(peerId, 'offer', pc.localDescription);
       console.log('[Proximity] ICE restart offer sent to', peerId);
     } catch (e) {
       console.warn('[Proximity] ICE restart failed for', peerId, ':', e.message);
@@ -945,12 +1054,23 @@ export class ProximityService {
   }
 
   _handleFileChunk(peerId, data) {
-    // Find the active receiving transfer for this peer
+    // O(1) lookup via _activeReceiving index; falls back to linear scan
     let transfer = null;
-    for (const [, t] of this.pendingTransfers) {
-      if (t.peerId === peerId && (t.state === 'receiving' || t.state === 'accepted')) {
+    const cachedId = this._activeReceiving?.get(peerId);
+    if (cachedId) {
+      const t = this.pendingTransfers.get(cachedId);
+      if (t && (t.state === 'receiving' || t.state === 'accepted')) {
         transfer = t;
-        break;
+      }
+    }
+    if (!transfer) {
+      for (const [id, t] of this.pendingTransfers) {
+        if (t.peerId === peerId && (t.state === 'receiving' || t.state === 'accepted')) {
+          transfer = t;
+          if (!this._activeReceiving) this._activeReceiving = new Map();
+          this._activeReceiving.set(peerId, id);
+          break;
+        }
       }
     }
     if (!transfer) {
@@ -1085,6 +1205,7 @@ export class ProximityService {
     transfer.startTime = Date.now();
     let offset = 0;
     let lastEmitTime = 0;
+    let _nextChunkPromise = null;
 
     // Set the low watermark to notify us proactively (Wait to reach half of max buffer)
     dc.bufferedAmountLowThreshold = 2 * 1024 * 1024;
@@ -1112,9 +1233,20 @@ export class ProximityService {
 
       const end = Math.min(offset + CHUNK_SIZE, file.size);
 
-      // Read only the specific chunk from the file system / memory map
-      const blobChunk = file.slice(offset, end);
-      const arrayBufferChunk = await readChunkAsArrayBuffer(blobChunk);
+      // Read current chunk (use pre-fetched if available, otherwise read now)
+      let arrayBufferChunk;
+      if (_nextChunkPromise) {
+        arrayBufferChunk = await _nextChunkPromise;
+        _nextChunkPromise = null;
+      } else {
+        arrayBufferChunk = await readChunkAsArrayBuffer(file.slice(offset, end));
+      }
+
+      // Read-ahead: kick off next chunk I/O while DataChannel sends current
+      const nextEnd = Math.min(end + CHUNK_SIZE, file.size);
+      if (end < file.size) {
+        _nextChunkPromise = readChunkAsArrayBuffer(file.slice(end, nextEnd));
+      }
 
       try {
         dc.send(arrayBufferChunk);

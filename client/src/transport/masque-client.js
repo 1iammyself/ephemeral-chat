@@ -173,6 +173,8 @@ export class MASQUEClient {
     this._streamWriter = null;
     /** @type {ReadableStreamDefaultReader|null} */
     this._streamReader = null;
+    /** @type {WebSocket|null} — WS fallback transport */
+    this._ws = null;
 
     this.connected    = false;
     this._paddingTimer = null;
@@ -202,8 +204,8 @@ export class MASQUEClient {
 
     // ─ WebTransport path (browser / Electron Chromium) ─
     if (!isWebTransportSupported()) {
-      console.warn('[MASQUE] WebTransport unavailable — tunnel cannot be created');
-      return false;
+      console.info('[MASQUE] WebTransport unavailable — falling back to WebSocket relay path');
+      return this._connectWebSocket();
     }
     if (!this.config.proxyUrl) {
       console.warn('[MASQUE] No proxy URL configured');
@@ -264,6 +266,70 @@ export class MASQUEClient {
 
     } catch (e) {
       console.error('[MASQUE] Tunnel setup failed:', e);
+      this.connected = false;
+      return false;
+    }
+  }
+
+  /**
+   * WebSocket fallback path — connects to the server-side MASQUE CONNECT-UDP
+   * proxy at /.well-known/masque/udp/{host}/{port}/ using a standard WS upgrade.
+   * Uses the same RFC 9297 capsule framing as the WebTransport path.
+   * @private
+   */
+  async _connectWebSocket() {
+    if (!this.config.proxyUrl || !this.config.targetHost) {
+      console.warn('[MASQUE] WS fallback: no proxy URL or target host configured');
+      return false;
+    }
+
+    try {
+      const path = buildConnectUDPPath(
+        this.config.connectUDPTemplate,
+        this.config.targetHost,
+        this.config.targetPort,
+      );
+      // Convert http(s):// → ws(s)://
+      const wsUrl = new URL(path, this.config.proxyUrl).href
+        .replace(/^http:/, 'ws:')
+        .replace(/^https:/, 'wss:');
+
+      await new Promise((resolve, reject) => {
+        const ws = new WebSocket(wsUrl);
+        ws.binaryType = 'arraybuffer';
+
+        ws.onopen = () => {
+          this._ws = ws;
+          this.connected = true;
+          console.log('[MASQUE] WebSocket tunnel active (fallback path)');
+          resolve(true);
+        };
+
+        ws.onmessage = (event) => {
+          this._stats.received++;
+          const capsule = decodeCapsule(new Uint8Array(event.data));
+          if (!capsule) return;
+          if (capsule.type !== CAPSULE_DATAGRAM) return;
+          if (this._onDatagram) this._onDatagram(capsule.payload);
+        };
+
+        ws.onerror = (err) => {
+          console.warn('[MASQUE] WS error:', err);
+          this.connected = false;
+          reject(new Error('WS connect failed'));
+        };
+
+        ws.onclose = () => {
+          this.connected = false;
+          this._ws = null;
+          console.info('[MASQUE] WS tunnel closed');
+        };
+      });
+
+      if (this.config.enablePadding) this._startPadding();
+      return true;
+    } catch (e) {
+      console.error('[MASQUE] WS fallback connect failed:', e);
       this.connected = false;
       return false;
     }
@@ -333,6 +399,10 @@ export class MASQUEClient {
         // Stream-based capsule framing
         const capsule = encodeCapsule(CAPSULE_DATAGRAM, data);
         await this._streamWriter.write(capsule);
+      } else if (this._ws && this._ws.readyState === WebSocket.OPEN) {
+        // WebSocket fallback: wrap in capsule and send as binary
+        const capsule = encodeCapsule(CAPSULE_DATAGRAM, data);
+        this._ws.send(capsule);
       } else {
         return false;
       }
@@ -461,15 +531,27 @@ export class MASQUEClient {
     this._dgReader = null;
     this._streamWriter = null;
     this._streamReader = null;
+
+    // WebSocket fallback teardown
+    if (this._ws) {
+      try {
+        const closeCapsule = encodeCapsule(CAPSULE_CLOSE, new Uint8Array(0));
+        this._ws.send(closeCapsule);
+        this._ws.close();
+      } catch { /* best effort */ }
+      this._ws = null;
+    }
   }
 
   // ── Status ─────────────────────────────────────────────
 
   getStatus() {
     return {
-      available: isWebTransportSupported() || isNativeBridgeAvailable(),
+      available: isWebTransportSupported() || isNativeBridgeAvailable() || true, // WS fallback always available
       datagramAPI: isDatagramAPISupported(),
       nativeBridge: isNativeBridgeAvailable(),
+      webTransport: isWebTransportSupported(),
+      wsFallback: !isWebTransportSupported() && !isNativeBridgeAvailable(),
       connected: this.connected,
       proxyUrl: this.config.proxyUrl,
       targetHost: this.config.targetHost,

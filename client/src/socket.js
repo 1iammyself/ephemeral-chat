@@ -1,4 +1,5 @@
 import { io } from 'socket.io-client';
+import { resolveBaseUrl } from './utils/resolve-url.js';
 
 /**
  * Simplified Socket.IO Manager based on working branch implementation
@@ -12,14 +13,8 @@ class SocketManager {
   }
 
   getServerUrl() {
-    // 1. Explicit env
-    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
-
-    // 2. Production fallback
-    if (import.meta.env.PROD) return '/';
-
-    // 3. Local desarrollo
-    return 'http://localhost:3001';
+    // Socket.IO needs '/' instead of '' for same-origin
+    return resolveBaseUrl() || '/';
   }
 
   connect() {
