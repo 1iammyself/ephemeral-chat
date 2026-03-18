@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCreatorId, getCreatorToken } from '../utils/creator';
+import { getCreatorId } from '../utils/creator';
 import { secureFetch } from '../utils/secure-fetch.js';
 import { ArrowLeft, Trash2, LogIn, Timer, Users, Zap, PartyPopper, Sun, Sunset, RefreshCw } from 'lucide-react';
 import { API_BASE } from '../utils/resolve-url.js';
@@ -19,10 +19,7 @@ const MyRooms = () => {
         try {
             setLoading(true);
             const creatorId = getCreatorId();
-            const token = await getCreatorToken();
-            const response = await secureFetch(`${API_BASE}/api/my-rooms?creatorId=${creatorId}`, {
-                headers: { 'X-Creator-Token': token },
-            });
+            const response = await secureFetch(`${API_BASE}/api/my-rooms?creatorId=${creatorId}`);
 
             if (!response.ok) {
                 throw new Error('Failed to fetch rooms');
@@ -43,10 +40,9 @@ const MyRooms = () => {
 
         try {
             const creatorId = getCreatorId();
-            const token = await getCreatorToken();
             const response = await secureFetch(`${API_BASE}/api/rooms/${roomCode}/delete`, {
                 method: 'DELETE',
-                headers: { 'Content-Type': 'application/json', 'X-Creator-Token': token },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ creatorId })
             });
 

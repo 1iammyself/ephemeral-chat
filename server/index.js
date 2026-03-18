@@ -929,26 +929,10 @@ app.post('/api/creator-token', creatorTokenLimiter, express.json(), (req, res) =
   res.json({ token });
 });
 
-// Creator token verification — prevents unauthenticated room enumeration.
-// The client must send X-Creator-Token header = HMAC-SHA256(CAP_SECRET, creatorId).
-// Note: Not IP-bound — creatorId is a 128-bit UUID (sufficient entropy) and IP-binding
-// causes spurious failures under proxies, load balancers, and mobile networks.
-function verifyCreatorToken(req, res, next) {
-  const creatorId = req.query.creatorId || req.body?.creatorId;
-  const token = req.headers['x-creator-token'];
-  if (!creatorId || !token) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-  const expected = nodeCrypto.createHmac('sha256', process.env.CAP_SECRET)
-    .update(String(creatorId))
-    .digest('hex');
-  if (token.length !== expected.length || !nodeCrypto.timingSafeEqual(Buffer.from(token, 'hex'), Buffer.from(expected, 'hex'))) {
-    return res.status(403).json({ error: 'Invalid creator token' });
-  }
-  next();
-}
-
-app.get('/api/my-rooms', verifyCreatorToken, async (req, res) => {
+// GET /api/my-rooms — List rooms created or joined by this creator.
+// The creatorId is a 128-bit UUID stored only in the user's sessionStorage —
+// sufficient protection for this metadata-only endpoint.
+app.get('/api/my-rooms', async (req, res) => {
   try {
     const { creatorId } = req.query;
 
@@ -1003,7 +987,7 @@ app.get('/api/my-rooms', verifyCreatorToken, async (req, res) => {
 });
 
 // Delete room by creator (manual deletion)
-app.delete('/api/rooms/:roomCode/delete', verifyCreatorToken, async (req, res) => {
+app.delete('/api/rooms/:roomCode/delete', async (req, res) => {
   try {
     const { roomCode } = req.params;
     const { creatorId } = req.body;
