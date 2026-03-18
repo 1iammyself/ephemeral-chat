@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Clock, Eye, AlertTriangle } from 'lucide-react';
+import { X, Clock, Eye } from 'lucide-react';
 import ImageReveal from './ImageReveal';
 import socketManager from '../socket';
 
@@ -150,9 +150,15 @@ const ImageViewer = ({ isOpen, onClose, imageUrl, duration = 30, isViewOnce = tr
           onMouseUp={(e) => e.stopPropagation()}
         >
           {imageUrl.startsWith('msg_') ? (
-            <ImageReveal
-              viewToken={revealData.viewToken}
-            />
+            revealData.viewToken ? (
+              <ImageReveal
+                viewToken={revealData.viewToken}
+              />
+            ) : (
+              <div className="flex items-center justify-center w-full h-full">
+                <div className="w-8 h-8 border-4 border-white/40 border-t-white rounded-full animate-spin" />
+              </div>
+            )
           ) : (
             <img
               src={imageUrl}
@@ -173,17 +179,6 @@ const ImageViewer = ({ isOpen, onClose, imageUrl, duration = 30, isViewOnce = tr
         </div>
       )}
 
-      {/* Warning Banner - Only for View Once */}
-      {isViewOnce && (
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-10">
-          <div className="bg-amber-500/90 backdrop-blur-sm rounded-lg px-4 py-2 flex items-center space-x-2">
-            <AlertTriangle className="w-4 h-4 text-white" />
-            <p className="text-white text-sm font-medium">
-              This image will disappear after viewing
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
