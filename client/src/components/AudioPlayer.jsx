@@ -105,22 +105,46 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
       if (isFinite(audio.duration) && audio.duration > 0.1) {
         setDuration(audio.duration);
       } else {
-        // Fix for duration bugs in WebM and MP4/M4A (Safari)
-        const needsDurationFix = mimeTypeRef.current && (
-          mimeTypeRef.current.includes('webm') ||
-          mimeTypeRef.current.includes('mp4') ||
-          mimeTypeRef.current.includes('m4a')
-        );
+        // Fix for duration bugs in WebM and MP4/M4A (Safari / iOS / Mobile)
+        // Some mobile browsers return Infinity or NaN initially
+        const needsDurationFix = true; // Always attempt fix if duration is bad
+        
         if (!needsDurationFix) return;
 
         setDuration(0);
-        audio.currentTime = 1e101; // Seek to end to force duration calculation
+        
+        // This hack forces the browser to calculate the actual duration
+        // by seeking to a ridiculously large number.
+        const originalTime = audio.currentTime;
+        audio.currentTime = 1e101; 
+        
+        const fallbackTimeout = setTimeout(() => {
+           // If ontimeupdate doesn't fire, try to reset anyway
+           if (isFinite(audio.duration) && audio.duration > 0.1) {
+             setDuration(audio.duration);
+           }
+           audio.currentTime = originalTime;
+        }, 1000);
+
         audio.ontimeupdate = function () {
-          this.ontimeupdate = () => { };
+          this.ontimeupdate = null; // Clean up
+          clearTimeout(fallbackTimeout);
+          
+          if (isFinite(audio.duration) && audio.duration > 0.1) {
+             setDuration(audio.duration);
+          }
+          
+          // Reset to beginning
           audio.currentTime = 0;
-          setDuration(audio.duration);
         };
       }
+    };
+
+    // Also listen to durationchange which fires on iOS when metadata finally parses
+    const handleDurationChange = () => {
+       if (isFinite(audio.duration) && audio.duration > 0.1) {
+          setDuration(audio.duration);
+       }
     };
 
     const handleEnded = () => {
@@ -131,11 +155,13 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
 
     audio.addEventListener('timeupdate', updateProgress);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('durationchange', handleDurationChange);
     audio.addEventListener('ended', handleEnded);
 
     return () => {
       audio.removeEventListener('timeupdate', updateProgress);
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('durationchange', handleDurationChange);
       audio.removeEventListener('ended', handleEnded);
     };
   }, [onEnded]);

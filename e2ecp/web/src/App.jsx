@@ -1986,7 +1986,7 @@ export default function App() {
                                 <button
                                     onClick={handleConnect}
                                     disabled={connected}
-                                    className={`btn-primary px-8 text-base tracking-widest whitespace-nowrap h-[54px] ${connected ? "opacity-30 cursor-not-allowed" : ""}`}
+                                    className={`btn-primary px-8 text-base tracking-widest whitespace-nowrap h-[54px] ${connected ? "bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-300 cursor-not-allowed border-transparent shadow-none" : ""}`}
                                 >
                                     {connected ? "JOINED" : "JOIN ROOM"}
                                 </button>

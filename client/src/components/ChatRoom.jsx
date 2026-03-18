@@ -2778,12 +2778,17 @@ const ChatRoom = () => {
               )}
               {/* Timer Pill */}
               {activeTimer && (
-                <div className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full bg-${vibeAccent}-100 dark:bg-${vibeAccent}-600/90 transition-colors`}>
-                  <Clock className={`w-3 h-3 ${timeLeft === '00:00' ? 'animate-bounce text-red-500 dark:text-red-300' : `animate-pulse text-${vibeAccent}-600 dark:text-white`}`} />
-                  <span className={`font-mono text-xs font-bold tracking-wider ${timeLeft === '00:00' ? 'text-red-600 dark:text-red-100' : `text-${vibeAccent}-700 dark:text-white`}`}>{timeLeft || '00:00'}</span>
+                <div
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full transition-colors"
+                  style={{
+                    backgroundColor: theme === 'dark' ? `${vibeHex}dd` : `${vibeHex}20`,
+                  }}
+                >
+                  <Clock className={`w-3 h-3 ${timeLeft === '00:00' ? 'animate-bounce text-red-500 dark:text-red-300' : 'animate-pulse'}`} style={timeLeft !== '00:00' ? { color: theme === 'dark' ? '#ffffff' : vibeHex } : undefined} />
+                  <span className={`font-mono text-xs font-bold tracking-wider ${timeLeft === '00:00' ? 'text-red-600 dark:text-red-100' : ''}`} style={timeLeft !== '00:00' ? { color: theme === 'dark' ? '#ffffff' : vibeHex } : undefined}>{timeLeft || '00:00'}</span>
                   {canManageRoom(currentUserRole) && (
-                    <button onClick={handleStopTimer} className={`p-0.5 rounded-full transition-colors hover:bg-black/5 dark:hover:bg-white/20`} title="Stop Timer">
-                      <X className={`w-3 h-3 ${timeLeft === '00:00' ? 'text-red-500 dark:text-red-300' : `text-${vibeAccent}-400 dark:text-red-300`}`} />
+                    <button onClick={handleStopTimer} className="p-0.5 rounded-full transition-colors hover:bg-black/5 dark:hover:bg-white/20" title="Stop Timer">
+                      <X className={`w-3 h-3 ${timeLeft === '00:00' ? 'text-red-500 dark:text-red-300' : 'text-red-300'}`} />
                     </button>
                   )}
                 </div>
