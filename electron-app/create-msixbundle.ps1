@@ -27,8 +27,8 @@ function Process-MSIX($arch) {
     # Fix manifest - set both to consistent versions
     $manifestPath = "$workDir\AppxManifest.xml"
     $manifest = Get-Content $manifestPath -Raw
-    $manifest = $manifest -replace '(MinVersion)="[0-9.]+"', 'MinVersion="10.0.16299.0"'
-    $manifest = $manifest -replace '(MaxVersionTested)="[0-9.]+"', 'MaxVersionTested="10.0.19041.0"'
+    $manifest = $manifest -replace '(MinVersion)="[0-9.]+"', 'MinVersion="10.0.18362.0"'
+    $manifest = $manifest -replace '(MaxVersionTested)="[0-9.]+"', 'MaxVersionTested="10.0.18362.0"'
     Set-Content $manifestPath -Value $manifest -Encoding UTF8
 
     # Repack with makeappx
