@@ -1,19 +1,16 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { ShieldAlert } from 'lucide-react';
-import { secureFetch } from '../utils/secure-fetch.js';
 
 /**
  * ImageReveal Component
  * Securely renders an image on a canvas only while the user is pressing.
  */
-const ImageReveal = ({ viewToken }) => {
+const ImageReveal = ({ imageData }) => {
     const canvasRef = useRef(null);
     const containerRef = useRef(null);
     const [revealActive, setRevealActive] = useState(false);
     const [imageBitmap, setImageBitmap] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isHolding, setIsHolding] = useState(false);
-    const [permissionWarning, setPermissionWarning] = useState(false);
 
     // Wipe canvas helper
     const wipeCanvas = useCallback(() => {
@@ -52,23 +49,15 @@ const ImageReveal = ({ viewToken }) => {
         ctx.drawImage(bitmap, x, y, drawWidth, drawHeight);
     }, []);
 
-    // PRE-FETCH IMAGE DATA
+    // CREATE BITMAP DIRECTLY FROM DATA URI (no network round-trip)
     useEffect(() => {
-        if (!viewToken) return;
+        if (!imageData) return;
 
         let active = true;
-        const fetchImage = async () => {
+        const loadImage = async () => {
             setIsLoading(true);
             try {
-                const apiBase = import.meta.env.VITE_API_URL || '';
-                const res = await secureFetch(`${apiBase}/api/reveal-image`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ viewToken })
-                });
-
-                if (!res.ok) throw new Error('Failed to fetch image');
-
+                const res = await fetch(imageData);
                 const blob = await res.blob();
                 const bitmap = await createImageBitmap(blob);
 
@@ -79,18 +68,18 @@ const ImageReveal = ({ viewToken }) => {
                 }
             } catch (err) {
                 if (process.env.NODE_ENV !== 'production') {
-                    console.error('Reveal fetch error:', err);
+                    console.error('Reveal load error:', err);
                 }
             } finally {
                 if (active) setIsLoading(false);
             }
         };
 
-        fetchImage();
+        loadImage();
         return () => {
             active = false;
         };
-    }, [viewToken]);
+    }, [imageData]);
 
     // Update reveal state based on holding and readiness
     useEffect(() => {
@@ -201,17 +190,6 @@ const ImageReveal = ({ viewToken }) => {
                 </div>
             )}
 
-            {permissionWarning && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none p-4">
-                    <div className="bg-red-500/90 backdrop-blur-md p-6 rounded-2xl border border-white/10 text-center max-w-xs transition-all duration-300">
-                        <ShieldAlert className="w-10 h-10 text-white mx-auto mb-3" />
-                        <p className="text-white font-bold mb-1">Security Lockdown</p>
-                        <p className="text-white/80 text-xs leading-relaxed">
-                            Clipboard permission is required to verify your environment. Please reset site permissions to continue.
-                        </p>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

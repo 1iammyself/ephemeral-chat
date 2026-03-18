@@ -157,7 +157,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
     if (message.isViewOnce && isMessageViewed(message)) return;
 
     setViewingImage(message);
-    setCurrentImageUrl(message.isViewOnce ? message.id : message.content);
+    setCurrentImageUrl(message.content);
 
     // Only mark as viewed/burned if it is actually view-once
     if (message.isViewOnce) {

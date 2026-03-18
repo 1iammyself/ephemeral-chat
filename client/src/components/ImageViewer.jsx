@@ -7,12 +7,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Clock, Eye } from 'lucide-react';
 import ImageReveal from './ImageReveal';
-import socketManager from '../socket';
 
 const ImageViewer = ({ isOpen, onClose, imageUrl, duration = 30, isViewOnce = true }) => {
   const [timeLeft, setTimeLeft] = useState(duration);
   const [isVisible, setIsVisible] = useState(false);
-  const [revealData, setRevealData] = useState({ viewToken: null, watermarkSeed: null });
 
   // Handle visibility change (tab switching)
   const handleVisibilityChange = useCallback(() => {
@@ -62,21 +60,8 @@ const ImageViewer = ({ isOpen, onClose, imageUrl, duration = 30, isViewOnce = tr
     } else {
       setIsVisible(false);
       setTimeLeft(duration);
-      setRevealData({ viewToken: null, watermarkSeed: null });
     }
   }, [isOpen, duration, onClose, handleVisibilityChange, handleKeyDown]);
-
-  // Request reveal token when opened
-  useEffect(() => {
-    if (isOpen && imageUrl && imageUrl.startsWith('msg_')) {
-      // imageUrl here is actually the messageId passed from MessageList
-      socketManager.emit('request-view-token', { messageId: imageUrl }, (res) => {
-        if (res.success) {
-          setRevealData({ viewToken: res.token, watermarkSeed: res.watermarkSeed });
-        }
-      });
-    }
-  }, [isOpen, imageUrl]);
 
   if (!isOpen) return null;
 
@@ -149,16 +134,8 @@ const ImageViewer = ({ isOpen, onClose, imageUrl, duration = 30, isViewOnce = tr
           onPointerUp={(e) => e.stopPropagation()}
           onMouseUp={(e) => e.stopPropagation()}
         >
-          {imageUrl.startsWith('msg_') ? (
-            revealData.viewToken ? (
-              <ImageReveal
-                viewToken={revealData.viewToken}
-              />
-            ) : (
-              <div className="flex items-center justify-center w-full h-full">
-                <div className="w-8 h-8 border-4 border-white/40 border-t-white rounded-full animate-spin" />
-              </div>
-            )
+          {isViewOnce ? (
+            <ImageReveal imageData={imageUrl} />
           ) : (
             <img
               src={imageUrl}
