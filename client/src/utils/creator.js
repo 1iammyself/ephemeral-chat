@@ -8,7 +8,7 @@
  */
 
 import { API_BASE } from './resolve-url.js';
-import { secureFetch } from './secure-fetch.js';
+import { unpadResponse } from './secure-fetch.js';
 
 const CREATOR_ID_KEY = 'eph-creator-id';
 const CREATOR_TOKEN_KEY = 'eph-creator-token';
@@ -64,13 +64,14 @@ export const getCreatorToken = async () => {
     if (cached) return cached;
 
     const creatorId = getCreatorId();
-    const res = await secureFetch(`${API_BASE}/api/creator-token`, {
+    const res = await fetch(`${API_BASE}/api/creator-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ creatorId }),
     });
     if (!res.ok) throw new Error('Failed to get creator token');
-    const { token } = await res.json();
+    const unpaddedRes = await unpadResponse(res);
+    const { token } = await unpaddedRes.json();
     sessionStorage.setItem(CREATOR_TOKEN_KEY, token);
     return token;
 };

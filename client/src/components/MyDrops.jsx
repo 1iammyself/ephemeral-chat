@@ -4,7 +4,7 @@ import {
   ArrowLeft, Package, Trash2, RefreshCw, Clock, Eye, EyeOff,
   Users, Shield, Type, Image, Mic, FileUp, Loader2, AlertTriangle, Plus
 } from 'lucide-react';
-import { getCreatorId } from '../utils/creator';
+import { getCreatorId, getCreatorToken } from '../utils/creator';
 import { getMyDropsAPI, deleteDropAPI } from '../utils/drops';
 import { formatTimeRemaining } from '../utils/eph-file';
 
@@ -23,7 +23,8 @@ const MyDrops = () => {
     try {
       setLoading(true);
       const creatorId = getCreatorId();
-      const data = await getMyDropsAPI(creatorId);
+      const token = await getCreatorToken();
+      const data = await getMyDropsAPI(creatorId, token);
       setDrops(data.drops || []);
       setError(null);
     } catch (err) {
