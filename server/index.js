@@ -263,10 +263,11 @@ setupNearbyNamespace(io);
 
 const PORT = process.env.PORT || 3001
 
-// Global JSON limit — 1 MB for all routes
-app.use(express.json({ limit: '1mb' }));
-// Elevated limit only for the encrypted file drop endpoint (base64-encoded payloads)
+// Elevated limit for encrypted file drop endpoints FIRST (base64-encoded payloads can be large)
+// Must come before the global 1 MB middleware so large drop bodies aren't rejected early.
 app.use('/api/drops', express.json({ limit: '50mb' }));
+// Global JSON limit — 1 MB for all other routes
+app.use(express.json({ limit: '1mb' }));
 
 // ─── Traffic Padding Middleware (RFC-compliant traffic analysis resistance) ──
 // Pads all JSON API responses to fixed bucket sizes so network observers
@@ -1235,8 +1236,22 @@ io.on('connection', (socket) => {
       roomData[roomCode] = room;
     }
 
-    // 4b. Check auto-approve mode — skip the knock/waiting lobby entirely
+    // 4b. Check auto-approve mode — skip the knock/waiting lobby entirely.
+    // Even when auto-approving, check the pre-approved list to assign any designated role.
     if (room.autoApprove) {
+      if (room.preApprovedList && room.preApprovedList.length > 0) {
+        const normalizedNickname = (nickname || '').toLowerCase().trim();
+        const matchedEntry = room.preApprovedList.find(
+          entry => entry.name.toLowerCase().trim() === normalizedNickname
+        );
+        if (matchedEntry && matchedEntry.role && matchedEntry.role !== 'none') {
+          if (!room.userRoles) room.userRoles = {};
+          const roleMap = { admin: 'tier1', mod: 'tier2', tier1: 'tier1', tier2: 'tier2', user: 'user' };
+          const internalRole = roleMap[matchedEntry.role.toLowerCase()] || 'user';
+          room.userRoles[socket.id] = internalRole;
+          logger.info(`✅ Auto-approve: assigned role "${matchedEntry.role}" to pre-approved user "${nickname}" in room ${roomCode}`);
+        }
+      }
       logger.info(`✅ Auto-approve enabled for room ${roomCode}, auto-approving ${nickname}`);
       return socket.emit('knock-approved', { isHost: false });
     }

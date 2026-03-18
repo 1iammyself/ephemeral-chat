@@ -8,6 +8,7 @@
  */
 
 import { API_BASE } from './resolve-url.js';
+import { secureFetch } from './secure-fetch.js';
 
 const CREATOR_ID_KEY = 'eph-creator-id';
 const CREATOR_TOKEN_KEY = 'eph-creator-token';
@@ -63,7 +64,7 @@ export const getCreatorToken = async () => {
     if (cached) return cached;
 
     const creatorId = getCreatorId();
-    const res = await fetch(`${API_BASE}/api/creator-token`, {
+    const res = await secureFetch(`${API_BASE}/api/creator-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ creatorId }),

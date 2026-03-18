@@ -2342,9 +2342,8 @@ const ChatRoom = () => {
           return;
         }
         socketManager.emit('send-message', {
+          ...voPayload,
           messageType: 'image',
-          imageData: voPayload,
-          isEncrypted: true,
           isViewOnce: true,
           recipients: selectedRecipients,
           isAnonymous: isAnonymousMode

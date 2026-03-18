@@ -25,6 +25,7 @@
 
 import { secureFetch } from './secure-fetch.js';
 import { API_BASE } from './resolve-url.js';
+import { getCreatorToken } from './creator.js';
 
 // ─── Hash Utilities ─────────────────────────────────────────
 
@@ -417,7 +418,10 @@ export async function validateEphAPI(ephPacket) {
  * @returns {Promise<Object[]>} Array of drop metadata
  */
 export async function getMyDropsAPI(creatorId) {
-  const response = await secureFetch(`${API_BASE}/api/drops/mine/${creatorId}`);
+  const token = await getCreatorToken();
+  const response = await secureFetch(`${API_BASE}/api/drops/mine/${creatorId}`, {
+    headers: { 'X-Creator-Token': token },
+  });
   const data = await response.json();
   if (!response.ok) {
     throw new Error(data.error || 'Failed to get drops');

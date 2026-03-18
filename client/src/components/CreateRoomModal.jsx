@@ -256,6 +256,7 @@ Verbal Code: ${verbalCode || 'N/A'}`;
 
   const handleNewRoom = () => {
     setCreatedRoom(null);
+    setIsCreating(false);
     setInviteLink('');
     setVerbalCode('');
     setIsCopied({
