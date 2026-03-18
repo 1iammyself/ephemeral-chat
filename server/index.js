@@ -923,25 +923,24 @@ app.post('/api/creator-token', creatorTokenLimiter, express.json(), (req, res) =
   if (!creatorId || typeof creatorId !== 'string' || creatorId.length > 128) {
     return res.status(400).json({ error: 'Invalid creator ID' });
   }
-  // Bind token to creatorId + client IP to prevent cross-IP enumeration
-  const clientIp = req.ip || req.socket.remoteAddress || '';
   const token = nodeCrypto.createHmac('sha256', process.env.CAP_SECRET)
-    .update(creatorId + ':' + clientIp)
+    .update(creatorId)
     .digest('hex');
   res.json({ token });
 });
 
 // Creator token verification — prevents unauthenticated room enumeration.
 // The client must send X-Creator-Token header = HMAC-SHA256(CAP_SECRET, creatorId).
+// Note: Not IP-bound — creatorId is a 128-bit UUID (sufficient entropy) and IP-binding
+// causes spurious failures under proxies, load balancers, and mobile networks.
 function verifyCreatorToken(req, res, next) {
   const creatorId = req.query.creatorId || req.body?.creatorId;
   const token = req.headers['x-creator-token'];
   if (!creatorId || !token) {
     return res.status(401).json({ error: 'Authentication required' });
   }
-  const clientIp = req.ip || req.socket.remoteAddress || '';
   const expected = nodeCrypto.createHmac('sha256', process.env.CAP_SECRET)
-    .update(String(creatorId) + ':' + clientIp)
+    .update(String(creatorId))
     .digest('hex');
   if (token.length !== expected.length || !nodeCrypto.timingSafeEqual(Buffer.from(token, 'hex'), Buffer.from(expected, 'hex'))) {
     return res.status(403).json({ error: 'Invalid creator token' });

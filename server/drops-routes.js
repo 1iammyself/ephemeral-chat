@@ -212,7 +212,7 @@ function createDropRoutes(dropManager, options = {}) {
   // ─── GET /api/drops/mine/:creatorId — List my drops ───────
   // NOTE: Must come before /:dropId to avoid "mine" being captured as dropId
   //
-  // Authorization: requires X-Creator-Token header = HMAC-SHA256(CAP_SECRET, creatorId + ':' + clientIP)
+  // Authorization: requires X-Creator-Token header = HMAC-SHA256(CAP_SECRET, creatorId)
   // This mirrors the verifyCreatorToken pattern used in /api/my-rooms.
 
   function verifyDropCreatorToken(req, res, next) {
@@ -225,10 +225,9 @@ function createDropRoutes(dropManager, options = {}) {
     if (!secret) {
       return res.status(500).json({ error: 'Server misconfiguration' });
     }
-    const clientIp = req.ip || req.socket?.remoteAddress || '';
     const crypto = require('crypto');
     const expected = crypto.createHmac('sha256', secret)
-      .update(String(creatorId) + ':' + clientIp)
+      .update(String(creatorId))
       .digest('hex');
     let tokenBuf, expectedBuf;
     try {
