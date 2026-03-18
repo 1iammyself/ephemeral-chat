@@ -95,7 +95,10 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
 
           {/* Detection Feedback */}
           {detected && (
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg bg-${vibeAccent}-50 dark:bg-${vibeAccent}-950/30 border border-${vibeAccent}-200/50 dark:border-${vibeAccent}-700/30 animate-in slide-in-from-bottom-2 duration-200`}>
+            <div
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border animate-in slide-in-from-bottom-2 duration-200"
+              style={{ backgroundColor: `${vibeColor}18`, borderColor: `${vibeColor}40` }}
+            >
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${detected.type === 'youtube' ? 'bg-red-500/10' :
                   detected.type === 'soundcloud' ? 'bg-orange-500/10' :
                     detected.type === 'figma' ? 'bg-pink-500/10' : 'bg-blue-500/10'
