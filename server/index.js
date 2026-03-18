@@ -335,7 +335,13 @@ const rateLimits = new Map();
 
 // Room metadata for Lobby/Host logic
 // Roles: 'host', 'tier1', 'tier2', 'user'
-const roomData = {}; // { [roomId]: { hostId: string, lobbyLimit: number, lobbyCount: number, userRoles: { [socketId]: role } } }
+// Use Object.create(null) to eliminate prototype chain — prevents __proto__ / constructor
+// prototype pollution attacks when roomCode values are used as keys.
+const roomData = Object.create(null); // { [roomId]: { hostId: string, lobbyLimit: number, lobbyCount: number, userRoles: { [socketId]: role } } }
+
+// Track which socket IDs are currently waiting in the knock lobby, per room.
+// approve-guest / deny-guest must verify guestId is in this set before acting.
+const pendingKnocks = new Map(); // roomCode → Set<socketId>
 
 // Track deferred (grace-period) user removals so they can be cancelled on reconnect
 // Key: sessionToken, Value: { timeoutId, socketId, roomCode }
@@ -613,12 +619,14 @@ app.post('/api/rooms/:roomCode/invite', async (req, res) => {
       }
     }
 
-    // Generate the invite link using the generateInviteLink method
-    const origin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : null);
+    // Generate the invite link using the server-configured public URL only.
+    // Never use the client-supplied Origin/Referer header — it is attacker-controlled
+    // and would allow open redirect attacks via crafted invite links.
+    const serverBaseUrl = process.env.PUBLIC_URL || process.env.BASE_URL || null;
     const invite = await roomManager.generateInviteLink(roomCode, {
       isPermanent: false,
       expiryMs: 25 * 60 * 1000, // 25 minutes
-      baseUrl: origin
+      baseUrl: serverBaseUrl
     });
 
     res.json({
@@ -760,7 +768,17 @@ app.post('/api/rooms', async (req, res) => {
     res.json({ success: true, roomCode });
   } catch (error) {
     logger.error('Error creating room via HTTP:', error);
-    res.status(500).json({ error: error.message || 'Failed to create room' });
+    // Never expose raw error.message in production — it can leak internal paths and logic
+    const isUserFacing = error.message && (
+      error.message.includes('maximum') ||
+      error.message.includes('capacity') ||
+      error.message.includes('taken') ||
+      error.message.includes('Invalid') ||
+      error.message.includes('between') ||
+      error.message.includes('only contain')
+    );
+    const clientMessage = isUserFacing ? error.message : 'Failed to create room';
+    res.status(500).json({ error: clientMessage });
   }
 });
 
@@ -840,7 +858,7 @@ app.post('/api/reveal-image', async (req, res) => {
  * Agora RTC Token Generation
  * GET /api/agora/token?channelName=roomCode
  */
-app.get('/api/agora/token', (req, res) => {
+app.get('/api/agora/token', async (req, res) => {
   try {
     const channelName = req.query.channelName;
     if (!channelName) {
@@ -853,6 +871,19 @@ app.get('/api/agora/token', (req, res) => {
     if (!appId || !appCertificate) {
       logger.error('Agora configuration missing');
       return res.status(500).json({ error: 'Agora not configured on server' });
+    }
+
+    // Verify the room exists and is not expired before issuing an Agora token.
+    // Without this check, any caller can generate valid tokens for arbitrary channel names.
+    if (!isValidRoomCode(channelName)) {
+      return res.status(400).json({ error: 'Invalid channel name' });
+    }
+    const agoraRoom = await roomManager.getRoom(channelName);
+    if (!agoraRoom) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+    if (new Date(agoraRoom.expiresAt) < new Date()) {
+      return res.status(404).json({ error: 'Room has expired' });
     }
 
     const role = RtcRole.PUBLISHER;
@@ -1156,8 +1187,22 @@ io.on('connection', (socket) => {
       }
     }
 
-    // 3. If room is empty (no live sockets), user becomes host automatically
+    // 3. If room is empty (no live sockets), user becomes host automatically.
+    //    Credentials must still be validated before granting host status — an empty
+    //    room does not waive the password requirement.
     if (liveUserCount === 0) {
+      const emptyRoomRecord = await roomManager.getRoom(roomCode);
+      if (emptyRoomRecord?.settings?.passwordHash && !inviteToken) {
+        if (!password) {
+          return socket.emit('knock-denied', { reason: 'Password required for this room' });
+        }
+        const pwMatch = await bcrypt.compare(password, emptyRoomRecord.settings.passwordHash);
+        if (!pwMatch) {
+          securityManager.recordFailedAttempt(socket.id);
+          return socket.emit('knock-denied', { reason: 'Incorrect password' });
+        }
+      }
+
       // Initialize or reset roomData (preserve preApprovedList and totpSecret if set)
       const existingPreApproved = room?.preApprovedList || [];
       const existingAutoApprove = room?.autoApprove || false;
@@ -1286,6 +1331,10 @@ io.on('connection', (socket) => {
       });
     }
 
+    // Track this socket as pending so approve/deny-guest can verify legitimacy
+    if (!pendingKnocks.has(roomCode)) pendingKnocks.set(roomCode, new Set());
+    pendingKnocks.get(roomCode).add(socket.id);
+
     socket.emit('knock-pending');
   });
 
@@ -1354,6 +1403,10 @@ io.on('connection', (socket) => {
     const requesterRole = room.userRoles?.[socket.id] || (room.hostId === socket.id ? 'host' : 'user');
     if (requesterRole !== 'host' && requesterRole !== 'tier1') return;
 
+    // Only act on sockets that actually sent a knock — prevents arbitrary socket targeting
+    if (!pendingKnocks.get(roomCode)?.has(guestId)) return;
+    pendingKnocks.get(roomCode).delete(guestId);
+
     const guestSocket = io.sockets.sockets.get(guestId);
     if (guestSocket) {
       if (roomData[roomCode].lobbyCount > 0) roomData[roomCode].lobbyCount--;
@@ -1370,6 +1423,10 @@ io.on('connection', (socket) => {
     if (!room) return;
     const requesterRole = room.userRoles?.[socket.id] || (room.hostId === socket.id ? 'host' : 'user');
     if (requesterRole !== 'host' && requesterRole !== 'tier1') return;
+
+    // Only act on sockets that actually sent a knock — prevents arbitrary socket targeting
+    if (!pendingKnocks.get(roomCode)?.has(guestId)) return;
+    pendingKnocks.get(roomCode).delete(guestId);
 
     const guestSocket = io.sockets.sockets.get(guestId);
     if (guestSocket) {
@@ -1395,6 +1452,10 @@ io.on('connection', (socket) => {
 
     // Can't change own role
     if (targetUserId === socket.id) return;
+
+    // Target must actually be present in the room — prevents pre-seeding roles for
+    // arbitrary socket IDs (including prototype pollution via crafted IDs)
+    if (!io.sockets.adapter.rooms.get(roomCode)?.has(targetUserId)) return;
 
     // Initialize userRoles if needed
     if (!room.userRoles) room.userRoles = {};
@@ -1524,7 +1585,7 @@ io.on('connection', (socket) => {
     if (!canChange) return;
 
     const durationSec = parseInt(duration);
-    if (!durationSec || durationSec <= 0) return;
+    if (!durationSec || durationSec <= 0 || durationSec > 86400) return; // cap at 24 hours
 
     const endTime = Date.now() + (durationSec * 1000);
     room.timer = {
@@ -1627,7 +1688,7 @@ io.on('connection', (socket) => {
             if (token !== sessionToken && def.roomCode === roomCode && def.socketId !== socket.id) {
               // Check if this deferred removal belongs to the same user
               const defSession = securityManager.validateSession(token);
-              if (defSession && defSession.userId && defSession.userId === (userId || socket.id)) {
+              if (defSession && defSession.userId && defSession.userId === (session.userId || socket.id)) {
                 clearTimeout(def.timeoutId);
                 const staleId = def.socketId;
                 const staleSocket = io.sockets.sockets.get(staleId);
@@ -1654,13 +1715,15 @@ io.on('connection', (socket) => {
           ensureRoomChaff(roomCode); // Start traffic-analysis-resistant chaff
           socket.roomCode = roomCode;
           socket.nickname = nickname || session.nickname || generateRandomNickname();
-          socket.persistentUserId = userId || socket.id; // Store persistent ID on socket
+          // Use server-authoritative userId from the session — never trust the client-supplied
+          // userId field for role transfers, as it could be another user's ID.
+          socket.persistentUserId = session.userId || socket.id;
 
           const room = await roomManager.getRoom(roomCode);
           if (room) {
             // ── Deduplicate: remove any stale entries for same user before re-adding ──
             const reconnectNickname = socket.nickname;
-            const reconnectUserId = userId || socket.id;
+            const reconnectUserId = session.userId || socket.id;
             const beforeCount = room.users.length;
 
             // ── Ensure roomData exists for this room ──
@@ -2684,6 +2747,9 @@ io.on('connection', (socket) => {
   // Zoom-style Room Reaction
   socket.on('send-room-reaction', ({ emoji }) => {
     if (!socket.roomCode) return;
+
+    // Validate emoji: non-empty string, capped at 64 bytes
+    if (typeof emoji !== 'string' || emoji.length === 0 || Buffer.byteLength(emoji, 'utf8') > 64) return;
 
     // Rate limit reactions to prevent spam (slightly higher limit than messages)
     if (!checkRateLimit(socket.id, 50, 60000)) return;
@@ -3846,11 +3912,15 @@ io.on('connection', (socket) => {
 
   // WebRTC Call Signaling Events
 
+  // Helper: check that a target socket ID is a member of the caller's current room
+  function isRoomMember(targetId) {
+    if (!socket.roomCode || !targetId) return false;
+    return io.sockets.adapter.rooms.get(socket.roomCode)?.has(targetId) ?? false;
+  }
+
   // Handle call offer
   socket.on('call-offer', (data) => {
     if (!socket.roomCode) return;
-
-    // logger.info(`📞 Call offer from ${socket.nickname} (${socket.id}) in room ${socket.roomCode}`);
 
     const payload = {
       ...data,
@@ -3859,7 +3929,8 @@ io.on('connection', (socket) => {
     };
 
     if (data.to) {
-      // Targeted offer
+      // Targeted offer — verify target is in the same room to prevent cross-room signaling
+      if (!isRoomMember(data.to)) return;
       io.to(data.to).emit('call-offer', payload);
     } else {
       // Broadcast offer to other participants in the room (legacy/group behavior)
@@ -3871,8 +3942,6 @@ io.on('connection', (socket) => {
   socket.on('call-answer', (data) => {
     if (!socket.roomCode) return;
 
-    // logger.info(`📞 Call answer from ${socket.nickname} (${socket.id}) in room ${socket.roomCode}`);
-
     const payload = {
       ...data,
       fromNickname: socket.nickname,
@@ -3880,6 +3949,7 @@ io.on('connection', (socket) => {
     };
 
     if (data.to) {
+      if (!isRoomMember(data.to)) return;
       io.to(data.to).emit('call-answer', payload);
     } else {
       socket.to(socket.roomCode).emit('call-answer', payload);
@@ -3896,6 +3966,7 @@ io.on('connection', (socket) => {
     };
 
     if (data.to) {
+      if (!isRoomMember(data.to)) return;
       io.to(data.to).emit('call-ice-candidate', payload);
     } else {
       socket.to(socket.roomCode).emit('call-ice-candidate', payload);
@@ -3906,8 +3977,6 @@ io.on('connection', (socket) => {
   socket.on('call-rejected', (data) => {
     if (!socket.roomCode) return;
 
-    // logger.info(`📞 Call rejected by ${socket.nickname} in room ${socket.roomCode}`);
-
     const payload = {
       ...data,
       rejectedBy: socket.nickname,
@@ -3915,6 +3984,7 @@ io.on('connection', (socket) => {
     };
 
     if (data.to) {
+      if (!isRoomMember(data.to)) return;
       io.to(data.to).emit('call-rejected', payload);
     } else {
       socket.to(socket.roomCode).emit('call-rejected', payload);
@@ -3925,8 +3995,6 @@ io.on('connection', (socket) => {
   socket.on('call-ended', (data) => {
     if (!socket.roomCode) return;
 
-    // logger.info(`📞 Call ended by ${socket.nickname} in room ${socket.roomCode}`);
-
     const payload = {
       ...data,
       endedBy: socket.nickname,
@@ -3934,6 +4002,7 @@ io.on('connection', (socket) => {
     };
 
     if (data.to) {
+      if (!isRoomMember(data.to)) return;
       io.to(data.to).emit('call-ended', payload);
     } else {
       socket.to(socket.roomCode).emit('call-ended', payload);
@@ -4195,7 +4264,8 @@ io.on('connection', (socket) => {
   // The server does NOT inspect MLS payloads — it merely forwards them
   // between room members so the MLS handshake can complete (RFC 9420).
   socket.on('mls-key-package', ({ roomCode: rc, keyPackage }) => {
-    if (!rc || !keyPackage) return;
+    // rc must match the room this socket has joined — prevents cross-room injection
+    if (!rc || rc !== socket.roomCode || !keyPackage) return;
     // Forward key package to all OTHER members (the group creator will add them)
     socket.to(rc).emit('mls-key-package', {
       keyPackage,
@@ -4205,9 +4275,10 @@ io.on('connection', (socket) => {
   });
 
   socket.on('mls-welcome', ({ roomCode: rc, welcome, commit, proposal, ratchetTree, target }) => {
-    if (!rc || !welcome) return;
-    // If target is specified, send only to that socket; otherwise broadcast
+    if (!rc || rc !== socket.roomCode || !welcome) return;
+    // If target is specified, send only to that socket — must be a room member
     if (target) {
+      if (!isRoomMember(target)) return;
       io.to(target).emit('mls-welcome', {
         welcome,
         commit: commit || null,
@@ -4310,6 +4381,13 @@ io.on('connection', (socket) => {
 
     // Cleanup file transfer tracking (clear all transfers for this socket)
     clearSocketTransfers(socket.id);
+
+    // Remove from knock lobby if this socket was waiting for host approval
+    if (socket.roomCode && pendingKnocks.has(socket.roomCode)) {
+      const knockSet = pendingKnocks.get(socket.roomCode);
+      knockSet.delete(socket.id);
+      if (knockSet.size === 0) pendingKnocks.delete(socket.roomCode);
+    }
 
     // Note: Media watcher cleanup is handled inside handleUserDeparture
     // Note: Do NOT delete io._activeMedia on disconnect — media persists for the room

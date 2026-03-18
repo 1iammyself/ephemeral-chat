@@ -83,10 +83,13 @@ class SecurityManager {
    * @returns {string} Checksum
    */
   createRoomCodeChecksum(roomCode) {
-    return crypto.createHash('sha256')
-      .update(roomCode + process.env.ROOM_CODE_SALT || 'ephemeral-chat-salt')
+    // Use HMAC to avoid the operator-precedence bug that previously evaluated as
+    // (roomCode + ROOM_CODE_SALT) || fallback, discarding the fallback when the
+    // env var was unset (making the salt effectively "undefined").
+    return crypto.createHmac('sha256', process.env.ROOM_CODE_SALT || 'ephemeral-chat-salt')
+      .update(String(roomCode))
       .digest('hex')
-      .substring(0, 16); // Use first 16 chars for brevity
+      .substring(0, 32); // 128-bit tag — enough for verification
   }
 
   /**
@@ -97,7 +100,11 @@ class SecurityManager {
    */
   verifyRoomCodeChecksum(roomCode, checksum) {
     const computed = this.createRoomCodeChecksum(roomCode);
-    return computed === checksum;
+    try {
+      return crypto.timingSafeEqual(Buffer.from(computed, 'hex'), Buffer.from(checksum, 'hex'));
+    } catch {
+      return false; // Mismatched lengths or invalid hex
+    }
   }
 
   /**

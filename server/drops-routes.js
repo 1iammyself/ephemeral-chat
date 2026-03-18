@@ -30,10 +30,22 @@ function createDropRoutes(dropManager, options = {}) {
   const createLimits = new Map(); // ip -> { count, resetTime }
   const claimLimits = new Map();  // ip -> { count, resetTime }
 
+  // Hard cap on in-memory rate limit entries to prevent unbounded growth under
+  // high-volume attacks using rotating IP addresses or proxy pools.
+  const MAX_RATE_LIMIT_ENTRIES = 50000;
+
   function rateLimit(store, maxRequests, windowMs) {
     return (req, res, next) => {
-      const ip = req.ip || req.connection.remoteAddress || 'unknown';
+      const ip = req.ip || req.connection?.remoteAddress || 'unknown';
       const now = Date.now();
+
+      // Refuse to track more IPs than the cap allows — fail open (let request proceed)
+      // rather than crash, but log so operators are aware of the pressure.
+      if (!store.has(ip) && store.size >= MAX_RATE_LIMIT_ENTRIES) {
+        logger.warn('[drops-rate-limit] Rate limit store at capacity, skipping tracking for IP');
+        return next();
+      }
+
       const entry = store.get(ip) || { count: 0, resetTime: now + windowMs };
 
       if (now > entry.resetTime) {
@@ -199,8 +211,39 @@ function createDropRoutes(dropManager, options = {}) {
 
   // ─── GET /api/drops/mine/:creatorId — List my drops ───────
   // NOTE: Must come before /:dropId to avoid "mine" being captured as dropId
+  //
+  // Authorization: requires X-Creator-Token header = HMAC-SHA256(CAP_SECRET, creatorId + ':' + clientIP)
+  // This mirrors the verifyCreatorToken pattern used in /api/my-rooms.
 
-  router.get('/mine/:creatorId', async (req, res) => {
+  function verifyDropCreatorToken(req, res, next) {
+    const { creatorId } = req.params;
+    const token = req.headers['x-creator-token'];
+    if (!creatorId || !token) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    const secret = process.env.CAP_SECRET;
+    if (!secret) {
+      return res.status(500).json({ error: 'Server misconfiguration' });
+    }
+    const clientIp = req.ip || req.socket?.remoteAddress || '';
+    const crypto = require('crypto');
+    const expected = crypto.createHmac('sha256', secret)
+      .update(String(creatorId) + ':' + clientIp)
+      .digest('hex');
+    let tokenBuf, expectedBuf;
+    try {
+      tokenBuf = Buffer.from(token, 'hex');
+      expectedBuf = Buffer.from(expected, 'hex');
+    } catch (_) {
+      return res.status(403).json({ error: 'Invalid creator token' });
+    }
+    if (tokenBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(tokenBuf, expectedBuf)) {
+      return res.status(403).json({ error: 'Invalid creator token' });
+    }
+    next();
+  }
+
+  router.get('/mine/:creatorId', claimRateLimit, verifyDropCreatorToken, async (req, res) => {
     try {
       const { creatorId } = req.params;
 
@@ -224,7 +267,7 @@ function createDropRoutes(dropManager, options = {}) {
   // ─── GET /api/drops/system/stats — Get drop system stats ──
   // NOTE: Must come before /:dropId to avoid "system" being captured as dropId
 
-  router.get('/system/stats', (req, res) => {
+  router.get('/system/stats', claimRateLimit, (req, res) => {
     try {
       const stats = dropManager.getStats();
       res.json({ success: true, stats });
@@ -271,10 +314,13 @@ function createDropRoutes(dropManager, options = {}) {
       }
 
       const buffer = generateEphFileBuffer(dropId, info.hint);
-      const filename = suggestFilename(dropId, info.hint);
+      const rawFilename = suggestFilename(dropId, info.hint);
+      // Strip any characters that could break the Content-Disposition header value
+      // (quotes, backslashes, control chars, path separators)
+      const safeFilename = rawFilename.replace(/[^\w.\-]/g, '_').substring(0, 100);
 
       res.setHeader('Content-Type', EPH_MIME_TYPE);
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
       res.setHeader('Content-Length', buffer.length);
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
       res.setHeader('Pragma', 'no-cache');

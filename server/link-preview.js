@@ -199,6 +199,11 @@ function fetchUrl(url, options = {}) {
           return;
         }
         const redirectUrl = new URL(res.headers.location, url).href;
+        // Re-validate redirect target to block SSRF via 302→private-IP chains
+        if (!isUrlSafe(redirectUrl)) {
+          reject(new Error('Redirect target blocked by security policy'));
+          return;
+        }
         fetchUrl(redirectUrl, { ...options, maxRedirects: maxRedirects - 1 })
           .then(resolve)
           .catch(reject);

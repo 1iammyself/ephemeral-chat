@@ -30,6 +30,12 @@ let cleanupInterval = null;
 function setupNearbyNamespace(io) {
   const nearbyNs = io.of('/nearby');
 
+  // Allowed characters for deviceId (UUID-like: hex digits and hyphens)
+  const DEVICE_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+  const MAX_DEVICE_ID_LEN = 64;
+  const MAX_PLATFORM_LEN = 20;
+  const MAX_DEVICE_TYPE_LEN = 20;
+
   nearbyNs.on('connection', (socket) => {
     const { deviceId, nickname, platform, deviceType } = socket.handshake.query;
 
@@ -39,10 +45,27 @@ function setupNearbyNamespace(io) {
       return;
     }
 
+    // Validate deviceId format and length to prevent memory abuse and log injection
+    if (
+      typeof deviceId !== 'string' ||
+      deviceId.length > MAX_DEVICE_ID_LEN ||
+      !DEVICE_ID_PATTERN.test(deviceId)
+    ) {
+      logger.warn('[Nearby] Connection rejected: invalid deviceId format');
+      socket.disconnect(true);
+      return;
+    }
+
     logger.info(`[Nearby] Peer connected: ${nickname} (${deviceId}) [${platform}/${deviceType}]`);
 
-    // Extract /24 subnet from peer IP for proximity filtering
-    const rawIp = socket.handshake.headers['x-forwarded-for']?.split(',')[0]?.trim()
+    // Extract /24 subnet from peer IP for proximity filtering.
+    // Only trust X-Forwarded-For when the server is configured behind a known reverse proxy
+    // (TRUST_PROXY=true or RENDER env var). Otherwise, use the socket's direct address to
+    // prevent clients from spoofing a private-subnet IP via a crafted XFF header.
+    const trustProxy = process.env.TRUST_PROXY === 'true' || !!process.env.RENDER;
+    const rawIp = (trustProxy
+      ? socket.handshake.headers['x-forwarded-for']?.split(',')[0]?.trim()
+      : null)
       || socket.handshake.address?.replace('::ffff:', '') || '';
     const subnet = getSubnet24(rawIp);
 
@@ -126,8 +149,30 @@ function setupNearbyNamespace(io) {
 
     // ─── WebRTC Signaling ───────────────────────────────────
 
-    socket.on('rtc-offer', ({ to, offer }) => {
+    /**
+     * Resolve a target deviceId to a socket only if:
+     *   1. The target device is registered and has an active socket.
+     *   2. Both sender and target share the same /24 subnet (proximity guard).
+     * Returns the target socketId or null.
+     */
+    function resolveTarget(to) {
+      const senderPeer = nearbyPeers.get(socket.id);
+      if (!senderPeer) return null;
+
       const targetSocketId = deviceToSocket.get(to);
+      if (!targetSocketId) return null;
+
+      const targetPeer = nearbyPeers.get(targetSocketId);
+      if (!targetPeer) return null;
+
+      // Enforce subnet isolation — prevents cross-subnet targeting
+      if (!isSameSubnet(senderPeer.subnet, targetPeer.subnet)) return null;
+
+      return targetSocketId;
+    }
+
+    socket.on('rtc-offer', ({ to, offer }) => {
+      const targetSocketId = resolveTarget(to);
       if (targetSocketId) {
         nearbyNs.to(targetSocketId).emit('rtc-offer', {
           from: deviceId,
@@ -137,7 +182,7 @@ function setupNearbyNamespace(io) {
     });
 
     socket.on('rtc-answer', ({ to, answer }) => {
-      const targetSocketId = deviceToSocket.get(to);
+      const targetSocketId = resolveTarget(to);
       if (targetSocketId) {
         nearbyNs.to(targetSocketId).emit('rtc-answer', {
           from: deviceId,
@@ -147,7 +192,7 @@ function setupNearbyNamespace(io) {
     });
 
     socket.on('rtc-ice-candidate', ({ to, candidate }) => {
-      const targetSocketId = deviceToSocket.get(to);
+      const targetSocketId = resolveTarget(to);
       if (targetSocketId) {
         nearbyNs.to(targetSocketId).emit('rtc-ice-candidate', {
           from: deviceId,
@@ -159,7 +204,7 @@ function setupNearbyNamespace(io) {
     // ─── Transfer Signaling (before data channel) ───────────
 
     socket.on('transfer-request', ({ to, metadata }) => {
-      const targetSocketId = deviceToSocket.get(to);
+      const targetSocketId = resolveTarget(to);
       if (targetSocketId) {
         nearbyNs.to(targetSocketId).emit('transfer-request', {
           from: deviceId,
@@ -169,7 +214,7 @@ function setupNearbyNamespace(io) {
     });
 
     socket.on('transfer-accepted', ({ to, transferId }) => {
-      const targetSocketId = deviceToSocket.get(to);
+      const targetSocketId = resolveTarget(to);
       if (targetSocketId) {
         nearbyNs.to(targetSocketId).emit('transfer-accepted', {
           from: deviceId,
@@ -179,7 +224,7 @@ function setupNearbyNamespace(io) {
     });
 
     socket.on('transfer-rejected', ({ to, transferId, reason }) => {
-      const targetSocketId = deviceToSocket.get(to);
+      const targetSocketId = resolveTarget(to);
       if (targetSocketId) {
         nearbyNs.to(targetSocketId).emit('transfer-rejected', {
           from: deviceId,
@@ -217,7 +262,12 @@ function setupNearbyNamespace(io) {
           logger.info(`[Nearby] Removing stale peer: ${peer.nickname} (${peer.deviceId})`);
           nearbyPeers.delete(socketId);
           deviceToSocket.delete(peer.deviceId);
-          nearbyNs.emit('peer-left', { deviceId: peer.deviceId });
+          // Only notify peers on the same subnet — prevents deviceId leaking cross-subnet
+          for (const [sid, otherPeer] of nearbyPeers) {
+            if (isSameSubnet(peer.subnet, otherPeer.subnet)) {
+              nearbyNs.to(sid).emit('peer-left', { deviceId: peer.deviceId });
+            }
+          }
         }
       }
     }, STALE_PEER_TIMEOUT / 2);
@@ -264,7 +314,11 @@ function getSubnet24(ip) {
  * @returns {boolean}
  */
 function isSameSubnet(a, b) {
-  if (!a || !b) return true; // Can't determine → allow
+  // If either subnet is empty (IPv6 or loopback), deny — don't let undetermined subnets
+  // match everyone. In dev/local environments where both peers have no IPv4 subnet,
+  // both will be '' and this still returns true via the equality check below.
+  if (!a && !b) return true; // both are loopback/IPv6 in dev — allow
+  if (!a || !b) return false; // one side is IPv4, other is not — deny cross-type
   return a === b;
 }
 
