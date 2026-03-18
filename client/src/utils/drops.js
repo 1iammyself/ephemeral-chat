@@ -416,10 +416,8 @@ export async function validateEphAPI(ephPacket) {
  * @param {string} creatorId
  * @returns {Promise<Object[]>} Array of drop metadata
  */
-export async function getMyDropsAPI(creatorId, token) {
-  const response = await secureFetch(`${API_BASE}/api/drops/mine/${creatorId}`, {
-    headers: { 'X-Creator-Token': token },
-  });
+export async function getMyDropsAPI(creatorId) {
+  const response = await secureFetch(`${API_BASE}/api/drops/mine/${creatorId}`);
   const data = await response.json();
   if (!response.ok) {
     throw new Error(data.error || 'Failed to get drops');

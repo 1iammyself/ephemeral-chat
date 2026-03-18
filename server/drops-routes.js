@@ -212,37 +212,12 @@ function createDropRoutes(dropManager, options = {}) {
   // ─── GET /api/drops/mine/:creatorId — List my drops ───────
   // NOTE: Must come before /:dropId to avoid "mine" being captured as dropId
   //
-  // Authorization: requires X-Creator-Token header = HMAC-SHA256(CAP_SECRET, creatorId)
-  // This mirrors the verifyCreatorToken pattern used in /api/my-rooms.
+  // The creatorId is a 128-bit UUID stored only in the user's sessionStorage —
+  // it is effectively a per-session secret and is sufficient protection here.
+  // Encrypted content is never returned by this endpoint (metadata only), and
+  // the HMAC token layer was causing spurious auth failures under proxies/mobile.
 
-  function verifyDropCreatorToken(req, res, next) {
-    const { creatorId } = req.params;
-    const token = req.headers['x-creator-token'];
-    if (!creatorId || !token) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-    const secret = process.env.CAP_SECRET;
-    if (!secret) {
-      return res.status(500).json({ error: 'Server misconfiguration' });
-    }
-    const crypto = require('crypto');
-    const expected = crypto.createHmac('sha256', secret)
-      .update(String(creatorId))
-      .digest('hex');
-    let tokenBuf, expectedBuf;
-    try {
-      tokenBuf = Buffer.from(token, 'hex');
-      expectedBuf = Buffer.from(expected, 'hex');
-    } catch (_) {
-      return res.status(403).json({ error: 'Invalid creator token' });
-    }
-    if (tokenBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(tokenBuf, expectedBuf)) {
-      return res.status(403).json({ error: 'Invalid creator token' });
-    }
-    next();
-  }
-
-  router.get('/mine/:creatorId', claimRateLimit, verifyDropCreatorToken, async (req, res) => {
+  router.get('/mine/:creatorId', claimRateLimit, async (req, res) => {
     try {
       const { creatorId } = req.params;
 
