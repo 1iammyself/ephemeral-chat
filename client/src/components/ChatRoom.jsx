@@ -2035,7 +2035,18 @@ const ChatRoom = () => {
 
       const replyData = replyingTo ? {
         id: replyingTo.id,
-        content: replyingTo.messageType === 'image' ? 'Image' : replyingTo.messageType === 'audio' ? 'Voice Note' : replyingTo.content,
+        content: (() => {
+          switch (replyingTo.messageType) {
+            case 'image': return 'Image';
+            case 'audio': return 'Voice Note';
+            case 'file': return replyingTo.fileName || 'File';
+            case 'game': return replyingTo.gameData?.gameType
+              ? `Game: ${replyingTo.gameData.gameType.replace(/-/g, ' ')}`
+              : 'Game';
+            case 'poll': return replyingTo.pollData?.question || 'Poll';
+            default: return replyingTo.content;
+          }
+        })(),
         sender: replyingTo.sender.nickname
       } : null;
 
