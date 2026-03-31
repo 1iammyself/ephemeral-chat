@@ -702,6 +702,37 @@ class RoomManager {
       };
     }
 
+    // Anagram masking: hide word + opponent answers until revealed
+    if (gameType === 'anagram') {
+      const gd = message.gameData;
+      if (gd.revealed || gd.gameOver) return message;
+      // Custom word setter (host) can see their own word but not others' answers
+      const isHost = gd.isCustomWord && (
+        socketId === message.sender?.socketId || userId === message.sender?.id ||
+        (persistentId && persistentId === message.sender?.id)
+      );
+      const maskedAnswers = {};
+      if (gd.answers) {
+        if (gd.answers[userId] !== undefined) maskedAnswers[userId] = gd.answers[userId];
+        if (persistentId && gd.answers[persistentId] !== undefined) maskedAnswers[persistentId] = gd.answers[persistentId];
+      }
+      if (isHost) return { ...message, gameData: { ...gd, answers: maskedAnswers } };
+      return { ...message, gameData: { ...gd, word: null, answers: maskedAnswers, isMasked: true } };
+    }
+
+    // Hangman masking: hide word until game over
+    if (gameType === 'hangman') {
+      const gd = message.gameData;
+      if (gd.gameOver) return message;
+      // Custom word setter (host) can always see their own word
+      const isHost = gd.isCustomWord && (
+        socketId === message.sender?.socketId || userId === message.sender?.id ||
+        (persistentId && persistentId === message.sender?.id)
+      );
+      if (isHost) return message;
+      return { ...message, gameData: { ...gd, word: null } };
+    }
+
     // WYR / Trivia answer masking
     if (!message.gameData.answers) {
       return message;

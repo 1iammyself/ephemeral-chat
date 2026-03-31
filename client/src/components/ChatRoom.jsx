@@ -2160,6 +2160,86 @@ const ChatRoom = () => {
     socketManager.emit('rps-action', { messageId, action, move });
   };
 
+  // ── Hangman handlers ──────────────────────────────────────────────
+  const handleHangmanJoin = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('hangman-join', { messageId });
+  };
+  const handleHangmanGuess = (messageId, letter) => {
+    if (!isConnected) return;
+    socketManager.emit('hangman-guess', { messageId, letter });
+  };
+
+  // ── Anagram handlers ──────────────────────────────────────────────
+  const handleAnagramJoin = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('anagram-join', { messageId });
+  };
+  const handleAnagramSubmit = (messageId, word) => {
+    if (!isConnected) return;
+    socketManager.emit('anagram-submit', { messageId, word });
+  };
+  const handleAnagramNextRound = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('anagram-next-round', { messageId });
+  };
+  const handleAnagramReveal = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('anagram-reveal', { messageId });
+  };
+  const handleAnagramHint = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('anagram-hint', { messageId });
+  };
+
+  // ── Share result handler ──────────────────────────────────────────
+  const handleShareResult = (text) => {
+    if (!isConnected || !text) return;
+    socketManager.emit('send-message', { content: text });
+  };
+
+  // ── Typing race handlers ──────────────────────────────────────────
+  const handleTypingRaceJoin = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('typing-race-join', { messageId });
+  };
+  const handleTypingRaceStart = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('typing-race-start', { messageId });
+  };
+  const handleTypingRaceProgress = (messageId, progress, wpm, accuracy, errors) => {
+    if (!isConnected) return;
+    socketManager.emit('typing-race-progress', { messageId, progress, wpm, accuracy, errors });
+  };
+  const handleTypingRaceFinish = (messageId, wpm, accuracy, errors, time) => {
+    if (!isConnected) return;
+    socketManager.emit('typing-race-finish', { messageId, wpm, accuracy, errors, time });
+  };
+
+  // ── Rematch handler ───────────────────────────────────────────────
+  const handleRematch = (messageId) => {
+    if (!isConnected) return;
+    const origMsg = messages.find(m => m.id === messageId);
+    if (!origMsg?.gameData) return;
+    const gd = origMsg.gameData;
+    const userId = currentUser?.id || currentUser?.socketId;
+    const allPlayers = gd.gameType === 'typing-race'
+      ? Object.values(gd.players || {})
+      : (gd.players || []);
+    const recipients = gd.isTargeted
+      ? allPlayers.filter(p => p.id !== userId).map(p => p.id).filter(Boolean)
+      : [];
+    socketManager.emit('send-message', {
+      messageType: 'game',
+      gameData: {
+        gameType: gd.gameType,
+        difficulty: gd.difficulty,
+        ...(gd.totalRounds ? { rounds: gd.totalRounds } : {}),
+      },
+      recipients,
+    });
+  };
+
   const handleVote = (messageId, optionId) => {
     if (!isConnected) return;
     socketManager.emit('vote-poll', { messageId, optionId });
@@ -2843,6 +2923,19 @@ const ChatRoom = () => {
               onLaunchChess={handleLaunchChess}
               onDelete={handleDeleteMessage}
               roomVibe={roomVibe}
+              onHangmanJoin={handleHangmanJoin}
+              onHangmanGuess={handleHangmanGuess}
+              onAnagramJoin={handleAnagramJoin}
+              onAnagramSubmit={handleAnagramSubmit}
+              onAnagramNextRound={handleAnagramNextRound}
+              onAnagramReveal={handleAnagramReveal}
+              onAnagramHint={handleAnagramHint}
+              onShareResult={handleShareResult}
+              onTypingRaceJoin={handleTypingRaceJoin}
+              onTypingRaceStart={handleTypingRaceStart}
+              onTypingRaceProgress={handleTypingRaceProgress}
+              onTypingRaceFinish={handleTypingRaceFinish}
+              onRematch={handleRematch}
               linkPreviews={linkPreviews}
               onOpenEmojiPicker={(messageId) => {
                 setReactionTargetId(messageId);

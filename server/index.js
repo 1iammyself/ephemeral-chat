@@ -261,6 +261,28 @@ const io = socketIo(server, {
 // Initialize the Nearby Transfer signaling namespace
 setupNearbyNamespace(io);
 
+// Server-side timeouts for timed games (anagram)
+const gameTimeouts = new Map();
+
+// Shared scoring helper for anagram rounds (used in all reveal paths)
+function applyAnagramRoundScores(gd) {
+  const basePoints = { novice: 10, adept: 15, expert: 20, master: 30 }[gd.difficulty] || 10;
+  if (!gd.streaks) gd.streaks = {};
+  gd.players.forEach(p => {
+    const ans = gd.answers?.[p.id];
+    if (ans && ans.word === gd.word) {
+      const timeSecs = ans.submittedAt && gd.startedAt ? (ans.submittedAt - gd.startedAt) / 1000 : gd.timeLimit;
+      const speedBonus = Math.max(0, Math.floor((gd.timeLimit - timeSecs) / 5));
+      gd.streaks[p.id] = (gd.streaks[p.id] || 0) + 1;
+      const streakBonus = gd.streaks[p.id] >= 5 ? 10 : gd.streaks[p.id] >= 3 ? 5 : 0;
+      if (!gd.scores[p.id]) gd.scores[p.id] = 0;
+      gd.scores[p.id] += basePoints + speedBonus + streakBonus;
+    } else {
+      gd.streaks[p.id] = 0;
+    }
+  });
+}
+
 const PORT = process.env.PORT || 3001
 
 // Elevated limit for encrypted file drop endpoints FIRST (base64-encoded payloads can be large)
@@ -2504,6 +2526,131 @@ io.on('connection', (socket) => {
             winner: null,
             lastActivity: Date.now()
           };
+        } else if (gameData.gameType === 'hangman') {
+          const { getHangmanWord } = require('./utils/gameWords');
+          const hDiff = ['easy', 'medium', 'hard'].includes(gameData.difficulty) ? gameData.difficulty : 'medium';
+          const rawHCustom = (gameData.customWord || '').toUpperCase().replace(/[^A-Z\s]/g, '').trim();
+          const hIsCustom = rawHCustom.length >= 2;
+          const hEntry = hIsCustom
+            ? { word: rawHCustom.replace(/\s+/g, ' '), category: 'Custom', hint: null }
+            : getHangmanWord(hDiff);
+          const hSenderId = socket.persistentUserId || data.userId || socket.id;
+          const hIsTargeted = !!(recipients && recipients.length === 1);
+          let hInvitedNickname = null, hInvitedUserId = null;
+          if (hIsTargeted) {
+            const hRoom = await roomManager.getRoom(socket.roomCode);
+            if (hRoom?.users) {
+              const hTarget = hRoom.users.find(u => u.socketId === recipients[0] || u.id === recipients[0]);
+              hInvitedNickname = hTarget?.nickname || null;
+              hInvitedUserId = hTarget?.id || recipients[0];
+            }
+          }
+          data.gameData = {
+            gameType: 'hangman',
+            word: hEntry.word,
+            category: hEntry.category,
+            hint: hEntry.hint,
+            display: hEntry.word.split('').map(() => '_'),
+            guessed: {},
+            wrongLetters: [],
+            mistakes: 0,
+            maxMistakes: hDiff === 'easy' ? 8 : hDiff === 'medium' ? 6 : 4,
+            hintUsed: false,
+            difficulty: hDiff,
+            currentTurn: 0,
+            isCustomWord: hIsCustom,
+            // Custom word setter is the host — not a guesser
+            players: hIsCustom ? [] : [{ id: hSenderId, socketId: socket.id, name: socket.nickname }],
+            winner: null,
+            gameOver: false,
+            isTargeted: hIsTargeted,
+            invitedNickname: hInvitedNickname,
+            invitedUserId: hInvitedUserId,
+            lastActivity: Date.now()
+          };
+        } else if (gameData.gameType === 'anagram') {
+          const { getAnagramWord } = require('./utils/gameWords');
+          const aDiff = ['novice', 'adept', 'expert', 'master'].includes(gameData.difficulty) ? gameData.difficulty : 'novice';
+          const aRounds = [3, 5, 7].includes(parseInt(gameData.rounds)) ? parseInt(gameData.rounds) : 5;
+          const aTimeLimits = { novice: 60, adept: 55, expert: 50, master: 45 };
+          const rawACustom = (gameData.customWord || '').toUpperCase().replace(/[^A-Z]/g, '');
+          const aIsCustom = rawACustom.length >= 3;
+          const aEntry = aIsCustom
+            ? { word: rawACustom, letters: rawACustom.split('').sort(() => Math.random() - 0.5) }
+            : getAnagramWord(aDiff);
+          const aSenderId = socket.persistentUserId || data.userId || socket.id;
+          const aIsTargeted = !!(recipients && recipients.length === 1);
+          let aInvitedNickname = null, aInvitedUserId = null;
+          if (aIsTargeted) {
+            const aRoom = await roomManager.getRoom(socket.roomCode);
+            if (aRoom?.users) {
+              const aTarget = aRoom.users.find(u => u.socketId === recipients[0] || u.id === recipients[0]);
+              aInvitedNickname = aTarget?.nickname || null;
+              aInvitedUserId = aTarget?.id || recipients[0];
+            }
+          }
+          // Targeted 1v1: wait for opponent before starting timer
+          const aStartedAt = aIsTargeted ? null : Date.now();
+          data.gameData = {
+            gameType: 'anagram',
+            difficulty: aDiff,
+            totalRounds: aRounds,
+            currentRound: 1,
+            word: aEntry.word,
+            letters: aEntry.letters,
+            startedAt: aStartedAt,
+            timeLimit: aTimeLimits[aDiff] || 60,
+            answers: {},
+            revealed: false,
+            roundHistory: [],
+            streaks: {},
+            hintUsed: false,
+            hintLetter: null,
+            isCustomWord: aIsCustom,
+            // Custom word setter is the host — watches others scramble, doesn't compete
+            scores: aIsCustom ? {} : { [aSenderId]: 0 },
+            players: aIsCustom ? [] : [{ id: aSenderId, socketId: socket.id, name: socket.nickname }],
+            gameOver: false,
+            isTargeted: aIsTargeted,
+            invitedNickname: aInvitedNickname,
+            invitedUserId: aInvitedUserId,
+            lastActivity: Date.now()
+          };
+        } else if (gameData.gameType === 'typing-race') {
+          const { getTypingText } = require('./utils/gameWords');
+          const tDiff = ['easy', 'medium', 'hard'].includes(gameData.difficulty) ? gameData.difficulty : 'easy';
+          const rawTCustom = (gameData.customText || '').trim();
+          const tIsCustom = rawTCustom.length >= 20;
+          const tText = tIsCustom ? rawTCustom.slice(0, 500) : getTypingText(tDiff);
+          const tSenderId = socket.persistentUserId || data.userId || socket.id;
+          const tIsTargeted = !!(recipients && recipients.length === 1);
+          let tInvitedNickname = null, tInvitedUserId = null;
+          if (tIsTargeted) {
+            const tRoom = await roomManager.getRoom(socket.roomCode);
+            if (tRoom?.users) {
+              const tTarget = tRoom.users.find(u => u.socketId === recipients[0] || u.id === recipients[0]);
+              tInvitedNickname = tTarget?.nickname || null;
+              tInvitedUserId = tTarget?.id || recipients[0];
+            }
+          }
+          data.gameData = {
+            gameType: 'typing-race',
+            difficulty: tDiff,
+            text: tText,
+            status: 'waiting',
+            startedAt: null,
+            isCustomText: tIsCustom,
+            players: tIsCustom ? {} : {
+              [tSenderId]: { id: tSenderId, socketId: socket.id, name: socket.nickname, progress: 0, wpm: 0, accuracy: 100, errors: 0, finishedAt: null, rank: null }
+            },
+            nextRank: 1,
+            winner: null,
+            gameOver: false,
+            isTargeted: tIsTargeted,
+            invitedNickname: tInvitedNickname,
+            invitedUserId: tInvitedUserId,
+            lastActivity: Date.now()
+          };
         } else {
           socket.emit('error', { message: 'Unknown game type' });
           return;
@@ -2511,7 +2658,10 @@ io.on('connection', (socket) => {
         messageContent = gameData.gameType === 'would-you-rather' ? 'Would You Rather' :
           gameData.gameType === 'trivia' ? 'Trivia' :
             gameData.gameType === 'rock-paper-scissors' ? 'Rock Paper Scissors' :
-              gameData.gameType === 'chess' ? 'Chess' : 'Tic-Tac-Toe';
+              gameData.gameType === 'chess' ? 'Chess' :
+                gameData.gameType === 'anagram' ? 'Anagram Challenge' :
+                  gameData.gameType === 'hangman' ? 'Hangman Together' :
+                    gameData.gameType === 'typing-race' ? 'Type Race' : 'Tic-Tac-Toe';
       } else {
         messageContent = isEncrypted ? content : sanitizeInput(content.trim());
       }
@@ -3836,6 +3986,448 @@ io.on('connection', (socket) => {
     } catch (err) { logger.error('chess-replace-response err:', err); }
   });
 
+
+  // ─────────────────────────────────────────────────────────
+  // HANGMAN HANDLERS
+  // ─────────────────────────────────────────────────────────
+
+  socket.on('hangman-join', async ({ messageId }) => {
+    try {
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = room.messages.find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'hangman') return;
+      const gd = message.gameData;
+      if (gd.gameOver) return;
+      const userId = socket.persistentUserId || socket.id;
+
+      // REJOIN: player already in game — update their socketId for reconnect
+      const existingIdx = gd.players.findIndex(p => p.id === userId);
+      if (existingIdx !== -1) {
+        gd.players[existingIdx].socketId = socket.id;
+        gd.lastActivity = Date.now();
+        await roomManager.saveRoom(socket.roomCode, room);
+        const roomUsers = room.users || [];
+        for (const u of roomUsers) {
+          const masked = roomManager.maskMessageForUser(message, u.socketId, u.id || u.userId);
+          io.to(u.socketId).emit('message-updated', masked);
+        }
+        return;
+      }
+
+      // TARGETED: only the invited player may join; cap at 2 players
+      if (gd.isTargeted) {
+        if (gd.players.length >= 2) return;
+        if (gd.invitedUserId && userId !== gd.invitedUserId && socket.id !== gd.invitedUserId) return;
+      }
+
+      gd.players.push({ id: userId, socketId: socket.id, name: socket.nickname });
+      gd.lastActivity = Date.now();
+      await roomManager.saveRoom(socket.roomCode, room);
+      const roomUsers = room.users || [];
+      for (const u of roomUsers) {
+        const masked = roomManager.maskMessageForUser(message, u.socketId, u.id || u.userId);
+        io.to(u.socketId).emit('message-updated', masked);
+      }
+    } catch (err) { logger.error('hangman-join error:', err); }
+  });
+
+  socket.on('hangman-guess', async ({ messageId, letter }) => {
+    try {
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = room.messages.find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'hangman') return;
+      const gd = message.gameData;
+      if (gd.gameOver) return;
+      const userId = socket.persistentUserId || socket.id;
+      if (!gd.players.some(p => p.id === userId || p.socketId === socket.id)) return;
+      // Custom word setter cannot guess (they chose the word — they're the host)
+      if (gd.isCustomWord && (message.sender.id === userId || message.sender.socketId === socket.id)) return;
+      // Enforce turn order in targeted 1v1
+      if (gd.isTargeted && gd.players.length >= 2) {
+        const turnPlayer = gd.players[gd.currentTurn ?? 0];
+        if (turnPlayer.id !== userId && turnPlayer.socketId !== socket.id) return;
+      }
+      const L = String(letter).toUpperCase().trim();
+      if (!/^[A-Z]$/.test(L)) return;
+      if (gd.guessed[L] !== undefined || gd.wrongLetters.includes(L)) return;
+
+      if (gd.word.includes(L)) {
+        gd.guessed[L] = userId;
+        gd.display = gd.word.split('').map(c => (gd.guessed[c] !== undefined ? c : '_'));
+        if (!gd.display.includes('_')) { gd.gameOver = true; gd.winner = 'team'; }
+      } else {
+        gd.wrongLetters.push(L);
+        gd.mistakes++;
+        if (gd.mistakes >= gd.maxMistakes) {
+          gd.gameOver = true;
+          gd.winner = 'house';
+          gd.display = gd.word.split(''); // reveal word on loss
+        }
+      }
+      // Flip turn after any guess in targeted 1v1
+      if (gd.isTargeted && gd.players.length >= 2 && !gd.gameOver) {
+        gd.currentTurn = (gd.currentTurn ?? 0) === 0 ? 1 : 0;
+      }
+      gd.lastActivity = Date.now();
+      await roomManager.saveRoom(socket.roomCode, room);
+      const roomUsers = room.users || [];
+      for (const u of roomUsers) {
+        const masked = roomManager.maskMessageForUser(message, u.socketId, u.id || u.userId);
+        io.to(u.socketId).emit('message-updated', masked);
+      }
+    } catch (err) { logger.error('hangman-guess error:', err); }
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // ANAGRAM HANDLERS
+  // ─────────────────────────────────────────────────────────
+
+  socket.on('anagram-join', async ({ messageId }) => {
+    try {
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = room.messages.find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'anagram') return;
+      const gd = message.gameData;
+      if (gd.gameOver) return;
+      const userId = socket.persistentUserId || socket.id;
+
+      // REJOIN: player already in game — update socketId for reconnect
+      const existingIdx = gd.players.findIndex(p => p.id === userId);
+      if (existingIdx !== -1) {
+        gd.players[existingIdx].socketId = socket.id;
+        gd.lastActivity = Date.now();
+        await roomManager.saveRoom(socket.roomCode, room);
+        const roomUsers = room.users || [];
+        for (const u of roomUsers) {
+          const masked = roomManager.maskMessageForUser(message, u.socketId, u.id || u.userId);
+          io.to(u.socketId).emit('message-updated', masked);
+        }
+        return;
+      }
+
+      // TARGETED: only the invited player may join; cap at 2 players
+      if (gd.isTargeted) {
+        if (gd.players.length >= 2) return;
+        if (gd.invitedUserId && userId !== gd.invitedUserId && socket.id !== gd.invitedUserId) return;
+      }
+
+      gd.players.push({ id: userId, socketId: socket.id, name: socket.nickname });
+      if (!gd.scores[userId]) gd.scores[userId] = 0;
+      // Targeted: start timer when both players are in; broadcast: timer already running
+      if (!gd.startedAt) gd.startedAt = Date.now();
+      gd.lastActivity = Date.now();
+      await roomManager.saveRoom(socket.roomCode, room);
+
+      // Server-side auto-reveal after timeLimit (prevents game hanging if client drops)
+      const timeoutKey = `${socket.roomCode}:${messageId}`;
+      if (!gameTimeouts.has(timeoutKey)) {
+        const tid = setTimeout(async () => {
+          gameTimeouts.delete(timeoutKey);
+          try {
+            const r2 = await roomManager.getRoom(socket.roomCode);
+            if (!r2) return;
+            const m2 = r2.messages.find(m => m.id === messageId);
+            if (!m2 || m2.gameData?.revealed || m2.gameData?.gameOver) return;
+            const g2 = m2.gameData;
+            g2.revealed = true;
+            applyAnagramRoundScores(g2);
+            await roomManager.saveRoom(socket.roomCode, r2);
+            const ru = r2.users || [];
+            for (const u of ru) {
+              const masked = roomManager.maskMessageForUser(m2, u.socketId, u.id || u.userId);
+              io.to(u.socketId).emit('message-updated', masked);
+            }
+          } catch (e) { logger.error('anagram auto-reveal error:', e); }
+        }, (gd.timeLimit + 2) * 1000); // +2s grace period
+        gameTimeouts.set(timeoutKey, tid);
+      }
+
+      const roomUsers = room.users || [];
+      for (const u of roomUsers) {
+        const masked = roomManager.maskMessageForUser(message, u.socketId, u.id || u.userId);
+        io.to(u.socketId).emit('message-updated', masked);
+      }
+    } catch (err) { logger.error('anagram-join error:', err); }
+  });
+
+  socket.on('anagram-submit', async ({ messageId, word }) => {
+    try {
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = room.messages.find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'anagram') return;
+      const gd = message.gameData;
+      if (gd.gameOver || gd.revealed) return;
+      const userId = socket.persistentUserId || socket.id;
+      if (gd.answers[userId] !== undefined) return;
+      // Custom word setter cannot submit (they set the word)
+      if (gd.isCustomWord && (message.sender.id === userId || message.sender.socketId === socket.id)) return;
+      if (!gd.players.some(p => p.id === userId || p.socketId === socket.id)) return;
+
+      const cleanWord = String(word || '').toUpperCase().replace(/[^A-Z]/g, '');
+      if (!cleanWord) return;
+      gd.answers[userId] = { word: cleanWord, submittedAt: Date.now() };
+      gd.lastActivity = Date.now();
+
+      // Auto-reveal when all players have answered
+      const allAnswered = gd.players.every(p => gd.answers[p.id] !== undefined);
+      if (allAnswered) {
+        gd.revealed = true;
+        applyAnagramRoundScores(gd);
+        const timeoutKey = `${socket.roomCode}:${messageId}`;
+        const t = gameTimeouts.get(timeoutKey);
+        if (t) { clearTimeout(t); gameTimeouts.delete(timeoutKey); }
+      }
+
+      await roomManager.saveRoom(socket.roomCode, room);
+      const roomUsers = room.users || [];
+      for (const u of roomUsers) {
+        const masked = roomManager.maskMessageForUser(message, u.socketId, u.id || u.userId);
+        io.to(u.socketId).emit('message-updated', masked);
+      }
+    } catch (err) { logger.error('anagram-submit error:', err); }
+  });
+
+  // Client fires this when the round timer expires client-side
+  socket.on('anagram-reveal', async ({ messageId }) => {
+    try {
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = room.messages.find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'anagram') return;
+      const gd = message.gameData;
+      if (gd.revealed || gd.gameOver) return;
+      // Only reveal if timer has genuinely elapsed
+      const elapsed = (Date.now() - gd.startedAt) / 1000;
+      if (elapsed < gd.timeLimit - 1) return;
+
+      // Cancel server-side auto-reveal timeout since we're revealing manually
+      const timeoutKey = `${socket.roomCode}:${messageId}`;
+      const tid = gameTimeouts.get(timeoutKey);
+      if (tid) { clearTimeout(tid); gameTimeouts.delete(timeoutKey); }
+
+      gd.revealed = true;
+      applyAnagramRoundScores(gd);
+      gd.lastActivity = Date.now();
+      await roomManager.saveRoom(socket.roomCode, room);
+      const roomUsers = room.users || [];
+      for (const u of roomUsers) {
+        const masked = roomManager.maskMessageForUser(message, u.socketId, u.id || u.userId);
+        io.to(u.socketId).emit('message-updated', masked);
+      }
+    } catch (err) { logger.error('anagram-reveal error:', err); }
+  });
+
+  // Hint: reveals first letter of the word publicly, deducts 5 pts from requester
+  socket.on('anagram-hint', async ({ messageId }) => {
+    try {
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = room.messages.find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'anagram') return;
+      const gd = message.gameData;
+      if (gd.revealed || gd.gameOver || gd.hintUsed) return;
+      const userId = socket.persistentUserId || socket.id;
+      if (!gd.players.some(p => p.id === userId || p.socketId === socket.id)) return;
+      gd.hintUsed = true;
+      gd.hintLetter = gd.word[0];
+      // Cost: -5 pts from requester
+      if (!gd.scores[userId]) gd.scores[userId] = 0;
+      gd.scores[userId] = Math.max(0, gd.scores[userId] - 5);
+      gd.lastActivity = Date.now();
+      await roomManager.saveRoom(socket.roomCode, room);
+      const roomUsers = room.users || [];
+      for (const u of roomUsers) {
+        const masked = roomManager.maskMessageForUser(message, u.socketId, u.id || u.userId);
+        io.to(u.socketId).emit('message-updated', masked);
+      }
+    } catch (err) { logger.error('anagram-hint error:', err); }
+  });
+
+  socket.on('anagram-next-round', async ({ messageId }) => {
+    try {
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = room.messages.find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'anagram') return;
+      const gd = message.gameData;
+      // Sender OR any active player may advance rounds (handles sender-offline case)
+      const advancerId = socket.persistentUserId || socket.id;
+      const isSenderAdvancing = message.sender.id === advancerId || message.sender.socketId === socket.id;
+      const isPlayerAdvancing = gd.players.some(p => p.id === advancerId || p.socketId === socket.id);
+      if (!isSenderAdvancing && !isPlayerAdvancing) return;
+      if (!gd.revealed && !gd.gameOver) return;
+      if (gd.gameOver) return;
+
+      const { getAnagramWord } = require('./utils/gameWords');
+      gd.roundHistory.push({ round: gd.currentRound, word: gd.word, letters: gd.letters, answers: { ...gd.answers } });
+      gd.currentRound++;
+
+      // Cancel any pending auto-reveal for the old round
+      const timeoutKey = `${socket.roomCode}:${messageId}`;
+      const oldTid = gameTimeouts.get(timeoutKey);
+      if (oldTid) { clearTimeout(oldTid); gameTimeouts.delete(timeoutKey); }
+
+      if (gd.currentRound > gd.totalRounds) {
+        gd.gameOver = true;
+      } else {
+        // For custom word games, reuse same word each round (that's the point)
+        if (!gd.isCustomWord) {
+          const next = getAnagramWord(gd.difficulty);
+          gd.word = next.word;
+          gd.letters = next.letters;
+        } else {
+          // Re-shuffle the same custom word
+          gd.letters = gd.word.split('').sort(() => Math.random() - 0.5);
+        }
+        gd.answers = {};
+        gd.revealed = false;
+        gd.hintUsed = false;
+        gd.hintLetter = null;
+        gd.startedAt = Date.now();
+
+        // Schedule server-side auto-reveal for the new round
+        const newTid = setTimeout(async () => {
+          gameTimeouts.delete(timeoutKey);
+          try {
+            const r2 = await roomManager.getRoom(socket.roomCode);
+            if (!r2) return;
+            const m2 = r2.messages.find(m => m.id === messageId);
+            if (!m2 || m2.gameData?.revealed || m2.gameData?.gameOver) return;
+            const g2 = m2.gameData;
+            g2.revealed = true;
+            applyAnagramRoundScores(g2);
+            await roomManager.saveRoom(socket.roomCode, r2);
+            const ru = r2.users || [];
+            for (const u of ru) {
+              const masked = roomManager.maskMessageForUser(m2, u.socketId, u.id || u.userId);
+              io.to(u.socketId).emit('message-updated', masked);
+            }
+          } catch (e) { logger.error('anagram auto-reveal (next round) error:', e); }
+        }, (gd.timeLimit + 2) * 1000);
+        gameTimeouts.set(timeoutKey, newTid);
+      }
+      gd.lastActivity = Date.now();
+      await roomManager.saveRoom(socket.roomCode, room);
+      const roomUsers = room.users || [];
+      for (const u of roomUsers) {
+        const masked = roomManager.maskMessageForUser(message, u.socketId, u.id || u.userId);
+        io.to(u.socketId).emit('message-updated', masked);
+      }
+    } catch (err) { logger.error('anagram-next-round error:', err); }
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // TYPING RACE HANDLERS
+  // ─────────────────────────────────────────────────────────
+
+  socket.on('typing-race-join', async ({ messageId }) => {
+    try {
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = room.messages.find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'typing-race') return;
+      const gd = message.gameData;
+      const userId = socket.persistentUserId || socket.id;
+
+      // REJOIN: player already in game — update socketId for reconnect
+      if (gd.players[userId]) {
+        gd.players[userId].socketId = socket.id;
+        gd.lastActivity = Date.now();
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        return;
+      }
+
+      if (gd.status !== 'waiting') return;
+
+      // Custom text host cannot race — they know the text
+      if (gd.isCustomText && (message.sender.id === userId || message.sender.socketId === socket.id)) return;
+
+      // TARGETED: only the invited player may join; cap at 2 players
+      if (gd.isTargeted) {
+        if (Object.keys(gd.players).length >= 2) return;
+        if (gd.invitedUserId && userId !== gd.invitedUserId && socket.id !== gd.invitedUserId) return;
+      }
+
+      gd.players[userId] = { id: userId, socketId: socket.id, name: socket.nickname, progress: 0, wpm: 0, accuracy: 100, errors: 0, finishedAt: null, rank: null };
+      // Auto-start for targeted 1v1 when both players have joined
+      if (gd.isTargeted && Object.keys(gd.players).length >= 2 && gd.status === 'waiting') {
+        gd.status = 'racing';
+        gd.startedAt = Date.now() + 3000;
+      }
+      gd.lastActivity = Date.now();
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('typing-race-join error:', err); }
+  });
+
+  socket.on('typing-race-start', async ({ messageId }) => {
+    try {
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = room.messages.find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'typing-race') return;
+      const gd = message.gameData;
+      if (gd.status !== 'waiting') return;
+      // Only sender can start
+      const senderId = socket.persistentUserId || socket.id;
+      if (message.sender.id !== senderId && message.sender.socketId !== socket.id) return;
+      gd.status = 'racing';
+      gd.startedAt = Date.now() + 3000; // 3s countdown
+      gd.lastActivity = Date.now();
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('typing-race-start error:', err); }
+  });
+
+  socket.on('typing-race-progress', async ({ messageId, progress, wpm, accuracy, errors }) => {
+    try {
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = room.messages.find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'typing-race') return;
+      const gd = message.gameData;
+      if (gd.status !== 'racing') return;
+      const userId = socket.persistentUserId || socket.id;
+      if (!gd.players[userId]) return;
+      gd.players[userId].progress = Math.min(1, Math.max(0, Number(progress) || 0));
+      gd.players[userId].wpm = Number(wpm) || 0;
+      gd.players[userId].accuracy = Number(accuracy) || 100;
+      gd.players[userId].errors = Number(errors) || 0;
+      gd.lastActivity = Date.now();
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('typing-race-progress error:', err); }
+  });
+
+  socket.on('typing-race-finish', async ({ messageId, wpm, accuracy, errors, time }) => {
+    try {
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = room.messages.find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'typing-race') return;
+      const gd = message.gameData;
+      if (gd.status !== 'racing') return;
+      const userId = socket.persistentUserId || socket.id;
+      if (!gd.players[userId] || gd.players[userId].finishedAt) return;
+      gd.players[userId].progress = 1;
+      gd.players[userId].wpm = Number(wpm) || 0;
+      gd.players[userId].accuracy = Number(accuracy) || 100;
+      gd.players[userId].errors = Number(errors) || 0;
+      gd.players[userId].finishedAt = Date.now();
+      gd.players[userId].rank = gd.nextRank++;
+      if (!gd.winner) gd.winner = userId;
+      const allDone = Object.values(gd.players).every(p => p.finishedAt != null);
+      if (allDone) { gd.status = 'finished'; gd.gameOver = true; }
+      gd.lastActivity = Date.now();
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('typing-race-finish error:', err); }
+  });
 
   // Handle ephemeral view token requests
   socket.on('request-view-token', async ({ messageId }, callback) => {

@@ -14,7 +14,10 @@ export const GAME_TYPES = {
     TRIVIA: 'trivia',
     TIC_TAC_TOE: 'tic-tac-toe',
     ROCK_PAPER_SCISSORS: 'rock-paper-scissors',
-    CHESS: 'chess'
+    CHESS: 'chess',
+    HANGMAN: 'hangman',
+    ANAGRAM: 'anagram',
+    TYPING_RACE: 'typing-race',
 };
 
 export const WOULD_YOU_RATHER_TOPICS = _WYR_TOPICS;

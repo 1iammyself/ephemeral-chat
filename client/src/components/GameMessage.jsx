@@ -4,8 +4,17 @@ import confetti from 'canvas-confetti';
 import { GAME_TYPES } from '../utils/games';
 import { getVibeById } from '../utils/vibes';
 import ChessGame from './games/ChessGame';
+import AnagramGame from './games/AnagramGame';
+import HangmanGame from './games/HangmanGame';
+import TypingRaceGame from './games/TypingRaceGame';
 
-const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRPSAction, onLaunchChess, onDelete, roomVibe }) => {
+const GameMessage = ({
+    message, currentUser, onGameAnswer, onTicTacToeMove, onRPSAction, onLaunchChess, onDelete, roomVibe,
+    onAnagramJoin, onAnagramSubmit, onAnagramNextRound, onAnagramReveal, onAnagramHint,
+    onHangmanJoin, onHangmanGuess,
+    onTypingRaceJoin, onTypingRaceStart, onTypingRaceProgress, onTypingRaceFinish,
+    onRematch, onShareResult,
+}) => {
     const { gameData } = message;
     const currentUserId = currentUser?.id || currentUser?.socketId;
     const vibe = getVibeById(roomVibe);
@@ -17,6 +26,9 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
     const isTicTacToe = gameData.gameType === GAME_TYPES.TIC_TAC_TOE;
     const isRPS = gameData.gameType === GAME_TYPES.ROCK_PAPER_SCISSORS;
     const isChess = gameData.gameType === GAME_TYPES.CHESS;
+    const isHangman = gameData.gameType === GAME_TYPES.HANGMAN;
+    const isAnagram = gameData.gameType === GAME_TYPES.ANAGRAM;
+    const isTypingRace = gameData.gameType === GAME_TYPES.TYPING_RACE;
 
     const isTargeted = message.recipients && message.recipients.length > 0;
     const isIntendedRecipient = isTargeted && message.recipients.includes(currentUserId);
@@ -850,6 +862,62 @@ const GameMessage = ({ message, currentUser, onGameAnswer, onTicTacToeMove, onRP
                         </button>
                     )}
                 </div>
+            </div>
+        );
+    }
+
+    // ── Hangman ──────────────────────────────────────────────────────
+    if (isHangman) {
+        return (
+            <div className={`rounded-2xl p-3 w-full max-w-xs sm:max-w-sm ${vibe.messageClass || 'bg-white dark:bg-gray-800'} shadow-sm border border-gray-200/50 dark:border-white/10`}>
+                <HangmanGame
+                    message={message}
+                    currentUser={currentUser}
+                    vibeColor={vibe.colors?.primary}
+                    onHangmanJoin={onHangmanJoin}
+                    onHangmanGuess={onHangmanGuess}
+                    onRematch={onRematch}
+                    onShareResult={onShareResult}
+                />
+            </div>
+        );
+    }
+
+    // ── Anagram ──────────────────────────────────────────────────────
+    if (isAnagram) {
+        return (
+            <div className={`rounded-2xl p-3 w-full max-w-xs sm:max-w-sm ${vibe.messageClass || 'bg-white dark:bg-gray-800'} shadow-sm border border-gray-200/50 dark:border-white/10`}>
+                <AnagramGame
+                    message={message}
+                    currentUser={currentUser}
+                    vibeColor={vibe.colors?.primary}
+                    onAnagramJoin={onAnagramJoin}
+                    onAnagramSubmit={onAnagramSubmit}
+                    onAnagramNextRound={onAnagramNextRound}
+                    onAnagramReveal={onAnagramReveal}
+                    onAnagramHint={onAnagramHint}
+                    onRematch={onRematch}
+                    onShareResult={onShareResult}
+                />
+            </div>
+        );
+    }
+
+    // ── Typing Race ───────────────────────────────────────────────────
+    if (isTypingRace) {
+        return (
+            <div className={`rounded-2xl p-3 w-full max-w-xs sm:max-w-sm ${vibe.messageClass || 'bg-white dark:bg-gray-800'} shadow-sm border border-gray-200/50 dark:border-white/10`}>
+                <TypingRaceGame
+                    message={message}
+                    currentUser={currentUser}
+                    vibeColor={vibe.colors?.primary}
+                    onTypingRaceJoin={onTypingRaceJoin}
+                    onTypingRaceStart={onTypingRaceStart}
+                    onTypingRaceProgress={onTypingRaceProgress}
+                    onTypingRaceFinish={onTypingRaceFinish}
+                    onRematch={onRematch}
+                    onShareResult={onShareResult}
+                />
             </div>
         );
     }

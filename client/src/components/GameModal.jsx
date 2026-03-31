@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { X, Send, Dices, Sparkles, HelpCircle, ChevronLeft, Hash, Trophy } from 'lucide-react';
+import { X, Send, Dices, Sparkles, HelpCircle, ChevronLeft, Hash, Trophy, Puzzle, Skull, Zap } from 'lucide-react';
 import { GAME_TYPES, getRandomWYR, getRandomTrivia, WYR_TOPIC_LIST, TRIVIA_TOPIC_LIST } from '../utils/games';
 import { getVibeById } from '../utils/vibes';
 
 const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL }) => {
-    const [gameType, setGameType] = useState(null); // null = select game, then select topic
+    const [gameType, setGameType] = useState(null);
     const [selectedTopic, setSelectedTopic] = useState(null);
     const [wyrData, setWyrData] = useState(null);
     const [triviaData, setTriviaData] = useState(null);
     const [customTimer, setCustomTimer] = useState(15);
+    // New game config state
+    const [hangmanDiff, setHangmanDiff] = useState('medium');
+    const [hangmanCustomWord, setHangmanCustomWord] = useState('');
+    const [anagramDiff, setAnagramDiff] = useState('novice');
+    const [anagramRounds, setAnagramRounds] = useState(5);
+    const [anagramCustomWord, setAnagramCustomWord] = useState('');
+    const [typingDiff, setTypingDiff] = useState('easy');
+    const [typingCustomText, setTypingCustomText] = useState('');
 
     // Calculate dynamic timer bounds based on room TTL
     const dynamicRoomTtl = roomTTL && roomTTL < 300 ? roomTTL * 2 : (roomTTL || 300);
@@ -57,6 +65,19 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
         }
     };
 
+    const handleSendHangman = () => {
+        onSend({ gameType: GAME_TYPES.HANGMAN, difficulty: hangmanDiff, customWord: hangmanCustomWord.trim() });
+        handleClose();
+    };
+    const handleSendAnagram = () => {
+        onSend({ gameType: GAME_TYPES.ANAGRAM, difficulty: anagramDiff, rounds: anagramRounds, customWord: anagramCustomWord.trim() });
+        handleClose();
+    };
+    const handleSendTypingRace = () => {
+        onSend({ gameType: GAME_TYPES.TYPING_RACE, difficulty: typingDiff, customText: typingCustomText.trim() });
+        handleClose();
+    };
+
     const handlePickTopic = (topic) => {
         const topicVal = topic === 'Any' ? null : topic;
         setSelectedTopic(topicVal);
@@ -101,6 +122,9 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
         setSelectedTopic(null);
         setWyrData(null);
         setTriviaData(null);
+        setHangmanCustomWord('');
+        setAnagramCustomWord('');
+        setTypingCustomText('');
         onClose();
     };
 
@@ -133,7 +157,12 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                         )}
                         <h2 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white flex items-center">
                             <Dices className={`w-4 h-4 sm:w-6 sm:h-6 mr-1 sm:mr-2 text-${vibeAccent}-500`} />
-                            {!gameType ? 'Pick a Game' : !selectedTopic && !(wyrData || triviaData) ? 'Pick a Topic' : gameType === GAME_TYPES.WYR ? 'Would You Rather' : 'Trivia'}
+                            {!gameType ? 'Pick a Game'
+                                : gameType === GAME_TYPES.HANGMAN ? 'Hangman Together'
+                                : gameType === GAME_TYPES.ANAGRAM ? 'Anagram Challenge'
+                                : gameType === GAME_TYPES.TYPING_RACE ? 'Type Race'
+                                : !selectedTopic && !(wyrData || triviaData) ? 'Pick a Topic'
+                                : gameType === GAME_TYPES.WYR ? 'Would You Rather' : 'Trivia'}
                         </h2>
                     </div>
                     <button onClick={handleClose} className="p-1 sm:p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400 transition-colors">
@@ -176,6 +205,30 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                                 <Dices className={`w-4 h-4 sm:w-6 sm:h-6 text-${vibeAccent}-500 mb-1 sm:mb-2 group-hover:scale-110 transition-transform`} />
                                 <span className="font-bold text-gray-900 dark:text-white text-[10px] sm:text-xs text-center leading-tight">RPS</span>
                                 <span className="hidden sm:block text-[9px] text-gray-600 dark:text-gray-400 mt-0.5 text-center">Classic Showdown</span>
+                            </button>
+                            <button
+                                onClick={() => handlePickGame(GAME_TYPES.HANGMAN)}
+                                className={`flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl border-2 border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:bg-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group active:scale-95`}
+                            >
+                                <Skull className={`w-4 h-4 sm:w-6 sm:h-6 text-${vibeAccent}-500 mb-1 sm:mb-2 group-hover:scale-110 transition-transform`} />
+                                <span className="font-bold text-gray-900 dark:text-white text-[10px] sm:text-xs text-center leading-tight">Hangman</span>
+                                <span className="hidden sm:block text-[9px] text-gray-600 dark:text-gray-400 mt-0.5 text-center">Guess together</span>
+                            </button>
+                            <button
+                                onClick={() => handlePickGame(GAME_TYPES.ANAGRAM)}
+                                className={`flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl border-2 border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:bg-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group active:scale-95`}
+                            >
+                                <Puzzle className={`w-4 h-4 sm:w-6 sm:h-6 text-${vibeAccent}-500 mb-1 sm:mb-2 group-hover:scale-110 transition-transform`} />
+                                <span className="font-bold text-gray-900 dark:text-white text-[10px] sm:text-xs text-center leading-tight">Anagram</span>
+                                <span className="hidden sm:block text-[9px] text-gray-600 dark:text-gray-400 mt-0.5 text-center">Unscramble race</span>
+                            </button>
+                            <button
+                                onClick={() => handlePickGame(GAME_TYPES.TYPING_RACE)}
+                                className={`flex flex-col items-center justify-center p-2 sm:p-4 rounded-xl border-2 border-${vibeAccent}-300 dark:border-${vibeAccent}-700 hover:bg-${vibeAccent}-50 dark:hover:bg-${vibeAccent}-900/20 transition-all group active:scale-95`}
+                            >
+                                <Zap className={`w-4 h-4 sm:w-6 sm:h-6 text-${vibeAccent}-500 mb-1 sm:mb-2 group-hover:scale-110 transition-transform`} />
+                                <span className="font-bold text-gray-900 dark:text-white text-[10px] sm:text-xs text-center leading-tight">Type Race</span>
+                                <span className="hidden sm:block text-[9px] text-gray-600 dark:text-gray-400 mt-0.5 text-center">Speed typing duel</span>
                             </button>
                             <button
                                 onClick={() => handlePickGame(GAME_TYPES.CHESS)}
@@ -293,6 +346,103 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                                     <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Send
                                 </button>
                             </div>
+                        </div>
+                    ) : gameType === GAME_TYPES.HANGMAN ? (
+                        <div className="space-y-3">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">Everyone collaborates to guess the hidden word. In 1v1, players take turns guessing!</p>
+                            <div className="space-y-1.5">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Difficulty</p>
+                                {[['easy', '8 lives — short words'], ['medium', '6 lives — medium words'], ['hard', '4 lives — long words']].map(([d, label]) => (
+                                    <button key={d} onClick={() => setHangmanDiff(d)}
+                                        className={`w-full p-2 rounded-lg border text-xs text-left flex items-center justify-between transition-all ${hangmanDiff === d ? `border-${vibeAccent}-500 bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20 font-bold text-${vibeAccent}-700 dark:text-${vibeAccent}-300` : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400'}`}>
+                                        <span className="capitalize">{d}</span><span className="text-[10px] opacity-70">{label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Custom Word <span className="normal-case font-normal text-gray-400">(optional)</span></p>
+                                <input
+                                    type="text"
+                                    value={hangmanCustomWord}
+                                    onChange={e => setHangmanCustomWord(e.target.value.toUpperCase().replace(/[^A-Z\s]/g, '').slice(0, 30))}
+                                    placeholder="e.g. MOUNTAIN GOAT"
+                                    className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent text-xs font-mono text-gray-800 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-1"
+                                    style={{ '--tw-ring-color': vibeColor }}
+                                />
+                            </div>
+                            <button onClick={handleSendHangman} style={{ backgroundColor: vibeColor }} className="w-full py-2 rounded-xl font-bold text-white text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+                                <Send className="w-3.5 h-3.5" /> Send Hangman{hangmanCustomWord.trim() ? ' · Custom word' : ''}
+                            </button>
+                        </div>
+                    ) : gameType === GAME_TYPES.ANAGRAM ? (
+                        <div className="space-y-3">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">Everyone sees the same scrambled letters. Secretly type the word — fastest correct answer scores the most!</p>
+                            <div className="space-y-1.5">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Difficulty</p>
+                                {[['novice', '4-letter words · 60s'], ['adept', '5-letter words · 55s'], ['expert', '6-letter words · 50s'], ['master', '7-letter words · 45s']].map(([d, label]) => (
+                                    <button key={d} onClick={() => setAnagramDiff(d)}
+                                        className={`w-full p-2 rounded-lg border text-xs text-left flex items-center justify-between transition-all ${anagramDiff === d ? `border-${vibeAccent}-500 bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20 font-bold text-${vibeAccent}-700 dark:text-${vibeAccent}-300` : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400'}`}>
+                                        <span className="capitalize">{d}</span><span className="text-[10px] opacity-70">{label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="space-y-1.5">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Rounds</p>
+                                <div className="flex gap-2">
+                                    {[3, 5, 7].map(r => (
+                                        <button key={r} onClick={() => setAnagramRounds(r)}
+                                            className={`flex-1 py-1.5 rounded-lg border text-xs font-bold transition-all ${anagramRounds === r ? `border-${vibeAccent}-500 bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20 text-${vibeAccent}-700 dark:text-${vibeAccent}-300` : 'border-gray-200 dark:border-gray-700 text-gray-500'}`}>
+                                            {r}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Custom Word <span className="normal-case font-normal text-gray-400">(optional — same word every round)</span></p>
+                                <input
+                                    type="text"
+                                    value={anagramCustomWord}
+                                    onChange={e => setAnagramCustomWord(e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 12))}
+                                    placeholder="e.g. PUZZLE"
+                                    className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent text-xs font-mono text-gray-800 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-1"
+                                    style={{ '--tw-ring-color': vibeColor }}
+                                />
+                            </div>
+                            <button onClick={handleSendAnagram} style={{ backgroundColor: vibeColor }} className="w-full py-2 rounded-xl font-bold text-white text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+                                <Send className="w-3.5 h-3.5" /> Send Anagram · {anagramRounds} rounds{anagramCustomWord.trim() ? ' · Custom' : ''}
+                            </button>
+                        </div>
+                    ) : gameType === GAME_TYPES.TYPING_RACE ? (
+                        <div className="space-y-3">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">Everyone types the same passage as fast as possible. Real-time progress bars — first to finish wins!</p>
+                            <div className="space-y-1.5">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Text Difficulty</p>
+                                {[['easy', 'Short simple sentences'], ['medium', 'Moderate length passages'], ['hard', 'Complex technical text']].map(([d, label]) => (
+                                    <button key={d} onClick={() => setTypingDiff(d)}
+                                        className={`w-full p-2 rounded-lg border text-xs text-left flex items-center justify-between transition-all ${typingDiff === d ? `border-${vibeAccent}-500 bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20 font-bold text-${vibeAccent}-700 dark:text-${vibeAccent}-300` : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400'}`}>
+                                        <span className="capitalize">{d}</span><span className="text-[10px] opacity-70">{label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Custom Text <span className="normal-case font-normal text-gray-400">(optional, 20–500 chars)</span></p>
+                                <textarea
+                                    value={typingCustomText}
+                                    onChange={e => setTypingCustomText(e.target.value.slice(0, 500))}
+                                    placeholder="Paste a quote, song lyric, or anything you want players to type…"
+                                    rows={3}
+                                    className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent text-xs text-gray-800 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-1 resize-none"
+                                    style={{ '--tw-ring-color': vibeColor }}
+                                />
+                                {typingCustomText.length > 0 && (
+                                    <p className={`text-[10px] text-right ${typingCustomText.trim().length < 20 ? 'text-red-400' : 'text-gray-400'}`}>
+                                        {typingCustomText.trim().length < 20 ? `Need ${20 - typingCustomText.trim().length} more chars` : `${typingCustomText.length}/500`}
+                                    </p>
+                                )}
+                            </div>
+                            <button onClick={handleSendTypingRace} disabled={typingCustomText.trim().length > 0 && typingCustomText.trim().length < 20} style={{ backgroundColor: vibeColor }} className="w-full py-2 rounded-xl font-bold text-white text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all disabled:opacity-50">
+                                <Send className="w-3.5 h-3.5" /> Send Race{typingCustomText.trim().length >= 20 ? ' · Custom text' : ''}
+                            </button>
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center p-8 text-gray-400">

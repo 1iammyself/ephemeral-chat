@@ -18,7 +18,7 @@ import { FileOpener } from '@capacitor-community/file-opener';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀', '🍕', '🍔', '🍦', '🍩', '🍺', '🎸', '🎮', '🚀', '🌈', '🍄'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onGameAnswer, onTicTacToeMove, onRPSAction, onLaunchChess, roomVibe, linkPreviews = {}, onOpenEmojiPicker }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onGameAnswer, onTicTacToeMove, onRPSAction, onLaunchChess, roomVibe, linkPreviews = {}, onOpenEmojiPicker, onHangmanJoin, onHangmanGuess, onAnagramJoin, onAnagramSubmit, onAnagramNextRound, onAnagramReveal, onAnagramHint, onTypingRaceJoin, onTypingRaceStart, onTypingRaceProgress, onTypingRaceFinish, onRematch, onShareResult }) => {
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
   const { theme } = useTheme();
@@ -438,6 +438,19 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         onLaunchChess={onLaunchChess}
                         onDelete={onDelete}
                         roomVibe={roomVibe}
+                        onHangmanJoin={onHangmanJoin}
+                        onHangmanGuess={onHangmanGuess}
+                        onAnagramJoin={onAnagramJoin}
+                        onAnagramSubmit={onAnagramSubmit}
+                        onAnagramNextRound={onAnagramNextRound}
+                        onAnagramReveal={onAnagramReveal}
+                        onAnagramHint={onAnagramHint}
+                        onTypingRaceJoin={onTypingRaceJoin}
+                        onTypingRaceStart={onTypingRaceStart}
+                        onTypingRaceProgress={onTypingRaceProgress}
+                        onTypingRaceFinish={onTypingRaceFinish}
+                        onRematch={onRematch}
+                        onShareResult={onShareResult}
                       />
                     ) : message.messageType === 'file' ? (
                       <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 w-full max-w-[260px]">
