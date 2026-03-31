@@ -708,7 +708,7 @@ class RoomManager {
       if (gd.revealed || gd.gameOver) return message;
       // Custom word setter (host) can see their own word but not others' answers
       const isHost = gd.isCustomWord && (
-        userId === message.sender?.socketId || userId === message.sender?.id ||
+        socketId === message.sender?.socketId || userId === message.sender?.id ||
         (persistentId && persistentId === message.sender?.id)
       );
       const maskedAnswers = {};
@@ -726,7 +726,7 @@ class RoomManager {
       if (gd.gameOver) return message;
       // Custom word setter (host) can always see their own word
       const isHost = gd.isCustomWord && (
-        userId === message.sender?.socketId || userId === message.sender?.id ||
+        socketId === message.sender?.socketId || userId === message.sender?.id ||
         (persistentId && persistentId === message.sender?.id)
       );
       if (isHost) return message;
