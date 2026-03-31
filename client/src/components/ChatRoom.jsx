@@ -2437,8 +2437,16 @@ const ChatRoom = () => {
           messageType: 'image',
           isViewOnce: true,
           recipients: selectedRecipients,
-          isAnonymous: isAnonymousMode
+          isAnonymous: isAnonymousMode,
+          replyTo: replyingTo ? {
+            id: replyingTo.id,
+            content: replyingTo.messageType === 'image' ? 'Image'
+              : replyingTo.messageType === 'audio' ? 'Voice Note'
+              : replyingTo.content,
+            sender: replyingTo.sender.nickname
+          } : null
         });
+        setReplyingTo(null);
         setIsUploading(false);
         return;
       }
@@ -2495,10 +2503,18 @@ const ChatRoom = () => {
             mimeType: file.type,
             fileSize: file.size,
             recipients: selectedRecipients,
-            isAnonymous: isAnonymousMode
+            isAnonymous: isAnonymousMode,
+            replyTo: replyingTo ? {
+              id: replyingTo.id,
+              content: replyingTo.messageType === 'image' ? 'Image'
+                : replyingTo.messageType === 'audio' ? 'Voice Note'
+                : replyingTo.content,
+              sender: replyingTo.sender.nickname
+            } : null
           });
         });
       }
+      setReplyingTo(null);
       setIsUploading(false);
     };
     reader.readAsDataURL(file);
