@@ -239,7 +239,7 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                                 <span className="hidden sm:block text-[9px] text-gray-600 dark:text-gray-400 mt-0.5 text-center">Classic Strategy</span>
                             </button>
                         </div>
-                    ) : !selectedTopic && !(wyrData || triviaData) ? (
+                    ) : (gameType === GAME_TYPES.WYR || gameType === GAME_TYPES.TRIVIA) && !selectedTopic && !(wyrData || triviaData) ? (
                         /* Topic picker */
                         <div className="max-h-[260px] sm:max-h-[300px] overflow-y-auto pr-1 scrollbar-thin">
                             <div className="grid grid-cols-1 gap-1 sm:gap-2">
