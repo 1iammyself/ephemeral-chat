@@ -2678,9 +2678,17 @@ const ChatRoom = () => {
             messageType: 'audio',
             isEncrypted: true,
             isViewOnce: audioViewOnce,
-            recipients: selectedRecipients
+            recipients: selectedRecipients,
+            replyTo: replyingTo ? {
+              id: replyingTo.id,
+              content: replyingTo.messageType === 'image' ? 'Image'
+                : replyingTo.messageType === 'audio' ? 'Voice Note'
+                : replyingTo.content,
+              sender: replyingTo.sender.nickname
+            } : null
           });
         });
+        setReplyingTo(null);
       } catch (e) {
         console.error('Audio encryption failed:', e.message);
         setError('Failed to encrypt audio.');
