@@ -85,7 +85,7 @@ import { getCreatorId } from '../utils/creator';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess } from '../utils/platform';
 import FileTransferModal from './FileTransferModal';
 import ChessModal from './games/ChessModal';
-import { GAME_TYPES } from '../utils/games';
+import { GAME_TYPES, GAME_CONFIG } from '../utils/games';
 import { toast } from 'react-toastify';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
@@ -2134,6 +2134,15 @@ const ChatRoom = () => {
       return;
     }
 
+    // Hangman is also 1-on-1 only
+    if (selectedRecipients.length > 1 && gameData.gameType === GAME_TYPES.HANGMAN) {
+      setError('Hangman can only be played 1-on-1.');
+      return;
+    }
+
+    // Anagrams and TypingRace support both 1-on-1 and broadcast
+    // (no recipient restriction for these)
+
     // Anonymous mode applies to games except chess (chess needs real identity for player tracking)
     const isChessGame = gameData.gameType === 'chess';
 
@@ -2142,7 +2151,9 @@ const ChatRoom = () => {
       gameData,
       recipients: selectedRecipients,
       userId: persistentUserId,
-      isAnonymous: isChessGame ? false : isAnonymousMode
+      isAnonymous: isChessGame ? false : isAnonymousMode,
+      // Add game-specific TTL from GAME_CONFIG
+      gameTTL: GAME_CONFIG[gameData.gameType]?.ttl || roomTTL
     });
   };
 
