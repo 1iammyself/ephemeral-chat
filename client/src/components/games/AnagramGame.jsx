@@ -56,6 +56,11 @@ const AnagramGame = ({
   // Show invitation to the invited user
   const showInvitation = gameData.isTargeted && isInvitedUser && !isInPlayers && !gameData.gameOver;
 
+  // Define game round variables early (needed by useEffect hooks below)
+  const currentRound = gameData.currentRound || 1;
+  const totalRounds = gameData.totalRounds || 5;
+  const revealedWord = gameData.word || gameData.roundHistory?.[gameData.roundHistory.length - 1]?.word;
+
   // Timer countdown — only starts when startedAt is set
   useEffect(() => {
     if (!gameData.startedAt || isRevealed) return;
@@ -126,9 +131,6 @@ const AnagramGame = ({
   const sortedPlayers = [...(gameData.players || [])].sort((a, b) =>
     (gameData.scores?.[b.id] || 0) - (gameData.scores?.[a.id] || 0)
   );
-  const currentRound = gameData.currentRound || 1;
-  const totalRounds = gameData.totalRounds || 5;
-  const revealedWord = gameData.word || gameData.roundHistory?.[gameData.roundHistory.length - 1]?.word;
 
   // ── Invitation card ──────────────────────────────────────────────
   if (showInvitation) {
