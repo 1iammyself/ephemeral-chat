@@ -20,6 +20,38 @@ export const GAME_TYPES = {
     TYPING_RACE: 'typing-race',
 };
 
+// Shorthand command aliases for games
+export const GAME_SHORTHAND = {
+    hmg: GAME_TYPES.HANGMAN,
+    hangman: GAME_TYPES.HANGMAN,
+    agm: GAME_TYPES.ANAGRAM,
+    anagram: GAME_TYPES.ANAGRAM,
+    trg: GAME_TYPES.TYPING_RACE,
+    'typing-race': GAME_TYPES.TYPING_RACE,
+    'typing': GAME_TYPES.TYPING_RACE,
+};
+
+// Game-specific configuration: TTL (seconds), defaults
+export const GAME_CONFIG = {
+    [GAME_TYPES.HANGMAN]: {
+        ttl: 600, // 10 minutes
+        minDifficulty: 'easy',
+        defaultDifficulty: 'medium',
+        maxMistakes: 6,
+    },
+    [GAME_TYPES.ANAGRAM]: {
+        ttl: 480, // 8 minutes
+        minDifficulty: 'novice',
+        defaultDifficulty: 'novice',
+        defaultRounds: 5,
+    },
+    [GAME_TYPES.TYPING_RACE]: {
+        ttl: 300, // 5 minutes
+        minDifficulty: 'easy',
+        defaultDifficulty: 'easy',
+    },
+};
+
 export const WOULD_YOU_RATHER_TOPICS = _WYR_TOPICS;
 // Trivia comes from the expanded external file (961+ questions, 14 categories)
 export const TRIVIA_TOPICS = _TRIVIA_TOPICS;
