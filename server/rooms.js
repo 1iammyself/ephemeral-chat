@@ -440,25 +440,21 @@ class RoomManager {
     const room = await this.getRoom(roomCode);
     if (!room) return;
 
-    const isChess = (message.messageType === 'game' && message.gameData?.gameType === 'chess') ||
-      (message.gameData?.type === 'chess'); // Compatibility check
-    const isHangman = message.messageType === 'game' && message.gameData?.gameType === 'hangman';
-    const isAnagram = message.messageType === 'game' && message.gameData?.gameType === 'anagram';
-    const isTypingRace = message.messageType === 'game' && message.gameData?.gameType === 'typing-race';
+    // Check if any game is in terminal state
+    let isGameTerminal = false;
+    if (message.messageType === 'game' && message.gameData) {
+      isGameTerminal =
+        !!message.gameData.winner ||           // Chess, TypingRace, etc.
+        message.gameData.gameOver === true ||  // Hangman, Anagram, TypingRace
+        !!message.gameData.endedAt;            // Alternative terminal marker
+    }
 
-    // Check if game has reached terminal state
-    const chessFinished = !!message.gameData?.winner || !!message.gameData?.endedAt;
-    const hangmanFinished = message.gameData?.gameOver === true;
-    const anagramFinished = message.gameData?.gameOver === true;
-    const typingRaceFinished = message.gameData?.gameOver === true;
-
-    const isGameFinished = (isChess && chessFinished) || (isHangman && hangmanFinished) || (isAnagram && anagramFinished) || (isTypingRace && typingRaceFinished);
-    const isActiveGame = (isChess || isHangman || isAnagram || isTypingRace) && !isGameFinished;
+    const isActiveGame = message.messageType === 'game' && !isGameTerminal;
 
     // Messages that should NEVER expire (overrideTtl === 0 means "no expiry")
     const neverExpire = isActiveGame || message.overrideTtl === 0;
 
-    // Active games (Chess, Hangman, Anagram, TypingRace) NEVER have an expiry until finished
+    // Active games NEVER have an expiry until finished
     if (isActiveGame) {
       delete message.expiresAt;
       delete message.overrideTtl;
@@ -488,15 +484,12 @@ class RoomManager {
 
       // Safety cap: prevent memory exhaustion (keep last 500 messages max)
       if (room.messages.length > 500) {
-        // Keep active games (not finished)
+        // Keep all active games (any game without terminal state)
         const activeGames = room.messages.filter(m => {
-          if (m.messageType !== 'game') return false;
-          const gameType = m.gameData?.gameType;
-          if (gameType === 'chess') return !m.gameData?.winner;
-          if (gameType === 'hangman' || gameType === 'anagram' || gameType === 'typing-race') {
-            return !m.gameData?.gameOver;
-          }
-          return false;
+          if (m.messageType !== 'game' || !m.gameData) return false;
+          // Game is active if it hasn't reached terminal state
+          const isTerminal = !!m.gameData.winner || m.gameData.gameOver === true || !!m.gameData.endedAt;
+          return !isTerminal;
         });
         const others = room.messages.filter(m => !activeGames.includes(m));
         const otherCount = Math.max(0, 500 - activeGames.length);
@@ -523,14 +516,26 @@ class RoomManager {
 
     if (!message.timestamp) message.timestamp = new Date().toISOString();
 
-    // GAME TTL LOGIC: If a room's TTL is < 5 minutes (300 seconds), game TTL should be twice the room's TTL
-    // EXCEPTION: Chess, Hangman, Anagram, TypingRace last until finished, then get TTL countdown.
-    const isSpecialGame = (message.messageType === 'game' &&
-      ['chess', 'hangman', 'anagram', 'typing-race'].includes(message.gameData?.gameType));
+    // GAME TTL LOGIC: NO GAME gets TTL until it reaches terminal state
+    // Terminal states: winner/draw/gameOver = true
+    // Once finished, games get 2-min TTL countdown
+    if (message.messageType === 'game' && message.gameData) {
+      const gameType = message.gameData.gameType;
 
-    if (message.messageType === 'game' && !isSpecialGame && room.settings && room.settings.messageTTL > 0 && room.settings.messageTTL < 300) {
-      if (!message.overrideTtl) {
-        message.overrideTtl = room.settings.messageTTL * 2;
+      // Check if game is in terminal state
+      const isTerminal =
+        !!message.gameData.winner ||           // Chess, TypingRace, etc.
+        message.gameData.gameOver === true ||  // Hangman, Anagram, TypingRace
+        !!message.gameData.endedAt;            // Alternative terminal marker
+
+      if (isTerminal) {
+        // Game finished: set 2-min TTL if not already set
+        if (!message.overrideTtl) {
+          message.overrideTtl = 120;
+        }
+      } else {
+        // Game in progress: NO TTL (delete if present)
+        delete message.overrideTtl;
       }
     }
 
