@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Sparkles, HelpCircle, Users, CheckCircle2, XCircle, Clock, Hash, Circle, X, Trophy, Swords } from 'lucide-react';
+import { Sparkles, HelpCircle, Users, CheckCircle2, XCircle, Clock, Hash, Circle, X, Trophy, Swords, Skull, Puzzle, Zap } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { GAME_TYPES } from '../utils/games';
 import { getVibeById } from '../utils/vibes';
@@ -866,58 +866,168 @@ const GameMessage = ({
         );
     }
 
-    // ── Hangman ──────────────────────────────────────────────────────
+    // ── Hangman ──
     if (isHangman) {
+        const isPlayer = (gameData.players || []).some(
+            p => p.id === currentUserId || p.socketId === currentUserId ||
+            (currentUser?.id && p.id === currentUser.id)
+        );
+        const isInvitedUser = gameData.invitedUserId && (
+            gameData.invitedUserId === currentUserId ||
+            (currentUser?.id && gameData.invitedUserId === currentUser.id)
+        );
+
         return (
-            <div className={`rounded-2xl p-3 w-full max-w-xs sm:max-w-sm ${vibe.messageClass || 'bg-white dark:bg-gray-800'} shadow-sm border border-gray-200/50 dark:border-white/10`}>
-                <HangmanGame
-                    message={message}
-                    currentUser={currentUser}
-                    vibeColor={vibe.colors?.primary}
-                    onHangmanJoin={onHangmanJoin}
-                    onHangmanGuess={onHangmanGuess}
-                    onRematch={onRematch}
-                    onShareResult={onShareResult}
-                />
+            <div className={`w-full max-w-[260px] sm:max-w-[280px] overflow-hidden rounded-2xl shadow-lg border-x border-b ${cardBorderClass} border-t-4 border-t-orange-500 animate-in fade-in zoom-in duration-300`}>
+                <div className={`p-2 sm:p-3 bg-gradient-to-r from-orange-500 to-amber-500 flex items-center justify-between`}>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                        <Skull className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                        <h3 className="text-white font-bold text-xs sm:text-sm">Hangman</h3>
+                    </div>
+                </div>
+
+                {!isExpanded ? (
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900 flex flex-col items-center gap-3">
+                        <p className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">
+                            Guess the word before {gameData.maxMistakes || 6} wrong guesses
+                        </p>
+                        <button
+                            onClick={() => setIsExpanded(true)}
+                            style={{ backgroundColor: vibeBtnColor }}
+                            className="w-full py-2 rounded-xl text-white text-[11px] font-bold transition-all shadow-md active:scale-95"
+                        >
+                            {gameData.gameOver ? 'View Result' : (isPlayer ? 'Continue Game' : 'View Game')}
+                        </button>
+                    </div>
+                ) : (
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900">
+                        <HangmanGame
+                            message={message}
+                            currentUser={currentUser}
+                            vibeColor={vibe.colors?.primary}
+                            onHangmanJoin={onHangmanJoin}
+                            onHangmanGuess={onHangmanGuess}
+                            onRematch={onRematch}
+                            onShareResult={onShareResult}
+                        />
+                        <button
+                            onClick={() => setIsExpanded(false)}
+                            className="mt-4 w-full text-[10px] font-bold text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors uppercase tracking-widest"
+                        >
+                            Collapse
+                        </button>
+                    </div>
+                )}
             </div>
         );
     }
 
-    // ── Anagram ──────────────────────────────────────────────────────
+    // ── Anagram ──
     if (isAnagram) {
+        const isPlayer = (gameData.players || []).some(
+            p => p.id === currentUserId || p.socketId === currentUserId ||
+            (currentUser?.id && p.id === currentUser.id)
+        );
+
         return (
-            <div className={`rounded-2xl p-3 w-full max-w-xs sm:max-w-sm ${vibe.messageClass || 'bg-white dark:bg-gray-800'} shadow-sm border border-gray-200/50 dark:border-white/10`}>
-                <AnagramGame
-                    message={message}
-                    currentUser={currentUser}
-                    vibeColor={vibe.colors?.primary}
-                    onAnagramJoin={onAnagramJoin}
-                    onAnagramSubmit={onAnagramSubmit}
-                    onAnagramNextRound={onAnagramNextRound}
-                    onAnagramReveal={onAnagramReveal}
-                    onAnagramHint={onAnagramHint}
-                    onRematch={onRematch}
-                    onShareResult={onShareResult}
-                />
+            <div className={`w-full max-w-[260px] sm:max-w-[280px] overflow-hidden rounded-2xl shadow-lg border-x border-b ${cardBorderClass} border-t-4 border-t-violet-500 animate-in fade-in zoom-in duration-300`}>
+                <div className={`p-2 sm:p-3 bg-gradient-to-r from-violet-500 to-purple-500 flex items-center justify-between`}>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                        <Puzzle className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                        <h3 className="text-white font-bold text-xs sm:text-sm">Anagrams</h3>
+                    </div>
+                </div>
+
+                {!isExpanded ? (
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900 flex flex-col items-center gap-3">
+                        <p className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">
+                            Unscramble {gameData.rounds || 5} words
+                        </p>
+                        <button
+                            onClick={() => setIsExpanded(true)}
+                            style={{ backgroundColor: vibeBtnColor }}
+                            className="w-full py-2 rounded-xl text-white text-[11px] font-bold transition-all shadow-md active:scale-95"
+                        >
+                            {gameData.gameOver ? 'View Result' : (isPlayer ? 'Continue Game' : 'View Game')}
+                        </button>
+                    </div>
+                ) : (
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900">
+                        <AnagramGame
+                            message={message}
+                            currentUser={currentUser}
+                            vibeColor={vibe.colors?.primary}
+                            onAnagramJoin={onAnagramJoin}
+                            onAnagramSubmit={onAnagramSubmit}
+                            onAnagramNextRound={onAnagramNextRound}
+                            onAnagramReveal={onAnagramReveal}
+                            onAnagramHint={onAnagramHint}
+                            onRematch={onRematch}
+                            onShareResult={onShareResult}
+                        />
+                        <button
+                            onClick={() => setIsExpanded(false)}
+                            className="mt-4 w-full text-[10px] font-bold text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors uppercase tracking-widest"
+                        >
+                            Collapse
+                        </button>
+                    </div>
+                )}
             </div>
         );
     }
 
-    // ── Typing Race ───────────────────────────────────────────────────
+    // ── Typing Race ──
     if (isTypingRace) {
+        const allPlayers = Object.values(gameData.players || {});
+        const isPlayer = allPlayers.some(
+            p => p.id === currentUserId || p.socketId === currentUserId ||
+            (currentUser?.id && p.id === currentUser.id)
+        );
+
         return (
-            <div className={`rounded-2xl p-3 w-full max-w-xs sm:max-w-sm ${vibe.messageClass || 'bg-white dark:bg-gray-800'} shadow-sm border border-gray-200/50 dark:border-white/10`}>
-                <TypingRaceGame
-                    message={message}
-                    currentUser={currentUser}
-                    vibeColor={vibe.colors?.primary}
-                    onTypingRaceJoin={onTypingRaceJoin}
-                    onTypingRaceStart={onTypingRaceStart}
-                    onTypingRaceProgress={onTypingRaceProgress}
-                    onTypingRaceFinish={onTypingRaceFinish}
-                    onRematch={onRematch}
-                    onShareResult={onShareResult}
-                />
+            <div className={`w-full max-w-[260px] sm:max-w-[280px] overflow-hidden rounded-2xl shadow-lg border-x border-b ${cardBorderClass} border-t-4 border-t-blue-500 animate-in fade-in zoom-in duration-300`}>
+                <div className={`p-2 sm:p-3 bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-between`}>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                        <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                        <h3 className="text-white font-bold text-xs sm:text-sm">Typing Race</h3>
+                    </div>
+                </div>
+
+                {!isExpanded ? (
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900 flex flex-col items-center gap-3">
+                        <p className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">
+                            Type as fast as you can
+                        </p>
+                        <button
+                            onClick={() => setIsExpanded(true)}
+                            style={{ backgroundColor: vibeBtnColor }}
+                            className="w-full py-2 rounded-xl text-white text-[11px] font-bold transition-all shadow-md active:scale-95"
+                        >
+                            {gameData.status === 'finished' ? 'View Result' : (isPlayer ? 'Continue Game' : 'View Game')}
+                        </button>
+                    </div>
+                ) : (
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900">
+                        <TypingRaceGame
+                            message={message}
+                            currentUser={currentUser}
+                            vibeColor={vibe.colors?.primary}
+                            onTypingRaceJoin={onTypingRaceJoin}
+                            onTypingRaceStart={onTypingRaceStart}
+                            onTypingRaceProgress={onTypingRaceProgress}
+                            onTypingRaceFinish={onTypingRaceFinish}
+                            onRematch={onRematch}
+                            onShareResult={onShareResult}
+                        />
+                        <button
+                            onClick={() => setIsExpanded(false)}
+                            className="mt-4 w-full text-[10px] font-bold text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors uppercase tracking-widest"
+                        >
+                            Collapse
+                        </button>
+                    </div>
+                )}
             </div>
         );
     }
