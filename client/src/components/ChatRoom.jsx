@@ -2143,15 +2143,16 @@ const ChatRoom = () => {
     // Anagrams and TypingRace support both 1-on-1 and broadcast
     // (no recipient restriction for these)
 
-    // Anonymous mode applies to games except chess (chess needs real identity for player tracking)
+    // Anonymous mode applies to games except chess and typing-race (both need real identity for player tracking)
     const isChessGame = gameData.gameType === 'chess';
+    const isTypingRaceGame = gameData.gameType === GAME_TYPES.TYPING_RACE;
 
     socketManager.emit('send-message', {
       messageType: 'game',
       gameData,
       recipients: selectedRecipients,
       userId: persistentUserId,
-      isAnonymous: isChessGame ? false : isAnonymousMode,
+      isAnonymous: (isChessGame || isTypingRaceGame) ? false : isAnonymousMode,
       // Add game-specific TTL from GAME_CONFIG
       gameTTL: GAME_CONFIG[gameData.gameType]?.ttl || roomTTL
     });

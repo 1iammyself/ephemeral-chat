@@ -7,6 +7,9 @@ import ChessGame from './games/ChessGame';
 import AnagramGame from './games/AnagramGame';
 import HangmanGame from './games/HangmanGame';
 import TypingRaceGame from './games/TypingRaceGame';
+import HangmanModal from './games/HangmanModal';
+import AnagramModal from './games/AnagramModal';
+import TypingRaceModal from './games/TypingRaceModal';
 
 const GameMessage = ({
     message, currentUser, onGameAnswer, onTicTacToeMove, onRPSAction, onLaunchChess, onDelete, roomVibe,
@@ -39,10 +42,14 @@ const GameMessage = ({
         (isChess && (
             gameData.players.white?.id === currentUserId || gameData.players.black?.id === currentUserId ||
             (currentNickname && (gameData.players.white?.name === currentNickname || gameData.players.black?.name === currentNickname))
-        ));
-    const isSpectator = !isPlayer && (isTicTacToe || isRPS || isChess);
+        )) ||
+        (isTypingRace && Object.values(gameData.players || {}).some(p => p.id === currentUserId || (currentNickname && p.name === currentNickname)));
+    const isSpectator = !isPlayer && (isTicTacToe || isRPS || isChess || isTypingRace);
     const [isExpanded, setIsExpanded] = useState(false);
     const [showVoteDetails, setShowVoteDetails] = useState(false);
+    const [showHangmanModal, setShowHangmanModal] = useState(false);
+    const [showAnagramModal, setShowAnagramModal] = useState(false);
+    const [showTypingRaceModal, setShowTypingRaceModal] = useState(false);
 
     // Trivia timer: Dynamic based on gameData.timer (defaults to 15 if missing)
     useEffect(() => {
@@ -190,6 +197,10 @@ const GameMessage = ({
                 if (winningPlayer?.id === currentUserId || (currentNickname && winningPlayer?.name === currentNickname)) {
                     amWinner = true;
                 }
+            } else if (isTypingRace) {
+                if (gameData.winner === currentUserId) {
+                    amWinner = true;
+                }
             }
 
             if (amWinner) {
@@ -215,7 +226,7 @@ const GameMessage = ({
                 fire(0.1, { spread: 120, startVelocity: 45 });
             }
         }
-    }, [gameData.winner, isTicTacToe, isRPS, isChess, currentUserId, currentNickname]);
+    }, [gameData.winner, isTicTacToe, isRPS, isChess, isTypingRace, currentUserId, currentNickname]);
 
     // Dynamic classes based on vibe
     // Explicit hex colors for buttons
@@ -872,53 +883,43 @@ const GameMessage = ({
             p => p.id === currentUserId || p.socketId === currentUserId ||
             (currentUser?.id && p.id === currentUser.id)
         );
-        const isInvitedUser = gameData.invitedUserId && (
-            gameData.invitedUserId === currentUserId ||
-            (currentUser?.id && gameData.invitedUserId === currentUser.id)
-        );
 
         return (
-            <div className={`w-full max-w-[260px] sm:max-w-[280px] overflow-hidden rounded-2xl shadow-lg border-x border-b ${cardBorderClass} border-t-4 border-t-orange-500 animate-in fade-in zoom-in duration-300`}>
-                <div className={`p-2 sm:p-3 bg-gradient-to-r from-orange-500 to-amber-500 flex items-center justify-between`}>
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                        <Skull className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                        <h3 className="text-white font-bold text-xs sm:text-sm">Hangman</h3>
+            <>
+                <div className={`w-full max-w-[260px] sm:max-w-[280px] overflow-hidden rounded-2xl shadow-lg border-x border-b ${cardBorderClass} border-t-4 border-t-orange-500 animate-in fade-in zoom-in duration-300 cursor-pointer hover:shadow-xl transition-shadow`} onClick={() => setShowHangmanModal(true)}>
+                    <div className={`p-2 sm:p-3 bg-gradient-to-r from-orange-500 to-amber-500 flex items-center justify-between`}>
+                        <div className="flex items-center gap-1.5 sm:gap-2">
+                            <Skull className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                            <h3 className="text-white font-bold text-xs sm:text-sm">Hangman</h3>
+                        </div>
                     </div>
-                </div>
 
-                {!isExpanded ? (
                     <div className="p-4 bg-gray-50 dark:bg-gray-900 flex flex-col items-center gap-3">
                         <p className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">
                             Guess the word before {gameData.maxMistakes || 6} wrong guesses
                         </p>
                         <button
-                            onClick={() => setIsExpanded(true)}
+                            onClick={(e) => { e.stopPropagation(); setShowHangmanModal(true); }}
                             style={{ backgroundColor: vibeBtnColor }}
                             className="w-full py-2 rounded-xl text-white text-[11px] font-bold transition-all shadow-md active:scale-95"
                         >
                             {gameData.gameOver ? 'View Result' : (isPlayer ? 'Continue Game' : 'View Game')}
                         </button>
                     </div>
-                ) : (
-                    <div className="p-4 bg-gray-50 dark:bg-gray-900">
-                        <HangmanGame
-                            message={message}
-                            currentUser={currentUser}
-                            vibeColor={vibe.colors?.primary}
-                            onHangmanJoin={onHangmanJoin}
-                            onHangmanGuess={onHangmanGuess}
-                            onRematch={onRematch}
-                            onShareResult={onShareResult}
-                        />
-                        <button
-                            onClick={() => setIsExpanded(false)}
-                            className="mt-4 w-full text-[10px] font-bold text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors uppercase tracking-widest"
-                        >
-                            Collapse
-                        </button>
-                    </div>
-                )}
-            </div>
+                </div>
+
+                <HangmanModal
+                    isOpen={showHangmanModal}
+                    onClose={() => setShowHangmanModal(false)}
+                    message={message}
+                    currentUser={currentUser}
+                    onHangmanJoin={onHangmanJoin}
+                    onHangmanGuess={onHangmanGuess}
+                    onRematch={onRematch}
+                    onShareResult={onShareResult}
+                    roomVibe={roomVibe}
+                />
+            </>
         );
     }
 
@@ -930,105 +931,76 @@ const GameMessage = ({
         );
 
         return (
-            <div className={`w-full max-w-[260px] sm:max-w-[280px] overflow-hidden rounded-2xl shadow-lg border-x border-b ${cardBorderClass} border-t-4 border-t-violet-500 animate-in fade-in zoom-in duration-300`}>
-                <div className={`p-2 sm:p-3 bg-gradient-to-r from-violet-500 to-purple-500 flex items-center justify-between`}>
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                        <Puzzle className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                        <h3 className="text-white font-bold text-xs sm:text-sm">Anagrams</h3>
+            <>
+                <div className={`w-full max-w-[260px] sm:max-w-[280px] overflow-hidden rounded-2xl shadow-lg border-x border-b ${cardBorderClass} border-t-4 border-t-violet-500 animate-in fade-in zoom-in duration-300 cursor-pointer hover:shadow-xl transition-shadow`} onClick={() => setShowAnagramModal(true)}>
+                    <div className={`p-2 sm:p-3 bg-gradient-to-r from-violet-500 to-purple-500 flex items-center justify-between`}>
+                        <div className="flex items-center gap-1.5 sm:gap-2">
+                            <Puzzle className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                            <h3 className="text-white font-bold text-xs sm:text-sm">Anagrams</h3>
+                        </div>
                     </div>
-                </div>
 
-                {!isExpanded ? (
                     <div className="p-4 bg-gray-50 dark:bg-gray-900 flex flex-col items-center gap-3">
                         <p className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">
                             Unscramble {gameData.rounds || 5} words
                         </p>
                         <button
-                            onClick={() => setIsExpanded(true)}
+                            onClick={(e) => { e.stopPropagation(); setShowAnagramModal(true); }}
                             style={{ backgroundColor: vibeBtnColor }}
                             className="w-full py-2 rounded-xl text-white text-[11px] font-bold transition-all shadow-md active:scale-95"
                         >
                             {gameData.gameOver ? 'View Result' : (isPlayer ? 'Continue Game' : 'View Game')}
                         </button>
                     </div>
-                ) : (
-                    <div className="p-4 bg-gray-50 dark:bg-gray-900">
-                        <AnagramGame
-                            message={message}
-                            currentUser={currentUser}
-                            vibeColor={vibe.colors?.primary}
-                            onAnagramJoin={onAnagramJoin}
-                            onAnagramSubmit={onAnagramSubmit}
-                            onAnagramNextRound={onAnagramNextRound}
-                            onAnagramReveal={onAnagramReveal}
-                            onAnagramHint={onAnagramHint}
-                            onRematch={onRematch}
-                            onShareResult={onShareResult}
-                        />
-                        <button
-                            onClick={() => setIsExpanded(false)}
-                            className="mt-4 w-full text-[10px] font-bold text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors uppercase tracking-widest"
-                        >
-                            Collapse
-                        </button>
-                    </div>
-                )}
-            </div>
+                </div>
+
+                <AnagramModal
+                    isOpen={showAnagramModal}
+                    onClose={() => setShowAnagramModal(false)}
+                    message={message}
+                    currentUser={currentUser}
+                    onAnagramJoin={onAnagramJoin}
+                    onAnagramSubmit={onAnagramSubmit}
+                    onAnagramNextRound={onAnagramNextRound}
+                    onAnagramReveal={onAnagramReveal}
+                    onAnagramHint={onAnagramHint}
+                    onRematch={onRematch}
+                    onShareResult={onShareResult}
+                    roomVibe={roomVibe}
+                />
+            </>
         );
     }
 
-    // ── Typing Race ──
+    // ── Typing Race ── (Treat like Chess - open in modal)
     if (isTypingRace) {
-        const allPlayers = Object.values(gameData.players || {});
-        const isPlayer = allPlayers.some(
-            p => p.id === currentUserId || p.socketId === currentUserId ||
-            (currentUser?.id && p.id === currentUser.id)
-        );
-
         return (
-            <div className={`w-full max-w-[260px] sm:max-w-[280px] overflow-hidden rounded-2xl shadow-lg border-x border-b ${cardBorderClass} border-t-4 border-t-blue-500 animate-in fade-in zoom-in duration-300`}>
-                <div className={`p-2 sm:p-3 bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-between`}>
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                        <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                        <h3 className="text-white font-bold text-xs sm:text-sm">Typing Race</h3>
+            <>
+                <div className={`rounded-2xl p-3 w-full max-w-xs sm:max-w-sm ${vibe.messageClass || 'bg-white dark:bg-gray-800'} shadow-sm border border-gray-200/50 dark:border-white/10 cursor-pointer hover:shadow-md transition-shadow`} onClick={() => setShowTypingRaceModal(true)}>
+                    <div className="p-3 flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-blue-500" />
+                        <span className="text-xs font-bold text-gray-700 dark:text-gray-200">Typing Race</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500 text-white">{gameData.difficulty || 'easy'}</span>
+                        <button onClick={(e) => { e.stopPropagation(); setShowTypingRaceModal(true); }} className="ml-auto px-3 py-1 rounded-lg bg-blue-500 text-white text-[11px] font-bold hover:bg-blue-600 transition-colors">
+                            {gameData.status === 'finished' ? 'View Result' : 'View Game'}
+                        </button>
                     </div>
                 </div>
 
-                {!isExpanded ? (
-                    <div className="p-4 bg-gray-50 dark:bg-gray-900 flex flex-col items-center gap-3">
-                        <p className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">
-                            Type as fast as you can
-                        </p>
-                        <button
-                            onClick={() => setIsExpanded(true)}
-                            style={{ backgroundColor: vibeBtnColor }}
-                            className="w-full py-2 rounded-xl text-white text-[11px] font-bold transition-all shadow-md active:scale-95"
-                        >
-                            {gameData.status === 'finished' ? 'View Result' : (isPlayer ? 'Continue Game' : 'View Game')}
-                        </button>
-                    </div>
-                ) : (
-                    <div className="p-4 bg-gray-50 dark:bg-gray-900">
-                        <TypingRaceGame
-                            message={message}
-                            currentUser={currentUser}
-                            vibeColor={vibe.colors?.primary}
-                            onTypingRaceJoin={onTypingRaceJoin}
-                            onTypingRaceStart={onTypingRaceStart}
-                            onTypingRaceProgress={onTypingRaceProgress}
-                            onTypingRaceFinish={onTypingRaceFinish}
-                            onRematch={onRematch}
-                            onShareResult={onShareResult}
-                        />
-                        <button
-                            onClick={() => setIsExpanded(false)}
-                            className="mt-4 w-full text-[10px] font-bold text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors uppercase tracking-widest"
-                        >
-                            Collapse
-                        </button>
-                    </div>
-                )}
-            </div>
+                <TypingRaceModal
+                    isOpen={showTypingRaceModal}
+                    onClose={() => setShowTypingRaceModal(false)}
+                    message={message}
+                    currentUser={currentUser}
+                    onTypingRaceJoin={onTypingRaceJoin}
+                    onTypingRaceStart={onTypingRaceStart}
+                    onTypingRaceProgress={onTypingRaceProgress}
+                    onTypingRaceFinish={onTypingRaceFinish}
+                    onRematch={onRematch}
+                    onShareResult={onShareResult}
+                    roomVibe={roomVibe}
+                />
+            </>
         );
     }
 };
