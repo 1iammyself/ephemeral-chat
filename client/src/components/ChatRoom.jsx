@@ -85,6 +85,7 @@ import { getCreatorId } from '../utils/creator';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess } from '../utils/platform';
 import FileTransferModal from './FileTransferModal';
 import ChessModal from './games/ChessModal';
+import { GAME_TYPES } from '../utils/games';
 import { toast } from 'react-toastify';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
@@ -1927,6 +1928,25 @@ const ChatRoom = () => {
           } else if (['rps', 'rock-paper-scissors'].includes(gameArg)) {
             if (selectedRecipients.length > 1) { setError('Rock Paper Scissors can only be sent to one person.'); return; }
             handleSendGame({ gameType: 'rock-paper-scissors' }); setNewMessage(''); return;
+          } else if (['hmg', 'hangman'].includes(gameArg)) {
+            // Hangman: 1-on-1 only
+            if (selectedRecipients.length > 1) { setError('Hangman can only be played 1-on-1.'); return; }
+            setShowGameModal(true);
+            setInitialGameType(GAME_TYPES.HANGMAN);
+            setNewMessage('');
+            return;
+          } else if (['agm', 'anagram'].includes(gameArg)) {
+            // Anagrams: 1-on-1 or broadcast
+            setShowGameModal(true);
+            setInitialGameType(GAME_TYPES.ANAGRAM);
+            setNewMessage('');
+            return;
+          } else if (['trg', 'typing', 'typing-race'].includes(gameArg)) {
+            // TypingRace: 1-on-1 or broadcast
+            setShowGameModal(true);
+            setInitialGameType(GAME_TYPES.TYPING_RACE);
+            setNewMessage('');
+            return;
           }
 
           setInitialGameType(initialGame);
