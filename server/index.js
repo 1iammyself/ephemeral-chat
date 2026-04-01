@@ -4070,6 +4070,13 @@ io.on('connection', (socket) => {
       if (gd.isTargeted && gd.players.length >= 2 && !gd.gameOver) {
         gd.currentTurn = (gd.currentTurn ?? 0) === 0 ? 1 : 0;
       }
+
+      // When game finishes, set TTL countdown
+      if (gd.gameOver && !message.overrideTtl) {
+        message.overrideTtl = 120; // 2-min TTL for finished Hangman
+        message.expiresAt = new Date(Date.now() + 120 * 1000).toISOString();
+      }
+
       gd.lastActivity = Date.now();
       await roomManager.saveRoom(socket.roomCode, room);
       const roomUsers = room.users || [];
@@ -4310,6 +4317,13 @@ io.on('connection', (socket) => {
         }, (gd.timeLimit + 2) * 1000);
         gameTimeouts.set(timeoutKey, newTid);
       }
+
+      // When game finishes, set TTL countdown
+      if (gd.gameOver && !message.overrideTtl) {
+        message.overrideTtl = 120; // 2-min TTL for finished Anagram
+        message.expiresAt = new Date(Date.now() + 120 * 1000).toISOString();
+      }
+
       gd.lastActivity = Date.now();
       await roomManager.saveRoom(socket.roomCode, room);
       const roomUsers = room.users || [];
@@ -4423,6 +4437,13 @@ io.on('connection', (socket) => {
       if (!gd.winner) gd.winner = userId;
       const allDone = Object.values(gd.players).every(p => p.finishedAt != null);
       if (allDone) { gd.status = 'finished'; gd.gameOver = true; }
+
+      // When game finishes, set TTL countdown
+      if (gd.gameOver && !message.overrideTtl) {
+        message.overrideTtl = 120; // 2-min TTL for finished TypingRace
+        message.expiresAt = new Date(Date.now() + 120 * 1000).toISOString();
+      }
+
       gd.lastActivity = Date.now();
       await roomManager.saveRoom(socket.roomCode, room);
       io.to(socket.roomCode).emit('message-updated', message);

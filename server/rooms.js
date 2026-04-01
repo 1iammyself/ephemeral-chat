@@ -442,12 +442,24 @@ class RoomManager {
 
     const isChess = (message.messageType === 'game' && message.gameData?.gameType === 'chess') ||
       (message.gameData?.type === 'chess'); // Compatibility check
-    const isFinished = !!message.gameData?.winner || !!message.gameData?.endedAt;
-    // Messages that should NEVER expire (overrideTtl === 0 means "no expiry")
-    const neverExpire = (isChess && !isFinished) || message.overrideTtl === 0;
+    const isHangman = message.messageType === 'game' && message.gameData?.gameType === 'hangman';
+    const isAnagram = message.messageType === 'game' && message.gameData?.gameType === 'anagram';
+    const isTypingRace = message.messageType === 'game' && message.gameData?.gameType === 'typing-race';
 
-    // Active Chess games NEVER have an expiry
-    if (isChess && !isFinished) {
+    // Check if game has reached terminal state
+    const chessFinished = !!message.gameData?.winner || !!message.gameData?.endedAt;
+    const hangmanFinished = message.gameData?.gameOver === true;
+    const anagramFinished = message.gameData?.gameOver === true;
+    const typingRaceFinished = message.gameData?.gameOver === true;
+
+    const isGameFinished = (isChess && chessFinished) || (isHangman && hangmanFinished) || (isAnagram && anagramFinished) || (isTypingRace && typingRaceFinished);
+    const isActiveGame = (isChess || isHangman || isAnagram || isTypingRace) && !isGameFinished;
+
+    // Messages that should NEVER expire (overrideTtl === 0 means "no expiry")
+    const neverExpire = isActiveGame || message.overrideTtl === 0;
+
+    // Active games (Chess, Hangman, Anagram, TypingRace) NEVER have an expiry until finished
+    if (isActiveGame) {
       delete message.expiresAt;
       delete message.overrideTtl;
     }
@@ -476,10 +488,19 @@ class RoomManager {
 
       // Safety cap: prevent memory exhaustion (keep last 500 messages max)
       if (room.messages.length > 500) {
-        const activeChess = room.messages.filter(m => m.messageType === 'game' && m.gameData?.gameType === 'chess' && !m.gameData?.winner);
-        const others = room.messages.filter(m => !(m.messageType === 'game' && m.gameData?.gameType === 'chess' && !m.gameData?.winner));
-        const otherCount = Math.max(0, 500 - activeChess.length);
-        room.messages = [...activeChess, ...others.slice(-otherCount)];
+        // Keep active games (not finished)
+        const activeGames = room.messages.filter(m => {
+          if (m.messageType !== 'game') return false;
+          const gameType = m.gameData?.gameType;
+          if (gameType === 'chess') return !m.gameData?.winner;
+          if (gameType === 'hangman' || gameType === 'anagram' || gameType === 'typing-race') {
+            return !m.gameData?.gameOver;
+          }
+          return false;
+        });
+        const others = room.messages.filter(m => !activeGames.includes(m));
+        const otherCount = Math.max(0, 500 - activeGames.length);
+        room.messages = [...activeGames, ...others.slice(-otherCount)];
       }
 
       await this.saveRoom(roomCode, room);
@@ -503,10 +524,11 @@ class RoomManager {
     if (!message.timestamp) message.timestamp = new Date().toISOString();
 
     // GAME TTL LOGIC: If a room's TTL is < 5 minutes (300 seconds), game TTL should be twice the room's TTL
-    // CHESS EXCEPTION: Chess lasts until room ends or manual delete, unless it's finished.
-    const isChess = (message.messageType === 'game' && message.gameData?.gameType === 'chess') || (message.gameData?.type === 'chess');
+    // EXCEPTION: Chess, Hangman, Anagram, TypingRace last until finished, then get TTL countdown.
+    const isSpecialGame = (message.messageType === 'game' &&
+      ['chess', 'hangman', 'anagram', 'typing-race'].includes(message.gameData?.gameType));
 
-    if (message.messageType === 'game' && !isChess && room.settings && room.settings.messageTTL > 0 && room.settings.messageTTL < 300) {
+    if (message.messageType === 'game' && !isSpecialGame && room.settings && room.settings.messageTTL > 0 && room.settings.messageTTL < 300) {
       if (!message.overrideTtl) {
         message.overrideTtl = room.settings.messageTTL * 2;
       }
