@@ -2738,9 +2738,9 @@ io.on('connection', (socket) => {
 
       // Broadcast logic
       if (recipients && recipients.length > 0) {
-        // Chess games should always be broadcast to the whole room (anyone can spectate)
-        const isChessGame = message.messageType === 'game' && message.gameData?.gameType === 'chess';
-        if (isChessGame) {
+        // Chess and TypingRace games should always be broadcast to the whole room (anyone can spectate)
+        const isSpecialGame = message.messageType === 'game' && ['chess', 'typing-race'].includes(message.gameData?.gameType);
+        if (isSpecialGame) {
           io.to(socket.roomCode).emit('new-message', message);
         } else {
           // Targeted delivery for non-chess messages
