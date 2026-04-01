@@ -66,14 +66,30 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
     };
 
     const handleSendHangman = () => {
+        // Hangman: 1-on-1 only
+        // - Host sets word/difficulty
+        // - Invited user guesses letters
+        // - TTL: 10 minutes (enough for a full game)
         onSend({ gameType: GAME_TYPES.HANGMAN, difficulty: hangmanDiff, customWord: hangmanCustomWord.trim() });
         handleClose();
     };
+
     const handleSendAnagram = () => {
+        // Anagrams: 1-on-1 or broadcast
+        // - 1-on-1: Host vs one opponent, race to unscramble words
+        // - Broadcast: First N players to join compete (example: 2-4 players)
+        // - All players see same scrambled words, first correct answer wins
+        // - TTL: 8 minutes (gives time for 5+ rounds)
         onSend({ gameType: GAME_TYPES.ANAGRAM, difficulty: anagramDiff, rounds: anagramRounds, customWord: anagramCustomWord.trim() });
         handleClose();
     };
+
     const handleSendTypingRace = () => {
+        // TypingRace: 1-on-1 or broadcast
+        // - All players race to type the same text fastest
+        // - Broadcast: Up to 8 players can join
+        // - Individual results shown (WPM, accuracy, ranking)
+        // - TTL: 5 minutes (accounts for typing + setup time)
         onSend({ gameType: GAME_TYPES.TYPING_RACE, difficulty: typingDiff, customText: typingCustomText.trim() });
         handleClose();
     };
