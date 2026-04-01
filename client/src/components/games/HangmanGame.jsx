@@ -75,6 +75,28 @@ const HangmanGame = ({ message, currentUser, vibeColor, onHangmanJoin, onHangman
     onHangmanGuess(message.id, letter);
   };
 
+  // Keyboard input support for desktop
+  useEffect(() => {
+    if (!isPlayer || isGameOver || waitingForOpponent || !isMyTurn) return;
+
+    const handleKeyPress = (e) => {
+      const letter = e.key.toUpperCase();
+
+      // Only handle single letters A-Z
+      if (!/^[A-Z]$/.test(letter)) return;
+
+      // Check if already guessed
+      if (guessedSet.has(letter)) return;
+
+      // Trigger the guess
+      e.preventDefault();
+      onHangmanGuess(message.id, letter);
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [isPlayer, isGameOver, waitingForOpponent, isMyTurn, guessedSet, message.id, onHangmanGuess]);
+
   const diffBadge = gameData.difficulty === 'hard' ? 'bg-red-500 text-white'
     : gameData.difficulty === 'medium' ? 'bg-amber-500 text-white'
     : 'bg-emerald-500 text-white';
