@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Zap, Flag, Users, Play, Loader2, UserCheck, Swords, RotateCcw } from 'lucide-react';
+import { Zap, Flag, Users, Play, Loader2, UserCheck, Swords, RotateCcw, Clock } from 'lucide-react';
 
 const TypingRaceGame = ({
   message, currentUser, vibeColor,
@@ -277,6 +277,36 @@ const TypingRaceGame = ({
           <span className="font-bold truncate max-w-[70px]" style={{ color: accent }}>{sortedPlayers[1]?.name}</span>
         </div>
       )}
+
+      {/* Difficulty indicator, text preview, and timer */}
+      <div className="space-y-1.5">
+        {/* Difficulty badge with color coding */}
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400">Difficulty:</span>
+          <div className={`px-2 py-1 rounded-md text-white text-[10px] font-bold ${
+            gameData.difficulty === 'easy' ? 'bg-green-500' :
+            gameData.difficulty === 'medium' ? 'bg-yellow-500' :
+            'bg-red-500'
+          }`}>
+            {(gameData.difficulty || 'easy').toUpperCase()}
+          </div>
+        </div>
+
+        {/* Text preview (first 60 chars) */}
+        <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700">
+          <p className="text-[12px] text-gray-700 dark:text-gray-300 font-mono leading-relaxed">
+            {text ? text.substring(0, 60) + (text.length > 60 ? '...' : '') : 'Loading text...'}
+          </p>
+        </div>
+
+        {/* Timer display */}
+        <div className="flex items-center gap-2">
+          <Clock className="w-4 h-4 text-blue-500" />
+          <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300">
+            Time: {gameData.duration || 60} seconds
+          </span>
+        </div>
+      </div>
 
       {/* Race lanes */}
       {sortedPlayers.length > 0 && (
