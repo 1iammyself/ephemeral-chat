@@ -1,5 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Users, UserCheck, Loader2, Swords, RotateCcw } from 'lucide-react';
+import confetti from 'canvas-confetti';
+import { toast } from 'react-toastify';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
@@ -26,7 +28,7 @@ const HangmanSVG = ({ mistakes }) => (
   </svg>
 );
 
-const HangmanGame = ({ message, currentUser, vibeColor, onHangmanJoin, onHangmanGuess, onRematch, onShareResult }) => {
+const HangmanGame = ({ message, currentUser, vibeColor, onHangmanJoin, onHangmanGuess, onHangmanHint, onRematch, onShareResult }) => {
   const { gameData } = message;
   const currentUserId = currentUser?.id || currentUser?.socketId;
   const accent = vibeColor || '#334155';
@@ -69,6 +71,58 @@ const HangmanGame = ({ message, currentUser, vibeColor, onHangmanJoin, onHangman
   })();
   const turnPlayerName = gameData.isTargeted && playerCount >= 2
     ? players[gameData.currentTurn ?? 0]?.name : null;
+
+  const statsKey = 'hangmanNativeStatsV1';
+  const [stats, setStats] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(statsKey) || '{"wins":0,"losses":0,"streak":0,"bestStreak":0,"games":0}');
+    } catch {
+      return { wins: 0, losses: 0, streak: 0, bestStreak: 0, games: 0 };
+    }
+  });
+  const endHandledRef = useRef(null);
+
+  const [hardTimeLeft, setHardTimeLeft] = useState(null);
+  const isHardTimed = gameData.difficulty === 'hard' && !!gameData.startedAt && !!gameData.timeLimit && !isGameOver;
+
+  useEffect(() => {
+    if (!isHardTimed) {
+      setHardTimeLeft(null);
+      return;
+    }
+    const tick = () => {
+      const elapsed = Math.floor((Date.now() - gameData.startedAt) / 1000);
+      setHardTimeLeft(Math.max(0, gameData.timeLimit - elapsed));
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [isHardTimed, gameData.startedAt, gameData.timeLimit]);
+
+  useEffect(() => {
+    if (!isGameOver || endHandledRef.current === message.id) return;
+    endHandledRef.current = message.id;
+
+    const won = gameData.winner === 'team';
+    setStats(prev => {
+      const next = {
+        wins: prev.wins + (won ? 1 : 0),
+        losses: prev.losses + (won ? 0 : 1),
+        streak: won ? prev.streak + 1 : 0,
+        games: prev.games + 1,
+        bestStreak: won ? Math.max(prev.bestStreak, prev.streak + 1) : prev.bestStreak,
+      };
+      try { localStorage.setItem(statsKey, JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
+
+    if (won) {
+      confetti({ particleCount: 160, spread: 95, origin: { y: 0.75 } });
+      toast.success('🎉 Hangman win! Nice teamwork.');
+    } else {
+      toast.info('💀 Round lost. Try a rematch!');
+    }
+  }, [isGameOver, message.id, gameData.winner]);
 
   const handleGuess = (letter) => {
     if (!isPlayer || isGameOver || guessedSet.has(letter) || waitingForOpponent || !isMyTurn) return;
@@ -183,6 +237,13 @@ const HangmanGame = ({ message, currentUser, vibeColor, onHangmanJoin, onHangman
         </div>
       </div>
 
+      <div className="grid grid-cols-4 gap-1 text-center text-[10px]">
+        <div className="rounded-md bg-gray-100 dark:bg-gray-800 py-1"><span className="opacity-60">Score</span><div className="font-black">{stats.wins}</div></div>
+        <div className="rounded-md bg-gray-100 dark:bg-gray-800 py-1"><span className="opacity-60">Best</span><div className="font-black">{stats.bestStreak}</div></div>
+        <div className="rounded-md bg-gray-100 dark:bg-gray-800 py-1"><span className="opacity-60">Streak</span><div className="font-black">{stats.streak}</div></div>
+        <div className="rounded-md bg-gray-100 dark:bg-gray-800 py-1"><span className="opacity-60">Games</span><div className="font-black">{stats.games}</div></div>
+      </div>
+
       {/* 1v1 vs line + turn indicator */}
       {gameData.isTargeted && playerCount >= 2 && (
         <div className="space-y-0.5">
@@ -209,11 +270,31 @@ const HangmanGame = ({ message, currentUser, vibeColor, onHangmanJoin, onHangman
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ backgroundColor: accent }}>Word Setter</span>
           )}
         </div>
-        {gameData.hint && <div className="text-[11px] italic text-gray-500 dark:text-gray-400">💡 {gameData.hint}</div>}
+  {gameData.hint && gameData.hintUsed && <div className="text-[11px] italic text-gray-500 dark:text-gray-400">💡 {gameData.hint}</div>}
         {/* Host sees the full word before game over */}
         {isCustomWordHost && !isGameOver && (
           <div className="text-[11px] font-mono font-bold tracking-widest" style={{ color: accent }}>{gameData.word}</div>
         )}
+      </div>
+
+      {isHardTimed && hardTimeLeft !== null && (
+        <div className="space-y-1">
+          <div className="h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+            <div
+              className={`h-full transition-all ${hardTimeLeft <= 10 ? 'bg-red-500' : 'bg-emerald-500'}`}
+              style={{ width: `${Math.max(0, (hardTimeLeft / gameData.timeLimit) * 100)}%` }}
+            />
+          </div>
+          <div className={`text-center text-[10px] font-bold ${hardTimeLeft <= 10 ? 'text-red-500' : 'text-gray-400'}`}>
+            ⏳ {hardTimeLeft}s
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-center gap-1">
+        {Array.from({ length: Math.min(maxMistakes, 8) }).map((_, i) => (
+          <span key={i} className={`w-2 h-2 rounded-full inline-block ${i < mistakes ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-700'}`} />
+        ))}
       </div>
 
       {/* SVG */}
@@ -274,27 +355,38 @@ const HangmanGame = ({ message, currentUser, vibeColor, onHangmanJoin, onHangman
 
       {/* Alphabet keyboard */}
       {!isGameOver && isPlayer && !waitingForOpponent && (
-        <div className={`flex flex-wrap gap-1 justify-center pt-0.5 ${!isMyTurn ? 'opacity-40 pointer-events-none' : ''}`}>
-          {ALPHABET.map(letter => {
-            const isCorrect = guessed[letter] !== undefined;
-            const isWrong   = wrongLetters.includes(letter);
-            return (
-              <button
-                key={letter}
-                onClick={() => handleGuess(letter)}
-                disabled={isCorrect || isWrong || !isMyTurn}
-                className={`w-6 h-6 sm:w-7 sm:h-7 text-[10px] sm:text-xs font-bold rounded transition-all active:scale-90 ${
-                  isCorrect ? 'bg-emerald-500 text-white cursor-default'
-                  : isWrong ? 'bg-red-300 dark:bg-red-900/60 text-red-700 dark:text-red-400 cursor-default opacity-60'
-                  : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:text-white'
-                }`}
-                onMouseEnter={e => { if (!isCorrect && !isWrong && isMyTurn) e.currentTarget.style.backgroundColor = accent; }}
-                onMouseLeave={e => { if (!isCorrect && !isWrong) e.currentTarget.style.backgroundColor = ''; }}
-              >
-                {letter}
-              </button>
-            );
-          })}
+        <div className="space-y-2">
+          {gameData.hint && !gameData.hintUsed && onHangmanHint && !isCustomWordHost && (
+            <button
+              onClick={() => onHangmanHint(message.id)}
+              className="w-full py-1 rounded-lg border text-[10px] font-bold border-amber-400 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+            >
+              💡 Reveal Hint (−1 life)
+            </button>
+          )}
+
+          <div className={`flex flex-wrap gap-1 justify-center pt-0.5 ${!isMyTurn ? 'opacity-40 pointer-events-none' : ''}`}>
+            {ALPHABET.map(letter => {
+              const isCorrect = guessed[letter] !== undefined;
+              const isWrong   = wrongLetters.includes(letter);
+              return (
+                <button
+                  key={letter}
+                  onClick={() => handleGuess(letter)}
+                  disabled={isCorrect || isWrong || !isMyTurn}
+                  className={`w-6 h-6 sm:w-7 sm:h-7 text-[10px] sm:text-xs font-bold rounded transition-all active:scale-90 ${
+                    isCorrect ? 'bg-emerald-500 text-white cursor-default'
+                    : isWrong ? 'bg-red-300 dark:bg-red-900/60 text-red-700 dark:text-red-400 cursor-default opacity-60'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:text-white'
+                  }`}
+                  onMouseEnter={e => { if (!isCorrect && !isWrong && isMyTurn) e.currentTarget.style.backgroundColor = accent; }}
+                  onMouseLeave={e => { if (!isCorrect && !isWrong) e.currentTarget.style.backgroundColor = ''; }}
+                >
+                  {letter}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 

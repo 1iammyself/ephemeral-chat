@@ -3,11 +3,10 @@ import { X, Trophy } from 'lucide-react';
 import HangmanGame from './HangmanGame';
 import { getVibeById } from '../../utils/vibes';
 
-const HangmanModal = ({ isOpen, onClose, message, currentUser, onHangmanJoin, onHangmanGuess, onRematch, onShareResult, roomVibe }) => {
+const HangmanModal = ({ isOpen, onClose, message, currentUser, onHangmanJoin, onHangmanGuess, onHangmanHint, onRematch, onShareResult, roomVibe }) => {
   if (!isOpen || !message) return null;
 
   const { gameData } = message;
-  const currentUserId = currentUser?.id || currentUser?.socketId;
   const vibe = getVibeById(roomVibe);
   const headerClass = vibe.accentClass;
 
@@ -51,6 +50,7 @@ const HangmanModal = ({ isOpen, onClose, message, currentUser, onHangmanJoin, on
             vibeColor={vibe.colors?.primary}
             onHangmanJoin={onHangmanJoin}
             onHangmanGuess={onHangmanGuess}
+            onHangmanHint={onHangmanHint}
             onRematch={onRematch}
             onShareResult={onShareResult}
           />

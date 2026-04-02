@@ -2212,15 +2212,19 @@ const ChatRoom = () => {
     if (!isConnected) return;
     socketManager.emit('hangman-guess', { messageId, letter });
   };
+  const handleHangmanHint = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('hangman-hint', { messageId });
+  };
 
   // ── Anagram handlers ──────────────────────────────────────────────
   const handleAnagramJoin = (messageId) => {
     if (!isConnected) return;
     socketManager.emit('anagram-join', { messageId });
   };
-  const handleAnagramSubmit = (messageId, word) => {
+  const handleAnagramSubmit = (messageId, word, powerUps = {}) => {
     if (!isConnected) return;
-    socketManager.emit('anagram-submit', { messageId, word });
+    socketManager.emit('anagram-submit', { messageId, word, powerUps });
   };
   const handleAnagramNextRound = (messageId) => {
     if (!isConnected) return;
@@ -2992,6 +2996,7 @@ const ChatRoom = () => {
               roomVibe={roomVibe}
               onHangmanJoin={handleHangmanJoin}
               onHangmanGuess={handleHangmanGuess}
+              onHangmanHint={handleHangmanHint}
               onAnagramJoin={handleAnagramJoin}
               onAnagramSubmit={handleAnagramSubmit}
               onAnagramNextRound={handleAnagramNextRound}

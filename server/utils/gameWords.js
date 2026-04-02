@@ -1,5 +1,5 @@
-// Word banks and text passages for chat-integrated games
-// Extracted from standalone game files in /games/
+// Word banks and text passages for chat-integrated games.
+// Originally sourced from legacy standalone HTML games; now maintained natively in-repo.
 
 const HANGMAN_WORDS = {
   easy: [

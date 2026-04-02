@@ -18,7 +18,7 @@ import { FileOpener } from '@capacitor-community/file-opener';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀', '🍕', '🍔', '🍦', '🍩', '🍺', '🎸', '🎮', '🚀', '🌈', '🍄'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onGameAnswer, onTicTacToeMove, onRPSAction, onLaunchChess, roomVibe, linkPreviews = {}, onOpenEmojiPicker, onHangmanJoin, onHangmanGuess, onAnagramJoin, onAnagramSubmit, onAnagramNextRound, onAnagramReveal, onAnagramHint, onTypingRaceJoin, onTypingRaceStart, onTypingRaceProgress, onTypingRaceFinish, onRematch, onShareResult }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onGameAnswer, onTicTacToeMove, onRPSAction, onLaunchChess, roomVibe, linkPreviews = {}, onOpenEmojiPicker, onHangmanJoin, onHangmanGuess, onHangmanHint, onAnagramJoin, onAnagramSubmit, onAnagramNextRound, onAnagramReveal, onAnagramHint, onTypingRaceJoin, onTypingRaceStart, onTypingRaceProgress, onTypingRaceFinish, onRematch, onShareResult }) => {
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
   const { theme } = useTheme();
@@ -31,6 +31,12 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   const [playingAudioId, setPlayingAudioId] = useState(null);
   const [newMessages, setNewMessages] = useState(new Set());
   const [linkPreviewUrl, setLinkPreviewUrl] = useState(null);
+
+  const isGameMessageTerminal = useCallback((message) => {
+    if (message?.messageType !== 'game' || !message?.gameData) return true;
+    const gd = message.gameData;
+    return !!gd.winner || gd.gameOver === true || !!gd.endedAt || gd.status === 'finished';
+  }, []);
 
   // Swipe to reply / Long press to react states
   const touchState = React.useRef({
@@ -71,9 +77,13 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   // Set up timers for messages with TTL
   useEffect(() => {
     messages.forEach(message => {
+      const isGame = message.messageType === 'game' && !!message.gameData;
+      const isActiveGame = isGame && !isGameMessageTerminal(message);
       const isChess = (message.messageType === 'game' && message.gameData?.gameType === 'chess') || (message.gameData?.type === 'chess');
-      // Chess messages never expire (TTL = 0) — only deleted when completed
-      const ttl = isChess ? (message.overrideTtl || 0) : (message.overrideTtl || messageTTL);
+      // Active game messages never expire client-side until they reach terminal state.
+      const ttl = isActiveGame
+        ? 0
+        : (isChess ? (message.overrideTtl || 0) : (message.overrideTtl || messageTTL));
 
       if (ttl && ttl > 0 && message.type !== 'system' && !messageTimers.has(message.id)) {
         const messageTime = new Date(message.timestamp).getTime();
@@ -97,7 +107,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
     return () => {
       messageTimers.forEach(timer => { if (typeof timer === 'object') clearTimeout(timer); });
     };
-  }, [messages, messageTTL]);
+  }, [messages, messageTTL, isGameMessageTerminal]);
 
   // Read Receipt Observer
   useEffect(() => {
@@ -136,6 +146,8 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   };
 
   const getTimeLeft = (message) => {
+    const isActiveGame = message?.messageType === 'game' && !!message?.gameData && !isGameMessageTerminal(message);
+    if (isActiveGame) return null;
     const isChess = (message.messageType === 'game' && message.gameData?.gameType === 'chess') || (message.gameData?.type === 'chess');
     const ttl = isChess ? (message.overrideTtl || 0) : (message.overrideTtl || messageTTL);
     if (!ttl || ttl === 0 || message.type === 'system') return null;
@@ -440,6 +452,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         roomVibe={roomVibe}
                         onHangmanJoin={onHangmanJoin}
                         onHangmanGuess={onHangmanGuess}
+                        onHangmanHint={onHangmanHint}
                         onAnagramJoin={onAnagramJoin}
                         onAnagramSubmit={onAnagramSubmit}
                         onAnagramNextRound={onAnagramNextRound}

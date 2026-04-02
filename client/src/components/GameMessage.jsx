@@ -14,7 +14,7 @@ import TypingRaceModal from './games/TypingRaceModal';
 const GameMessage = ({
     message, currentUser, onGameAnswer, onTicTacToeMove, onRPSAction, onLaunchChess, onDelete, roomVibe,
     onAnagramJoin, onAnagramSubmit, onAnagramNextRound, onAnagramReveal, onAnagramHint,
-    onHangmanJoin, onHangmanGuess,
+    onHangmanJoin, onHangmanGuess, onHangmanHint,
     onTypingRaceJoin, onTypingRaceStart, onTypingRaceProgress, onTypingRaceFinish,
     onRematch, onShareResult,
 }) => {
@@ -915,6 +915,7 @@ const GameMessage = ({
                     currentUser={currentUser}
                     onHangmanJoin={onHangmanJoin}
                     onHangmanGuess={onHangmanGuess}
+                    onHangmanHint={onHangmanHint}
                     onRematch={onRematch}
                     onShareResult={onShareResult}
                     roomVibe={roomVibe}

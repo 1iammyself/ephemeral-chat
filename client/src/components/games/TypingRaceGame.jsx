@@ -35,7 +35,20 @@ const TypingRaceGame = ({
   const [typed, setTyped]         = useState('');
   const [countdown, setCountdown] = useState(null);
   const [localWpm, setLocalWpm]   = useState(0);
+  const [rawWpm, setRawWpm]       = useState(0);
   const [errors, setErrors]       = useState(0);
+  const [capsOn, setCapsOn]       = useState(false);
+  const [pacerSpeed, setPacerSpeed] = useState(7);
+  const [ghostIndex, setGhostIndex] = useState(0);
+  const [errorHeatmap, setErrorHeatmap] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('typingRaceHeatmapV1') || '{}'); } catch { return {}; }
+  });
+  const [wpmHistory, setWpmHistory] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('typingRaceHistoryV1') || '[]'); } catch { return []; }
+  });
+  const [testStreak, setTestStreak] = useState(() => {
+    try { return parseInt(localStorage.getItem('typingRaceStreakV1') || '0', 10); } catch { return 0; }
+  });
   const [isNewPB, setIsNewPB]     = useState(false);
   const [personalBest, setPersonalBest] = useState(() => {
     try { return parseInt(localStorage.getItem('typingRacePB') || '0', 10); } catch (_) { return 0; }
@@ -65,10 +78,34 @@ const TypingRaceGame = ({
 
   useEffect(() => {
     if (status === 'waiting') {
-      setTyped(''); setLocalWpm(0); setErrors(0); setIsNewPB(false);
+      setTyped(''); setLocalWpm(0); setRawWpm(0); setErrors(0); setIsNewPB(false); setGhostIndex(0);
       finishedRef.current = false; startTimeRef.current = null;
     }
   }, [status]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (typeof e.getModifierState === 'function') {
+        setCapsOn(e.getModifierState('CapsLock'));
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKey);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (status !== 'racing' || countdown !== null || !startTimeRef.current || iFinished) return;
+    const id = setInterval(() => {
+      const elapsedSec = (Date.now() - startTimeRef.current) / 1000;
+      const idx = Math.min(text.length - 1, Math.floor(elapsedSec * pacerSpeed));
+      setGhostIndex(Math.max(0, idx));
+    }, 120);
+    return () => clearInterval(id);
+  }, [status, countdown, iFinished, text.length, pacerSpeed]);
 
   // Personal best detection
   useEffect(() => {
@@ -99,8 +136,24 @@ const TypingRaceGame = ({
     setErrors(errs);
     const { wpm } = calcWpm(val);
     setLocalWpm(wpm);
+    const elapsedMin = startTimeRef.current ? Math.max(0.001, (Date.now() - startTimeRef.current) / 60000) : 0.001;
+    setRawWpm(Math.max(0, Math.round((val.length / 5) / elapsedMin)));
     const progress = val.length / text.length;
     const acc = val.length > 0 ? Math.round(((val.length - errs) / val.length) * 100) : 100;
+
+    if (val.length > 0) {
+      const i = val.length - 1;
+      if (val[i] !== text[i]) {
+        const key = (val[i] || '').toUpperCase();
+        if (key) {
+          setErrorHeatmap(prev => {
+            const next = { ...prev, [key]: (prev[key] || 0) + 1 };
+            try { localStorage.setItem('typingRaceHeatmapV1', JSON.stringify(next)); } catch (_) {}
+            return next;
+          });
+        }
+      }
+    }
     const now = Date.now();
     if (now - lastProgressRef.current > 500) {
       lastProgressRef.current = now;
@@ -111,6 +164,17 @@ const TypingRaceGame = ({
       const timeSecs = startTimeRef.current ? Math.round((Date.now() - startTimeRef.current) / 1000) : 0;
       const finalAcc = val.length > 0 ? Math.round(((val.length - errs) / val.length) * 100) : 100;
       onTypingRaceFinish(message.id, wpm, finalAcc, errs, timeSecs);
+
+      setWpmHistory(prev => {
+        const next = [...prev, wpm].slice(-20);
+        try { localStorage.setItem('typingRaceHistoryV1', JSON.stringify(next)); } catch (_) {}
+        return next;
+      });
+      setTestStreak(prev => {
+        const next = prev + 1;
+        try { localStorage.setItem('typingRaceStreakV1', String(next)); } catch (_) {}
+        return next;
+      });
     }
   }, [isPlayer, iFinished, countdown, status, text, calcWpm, message.id, onTypingRaceProgress, onTypingRaceFinish]);
 
@@ -265,9 +329,63 @@ const TypingRaceGame = ({
           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase text-white shrink-0 ${diffBadge}`}>{gameData.difficulty || 'easy'}</span>
         </div>
         {status === 'racing' && countdown === null && localWpm > 0 && (
-          <span className="text-xs font-bold shrink-0" style={{ color: accent }}>{localWpm} WPM</span>
+            <span className="text-xs font-bold shrink-0" style={{ color: accent }}>Net {localWpm} / Raw {rawWpm}</span>
         )}
       </div>
+
+        {capsOn && (
+          <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 text-center">⚠️ Caps Lock is ON</div>
+        )}
+
+        <div className="grid grid-cols-4 gap-1 text-center text-[10px]">
+          <div className="rounded-md bg-gray-100 dark:bg-gray-800 py-1"><span className="opacity-60">Net</span><div className="font-black">{localWpm}</div></div>
+          <div className="rounded-md bg-gray-100 dark:bg-gray-800 py-1"><span className="opacity-60">Raw</span><div className="font-black">{rawWpm}</div></div>
+          <div className="rounded-md bg-gray-100 dark:bg-gray-800 py-1"><span className="opacity-60">Acc</span><div className="font-black">{typed.length > 0 ? Math.max(0, Math.round(((typed.length - errors) / typed.length) * 100)) : 100}%</div></div>
+          <div className="rounded-md bg-gray-100 dark:bg-gray-800 py-1"><span className="opacity-60">Chars</span><div className="font-black">{typed.length}/{text.length}</div></div>
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-[10px] text-gray-400">
+            <span>Pacer speed</span>
+            <span>{pacerSpeed} cps · Streak {testStreak}</span>
+          </div>
+          <input type="range" min={3} max={15} value={pacerSpeed} onChange={(e) => setPacerSpeed(parseInt(e.target.value, 10))} className="w-full" />
+        </div>
+
+        <div className="space-y-1">
+          <div className="text-[10px] text-gray-400">Skill Zone</div>
+          <div className="h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+            <div className={`h-full ${localWpm < 35 ? 'bg-blue-500' : localWpm < 60 ? 'bg-emerald-500' : localWpm < 100 ? 'bg-lime-500' : 'bg-amber-500'}`} style={{ width: `${Math.min(100, (localWpm / 120) * 100)}%` }} />
+          </div>
+        </div>
+
+        {wpmHistory.length > 1 && (
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-2 bg-gray-50 dark:bg-gray-900/50">
+            <div className="text-[10px] text-gray-400 mb-1">WPM History</div>
+            <svg viewBox="0 0 200 40" className="w-full h-10">
+              <polyline
+                fill="none"
+                stroke={accent}
+                strokeWidth="2"
+                points={wpmHistory.map((v, i) => `${(i / Math.max(1, wpmHistory.length - 1)) * 200},${40 - Math.min(38, (v / 120) * 38)}`).join(' ')}
+              />
+            </svg>
+          </div>
+        )}
+
+        {Object.keys(errorHeatmap).length > 0 && (
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-2 bg-gray-50 dark:bg-gray-900/50">
+            <div className="text-[10px] text-gray-400 mb-1">Error Heatmap (top keys)</div>
+            <div className="flex flex-wrap gap-1">
+              {Object.entries(errorHeatmap)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 12)
+                .map(([k, v]) => (
+                  <span key={k} className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 font-bold">{k}:{v}</span>
+                ))}
+            </div>
+          </div>
+        )}
 
       {/* 1v1 vs */}
       {gameData.isTargeted && allPlayers.length >= 2 && (
@@ -360,6 +478,9 @@ const TypingRaceGame = ({
             onClick={() => inputRef.current?.focus()}
           >
             {renderText()}
+            {status === 'racing' && countdown === null && !iFinished && (
+              <div className="mt-1 text-[10px] text-gray-400">👻 Ghost target at char {Math.min(text.length, ghostIndex + 1)}</div>
+            )}
           </div>
           {isPlayer && !iFinished && (
             <>

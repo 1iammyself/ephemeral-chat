@@ -129,3 +129,6 @@ build_log.txt
 bundle_*.log
 keystore_path/
 
+# Rust build artifacts
+target/
+

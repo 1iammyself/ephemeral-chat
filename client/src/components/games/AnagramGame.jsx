@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Clock, Trophy, ChevronRight, Check, X as XIcon, Puzzle, Loader2, Swords, UserCheck, RotateCcw } from 'lucide-react';
 
 const DIFF_COLORS = {
@@ -20,6 +20,8 @@ const AnagramGame = ({
   const [timeLeft, setTimeLeft] = useState(null);
   const [localRevealed, setLocalRevealed] = useState(false);
   const [nextRoundIn, setNextRoundIn] = useState(null);
+  const [powerUps, setPowerUps] = useState({ freeze: 1, speedBoost: 1, doublePoints: 1 });
+  const [activePowerUps, setActivePowerUps] = useState({ speedBoost: false, doublePoints: false });
   const nextRoundTimerRef = useRef(null);
 
   const difficulty = gameData.difficulty || 'novice';
@@ -120,9 +122,17 @@ const AnagramGame = ({
 
   const handleSubmit = () => {
     if (!inputWord.trim() || hasSubmitted || !isInPlayers) return;
-    onAnagramSubmit(message.id, inputWord.trim().toUpperCase());
+    onAnagramSubmit(message.id, inputWord.trim().toUpperCase(), {
+      speedBoost: activePowerUps.speedBoost,
+      doublePoints: activePowerUps.doublePoints,
+    });
+    setActivePowerUps({ speedBoost: false, doublePoints: false });
     setInputWord('');
   };
+
+  const recentHistory = useMemo(() => {
+    return [...(gameData.roundHistory || [])].slice(-5).reverse();
+  }, [gameData.roundHistory]);
 
   const timerPct = timeLeft !== null && gameData.timeLimit
     ? (timeLeft / gameData.timeLimit) * 100 : 100;
@@ -284,6 +294,45 @@ const AnagramGame = ({
         </div>
       )}
 
+      {/* Power-ups */}
+      {!isRevealed && !hasSubmitted && isInPlayers && !isCustomWordHost && !waitingForOpponent && gameData.startedAt && (
+        <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+          <button
+            onClick={() => {
+              if (powerUps.freeze <= 0) return;
+              setPowerUps(prev => ({ ...prev, freeze: prev.freeze - 1 }));
+              setTimeLeft(prev => prev !== null ? prev + 5 : prev);
+            }}
+            disabled={powerUps.freeze <= 0}
+            className="px-2 py-1 rounded-lg border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 disabled:opacity-40"
+          >
+            ❄️ +5s ({powerUps.freeze})
+          </button>
+          <button
+            onClick={() => {
+              if (powerUps.speedBoost <= 0) return;
+              setPowerUps(prev => ({ ...prev, speedBoost: prev.speedBoost - 1 }));
+              setActivePowerUps(prev => ({ ...prev, speedBoost: !prev.speedBoost }));
+            }}
+            disabled={powerUps.speedBoost <= 0}
+            className={`px-2 py-1 rounded-lg border ${activePowerUps.speedBoost ? 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-400' : 'border-emerald-300 dark:border-emerald-700'} text-emerald-600 dark:text-emerald-400 disabled:opacity-40`}
+          >
+            ⚡ +3pts {activePowerUps.speedBoost ? 'ON' : `(${powerUps.speedBoost})`}
+          </button>
+          <button
+            onClick={() => {
+              if (powerUps.doublePoints <= 0) return;
+              setPowerUps(prev => ({ ...prev, doublePoints: prev.doublePoints - 1 }));
+              setActivePowerUps(prev => ({ ...prev, doublePoints: !prev.doublePoints }));
+            }}
+            disabled={powerUps.doublePoints <= 0}
+            className={`px-2 py-1 rounded-lg border ${activePowerUps.doublePoints ? 'bg-amber-100 dark:bg-amber-900/30 border-amber-400' : 'border-amber-300 dark:border-amber-700'} text-amber-600 dark:text-amber-400 disabled:opacity-40`}
+          >
+            ✨ 2x {activePowerUps.doublePoints ? 'ON' : `(${powerUps.doublePoints})`}
+          </button>
+        </div>
+      )}
+
       {/* Hint display / button */}
       {!isRevealed && gameData.startedAt && !waitingForOpponent && (
         <div className="flex items-center justify-between gap-2">
@@ -355,6 +404,20 @@ const AnagramGame = ({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {recentHistory.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-[10px] font-bold uppercase text-gray-400 tracking-wider">History</div>
+          <div className="space-y-1">
+            {recentHistory.map((h) => (
+              <div key={h.round} className="text-[10px] flex items-center justify-between rounded-md bg-gray-100 dark:bg-gray-800 px-2 py-1">
+                <span className="text-gray-500">R{h.round}</span>
+                <span className="font-black tracking-widest" style={{ color: accent }}>{h.word}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
