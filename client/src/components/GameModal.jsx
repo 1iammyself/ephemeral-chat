@@ -11,12 +11,15 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
     const [customTimer, setCustomTimer] = useState(15);
     // New game config state
     const [hangmanDiff, setHangmanDiff] = useState('medium');
+    const [hangmanMode, setHangmanMode] = useState('pvp');
     const [hangmanCustomWord, setHangmanCustomWord] = useState('');
     const [anagramDiff, setAnagramDiff] = useState('novice');
     const [anagramRounds, setAnagramRounds] = useState(5);
     const [anagramCustomWord, setAnagramCustomWord] = useState('');
     const [typingDiff, setTypingDiff] = useState('easy');
     const [typingCustomText, setTypingCustomText] = useState('');
+    const [typingMode, setTypingMode] = useState('pvp');
+    const [matchMode, setMatchMode] = useState('pvp');
 
     // Calculate dynamic timer bounds based on room TTL
     const dynamicRoomTtl = roomTTL && roomTTL < 300 ? roomTTL * 2 : (roomTTL || 300);
@@ -38,6 +41,9 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
             setSelectedTopic(null);
             setWyrData(null);
             setTriviaData(null);
+            setMatchMode('pvp');
+            setTypingMode('pvp');
+            setHangmanMode('pvp');
         } else if (initialGameType) {
             setGameType(initialGameType);
         }
@@ -51,18 +57,10 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
     if (!isOpen) return null;
 
     const handlePickGame = (type) => {
-        if (type === GAME_TYPES.TIC_TAC_TOE) {
-            onSend({ gameType: GAME_TYPES.TIC_TAC_TOE });
-            handleClose();
-        } else if (type === GAME_TYPES.CHESS) {
-            onSend({ gameType: GAME_TYPES.CHESS });
-            handleClose();
-        } else if (type === GAME_TYPES.ROCK_PAPER_SCISSORS) {
-            onSend({ gameType: GAME_TYPES.ROCK_PAPER_SCISSORS });
-            handleClose();
-        } else {
-            setGameType(type);
-        }
+        setGameType(type);
+        setMatchMode('pvp');
+        setTypingMode('pvp');
+        setHangmanMode('pvp');
     };
 
     const handleSendHangman = () => {
@@ -70,8 +68,8 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
         // - Host sets word/difficulty
         // - Invited user guesses letters
         // - TTL: 10 minutes (enough for a full game)
-        onSend({ gameType: GAME_TYPES.HANGMAN, difficulty: hangmanDiff, customWord: hangmanCustomWord.trim() });
-        handleClose();
+        const sent = onSend({ gameType: GAME_TYPES.HANGMAN, difficulty: hangmanDiff, customWord: hangmanCustomWord.trim(), mode: hangmanMode });
+        if (sent !== false) handleClose();
     };
 
     const handleSendAnagram = () => {
@@ -80,8 +78,8 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
         // - Broadcast: First N players to join compete (example: 2-4 players)
         // - All players see same scrambled words, first correct answer wins
         // - TTL: 8 minutes (gives time for 5+ rounds)
-        onSend({ gameType: GAME_TYPES.ANAGRAM, difficulty: anagramDiff, rounds: anagramRounds, customWord: anagramCustomWord.trim() });
-        handleClose();
+        const sent = onSend({ gameType: GAME_TYPES.ANAGRAM, difficulty: anagramDiff, rounds: anagramRounds, customWord: anagramCustomWord.trim() });
+        if (sent !== false) handleClose();
     };
 
     const handleSendTypingRace = () => {
@@ -90,8 +88,13 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
         // - Broadcast: Up to 8 players can join
         // - Individual results shown (WPM, accuracy, ranking)
         // - TTL: 5 minutes (accounts for typing + setup time)
-        onSend({ gameType: GAME_TYPES.TYPING_RACE, difficulty: typingDiff, customText: typingCustomText.trim() });
-        handleClose();
+        const sent = onSend({
+            gameType: GAME_TYPES.TYPING_RACE,
+            difficulty: typingDiff,
+            customText: typingCustomText.trim(),
+            mode: typingMode,
+        });
+        if (sent !== false) handleClose();
     };
 
     const handlePickTopic = (topic) => {
@@ -110,27 +113,52 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
     };
 
     const handleSend = () => {
-        if (gameType === GAME_TYPES.WYR && wyrData) {
-            onSend({
+        if (gameType === GAME_TYPES.WYR) {
+            const currentWyr = wyrData || getRandomWYR(selectedTopic);
+            if (!currentWyr) return;
+            if (!wyrData) setWyrData(currentWyr);
+            const sent = onSend({
                 gameType: GAME_TYPES.WYR,
-                optionA: wyrData.optionA,
-                optionB: wyrData.optionB
+                optionA: currentWyr.optionA,
+                optionB: currentWyr.optionB
             });
-        } else if (gameType === GAME_TYPES.TRIVIA && triviaData) {
-            onSend({
+            if (sent !== false) handleClose();
+            return;
+        }
+
+        if (gameType === GAME_TYPES.TRIVIA) {
+            const currentTrivia = triviaData || getRandomTrivia(selectedTopic);
+            if (!currentTrivia) return;
+            if (!triviaData) setTriviaData(currentTrivia);
+            const sent = onSend({
                 gameType: GAME_TYPES.TRIVIA,
-                question: triviaData.question,
-                options: triviaData.options,
-                answer: triviaData.answer,
+                question: currentTrivia.question,
+                options: currentTrivia.options,
+                answer: currentTrivia.answer,
                 timer: customTimer
             });
-        } else if (gameType === GAME_TYPES.CHESS) {
-            onSend({
+            if (sent !== false) handleClose();
+            return;
+        }
+
+        if (gameType === GAME_TYPES.CHESS) {
+            const sent = onSend({
                 gameType: GAME_TYPES.CHESS,
+                mode: matchMode,
                 players: { white: null, black: null }
             });
+            if (sent !== false) handleClose();
+            return;
         }
-        handleClose();
+
+        if (gameType === GAME_TYPES.TIC_TAC_TOE || gameType === GAME_TYPES.ROCK_PAPER_SCISSORS) {
+            const sent = onSend({
+                gameType,
+                mode: matchMode,
+            });
+            if (sent !== false) handleClose();
+            return;
+        }
     };
 
     const handleClose = () => {
@@ -141,6 +169,9 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
         setHangmanCustomWord('');
         setAnagramCustomWord('');
         setTypingCustomText('');
+        setMatchMode('pvp');
+        setTypingMode('pvp');
+        setHangmanMode('pvp');
         onClose();
     };
 
@@ -177,6 +208,9 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                                 : gameType === GAME_TYPES.HANGMAN ? 'Hangman Together'
                                 : gameType === GAME_TYPES.ANAGRAM ? 'Anagram Challenge'
                                 : gameType === GAME_TYPES.TYPING_RACE ? 'Type Race'
+                                : gameType === GAME_TYPES.TIC_TAC_TOE ? 'Tic-Tac-Toe Setup'
+                                : gameType === GAME_TYPES.ROCK_PAPER_SCISSORS ? 'RPS Setup'
+                                : gameType === GAME_TYPES.CHESS ? 'Chess Setup'
                                 : !selectedTopic && !(wyrData || triviaData) ? 'Pick a Topic'
                                 : gameType === GAME_TYPES.WYR ? 'Would You Rather' : 'Trivia'}
                         </h2>
@@ -253,6 +287,33 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                                 <Trophy className={`w-4 h-4 sm:w-6 sm:h-6 text-${vibeAccent}-500 mb-1 sm:mb-2 group-hover:scale-110 transition-transform`} />
                                 <span className="font-bold text-gray-900 dark:text-white text-[10px] sm:text-xs text-center leading-tight">Chess</span>
                                 <span className="hidden sm:block text-[9px] text-gray-600 dark:text-gray-400 mt-0.5 text-center">Classic Strategy</span>
+                            </button>
+                        </div>
+                    ) : (gameType === GAME_TYPES.TIC_TAC_TOE || gameType === GAME_TYPES.ROCK_PAPER_SCISSORS || gameType === GAME_TYPES.CHESS) ? (
+                        <div className="space-y-3">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                                Choose how to play this match in chat.
+                            </p>
+                            <div className="space-y-1.5">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Mode</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        onClick={() => setMatchMode('pvp')}
+                                        className={`py-2 rounded-lg border text-xs font-bold transition-all ${matchMode === 'pvp' ? `border-${vibeAccent}-500 bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20 text-${vibeAccent}-700 dark:text-${vibeAccent}-300` : 'border-gray-200 dark:border-gray-700 text-gray-500'}`}
+                                    >
+                                        Vs Player
+                                    </button>
+                                    <button
+                                        onClick={() => setMatchMode('cpu')}
+                                        className={`py-2 rounded-lg border text-xs font-bold transition-all ${matchMode === 'cpu' ? `border-${vibeAccent}-500 bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20 text-${vibeAccent}-700 dark:text-${vibeAccent}-300` : 'border-gray-200 dark:border-gray-700 text-gray-500'}`}
+                                    >
+                                        Vs CPU
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button onClick={handleSend} style={{ backgroundColor: vibeColor }} className="w-full py-2 rounded-xl font-bold text-white text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+                                <Send className="w-3.5 h-3.5" /> Send {gameType === GAME_TYPES.TIC_TAC_TOE ? 'Tic-Tac-Toe' : gameType === GAME_TYPES.ROCK_PAPER_SCISSORS ? 'RPS' : 'Chess'} · {matchMode === 'cpu' ? 'Vs CPU' : 'Vs Player'}
                             </button>
                         </div>
                     ) : (gameType === GAME_TYPES.WYR || gameType === GAME_TYPES.TRIVIA) && !selectedTopic && !(wyrData || triviaData) ? (
@@ -365,7 +426,24 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                         </div>
                     ) : gameType === GAME_TYPES.HANGMAN ? (
                         <div className="space-y-3">
-                            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">Everyone collaborates to guess the hidden word. In 1v1, players take turns guessing!</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">Everyone collaborates to guess the hidden word. Works smoothly with both touch and physical keyboards.</p>
+                            <div className="space-y-1.5">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Mode</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        onClick={() => setHangmanMode('pvp')}
+                                        className={`py-2 rounded-lg border text-xs font-bold transition-all ${hangmanMode === 'pvp' ? `border-${vibeAccent}-500 bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20 text-${vibeAccent}-700 dark:text-${vibeAccent}-300` : 'border-gray-200 dark:border-gray-700 text-gray-500'}`}
+                                    >
+                                        Vs Player
+                                    </button>
+                                    <button
+                                        onClick={() => setHangmanMode('cpu')}
+                                        className={`py-2 rounded-lg border text-xs font-bold transition-all ${hangmanMode === 'cpu' ? `border-${vibeAccent}-500 bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20 text-${vibeAccent}-700 dark:text-${vibeAccent}-300` : 'border-gray-200 dark:border-gray-700 text-gray-500'}`}
+                                    >
+                                        Vs CPU
+                                    </button>
+                                </div>
+                            </div>
                             <div className="space-y-1.5">
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Difficulty</p>
                                 {[['easy', '8 lives — short words'], ['medium', '6 lives — medium words'], ['hard', '4 lives — long words']].map(([d, label]) => (
@@ -387,7 +465,7 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                                 />
                             </div>
                             <button onClick={handleSendHangman} style={{ backgroundColor: vibeColor }} className="w-full py-2 rounded-xl font-bold text-white text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all">
-                                <Send className="w-3.5 h-3.5" /> Send Hangman{hangmanCustomWord.trim() ? ' · Custom word' : ''}
+                                <Send className="w-3.5 h-3.5" /> Send Hangman · {hangmanMode === 'cpu' ? 'Vs CPU' : 'Vs Player'}{hangmanCustomWord.trim() ? ' · Custom word' : ''}
                             </button>
                         </div>
                     ) : gameType === GAME_TYPES.ANAGRAM ? (
@@ -432,6 +510,23 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                         <div className="space-y-3">
                             <p className="text-xs text-gray-500 dark:text-gray-400 text-center">Everyone types the same passage as fast as possible. Real-time progress bars — first to finish wins!</p>
                             <div className="space-y-1.5">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Mode</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        onClick={() => setTypingMode('pvp')}
+                                        className={`py-2 rounded-lg border text-xs font-bold transition-all ${typingMode === 'pvp' ? `border-${vibeAccent}-500 bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20 text-${vibeAccent}-700 dark:text-${vibeAccent}-300` : 'border-gray-200 dark:border-gray-700 text-gray-500'}`}
+                                    >
+                                        Vs Player
+                                    </button>
+                                    <button
+                                        onClick={() => setTypingMode('cpu')}
+                                        className={`py-2 rounded-lg border text-xs font-bold transition-all ${typingMode === 'cpu' ? `border-${vibeAccent}-500 bg-${vibeAccent}-50 dark:bg-${vibeAccent}-900/20 text-${vibeAccent}-700 dark:text-${vibeAccent}-300` : 'border-gray-200 dark:border-gray-700 text-gray-500'}`}
+                                    >
+                                        Vs CPU
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Text Difficulty</p>
                                 {[['easy', 'Short simple sentences'], ['medium', 'Moderate length passages'], ['hard', 'Complex technical text']].map(([d, label]) => (
                                     <button key={d} onClick={() => setTypingDiff(d)}
@@ -457,7 +552,7 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                                 )}
                             </div>
                             <button onClick={handleSendTypingRace} disabled={typingCustomText.trim().length > 0 && typingCustomText.trim().length < 20} style={{ backgroundColor: vibeColor }} className="w-full py-2 rounded-xl font-bold text-white text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all disabled:opacity-50">
-                                <Send className="w-3.5 h-3.5" /> Send Race{typingCustomText.trim().length >= 20 ? ' · Custom text' : ''}
+                                <Send className="w-3.5 h-3.5" /> Send Race · {typingMode === 'cpu' ? 'Vs CPU' : 'Vs Player'}{typingCustomText.trim().length >= 20 ? ' · Custom text' : ''}
                             </button>
                         </div>
                     ) : (

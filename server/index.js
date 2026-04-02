@@ -264,6 +264,7 @@ setupNearbyNamespace(io);
 // Server-side timeouts for timed games (anagram)
 const gameTimeouts = new Map();
 const recentHangmanWordsByRoom = new Map();
+const hangmanCpuGuessTimers = new Map();
 
 // Shared scoring helper for anagram rounds (used in all reveal paths)
 function getScrabbleScore(word = '') {
@@ -2500,12 +2501,16 @@ io.on('connection', (socket) => {
           };
         } else if (gameData.gameType === 'tic-tac-toe') {
           const tttSenderId = socket.persistentUserId || data.userId || socket.id;
+          const isCpuMode = gameData.mode === 'cpu';
           data.gameData = {
             gameType: gameData.gameType,
+            mode: isCpuMode ? 'cpu' : 'pvp',
             board: Array(9).fill(null),
             players: {
               X: { id: tttSenderId, socketId: socket.id, name: socket.nickname },
-              O: { id: null, socketId: null, name: null }
+              O: isCpuMode
+                ? { id: 'cpu-bot', socketId: null, name: 'CPU 🤖' }
+                : { id: null, socketId: null, name: null }
             },
             turn: 'X',
             winner: null,
@@ -2514,11 +2519,15 @@ io.on('connection', (socket) => {
           };
         } else if (gameData.gameType === 'rock-paper-scissors') {
           const rpsSenderId = socket.persistentUserId || data.userId || socket.id;
+          const isCpuMode = gameData.mode === 'cpu';
           data.gameData = {
             gameType: gameData.gameType,
+            mode: isCpuMode ? 'cpu' : 'pvp',
             players: {
               P1: { id: rpsSenderId, socketId: socket.id, name: socket.nickname, move: null },
-              P2: { id: null, socketId: null, name: null, move: null }
+              P2: isCpuMode
+                ? { id: 'cpu-bot', socketId: null, name: 'CPU 🤖', move: null }
+                : { id: null, socketId: null, name: null, move: null }
             },
             scores: { P1: 0, P2: 0 },
             rounds: [],
@@ -2527,9 +2536,10 @@ io.on('connection', (socket) => {
           };
         } else if (gameData.gameType === 'chess') {
           const senderId = socket.persistentUserId || data.userId || socket.id; // Persistent ID preferred
+          const isCpuMode = gameData.mode === 'cpu';
           const isTargeted = recipients && recipients.length === 1;
           let invitedNickname = null;
-          if (isTargeted) {
+          if (isTargeted && !isCpuMode) {
             const chessRoom = await roomManager.getRoom(socket.roomCode);
             if (chessRoom && chessRoom.users) {
               const targetUser = chessRoom.users.find(u => u.socketId === recipients[0] || u.id === recipients[0]);
@@ -2539,10 +2549,11 @@ io.on('connection', (socket) => {
 
           data.gameData = {
             gameType: gameData.gameType,
+            mode: isCpuMode ? 'cpu' : 'pvp',
             fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
             players: {
               white: { id: senderId, socketId: socket.id, name: socket.nickname },
-              black: null
+              black: isCpuMode ? { id: 'cpu-bot', socketId: null, name: 'CPU 🤖' } : null
             },
             invitedNickname, // Store invited name for UI display
             turn: 'w',
@@ -2571,9 +2582,10 @@ io.on('connection', (socket) => {
             recentHangmanWordsByRoom.set(socket.roomCode, nextRecent);
           }
           const hSenderId = socket.persistentUserId || data.userId || socket.id;
-          const hIsTargeted = !!(recipients && recipients.length === 1);
-          const hMode = hIsTargeted ? 'duel' : 'coop';
-          const hMaxPlayers = hIsTargeted ? 2 : 8;
+          const hIsCpuMode = gameData.mode === 'cpu';
+          const hIsTargeted = !hIsCpuMode && !!(recipients && recipients.length === 1);
+          const hMode = hIsCpuMode ? 'cpu' : (hIsTargeted ? 'duel' : 'coop');
+          const hMaxPlayers = hIsCpuMode ? 2 : (hIsTargeted ? 2 : 8);
           let hInvitedNickname = null, hInvitedUserId = null;
           if (hIsTargeted) {
             const hRoom = await roomManager.getRoom(socket.roomCode);
@@ -2602,7 +2614,16 @@ io.on('connection', (socket) => {
             currentTurn: 0,
             isCustomWord: hIsCustom,
             // Custom word setter is the host — not a guesser
-            players: hIsCustom ? [] : [{ id: hSenderId, socketId: socket.id, name: socket.nickname }],
+            players: hIsCustom
+              ? (hIsCpuMode ? [{ id: 'cpu-bot', socketId: null, name: 'CPU 🤖' }] : [])
+              : [{ id: hSenderId, socketId: socket.id, name: socket.nickname }, ...(hIsCpuMode ? [{ id: 'cpu-bot', socketId: null, name: 'CPU 🤖' }] : [])],
+            cpuProfile: hIsCpuMode
+              ? {
+                missChance: hDiff === 'hard' ? 0.34 : hDiff === 'medium' ? 0.24 : 0.17,
+                minDelayMs: hDiff === 'hard' ? 800 : hDiff === 'medium' ? 1000 : 1200,
+                maxDelayMs: hDiff === 'hard' ? 1500 : hDiff === 'medium' ? 1900 : 2300,
+              }
+              : null,
             winner: null,
             gameOver: false,
             isTargeted: hIsTargeted,
@@ -2670,8 +2691,9 @@ io.on('connection', (socket) => {
           const tIsCustom = rawTCustom.length >= 20;
           const tText = tIsCustom ? rawTCustom.slice(0, 500) : getTypingText(tDiff);
           const tSenderId = socket.persistentUserId || data.userId || socket.id;
-          const tIsTargeted = !!(recipients && recipients.length === 1);
-          const tMode = tIsTargeted ? 'duel' : 'race';
+          const tIsCpuMode = gameData.mode === 'cpu';
+          const tIsTargeted = !tIsCpuMode && !!(recipients && recipients.length === 1);
+          const tMode = tIsCpuMode ? 'cpu' : (tIsTargeted ? 'duel' : 'race');
           const tMaxPlayers = tIsTargeted ? 2 : 8;
           let tInvitedNickname = null, tInvitedUserId = null;
           if (tIsTargeted) {
@@ -2693,9 +2715,36 @@ io.on('connection', (socket) => {
             startedAt: null,
             endsAt: null,
             isCustomText: tIsCustom,
-            players: tIsCustom ? {} : {
-              [tSenderId]: { id: tSenderId, socketId: socket.id, name: socket.nickname, progress: 0, wpm: 0, accuracy: 100, errors: 0, finishedAt: null, rank: null }
-            },
+            players: tIsCustom
+              ? {}
+              : {
+                [tSenderId]: { id: tSenderId, socketId: socket.id, name: socket.nickname, progress: 0, wpm: 0, accuracy: 100, errors: 0, finishedAt: null, rank: null },
+                ...(tIsCpuMode
+                  ? {
+                    'cpu-bot': { id: 'cpu-bot', socketId: null, name: 'CPU 🤖', progress: 0, wpm: 0, accuracy: 100, errors: 0, finishedAt: null, rank: null }
+                  }
+                  : {})
+              },
+            cpuProfile: tIsCpuMode
+              ? {
+                // Lightly randomized profile per match for natural-feeling races.
+                wpm: Math.round(
+                  tDiff === 'hard'
+                    ? 70 + Math.random() * 35
+                    : tDiff === 'medium'
+                      ? 52 + Math.random() * 25
+                      : 35 + Math.random() * 20
+                ),
+                accuracy: Math.round(
+                  tDiff === 'hard'
+                    ? 89 + Math.random() * 7
+                    : tDiff === 'medium'
+                      ? 91 + Math.random() * 7
+                      : 93 + Math.random() * 6
+                ),
+                reactionMs: Math.round(500 + Math.random() * 1400),
+              }
+              : null,
             nextRank: 1,
             winner: null,
             gameOver: false,
@@ -2785,6 +2834,13 @@ io.on('connection', (socket) => {
       }
 
       await roomManager.addMessage(socket.roomCode, message);
+
+      if (messageType === 'game' && message.gameData?.gameType === 'hangman' && message.gameData?.mode === 'cpu') {
+        const profile = message.gameData.cpuProfile || {};
+        const minDelay = Number(profile.minDelayMs) || 1000;
+        const maxDelay = Number(profile.maxDelayMs) || 1800;
+        scheduleHangmanCpuGuess(message.id, minDelay, maxDelay);
+      }
 
       // Update user activity on any message sent
       securityManager.updateUserActivity(socket.id, handleInactivityTimeout);
@@ -3516,6 +3572,7 @@ io.on('connection', (socket) => {
       const isO = gameData.players.O.id === playerId || gameData.players.O.id === socket.id || gameData.players.O.name === socket.nickname;
 
       if (action === 'join') {
+        if (gameData.mode === 'cpu') return;
         if (!gameData.players.O.id && !isX) {
           // Check if it's a targeted match - check both socket.id and persistentUserId
           const recipients = message.recipients || [];
@@ -3565,22 +3622,38 @@ io.on('connection', (socket) => {
           [0, 4, 8], [2, 4, 6]             // Diagonals
         ];
 
-        let winnerFound = false;
-        for (const line of winLines) {
-          const [a, b, c] = line;
-          if (gameData.board[a] && gameData.board[a] === gameData.board[b] && gameData.board[a] === gameData.board[c]) {
-            gameData.winner = gameData.turn;
-            gameData.winningLine = line;
-            winnerFound = true;
-            break;
+        const resolveBoardState = () => {
+          let winnerFound = false;
+          for (const line of winLines) {
+            const [a, b, c] = line;
+            if (gameData.board[a] && gameData.board[a] === gameData.board[b] && gameData.board[a] === gameData.board[c]) {
+              gameData.winner = gameData.board[a];
+              gameData.winningLine = line;
+              winnerFound = true;
+              break;
+            }
           }
-        }
 
-        if (!winnerFound) {
-          if (gameData.board.every(cell => cell !== null)) {
-            gameData.winner = 'draw';
-          } else {
-            gameData.turn = gameData.turn === 'X' ? 'O' : 'X';
+          if (!winnerFound) {
+            if (gameData.board.every(cell => cell !== null)) {
+              gameData.winner = 'draw';
+            } else {
+              gameData.turn = gameData.turn === 'X' ? 'O' : 'X';
+            }
+          }
+        };
+
+        resolveBoardState();
+
+        // CPU turn (O) for single-player mode
+        if (!gameData.winner && gameData.mode === 'cpu' && gameData.turn === 'O') {
+          const openCells = gameData.board
+            .map((cell, idx) => (cell === null ? idx : null))
+            .filter(idx => idx !== null);
+          if (openCells.length > 0) {
+            const cpuPos = openCells[Math.floor(Math.random() * openCells.length)];
+            gameData.board[cpuPos] = 'O';
+            resolveBoardState();
           }
         }
 
@@ -3612,6 +3685,7 @@ io.on('connection', (socket) => {
       const isP2 = gameData.players.P2.id === playerId || gameData.players.P2.id === socket.id || gameData.players.P2.name === socket.nickname;
 
       if (action === 'join') {
+        if (gameData.mode === 'cpu') return;
         if (!gameData.players.P2.id && !isP1) {
           // Check if it's a targeted match - check both socket.id and persistentUserId
           const recipients = message.recipients || [];
@@ -3656,6 +3730,12 @@ io.on('connection', (socket) => {
           gameData.players.P2.move = move;
         } else {
           return; // Move already locked in
+        }
+
+        // CPU instantly picks after player move
+        if (gameData.mode === 'cpu' && gameData.players.P1.move && !gameData.players.P2.move) {
+          const cpuMoves = ['rock', 'paper', 'scissors'];
+          gameData.players.P2.move = cpuMoves[Math.floor(Math.random() * cpuMoves.length)];
         }
 
         // Check if round is over
@@ -3733,6 +3813,7 @@ io.on('connection', (socket) => {
       if (!gameData.players.white?.id) {
         gameData.players.white = { id: joinerId, socketId: socket.id, name: socket.nickname };
       } else if (!gameData.players.black?.id) {
+        if (gameData.mode === 'cpu') return;
         if (gameData.players.white?.id === joinerId || gameData.players.white?.name === socket.nickname) return; // Already joined as White
 
         const isTargeted = message.recipients && message.recipients.length > 0;
@@ -3796,25 +3877,43 @@ io.on('connection', (socket) => {
       const moveResult = chess.move(move);
 
       if (moveResult) {
-        gameData.fen = chess.fen();
-        gameData.turn = chess.turn();
+        const applyTerminalState = () => {
+          if (chess.isCheckmate() || chess.isDraw()) {
+            const winner = chess.isDraw() ? 'draw' : (chess.turn() === 'w' ? 'black' : 'white');
+            gameData.winner = winner;
+            if (winner !== 'draw') {
+              gameData.winnerId = winner === 'white' ? gameData.players.white.id : gameData.players.black.id;
+            }
+            gameData.endedAt = Date.now();
 
-        if (chess.isCheckmate() || chess.isDraw()) {
-          const winner = chess.isDraw() ? 'draw' : (chess.turn() === 'w' ? 'black' : 'white');
-          gameData.winner = winner;
-          if (winner !== 'draw') {
-            gameData.winnerId = winner === 'white' ? gameData.players.white.id : gameData.players.black.id;
+            // Completed games get 2-min TTL
+            message.timestamp = new Date().toISOString();
+            message.overrideTtl = 120;
+            message.expiresAt = new Date(Date.now() + 120 * 1000).toISOString();
           }
-          gameData.endedAt = Date.now();
-
-          // Completed games get 2-min TTL
-          message.timestamp = new Date().toISOString();
-          message.overrideTtl = 120;
-          message.expiresAt = new Date(Date.now() + 120 * 1000).toISOString();
-        }
+        };
 
         gameData.history = gameData.history || [];
         gameData.history.push(moveResult.san);
+        gameData.fen = chess.fen();
+        gameData.turn = chess.turn();
+        applyTerminalState();
+
+        // CPU auto-move as Black
+        if (!gameData.winner && gameData.mode === 'cpu' && gameData.turn === 'b') {
+          const legalMoves = chess.moves();
+          if (legalMoves.length > 0) {
+            const cpuMove = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+            const cpuResult = chess.move(cpuMove);
+            if (cpuResult) {
+              gameData.history.push(cpuResult.san);
+              gameData.fen = chess.fen();
+              gameData.turn = chess.turn();
+              applyTerminalState();
+            }
+          }
+        }
+
         gameData.lastActivity = Date.now();
 
         await roomManager.saveRoom(socket.roomCode, room);
@@ -4044,6 +4143,112 @@ io.on('connection', (socket) => {
   // HANGMAN HANDLERS
   // ─────────────────────────────────────────────────────────
 
+  const clearHangmanCpuTimer = (messageId) => {
+    const existing = hangmanCpuGuessTimers.get(messageId);
+    if (existing) {
+      clearTimeout(existing);
+      hangmanCpuGuessTimers.delete(messageId);
+    }
+  };
+
+  const scheduleHangmanCpuGuess = (messageId, minDelayMs = 900, maxDelayMs = 1800) => {
+    clearHangmanCpuTimer(messageId);
+    const floor = Math.max(250, Number(minDelayMs) || 900);
+    const ceil = Math.max(floor + 10, Number(maxDelayMs) || 1800);
+    const delay = Math.round(floor + Math.random() * (ceil - floor));
+
+    const timer = setTimeout(async () => {
+      hangmanCpuGuessTimers.delete(messageId);
+      try {
+        const room = await roomManager.getRoom(socket.roomCode);
+        if (!room) return;
+        const message = room.messages.find(m => m.id === messageId);
+        if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'hangman') return;
+
+        const gd = message.gameData;
+        if (gd.gameOver || gd.mode !== 'cpu') {
+          clearHangmanCpuTimer(messageId);
+          return;
+        }
+
+        if (!gd.startedAt) gd.startedAt = Date.now();
+
+        if (gd.difficulty === 'hard' && gd.timeLimit) {
+          const elapsed = Math.floor((Date.now() - gd.startedAt) / 1000);
+          if (elapsed >= gd.timeLimit) {
+            gd.gameOver = true;
+            gd.winner = 'house';
+            gd.display = gd.word.split('');
+          }
+        }
+
+        if (!gd.gameOver) {
+          const profile = gd.cpuProfile || {};
+          const missChance = Math.max(0, Math.min(0.95, Number(profile.missChance) || 0.25));
+          const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+          const unrevealedLetters = [...new Set(
+            String(gd.word || '')
+              .split('')
+              .filter(ch => /^[A-Z]$/.test(ch) && gd.guessed[ch] === undefined && !gd.wrongLetters.includes(ch))
+          )];
+
+          const availableWrongLetters = alphabet.filter(
+            l => gd.guessed[l] === undefined && !gd.wrongLetters.includes(l) && !String(gd.word || '').includes(l)
+          );
+
+          if (unrevealedLetters.length > 0 || availableWrongLetters.length > 0) {
+            const pickWrong = availableWrongLetters.length > 0 && (unrevealedLetters.length === 0 || Math.random() < missChance);
+            const pool = pickWrong ? availableWrongLetters : unrevealedLetters;
+            const pickedLetter = pool[Math.floor(Math.random() * pool.length)];
+
+            if (pickedLetter && String(gd.word || '').includes(pickedLetter)) {
+              gd.guessed[pickedLetter] = 'cpu-bot';
+              gd.display = String(gd.word || '').split('').map(c => (gd.guessed[c] !== undefined ? c : '_'));
+              if (!gd.display.includes('_')) {
+                gd.gameOver = true;
+                gd.winner = 'team';
+              }
+            } else if (pickedLetter) {
+              gd.wrongLetters.push(pickedLetter);
+              gd.mistakes++;
+              if (gd.mistakes >= gd.maxMistakes) {
+                gd.gameOver = true;
+                gd.winner = 'house';
+                gd.display = String(gd.word || '').split('');
+              }
+            }
+          }
+        }
+
+        if (gd.gameOver && !message.overrideTtl) {
+          message.overrideTtl = 120;
+          message.expiresAt = new Date(Date.now() + 120 * 1000).toISOString();
+        }
+
+        gd.lastActivity = Date.now();
+        await roomManager.saveRoom(socket.roomCode, room);
+        const roomUsers = room.users || [];
+        for (const u of roomUsers) {
+          const masked = roomManager.maskMessageForUser(message, u.socketId, u.id || u.userId);
+          io.to(u.socketId).emit('message-updated', masked);
+        }
+
+        if (!gd.gameOver) {
+          const nextMin = Number(gd.cpuProfile?.minDelayMs) || floor;
+          const nextMax = Number(gd.cpuProfile?.maxDelayMs) || ceil;
+          scheduleHangmanCpuGuess(messageId, nextMin, nextMax);
+        } else {
+          clearHangmanCpuTimer(messageId);
+        }
+      } catch (err) {
+        logger.error('hangman CPU guess error:', err);
+      }
+    }, delay);
+
+    hangmanCpuGuessTimers.set(messageId, timer);
+  };
+
   socket.on('hangman-join', async ({ messageId }) => {
     try {
       const room = await roomManager.getRoom(socket.roomCode);
@@ -4051,6 +4256,7 @@ io.on('connection', (socket) => {
       const message = room.messages.find(m => m.id === messageId);
       if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'hangman') return;
       const gd = message.gameData;
+      if (gd.mode === 'cpu') return;
       if (gd.gameOver) return;
       const userId = socket.persistentUserId || socket.id;
 
@@ -4094,6 +4300,7 @@ io.on('connection', (socket) => {
       const message = room.messages.find(m => m.id === messageId);
       if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'hangman') return;
       const gd = message.gameData;
+  if (gd.mode === 'cpu') clearHangmanCpuTimer(messageId);
       if (gd.gameOver) return;
       const userId = socket.persistentUserId || socket.id;
       if (!gd.players.some(p => p.id === userId || p.socketId === socket.id)) return;
@@ -4110,11 +4317,6 @@ io.on('connection', (socket) => {
       if (gd.gameOver) return;
       // Custom word setter cannot guess (they chose the word — they're the host)
       if (gd.isCustomWord && (message.sender.id === userId || message.sender.socketId === socket.id)) return;
-      // Enforce turn order in targeted 1v1
-      if (gd.isTargeted && gd.players.length >= 2) {
-        const turnPlayer = gd.players[gd.currentTurn ?? 0];
-        if (turnPlayer.id !== userId && turnPlayer.socketId !== socket.id) return;
-      }
       const L = String(letter).toUpperCase().trim();
       if (!/^[A-Z]$/.test(L)) return;
       if (gd.guessed[L] !== undefined || gd.wrongLetters.includes(L)) return;
@@ -4132,15 +4334,14 @@ io.on('connection', (socket) => {
           gd.display = gd.word.split(''); // reveal word on loss
         }
       }
-      // Flip turn after any guess when multiple players are active
-      if (gd.players.length >= 2 && !gd.gameOver) {
-        gd.currentTurn = ((gd.currentTurn ?? 0) + 1) % gd.players.length;
-      }
-
       // When game finishes, set TTL countdown
       if (gd.gameOver && !message.overrideTtl) {
         message.overrideTtl = 120; // 2-min TTL for finished Hangman
         message.expiresAt = new Date(Date.now() + 120 * 1000).toISOString();
+      }
+
+      if (gd.gameOver) {
+        clearHangmanCpuTimer(messageId);
       }
 
       gd.lastActivity = Date.now();
@@ -4149,6 +4350,12 @@ io.on('connection', (socket) => {
       for (const u of roomUsers) {
         const masked = roomManager.maskMessageForUser(message, u.socketId, u.id || u.userId);
         io.to(u.socketId).emit('message-updated', masked);
+      }
+
+      if (gd.mode === 'cpu' && !gd.gameOver) {
+        const minDelay = Number(gd.cpuProfile?.minDelayMs) || 1000;
+        const maxDelay = Number(gd.cpuProfile?.maxDelayMs) || 1800;
+        scheduleHangmanCpuGuess(messageId, minDelay, maxDelay);
       }
     } catch (err) { logger.error('hangman-guess error:', err); }
   });
@@ -4175,13 +4382,13 @@ io.on('connection', (socket) => {
         gd.display = gd.word.split('');
       }
 
-      if (gd.players.length >= 2 && !gd.gameOver) {
-        gd.currentTurn = ((gd.currentTurn ?? 0) + 1) % gd.players.length;
-      }
-
       if (gd.gameOver && !message.overrideTtl) {
         message.overrideTtl = 120;
         message.expiresAt = new Date(Date.now() + 120 * 1000).toISOString();
+      }
+
+      if (gd.gameOver) {
+        clearHangmanCpuTimer(messageId);
       }
 
       gd.lastActivity = Date.now();
@@ -4190,6 +4397,12 @@ io.on('connection', (socket) => {
       for (const u of roomUsers) {
         const masked = roomManager.maskMessageForUser(message, u.socketId, u.id || u.userId);
         io.to(u.socketId).emit('message-updated', masked);
+      }
+
+      if (gd.mode === 'cpu' && !gd.gameOver) {
+        const minDelay = Number(gd.cpuProfile?.minDelayMs) || 1000;
+        const maxDelay = Number(gd.cpuProfile?.maxDelayMs) || 1800;
+        scheduleHangmanCpuGuess(messageId, minDelay, maxDelay);
       }
     } catch (err) { logger.error('hangman-hint error:', err); }
   });
@@ -4511,6 +4724,31 @@ io.on('connection', (socket) => {
     return true;
   };
 
+  const updateTypingRaceCpuProgress = (gd) => {
+    if (!gd || gd.gameType !== 'typing-race' || gd.mode !== 'cpu' || gd.status !== 'racing' || !gd.startedAt) return;
+    const cpu = gd.players?.['cpu-bot'];
+    if (!cpu) return;
+
+    const profile = gd.cpuProfile || { wpm: 50, accuracy: 93, reactionMs: 900 };
+    const textLen = String(gd.text || '').length || 1;
+    const words = Math.max(1, textLen / 5);
+    const cpuWpm = Math.max(20, Number(profile.wpm) || 50);
+    const cpuFinishMs = (words / cpuWpm) * 60 * 1000;
+    const elapsedMs = Math.max(0, Date.now() - gd.startedAt - (Number(profile.reactionMs) || 0));
+    const progress = Math.min(1, elapsedMs / Math.max(1, cpuFinishMs));
+
+    cpu.progress = progress;
+    cpu.wpm = cpuWpm;
+    cpu.accuracy = Math.min(100, Math.max(75, Number(profile.accuracy) || 93));
+    cpu.errors = Math.max(0, Math.round((1 - (cpu.accuracy / 100)) * words * 5 * progress));
+
+    if (progress >= 1 && !cpu.finishedAt) {
+      cpu.finishedAt = Date.now();
+      cpu.rank = gd.nextRank++;
+      if (!gd.winner) gd.winner = cpu.id;
+    }
+  };
+
   socket.on('typing-race-join', async ({ messageId }) => {
     try {
       const room = await roomManager.getRoom(socket.roomCode);
@@ -4519,6 +4757,8 @@ io.on('connection', (socket) => {
       if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'typing-race') return;
       const gd = message.gameData;
       const userId = socket.persistentUserId || socket.id;
+
+  if (gd.mode === 'cpu') return;
 
       // REJOIN: player already in game — update socketId for reconnect
       if (gd.players[userId]) {
@@ -4569,6 +4809,9 @@ io.on('connection', (socket) => {
       gd.status = 'racing';
       gd.startedAt = Date.now() + 3000; // 3s countdown
   gd.endsAt = gd.startedAt + ((Number(gd.duration) || 60) * 1000);
+      if (gd.mode === 'cpu') {
+        updateTypingRaceCpuProgress(gd);
+      }
       gd.lastActivity = Date.now();
       await roomManager.saveRoom(socket.roomCode, room);
       io.to(socket.roomCode).emit('message-updated', message);
@@ -4584,6 +4827,10 @@ io.on('connection', (socket) => {
       const gd = message.gameData;
       if (gd.status !== 'racing') return;
 
+      if (gd.mode === 'cpu') {
+        updateTypingRaceCpuProgress(gd);
+      }
+
       if (finalizeTypingRaceIfNeeded(message)) {
         gd.lastActivity = Date.now();
         await roomManager.saveRoom(socket.roomCode, room);
@@ -4597,6 +4844,11 @@ io.on('connection', (socket) => {
       gd.players[userId].wpm = Number(wpm) || 0;
       gd.players[userId].accuracy = Number(accuracy) || 100;
       gd.players[userId].errors = Number(errors) || 0;
+
+      if (gd.mode === 'cpu') {
+        updateTypingRaceCpuProgress(gd);
+      }
+
       gd.lastActivity = Date.now();
       await roomManager.saveRoom(socket.roomCode, room);
       io.to(socket.roomCode).emit('message-updated', message);
@@ -4620,6 +4872,11 @@ io.on('connection', (socket) => {
       gd.players[userId].finishedAt = Date.now();
       gd.players[userId].rank = gd.nextRank++;
       if (!gd.winner) gd.winner = userId;
+
+      if (gd.mode === 'cpu') {
+        updateTypingRaceCpuProgress(gd);
+      }
+
       const allDone = Object.values(gd.players).every(p => p.finishedAt != null);
       if (allDone) {
         finalizeTypingRaceIfNeeded(message, true);

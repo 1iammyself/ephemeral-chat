@@ -2126,18 +2126,18 @@ const ChatRoom = () => {
 
   const handleSendGame = (gameData) => {
     // Games are NOT encrypted — server must create and track game state (board, players, moves).
-    if (!isConnected) return;
+    if (!isConnected) return false;
 
     // Match games (TTT, RPS, Chess) only allow 1 recipient
     if (selectedRecipients.length > 1 && (gameData.gameType === 'tic-tac-toe' || gameData.gameType === 'rock-paper-scissors' || gameData.gameType === 'chess')) {
       setError('Match games can only be sent to one person at a time.');
-      return;
+      return false;
     }
 
     // Hangman is also 1-on-1 only
     if (selectedRecipients.length > 1 && gameData.gameType === GAME_TYPES.HANGMAN) {
       setError('Hangman can only be played 1-on-1.');
-      return;
+      return false;
     }
 
     // Anagrams and TypingRace support both 1-on-1 and broadcast
@@ -2156,6 +2156,8 @@ const ChatRoom = () => {
       // Add game-specific TTL from GAME_CONFIG
       gameTTL: GAME_CONFIG[gameData.gameType]?.ttl || roomTTL
     });
+
+    return true;
   };
 
   const handleDeleteMessage = (messageId) => {

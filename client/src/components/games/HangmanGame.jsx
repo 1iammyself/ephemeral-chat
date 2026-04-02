@@ -55,6 +55,7 @@ const HangmanGame = ({ message, currentUser, vibeColor, onHangmanJoin, onHangman
   const isLoss       = gameData.winner === 'house';
   const players      = gameData.players || [];
   const playerCount  = players.length;
+  const isCpuMode    = gameData.mode === 'cpu';
 
   const guessedSet = new Set([...Object.keys(guessed), ...wrongLetters]);
   const waitingForOpponent = gameData.isTargeted && playerCount < 2 && !isGameOver;
@@ -64,14 +65,7 @@ const HangmanGame = ({ message, currentUser, vibeColor, onHangmanJoin, onHangman
   // Custom word host: sender who set the word — watches, sees word, can't guess
   const isCustomWordHost = gameData.isCustomWord && isSender;
 
-  const isMyTurn = !gameData.isTargeted || playerCount < 2 || (() => {
-    const tp = players[gameData.currentTurn ?? 0];
-    return tp?.id === currentUserId || tp?.socketId === currentUserId ||
-      (currentUser?.id && tp?.id === currentUser.id);
-  })();
-  const turnPlayerName = gameData.isTargeted && playerCount >= 2
-    ? players[gameData.currentTurn ?? 0]?.name : null;
-
+  const isMyTurn = isPlayer && !isGameOver && !waitingForOpponent && !isCustomWordHost;
   const statsKey = 'hangmanNativeStatsV1';
   const [stats, setStats] = useState(() => {
     try {
@@ -125,13 +119,13 @@ const HangmanGame = ({ message, currentUser, vibeColor, onHangmanJoin, onHangman
   }, [isGameOver, message.id, gameData.winner]);
 
   const handleGuess = (letter) => {
-    if (!isPlayer || isGameOver || guessedSet.has(letter) || waitingForOpponent || !isMyTurn) return;
+    if (!isPlayer || isGameOver || guessedSet.has(letter) || waitingForOpponent || isCustomWordHost) return;
     onHangmanGuess(message.id, letter);
   };
 
   // Keyboard input support for desktop
   useEffect(() => {
-    if (!isPlayer || isGameOver || waitingForOpponent || !isMyTurn) return;
+  if (!isPlayer || isGameOver || waitingForOpponent || isCustomWordHost) return;
 
     const handleKeyPress = (e) => {
       const letter = e.key.toUpperCase();
@@ -149,7 +143,7 @@ const HangmanGame = ({ message, currentUser, vibeColor, onHangmanJoin, onHangman
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [isPlayer, isGameOver, waitingForOpponent, isMyTurn, guessedSet, message.id, onHangmanGuess]);
+  }, [isPlayer, isGameOver, waitingForOpponent, isCustomWordHost, guessedSet, message.id, onHangmanGuess]);
 
   const diffBadge = gameData.difficulty === 'hard' ? 'bg-red-500 text-white'
     : gameData.difficulty === 'medium' ? 'bg-amber-500 text-white'
@@ -226,6 +220,9 @@ const HangmanGame = ({ message, currentUser, vibeColor, onHangmanJoin, onHangman
           <span className="text-sm shrink-0">🪓</span>
           <span className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate">Hangman Together</span>
           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase shrink-0 ${diffBadge}`}>{gameData.difficulty || 'medium'}</span>
+          {isCpuMode && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase bg-violet-500 text-white shrink-0">Vs CPU</span>
+          )}
         </div>
         {/* Lives — fewer hearts on mobile */}
         <div className="flex items-center gap-0.5 shrink-0 overflow-hidden max-w-[80px] sm:max-w-none">
@@ -256,7 +253,7 @@ const HangmanGame = ({ message, currentUser, vibeColor, onHangmanJoin, onHangman
             <div className="text-center text-[10px] font-bold">
               {isMyTurn
                 ? <span className="text-emerald-600 dark:text-emerald-400">Your turn — guess a letter!</span>
-                : <span className="text-gray-400">{turnPlayerName}'s turn…</span>}
+                : <span className="text-gray-400">Waiting to play…</span>}
             </div>
           )}
         </div>
@@ -365,7 +362,7 @@ const HangmanGame = ({ message, currentUser, vibeColor, onHangmanJoin, onHangman
             </button>
           )}
 
-          <div className={`flex flex-wrap gap-1 justify-center pt-0.5 ${!isMyTurn ? 'opacity-40 pointer-events-none' : ''}`}>
+          <div className="flex flex-wrap gap-1 justify-center pt-0.5">
             {ALPHABET.map(letter => {
               const isCorrect = guessed[letter] !== undefined;
               const isWrong   = wrongLetters.includes(letter);
@@ -387,11 +384,20 @@ const HangmanGame = ({ message, currentUser, vibeColor, onHangmanJoin, onHangman
               );
             })}
           </div>
+
+          <div className="flex items-center justify-center gap-2 text-[10px] text-gray-400 flex-wrap">
+            <span className="px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-700 font-mono">A–Z</span>
+            <span>guess letters</span>
+            <span className="px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-700 font-mono">Tap</span>
+            <span>mobile keyboard</span>
+            <span className="px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-700 font-mono">Type</span>
+            <span>physical keyboard</span>
+          </div>
         </div>
       )}
 
       {/* Join button — non-targeted spectators */}
-      {!isPlayer && !isGameOver && !gameData.isTargeted && (
+      {!isPlayer && !isGameOver && !gameData.isTargeted && !isCpuMode && (
         <button
           onClick={() => onHangmanJoin(message.id)}
           className="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors active:scale-95"
@@ -400,6 +406,10 @@ const HangmanGame = ({ message, currentUser, vibeColor, onHangmanJoin, onHangman
           <Users className="w-3.5 h-3.5" />
           Join &amp; Guess
         </button>
+      )}
+
+      {!isPlayer && !isGameOver && isCpuMode && (
+        <div className="text-center text-[11px] text-gray-400">CPU match in progress — spectating only.</div>
       )}
 
       {/* Wrong + players footer */}

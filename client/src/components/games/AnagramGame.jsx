@@ -47,7 +47,8 @@ const AnagramGame = ({
     (gameData.answers?.[currentUserId] !== undefined) ||
     (currentUser?.id && gameData.answers?.[currentUser.id] !== undefined)
   );
-  const isRevealed = gameData.revealed || localRevealed || gameData.gameOver;
+  const serverRevealed = gameData.revealed || gameData.gameOver;
+  const isRevealed = serverRevealed || localRevealed;
   // Custom word host: sender who set the word — can see it but can't play
   const isCustomWordHost = gameData.isCustomWord && isSender;
   const submittedCount = Object.keys(gameData.answers || {}).length;
@@ -62,6 +63,42 @@ const AnagramGame = ({
   const currentRound = gameData.currentRound || 1;
   const totalRounds = gameData.totalRounds || 5;
   const revealedWord = gameData.word || gameData.roundHistory?.[gameData.roundHistory.length - 1]?.word;
+
+  const availableLetterCounts = useMemo(() => {
+    const counts = {};
+    (gameData.letters || []).forEach((l) => {
+      const key = String(l || '').toUpperCase();
+      if (!/^[A-Z]$/.test(key)) return;
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    return counts;
+  }, [gameData.letters]);
+
+  const normalizeByAvailableLetters = (rawValue = '') => {
+    const pool = { ...availableLetterCounts };
+    let out = '';
+    for (const ch of String(rawValue).toUpperCase().replace(/[^A-Z]/g, '')) {
+      if ((pool[ch] || 0) <= 0) continue;
+      out += ch;
+      pool[ch] -= 1;
+    }
+    return out;
+  };
+
+  const appendLetter = (letter) => {
+    const next = normalizeByAvailableLetters(`${inputWord}${letter}`);
+    setInputWord(next);
+  };
+
+  const removeLetter = () => setInputWord(prev => prev.slice(0, -1));
+
+  const usedLetterCounts = useMemo(() => {
+    const counts = {};
+    inputWord.split('').forEach(ch => {
+      counts[ch] = (counts[ch] || 0) + 1;
+    });
+    return counts;
+  }, [inputWord]);
 
   // Timer countdown — only starts when startedAt is set
   useEffect(() => {
@@ -129,6 +166,31 @@ const AnagramGame = ({
     setActivePowerUps({ speedBoost: false, doublePoints: false });
     setInputWord('');
   };
+
+  useEffect(() => {
+    if (isRevealed || hasSubmitted || !isInPlayers || isCustomWordHost || waitingForOpponent || !gameData.startedAt) return;
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        removeLetter();
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSubmit();
+        return;
+      }
+
+      const letter = e.key.toUpperCase();
+      if (!/^[A-Z]$/.test(letter)) return;
+      e.preventDefault();
+      appendLetter(letter);
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isRevealed, hasSubmitted, isInPlayers, isCustomWordHost, waitingForOpponent, gameData.startedAt, inputWord]);
 
   const recentHistory = useMemo(() => {
     return [...(gameData.roundHistory || [])].slice(-5).reverse();
@@ -276,7 +338,7 @@ const AnagramGame = ({
           <input
             type="text"
             value={inputWord}
-            onChange={e => setInputWord(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))}
+            onChange={e => setInputWord(normalizeByAvailableLetters(e.target.value))}
             onKeyDown={e => e.key === 'Enter' && handleSubmit()}
             maxLength={20}
             placeholder="Spell the word…"
@@ -291,6 +353,46 @@ const AnagramGame = ({
           >
             Submit
           </button>
+        </div>
+      )}
+
+      {!isRevealed && !hasSubmitted && isInPlayers && !isCustomWordHost && !waitingForOpponent && gameData.startedAt && (
+        <div className="space-y-1.5">
+          <div className="grid grid-cols-9 gap-1">
+            {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((letter) => {
+              const available = availableLetterCounts[letter] || 0;
+              const used = usedLetterCounts[letter] || 0;
+              const disabled = available === 0 || used >= available;
+              return (
+                <button
+                  key={letter}
+                  onClick={() => appendLetter(letter)}
+                  disabled={disabled}
+                  className={`h-7 rounded-md text-[10px] font-black transition-all border ${disabled
+                    ? 'opacity-35 bg-gray-200 dark:bg-gray-800 text-gray-500 border-gray-300 dark:border-gray-700 cursor-not-allowed'
+                    : 'bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-300 dark:border-violet-700 hover:bg-violet-500/25 active:scale-95'
+                    }`}
+                >
+                  {letter}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            onClick={removeLetter}
+            disabled={!inputWord.length}
+            className="w-full py-1 rounded-md border text-[10px] font-bold border-gray-300 dark:border-gray-700 text-gray-500 disabled:opacity-40"
+          >
+            ⌫ Remove last letter
+          </button>
+          <div className="flex items-center justify-center gap-2 text-[10px] text-gray-400 flex-wrap">
+            <span className="px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-700 font-mono">A–Z</span>
+            <span>pick letters</span>
+            <span className="px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-700 font-mono">Enter</span>
+            <span>submit</span>
+            <span className="px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-700 font-mono">Backspace</span>
+            <span>remove</span>
+          </div>
         </div>
       )}
 
@@ -457,7 +559,7 @@ const AnagramGame = ({
       )}
 
       {/* Next round */}
-      {isRevealed && !gameData.gameOver && currentRound < totalRounds && (isSender || isInPlayers) && (
+      {serverRevealed && !gameData.gameOver && currentRound < totalRounds && (isSender || isInPlayers) && (
         <button
           onClick={() => {
             if (nextRoundTimerRef.current) clearInterval(nextRoundTimerRef.current);
@@ -471,6 +573,12 @@ const AnagramGame = ({
             ? (isSender ? `Next Round in ${nextRoundIn}s (tap to skip)` : `Next round in ${nextRoundIn}s…`)
             : <>{isSender ? 'Next Round' : 'Start Next Round'} <ChevronRight className="w-3 h-3" /></>}
         </button>
+      )}
+
+      {!serverRevealed && localRevealed && !gameData.gameOver && (
+        <div className="text-center text-[10px] text-gray-400">
+          Waiting for round reveal to sync…
+        </div>
       )}
     </div>
   );

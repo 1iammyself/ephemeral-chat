@@ -31,6 +31,7 @@ const TypingRaceGame = ({
 
   const status = gameData.status || 'waiting';
   const text   = gameData.text || '';
+  const isCpuMode = gameData.mode === 'cpu';
 
   const [typed, setTyped]         = useState('');
   const [countdown, setCountdown] = useState(null);
@@ -327,6 +328,9 @@ const TypingRaceGame = ({
           <Zap className="w-4 h-4 shrink-0" style={{ color: accent }} />
           <span className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate">Type Race</span>
           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase text-white shrink-0 ${diffBadge}`}>{gameData.difficulty || 'easy'}</span>
+          {isCpuMode && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase bg-violet-500 text-white shrink-0">Vs CPU</span>
+          )}
         </div>
         {status === 'racing' && countdown === null && localWpm > 0 && (
             <span className="text-xs font-bold shrink-0" style={{ color: accent }}>Net {localWpm} / Raw {rawWpm}</span>
@@ -497,6 +501,14 @@ const TypingRaceGame = ({
                 Tap the text to focus, then type!
                 {errors > 0 && <span className="text-red-400 ml-1">{errors} error{errors !== 1 ? 's' : ''}</span>}
               </div>
+              <div className="flex items-center justify-center gap-2 text-[10px] text-gray-400 flex-wrap">
+                <span className="px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-700 font-mono">Tab</span>
+                <span>focus</span>
+                <span className="px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-700 font-mono">Enter</span>
+                <span>line break key disabled</span>
+                <span className="px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-700 font-mono">Backspace</span>
+                <span>correct typos</span>
+              </div>
             </>
           )}
           {iFinished && (
@@ -560,7 +572,7 @@ const TypingRaceGame = ({
       {/* Waiting controls */}
       {status === 'waiting' && (
         <div className="space-y-1.5">
-          {!isPlayer && !gameData.isTargeted && (
+          {!isPlayer && !gameData.isTargeted && !isCpuMode && (
             <button
               onClick={() => onTypingRaceJoin(message.id)}
               className="w-full py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors active:scale-95"
@@ -576,11 +588,14 @@ const TypingRaceGame = ({
               style={{ backgroundColor: '#16a34a' }}
             >
               <Play className="w-3.5 h-3.5" />
-              Start Race · {allPlayers.length} player{allPlayers.length !== 1 ? 's' : ''}
+              Start {isCpuMode ? 'CPU Duel' : 'Race'} · {allPlayers.length} player{allPlayers.length !== 1 ? 's' : ''}
             </button>
           )}
-          {!isSender && isPlayer && !gameData.isTargeted && (
+          {!isSender && isPlayer && !gameData.isTargeted && !isCpuMode && (
             <div className="text-center text-[11px] text-gray-400">Waiting for host to start the race…</div>
+          )}
+          {!isPlayer && isCpuMode && (
+            <div className="text-center text-[11px] text-gray-400">CPU duel in progress — spectating only.</div>
           )}
         </div>
       )}
