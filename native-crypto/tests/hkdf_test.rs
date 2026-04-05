@@ -60,3 +60,17 @@ fn test_same_inputs_deterministic() {
     let k2: [u8; 32] = d2.derive(b"info").unwrap();
     assert_eq!(k1, k2); // HKDF is deterministic
 }
+
+#[test]
+fn test_derive_oversized_fails() {
+    let d = HKDFDeriver::new(b"ikm", Some(b"salt"));
+    let mut buf = vec![0u8; 8161]; // 255 * 32 + 1 = exceeds max
+    assert!(d.derive_var(b"info", &mut buf).is_err());
+}
+
+#[test]
+fn test_derive_empty_output_fails() {
+    let d = HKDFDeriver::new(b"ikm", Some(b"salt"));
+    let mut buf = vec![];
+    assert!(d.derive_var(b"info", &mut buf).is_err());
+}

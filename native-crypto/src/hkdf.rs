@@ -20,15 +20,7 @@ impl HKDFDeriver {
     /// crate substitutes a hash-length string of zero bytes internally, which
     /// matches the RFC exactly.
     pub fn new(ikm: &[u8], salt: Option<&[u8]>) -> Self {
-        let hk = Hkdf::<Sha256>::new(salt, ikm);
-
-        // Retrieve the 32-byte PRK.
-        let mut prk_bytes = Zeroizing::new(vec![0u8; 32]);
-        hk.expand(&[], &mut prk_bytes)
-            .expect("32-byte expand for PRK storage should never fail");
-
-        // We actually want to store the real PRK, not expanded output.
-        // Re-extract properly by using the `extract` constructor variant.
+        // Extract the PRK using HKDF-Extract.
         let (prk_arr, _) = Hkdf::<Sha256>::extract(salt, ikm);
         let prk = Zeroizing::new(prk_arr.to_vec());
 
