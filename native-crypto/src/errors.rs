@@ -3,6 +3,7 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq)]
 pub enum CryptoError {
     InvalidKeyLength { expected: usize, got: usize },
+    EncryptionFailed,
     DecryptionFailed,
     KeyDerivationFailed(String),
     InvalidNonce,
@@ -15,6 +16,8 @@ impl fmt::Display for CryptoError {
         match self {
             CryptoError::InvalidKeyLength { expected, got } =>
                 write!(f, "Invalid key length: expected {}, got {}", expected, got),
+            CryptoError::EncryptionFailed =>
+                write!(f, "encryption operation failed"),
             CryptoError::DecryptionFailed =>
                 write!(f, "Decryption failed: authentication tag mismatch or corrupted ciphertext"),
             CryptoError::KeyDerivationFailed(msg) =>

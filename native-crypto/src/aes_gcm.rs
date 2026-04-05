@@ -10,7 +10,7 @@ use zeroize::ZeroizeOnDrop;
 const KEY_SIZE: usize = 32;
 const NONCE_SIZE: usize = 12;
 
-#[derive(Clone, ZeroizeOnDrop)]
+#[derive(ZeroizeOnDrop)]
 pub struct AESGCMKey([u8; KEY_SIZE]);
 
 impl AESGCMKey {
@@ -50,7 +50,7 @@ impl AESGCMKey {
 
         let ciphertext = cipher
             .encrypt(nonce, aes_gcm::aead::Payload { msg: plaintext, aad })
-            .map_err(|_| CryptoError::DecryptionFailed)?;
+            .map_err(|_| CryptoError::EncryptionFailed)?;
 
         // Prepend the nonce so the receiver can split it off.
         let mut output = Vec::with_capacity(NONCE_SIZE + ciphertext.len());
