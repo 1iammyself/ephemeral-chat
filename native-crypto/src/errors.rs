@@ -52,4 +52,10 @@ mod tests {
         let err = CryptoError::DecryptionFailed;
         assert!(err.to_string().contains("Decryption failed"));
     }
+
+    #[test]
+    fn test_error_display_encryption_failed() {
+        let err = CryptoError::EncryptionFailed;
+        assert!(err.to_string().contains("encryption"));
+    }
 }
