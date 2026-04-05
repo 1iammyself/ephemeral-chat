@@ -132,3 +132,4 @@ keystore_path/
 # Rust build artifacts
 target/
 
+.worktrees/
