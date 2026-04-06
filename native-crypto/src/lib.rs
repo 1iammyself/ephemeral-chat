@@ -22,3 +22,4 @@ pub use hkdf::HKDFDeriver;
 pub use double_ratchet::{DoubleRatchetSession, RatchetKey};
 pub use pqxdh::{PQXDHInitiator, PQXDHResponder, PQXDHPublicBundle};
 pub use key_transparency::{KeyTransparencyTree, InclusionProof, ConsistencyProof, SignedTreeHead};
+pub use ffi::*;
