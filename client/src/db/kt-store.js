@@ -25,6 +25,8 @@ export class KTTOFUStore {
 
       const getReq = store.get(serverHost);
 
+      let resolveValue = null;
+
       getReq.onsuccess = () => {
         const existing = getReq.result;
 
@@ -36,12 +38,13 @@ export class KTTOFUStore {
               `received=${publicKeyHex.slice(0, 16)}... ` +
               `This may indicate a key substitution attack.`
             ));
+            tx.abort();
             return;
           }
           // Pin matches — update timestamp
           const updated = { ...existing, timestamp: Date.now(), verified: true };
           store.put(updated);
-          resolve({ status: 'verified', pin: existing });
+          resolveValue = { status: 'verified', pin: existing };
           return;
         }
 
@@ -53,9 +56,10 @@ export class KTTOFUStore {
           verified: true,
         };
         store.put(newPin);
-        resolve({ status: 'pinned', pin: newPin });
+        resolveValue = { status: 'pinned', pin: newPin };
       };
 
+      tx.oncomplete = () => resolve(resolveValue);
       getReq.onerror = () => reject(getReq.error);
       tx.onerror = () => reject(tx.error);
     });

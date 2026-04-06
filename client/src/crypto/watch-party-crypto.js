@@ -32,7 +32,7 @@ const ALLOWED_URL_PREFIXES = [
  * @param {Uint8Array} roomSharedSecret - 32-byte room shared secret
  * @returns {Promise<CryptoKey>} AES-256-GCM CryptoKey (non-extractable)
  */
-async function deriveWatchPartyKey(roomSharedSecret) {
+export async function deriveWatchPartyKey(roomSharedSecret) {
   const baseKey = await crypto.subtle.importKey(
     'raw',
     roomSharedSecret,
@@ -152,7 +152,7 @@ export async function encryptWatchPartyEvent(event, roomSharedSecret) {
     type: event.type,
     mediaId: event.mediaId,
     ...(event.currentTime !== undefined && { currentTime: event.currentTime }),
-    userId: hashUserId(event.userId),
+    userId: await hashUserId(event.userId),
     timestamp: event.timestamp,
   };
 
@@ -227,11 +227,15 @@ function fromBase64(b64) {
 }
 
 /**
- * One-way hash of user ID for privacy.
- * Uses first 8 chars of SHA-256 truncated hex — sufficient for room-local identification.
+ * One-way SHA-256 hash of user ID for privacy.
+ * Returns first 8 hex chars of SHA-256(userId) — sufficient for room-local identification
+ * without exposing the raw user ID in the encrypted envelope.
  */
-function hashUserId(userId) {
-  // Sync approximation — in prod use crypto.subtle.digest async
-  // We use a deterministic prefix to avoid async in this helper
-  return `u_${userId.slice(0, 8)}`;
+async function hashUserId(userId) {
+  const data = new TextEncoder().encode(String(userId));
+  const hashBuf = await crypto.subtle.digest('SHA-256', data);
+  const hex = Array.from(new Uint8Array(hashBuf))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `u_${hex.slice(0, 8)}`;
 }
