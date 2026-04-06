@@ -175,17 +175,57 @@ function setupSecurity(window) {
     });
   }
 
-  // Content Security Policy
-  // Note: We don't override CSP - let the server's CSP be used
-  // The cap.js widget needs blob: and worker-src which the server already provides
-  // Overriding CSP here was breaking cap.js proof-of-work verification
-
-  // Only add security headers that don't conflict with the app
+  // Security headers — Electron-layer hardening (Task 20 / CSP hardening)
+  // We do NOT override Content-Security-Policy (server handles it and cap.js requires blob:)
+  // Instead we inject additional headers the server doesn't set at the Electron layer.
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    // Don't modify CSP - let the server handle it
-    // Just pass through the response headers as-is
-    callback({ responseHeaders: details.responseHeaders });
+    const headers = { ...details.responseHeaders };
+
+    // Inject Permissions-Policy to disable sensitive APIs not needed by the app
+    if (!headers['permissions-policy'] && !headers['Permissions-Policy']) {
+      headers['Permissions-Policy'] = [
+        'geolocation=()',
+        'microphone=()',
+        'camera=()',
+        'payment=()',
+        'usb=()',
+        'serial=()',
+        'bluetooth=()',
+        'accelerometer=()',
+        'gyroscope=()',
+        'magnetometer=()',
+      ].join(', ');
+    }
+
+    // Cross-Origin-Opener-Policy: prevent cross-origin window sharing
+    if (!headers['cross-origin-opener-policy'] && !headers['Cross-Origin-Opener-Policy']) {
+      headers['Cross-Origin-Opener-Policy'] = ['same-origin'];
+    }
+
+    // Cross-Origin-Resource-Policy: block cross-origin reads of our resources
+    if (!headers['cross-origin-resource-policy'] && !headers['Cross-Origin-Resource-Policy']) {
+      headers['Cross-Origin-Resource-Policy'] = ['same-site'];
+    }
+
+    callback({ responseHeaders: headers });
   });
+
+  // Block requests to non-HTTPS external origins (belt-and-suspenders for webSecurity)
+  session.defaultSession.webRequest.onBeforeRequest(
+    { urls: ['http://*/*'] },
+    (details, callback) => {
+      // Allow localhost/127.0.0.1 for dev server
+      if (
+        details.url.includes('localhost') ||
+        details.url.includes('127.0.0.1') ||
+        details.url.includes('0.0.0.0')
+      ) {
+        return callback({ cancel: false });
+      }
+      // Block all other plain HTTP to prevent downgrade attacks
+      callback({ cancel: true });
+    },
+  );
 
   // ── Fix embed compatibility for YouTube, Spotify, TikTok ──
   // Services detect "Electron" in the user-agent and may block or show CAPTCHAs.
