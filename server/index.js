@@ -46,6 +46,7 @@ const { attachMASQUEProxy } = require('./masque-proxy');
 const { attachWebAuthnRoutes } = require('./webauthn');
 const { trafficPaddingMiddleware, startServerChaff, stopServerChaff, isChaff, stripPadding, padResponseMiddleware } = require('./traffic-padding');
 const { LinkPreviewService } = require('./link-preview');
+const { initializeAttestation } = require('./device-attestation-verifier');
 
 // Initialize Cap.js for proof-of-work CAPTCHA
 if (!process.env.CAP_SECRET) {
@@ -119,6 +120,13 @@ async function initializeServer() {
     attachWebAuthnRoutes(app);
   } catch (e) {
     logger.warn('⚠️  WebAuthn routes init failed (non-fatal):', e.message);
+  }
+
+  // Device Attestation — Android/iOS authenticity verification
+  try {
+    initializeAttestation();
+  } catch (e) {
+    logger.warn('⚠️  Device attestation init failed (non-fatal):', e.message);
   }
 
   // Start e2ecp relay process - REMOVED (Lazy loaded now)
