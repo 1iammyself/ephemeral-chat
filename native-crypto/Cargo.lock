@@ -559,6 +559,7 @@ checksum = "3944cf8cf766b40e2a1a333ee5e9b563f854d5fa49d6a8ca2764e97c6eddb214"
 dependencies = [
  "ctutils",
  "typenum",
+ "zeroize",
 ]
 
 [[package]]
@@ -679,6 +680,7 @@ dependencies = [
  "module-lattice",
  "rand_core 0.10.0",
  "sha3",
+ "zeroize",
 ]
 
 [[package]]
@@ -690,6 +692,7 @@ dependencies = [
  "ctutils",
  "hybrid-array",
  "num-traits",
+ "zeroize",
 ]
 
 [[package]]
