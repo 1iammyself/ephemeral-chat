@@ -15,13 +15,47 @@ import { hkdf } from './hkdf.js';
 
 /**
  * Generate a new sender key state.
- * @returns {Promise<{key: Uint8Array, counter: number, id: string}>}
+ * @returns {Promise<{key: Uint8Array, counter: number, id: string, epoch: number, epochBarrier: number}>}
  */
 export async function generateSenderKey() {
   const key = crypto.getRandomValues(new Uint8Array(32));
   const idBytes = crypto.getRandomValues(new Uint8Array(8));
   const id = btoa(String.fromCharCode(...idBytes)).replace(/[+/=]/g, '').substring(0, 8);
-  return { key: new Uint8Array(key), counter: 0, id };
+  return { key: new Uint8Array(key), counter: 0, id, epoch: 0, epochBarrier: 0 };
+}
+
+/**
+ * Rotate a sender key state — generates a fresh random key, bumps epoch.
+ * Used when a group member leaves to prevent the departed member from
+ * decrypting future messages (post-compromise forward secrecy).
+ *
+ * @param {Object} state - Mutable sender key state (key, counter, id, epoch)
+ * @returns {Promise<void>}
+ */
+export async function rotateSenderKey(state) {
+  // Zero old key material
+  if (state.key) state.key.fill(0);
+
+  // Generate fresh key — do NOT derive from old key (break backward access)
+  state.key = crypto.getRandomValues(new Uint8Array(32));
+  state.counter = 0;
+  state.epoch += 1;
+
+  // New epoch ID
+  const idBytes = crypto.getRandomValues(new Uint8Array(8));
+  state.id = btoa(String.fromCharCode(...idBytes)).replace(/[+/=]/g, '').substring(0, 8);
+}
+
+/**
+ * Set the minimum acceptable epoch for decryption.
+ * Messages with epoch < barrier are rejected to prevent replay of
+ * pre-rotation messages after a member-leave event.
+ *
+ * @param {Object} receiverState - Receiver's sender key state for this sender
+ * @param {number} newBarrier
+ */
+export function setEpochBarrier(receiverState, newBarrier) {
+  receiverState.epochBarrier = Math.max(receiverState.epochBarrier ?? 0, newBarrier);
 }
 
 // ─── Encrypt ──────────────────────────────────────────────
@@ -55,6 +89,7 @@ export async function encryptWithSenderKey(state, plaintext) {
     iv: _toBase64(iv),
     counter,
     skId: state.id,
+    epoch: state.epoch,
   };
 }
 
@@ -77,6 +112,18 @@ export async function encryptWithSenderKey(state, plaintext) {
  */
 export async function decryptWithSenderKey(state, payload) {
   const targetCounter = payload.counter;
+  const msgEpoch = payload.epoch ?? 0;
+
+  // Epoch barrier: reject messages from epochs before the current barrier.
+  // This prevents a departed member's pre-rotation messages from being
+  // replayed after a group rekey event (post-compromise forward secrecy).
+  const barrier = state.epochBarrier ?? 0;
+  if (msgEpoch < barrier) {
+    throw new Error(
+      `[SenderKey] Rejected message from epoch ${msgEpoch}: ` +
+      `current barrier is ${barrier} (possible pre-rekey replay)`
+    );
+  }
 
   if (targetCounter < state.counter) {
     throw new Error(

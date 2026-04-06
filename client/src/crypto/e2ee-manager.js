@@ -37,6 +37,8 @@ import {
 } from './double-ratchet.js';
 import {
   generateSenderKey,
+  rotateSenderKey,
+  setEpochBarrier,
   encryptWithSenderKey,
   decryptWithSenderKey,
   serializeSenderKey,
@@ -144,11 +146,19 @@ export async function initE2EE(roomCode, socketManager) {
       await _receiveSenderKeyDistribution(roomCode, peerId, encryptedKeyDist);
     };
 
+    // Handler: peer left the room — rotate our sender key so the departed member
+    // cannot decrypt future group messages (post-compromise forward secrecy).
+    const handlePeerLeft = async ({ socketId: peerId, roomCode: rc }) => {
+      if (rc !== roomCode) return;
+      await _rekeyAfterPeerLeave(roomCode, peerId, socketManager);
+    };
+
     socketManager.on('key-bundle-roster', handleRoster);
     socketManager.on('peer-key-bundle', handlePeerBundle);
     socketManager.on('key-bundle-offer', handleOffer);
     socketManager.on('key-bundle-answer', handleAnswer);
     socketManager.on('sender-key-distribution', handleSKDist);
+    socketManager.on('peer-left', handlePeerLeft);
 
     cleanups.push(
       () => socketManager.off('key-bundle-roster', handleRoster),
@@ -156,6 +166,7 @@ export async function initE2EE(roomCode, socketManager) {
       () => socketManager.off('key-bundle-offer', handleOffer),
       () => socketManager.off('key-bundle-answer', handleAnswer),
       () => socketManager.off('sender-key-distribution', handleSKDist),
+      () => socketManager.off('peer-left', handlePeerLeft),
     );
 
     // Register our public bundle + request existing peers' bundles
@@ -402,5 +413,57 @@ async function _receiveSenderKeyDistribution(roomCode, fromPeerId, encryptedKeyD
     dbg(`[E2EE] 📦 Sender key received from ${fromPeerId}`);
   } catch (e) {
     dbg('[E2EE] Receive sender key failed:', e.message);
+  }
+}
+
+// ─── Internal — Group Rekey After Peer Leave ───────────────
+
+/**
+ * When a peer leaves a group room:
+ *   1. Rotate our sender key (fresh random key, bumped epoch) so the
+ *      departed member cannot decrypt future messages.
+ *   2. Distribute the new key to all remaining peers.
+ *   3. Set epoch barriers on all receiver states that belonged to the
+ *      departed peer, preventing replay of their pre-leave messages.
+ *
+ * Only acts on group rooms (sessions.size > 1 after removal).
+ */
+async function _rekeyAfterPeerLeave(roomCode, departedPeerId, socketManager) {
+  try {
+    const sessions = drSessions.get(roomCode);
+    if (!sessions) return;
+
+    // Remove the departed peer's DR session
+    sessions.delete(departedPeerId);
+
+    // Only rotate if we had a sender key (i.e., this was a group room)
+    const mySenderKey = mySenderKeys.get(roomCode);
+    if (!mySenderKey) return;
+
+    // Step 1: Rotate sender key — breaks backward access for departed peer
+    await rotateSenderKey(mySenderKey);
+    dbg(`[E2EE] 🔄 Rotated sender key after ${departedPeerId} left (new epoch: ${mySenderKey.epoch})`);
+
+    // Step 2: Distribute the new key to all remaining peers
+    for (const remainingPeerId of sessions.keys()) {
+      await _distributeSenderKey(roomCode, remainingPeerId, socketManager);
+    }
+
+    // Step 3: Set epoch barrier on all receiver states for the departed peer.
+    // Their keys are identified by `departedPeerId + ':' + skId`. We set the
+    // barrier to 1 above their last known epoch so their old messages cannot
+    // be replayed after the rekey.
+    const roomSenderKeys = senderKeys.get(roomCode);
+    if (roomSenderKeys) {
+      for (const [keyId, keyState] of roomSenderKeys) {
+        if (keyId.startsWith(departedPeerId + ':')) {
+          const departedEpoch = keyState.epoch ?? 0;
+          setEpochBarrier(keyState, departedEpoch + 1);
+          dbg(`[E2EE] 🚧 Epoch barrier set for ${keyId}: barrier=${keyState.epochBarrier}`);
+        }
+      }
+    }
+  } catch (e) {
+    dbg('[E2EE] Rekey after peer leave failed:', e.message);
   }
 }
