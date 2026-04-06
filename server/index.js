@@ -48,7 +48,6 @@ const { trafficPaddingMiddleware, startServerChaff, stopServerChaff, isChaff, st
 const { LinkPreviewService } = require('./link-preview');
 const { initializeAttestation } = require('./device-attestation-verifier');
 const { initSigningKey, signSocketPayload, getPublicKeyBase64 } = require('./middleware/response-signing');
-const { initAuditLogger, logAuditEvent } = require('./audit-logger');
 
 // Initialize Cap.js for proof-of-work CAPTCHA
 if (!process.env.CAP_SECRET) {
@@ -139,14 +138,6 @@ async function initializeServer() {
     logger.warn('⚠️  Response signing init failed (non-fatal):', e.message);
   }
 
-  // Encrypted audit log — forensic trail for security-critical events
-  try {
-    initAuditLogger();
-    logger.info('✅ Encrypted audit logger initialized');
-  } catch (e) {
-    logger.warn('⚠️  Audit logger init failed (non-fatal):', e.message);
-  }
-
   // Start e2ecp relay process - REMOVED (Lazy loaded now)
   // startRelayServer();
 
@@ -167,12 +158,6 @@ if (process.env.TRUST_PROXY === 'true' || process.env.RENDER) {
   app.set('trust proxy', 1);
   logger.info('Express trust proxy enabled (trust proxy = 1)');
 }
-
-// Request logging middleware
-app.use((req, res, next) => {
-  logger.info(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  next();
-});
 
 // Serve static files from .well-known directory (for Digital Asset Links)
 app.use('/.well-known', express.static(path.join(__dirname, '../client/public/.well-known')));
@@ -653,8 +638,6 @@ app.post('/api/cap/challenge', async (req, res) => {
 });
 
 app.post('/api/cap/redeem', async (req, res) => {
-  logger.info('Received Cap redeem request');
-  logger.info('Request body:', req.body);
   try {
     const { token, solution } = req.body;
     // The widget might send 'token' or 'solution' or both.
@@ -797,8 +780,6 @@ app.post('/api/verbal-join', async (req, res) => {
 app.post('/api/rooms', async (req, res) => {
   try {
     const { messageTTL, password, maxUsers, capToken, creatorId, persistenceMode, customCode, hp_email, hp_website, hp_timestamp, autoApprove, preApprovedList } = req.body;
-
-    logger.info('HTTP room creation request:', { messageTTL, password: password ? '[REDACTED]' : undefined, maxUsers, hasCapToken: !!capToken, creatorId: !!creatorId, persistenceMode });
 
     // Honeypot validation - bots fill these hidden fields, humans don't
     if (hp_email || hp_website) {
@@ -1208,7 +1189,6 @@ io.on('connection', (socket) => {
         totpSecret: totpSecret || undefined, // undefined = TOTP not required
       };
 
-      logAuditEvent('room-created', { socketId: socket.id, roomCode });
       callback({ success: true, roomCode, totpSecret }); // creator receives the secret to share
     } catch (error) {
       logger.error('Error creating room:', error);
@@ -5257,7 +5237,6 @@ io.on('connection', (socket) => {
       });
       // Emit peer-left so remaining clients can rekey their group sender key
       io.to(roomCode).emit('peer-left', { socketId, roomCode });
-      logAuditEvent('peer-left-room', { socketId, roomCode });
 
       if (roomData[roomCode]) {
         const enrichedUsers = getEnrichedUsers(roomCode);
@@ -5449,7 +5428,6 @@ io.on('connection', (socket) => {
     // Broadcast to other room members so they can initiate key exchange
     socket.to(roomCode).emit('peer-key-bundle', signSocketPayload({ socketId: socket.id, bundle, roomCode }));
     logger.info(`🔑 Key bundle registered for socket ${socket.id} in room ${roomCode}`);
-    logAuditEvent('key-bundle-registered', { socketId: socket.id, roomCode });
   });
 
   // Client requests bundles for all existing room members
@@ -5474,7 +5452,6 @@ io.on('connection', (socket) => {
     const targetSocket = io.sockets.sockets.get(to);
     if (targetSocket) {
       targetSocket.emit('key-bundle-answer', { from: socket.id, roomCode });
-      logAuditEvent('key-exchange-complete', { initiator: to, responder: socket.id, roomCode });
     }
   });
 
