@@ -225,14 +225,36 @@ app.use(helmet({
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", 'data:', 'blob:'],
-      connectSrc: ["'self'", 'wss:', 'https:'],
+      connectSrc: [
+        "'self'",
+        'wss:',
+        'https:',
+        // Allow socket.io and OHTTP relay connections
+        ...(process.env.PUBLIC_URL ? [process.env.PUBLIC_URL.replace(/^http/, 'ws')] : []),
+      ].filter(Boolean),
       mediaSrc: ["'self'", 'blob:'],
       workerSrc: ["'self'", 'blob:'],
       frameSrc: ["'none'"],
+      frameAncestors: ["'none'"],       // Stronger clickjacking protection than X-Frame-Options
       objectSrc: ["'none'"],
+      baseUri: ["'none'"],              // Prevent base tag injection
+      formAction: ["'self'"],           // Prevent form hijacking to external targets
+      manifestSrc: ["'self'"],
+      upgradeInsecureRequests: [],      // Force HTTPS for all sub-resources
+      blockAllMixedContent: [],         // Belt-and-suspenders mixed content block
     },
+    // Collect violations in dev for tuning (remove reportUri in prod if not configured)
+    ...(process.env.CSP_REPORT_URI ? { reportUri: process.env.CSP_REPORT_URI } : {}),
   },
   crossOriginEmbedderPolicy: false, // Allow SharedArrayBuffer for WebRTC
+  // Additional security headers
+  hsts: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true,
+  },
+  referrerPolicy: { policy: 'no-referrer' },
+  permittedCrossDomainPolicies: { permittedPolicies: 'none' },
 }));
 
 app.use(cors(corsOptions));
