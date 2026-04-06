@@ -17,6 +17,7 @@
 const http = require('http');
 const https = require('https');
 const { logger } = require('./utils');
+const relayAuth = require('./config/relay-auth');
 
 const RELAY_PORT = parseInt(process.env.OHTTP_RELAY_PORT || (parseInt(process.env.PORT || '3001') + 1));
 // Prefer an explicit env var; fall back to PUBLIC_URL; last resort derived from url-config
@@ -74,6 +75,9 @@ function startOHTTPRelay() {
       const isHttps = gatewayUrl.protocol === 'https:';
       const transport = isHttps ? https : http;
 
+      // Sign the forwarded body for gateway authentication (C3/M1)
+      const { signature, timestamp } = relayAuth.signRequest(body);
+
       const options = {
         hostname: gatewayUrl.hostname,
         port: gatewayUrl.port || (isHttps ? 443 : 80),
@@ -82,6 +86,8 @@ function startOHTTPRelay() {
         headers: {
           ...forwardHeaders,
           'content-length': body.length,
+          'x-relay-auth': signature,
+          'x-relay-timestamp': String(timestamp),
         },
       };
 

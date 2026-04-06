@@ -248,6 +248,13 @@ function issueTokens(blindedTokens, clientIP) {
     // Per-element DLEQ proof:  prove  Z = k·B  ∧  Y = k·G
     const proof = ristretto.dleqProve(issuerSecretScalar, B, Z, issuerPublicPoint);
 
+    // Self-verify the proof we just generated (M6 — catch cryptographic bugs before issuance)
+    const selfCheckValid = ristretto.dleqVerify(proof, B, Z, issuerPublicPoint);
+    if (!selfCheckValid) {
+      logger.error('[Privacy Pass] CRITICAL: DLEQ proof self-verification failed — cryptographic bug detected');
+      throw new Error('Internal cryptographic error: DLEQ proof self-verification failed');
+    }
+
     signedTokens.push(Buffer.from(ristretto.pointToBytes(Z)).toString('base64'));
     proofs.push({
       c: Buffer.from(proof.c).toString('base64'),

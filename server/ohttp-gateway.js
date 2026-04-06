@@ -14,6 +14,7 @@
 
 const nodeCrypto = require('crypto');
 const { logger } = require('./utils');
+const relayAuth = require('./config/relay-auth');
 
 // ─── HPKE Setup ────────────────────────────────────────────
 
@@ -271,6 +272,18 @@ function ohttpGatewayMiddleware(app) {
   // Handle encapsulated requests
   app.post('/ohttp/request', express_raw(), async (req, res) => {
     try {
+      // Verify relay → gateway HMAC authentication (C3/M1)
+      const relaySignature = req.headers['x-relay-auth'];
+      const relayTimestamp = req.headers['x-relay-timestamp'];
+      if (!relaySignature || !relayTimestamp) {
+        logger.warn('[OHTTP Gateway] Request missing relay auth headers — rejecting');
+        return res.status(401).json({ error: 'Relay authentication required' });
+      }
+      if (!relayAuth.verifyRequest(req.body, relaySignature, relayTimestamp)) {
+        logger.warn('[OHTTP Gateway] Relay signature verification failed — possible impersonation');
+        return res.status(401).json({ error: 'Invalid relay signature' });
+      }
+
       // FIX S-07 / Code-Review: await the async decapsulateRequest
       const { method, path, headers, body, responseKey } =
         await decapsulateRequest(req.body);
