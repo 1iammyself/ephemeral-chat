@@ -48,14 +48,16 @@ impl RatchetKey {
     }
 
     /// Reconstruct a RatchetKey from raw secret bytes.
-    /// Used internally to "transfer" a caller-owned key into the session.
+    /// `bytes` is consumed by moving into `StaticSecret`; the stack copy is
+    /// zeroized by the caller (use `Zeroizing` at the call site).
     fn from_secret_bytes(bytes: [u8; 32]) -> Self {
         RatchetKey { secret: StaticSecret::from(bytes) }
     }
 
-    /// Extract raw secret bytes for transferring the key material.
-    fn to_secret_bytes(&self) -> [u8; 32] {
-        self.secret.to_bytes()
+    /// Extract raw secret bytes wrapped in `Zeroizing` so the copy on the
+    /// stack is overwritten when the returned value is dropped.
+    fn to_secret_bytes(&self) -> Zeroizing<[u8; 32]> {
+        Zeroizing::new(self.secret.to_bytes())
     }
 
     pub fn public(&self) -> PublicKey {
@@ -167,7 +169,8 @@ impl DoubleRatchetSession {
         let scv = send_chain_key.to_vec();
 
         // Copy my_key into the session so dhr_key.public() == my_key.public().
-        let session_dhr = RatchetKey::from_secret_bytes(my_key.to_secret_bytes());
+        // to_secret_bytes() returns Zeroizing<[u8;32]> so the intermediate copy is wiped.
+        let session_dhr = RatchetKey::from_secret_bytes(*my_key.to_secret_bytes());
 
         Ok(DoubleRatchetSession {
             dhr_key: session_dhr,
