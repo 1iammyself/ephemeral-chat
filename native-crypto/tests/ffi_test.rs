@@ -105,6 +105,7 @@ fn test_ffi_pqxdh_roundtrip() {
             bundle_buf.as_ptr(),
             bundle_len,
             shared.as_mut_ptr(),
+            32,  // shared_secret_buf_len
             msg_buf.as_mut_ptr(),
             msg_buf.len(),
             &mut msg_len,

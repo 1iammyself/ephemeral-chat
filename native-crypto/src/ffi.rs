@@ -265,6 +265,7 @@ pub unsafe extern "C" fn ephchat_pqxdh_create_initial_message(
     bundle_json: *const u8,
     bundle_json_len: usize,
     shared_secret_buf: *mut u8,
+    shared_secret_buf_len: usize,   // must be >= 32
     msg_buf: *mut u8,
     msg_buf_len: usize,
     msg_len: *mut usize,
@@ -283,7 +284,12 @@ pub unsafe extern "C" fn ephchat_pqxdh_create_initial_message(
         let initiator = crate::pqxdh::PQXDHInitiator::new(&bundle)?;
         let (shared, msg) = initiator.create_initial_message()?;
 
-        // Write 32-byte shared secret.
+        // Validate shared secret buffer capacity before writing.
+        if shared_secret_buf_len < 32 {
+            return Err(crate::errors::CryptoError::InvalidInput(
+                "shared_secret_buf too small (need 32 bytes)".into(),
+            ));
+        }
         std::ptr::copy_nonoverlapping(shared.as_ptr(), shared_secret_buf, 32);
 
         if msg.len() > msg_buf_len {
