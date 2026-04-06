@@ -30,6 +30,7 @@ use crate::errors::CryptoError;
 use crate::Result;
 
 const MAX_SKIP: u32 = 1000;
+const MAX_SKIPPED_TOTAL: usize = 2000;
 const HKDF_INFO_ROOT: &[u8] = b"ephchat-root-ratchet";
 const HKDF_INFO_CHAIN: &[u8] = b"ephchat-chain-ratchet";
 
@@ -64,8 +65,8 @@ impl RatchetKey {
         PublicKey::from(&self.secret)
     }
 
-    fn dh(&self, their_public: &PublicKey) -> [u8; 32] {
-        self.secret.diffie_hellman(their_public).to_bytes()
+    fn dh(&self, their_public: &PublicKey) -> Zeroizing<[u8; 32]> {
+        Zeroizing::new(self.secret.diffie_hellman(their_public).to_bytes())
     }
 }
 
@@ -88,27 +89,27 @@ pub struct MessageHeader {
 // --------------------------------------------------------------------------
 
 /// Root-key ratchet: HKDF(salt=root_key, IKM=dh_output) → (new_rk, new_ck)
-fn kdf_rk(root_key: &[u8; 32], dh_output: &[u8; 32]) -> ([u8; 32], [u8; 32]) {
+fn kdf_rk(root_key: &[u8; 32], dh_output: &[u8; 32]) -> Result<([u8; 32], [u8; 32])> {
     let deriver = crate::hkdf::HKDFDeriver::new(dh_output, Some(root_key));
     let mut combined = [0u8; 64];
-    let _ = deriver.derive_var(HKDF_INFO_ROOT, &mut combined);
+    deriver.derive_var(HKDF_INFO_ROOT, &mut combined)?;
     let mut rk = [0u8; 32];
     let mut ck = [0u8; 32];
     rk.copy_from_slice(&combined[..32]);
     ck.copy_from_slice(&combined[32..]);
-    (rk, ck)
+    Ok((rk, ck))
 }
 
 /// Chain-key step: HKDF(IKM=chain_key) → (new_ck, message_key)
-fn kdf_ck(chain_key: &[u8; 32]) -> ([u8; 32], [u8; 32]) {
+fn kdf_ck(chain_key: &[u8; 32]) -> Result<([u8; 32], [u8; 32])> {
     let deriver = crate::hkdf::HKDFDeriver::new(chain_key, None);
     let mut combined = [0u8; 64];
-    let _ = deriver.derive_var(HKDF_INFO_CHAIN, &mut combined);
+    deriver.derive_var(HKDF_INFO_CHAIN, &mut combined)?;
     let mut new_ck = [0u8; 32];
     let mut mk = [0u8; 32];
     new_ck.copy_from_slice(&combined[..32]);
     mk.copy_from_slice(&combined[32..]);
-    (new_ck, mk)
+    Ok((new_ck, mk))
 }
 
 // --------------------------------------------------------------------------
@@ -148,7 +149,7 @@ pub struct DoubleRatchetSession {
     skipped: BTreeMap<([u8; 32], u32), [u8; 32]>,
 
     /// Public compat field: mirrors send_chain_key as Vec<u8>.
-    pub sending_chain_key: Vec<u8>,
+    pub sending_chain_key: Zeroizing<Vec<u8>>,
 }
 
 impl DoubleRatchetSession {
@@ -165,8 +166,7 @@ impl DoubleRatchetSession {
     ///   (RK, send_ck) = KDF_RK(shared, DH(my_key, peer_pub))
     pub fn new_initiator(shared: &[u8; 32], my_key: &RatchetKey, peer_pub: &PublicKey) -> Result<Self> {
         let dh_out = my_key.dh(peer_pub);
-        let (root_key, send_chain_key) = kdf_rk(shared, &dh_out);
-        let scv = send_chain_key.to_vec();
+        let (root_key, send_chain_key) = kdf_rk(shared, &*dh_out)?;
 
         // Copy my_key into the session so dhr_key.public() == my_key.public().
         // to_secret_bytes() returns Zeroizing<[u8;32]> so the intermediate copy is wiped.
@@ -182,7 +182,7 @@ impl DoubleRatchetSession {
             recv_n: 0,
             prev_send_n: 0,
             skipped: BTreeMap::new(),
-            sending_chain_key: scv,
+            sending_chain_key: Zeroizing::new(send_chain_key.to_vec()),
         })
     }
 
@@ -203,7 +203,7 @@ impl DoubleRatchetSession {
     /// `DH(bob_fresh_key, alice_pub)`.
     pub fn new_responder(shared: &[u8; 32], my_key: &RatchetKey, peer_pub: &PublicKey) -> Result<Self> {
         let dh_out = my_key.dh(peer_pub);
-        let (root_key, recv_chain_key) = kdf_rk(shared, &dh_out);
+        let (root_key, recv_chain_key) = kdf_rk(shared, &*dh_out)?;
 
         // Fresh ratchet key for Bob's first send (its public will appear in Bob's headers).
         let session_dhr = RatchetKey::generate()?;
@@ -218,7 +218,7 @@ impl DoubleRatchetSession {
             recv_n: 0,
             prev_send_n: 0,
             skipped: BTreeMap::new(),
-            sending_chain_key: vec![0u8; 32],
+            sending_chain_key: Zeroizing::new(vec![0u8; 32]),
         })
     }
 
@@ -234,7 +234,7 @@ impl DoubleRatchetSession {
         }
 
         // Advance send chain key → message key.
-        let (new_ck, mk) = kdf_ck(&self.send_chain_key);
+        let (new_ck, mk) = kdf_ck(&self.send_chain_key)?;
         *self.send_chain_key = new_ck;
 
         let header = MessageHeader {
@@ -255,7 +255,7 @@ impl DoubleRatchetSession {
         out.extend_from_slice(&header_bytes);
         out.extend_from_slice(&ciphertext);
 
-        self.sending_chain_key = self.send_chain_key.to_vec();
+        self.sending_chain_key = Zeroizing::new(self.send_chain_key.to_vec());
         Ok(out)
     }
 
@@ -294,7 +294,9 @@ impl DoubleRatchetSession {
         // Advance recv chain to message n.
         self.skip_message_keys(header.n)?;
 
-        let (new_ck, mk) = kdf_ck(&self.recv_chain_key);
+        // Note: replay protection requires the caller to track consumed message numbers.
+        // This implementation does not deduplicate decrypted messages.
+        let (new_ck, mk) = kdf_ck(&self.recv_chain_key)?;
         *self.recv_chain_key = new_ck;
         self.recv_n += 1;
 
@@ -310,8 +312,12 @@ impl DoubleRatchetSession {
         if self.recv_n.saturating_add(MAX_SKIP) < until {
             return Err(CryptoError::InvalidInput("too many skipped messages".into()));
         }
+        // Guard total map size against unbounded growth across ratchet steps
         while self.recv_n < until {
-            let (new_ck, mk) = kdf_ck(&self.recv_chain_key);
+            if self.skipped.len() >= MAX_SKIPPED_TOTAL {
+                return Err(CryptoError::InvalidInput("skipped message cache full".into()));
+            }
+            let (new_ck, mk) = kdf_ck(&self.recv_chain_key)?;
             *self.recv_chain_key = new_ck;
             self.skipped.insert((self.dhr_remote.to_bytes(), self.recv_n), mk);
             self.recv_n += 1;
@@ -324,10 +330,10 @@ impl DoubleRatchetSession {
     fn ratchet_send_only(&mut self, remote_pub: &PublicKey) -> Result<()> {
         self.dhr_key = RatchetKey::generate()?;
         let dh_send = self.dhr_key.dh(remote_pub);
-        let (new_rk, new_send_ck) = kdf_rk(&self.root_key, &dh_send);
+        let (new_rk, new_send_ck) = kdf_rk(&self.root_key, &*dh_send)?;
         *self.root_key = new_rk;
         *self.send_chain_key = new_send_ck;
-        self.sending_chain_key = self.send_chain_key.to_vec();
+        self.sending_chain_key = Zeroizing::new(self.send_chain_key.to_vec());
         Ok(())
     }
 
@@ -340,7 +346,7 @@ impl DoubleRatchetSession {
 
         // Receiving step: DH(our current key, their new key) → recv chain
         let dh_recv = self.dhr_key.dh(remote_pub);
-        let (new_rk, new_recv_ck) = kdf_rk(&self.root_key, &dh_recv);
+        let (new_rk, new_recv_ck) = kdf_rk(&self.root_key, &*dh_recv)?;
         *self.root_key = new_rk;
         *self.recv_chain_key = new_recv_ck;
 
@@ -349,11 +355,11 @@ impl DoubleRatchetSession {
 
         // Sending step: DH(new key, their new key) → send chain
         let dh_send = self.dhr_key.dh(remote_pub);
-        let (new_rk2, new_send_ck) = kdf_rk(&self.root_key, &dh_send);
+        let (new_rk2, new_send_ck) = kdf_rk(&self.root_key, &*dh_send)?;
         *self.root_key = new_rk2;
         *self.send_chain_key = new_send_ck;
 
-        self.sending_chain_key = self.send_chain_key.to_vec();
+        self.sending_chain_key = Zeroizing::new(self.send_chain_key.to_vec());
         Ok(())
     }
 }
