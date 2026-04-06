@@ -39,6 +39,13 @@ function startOHTTPRelay() {
   if (relayServer) return;
 
   relayServer = http.createServer((req, res) => {
+    // Health check for UptimeRobot / monitoring
+    if (req.method === 'GET' && req.url === '/health') {
+      res.writeHead(200, { 'content-type': 'text/plain' });
+      res.end('ok');
+      return;
+    }
+
     // Only accept POST to /ohttp/request
     if (req.method !== 'POST' || req.url !== '/ohttp/request') {
       res.writeHead(404);
