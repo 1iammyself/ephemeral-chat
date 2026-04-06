@@ -27,6 +27,14 @@ zeroize = { version = "1.7", features = ["zeroize_derive", "derive"] }
 rand = "0.8"
 rand_core = "0.6"
 
+
+# WASM: both getrandom versions need browser crypto features when targeting wasm32.
+# v0.2 (pulled by ed25519-dalek, aes-gcm, etc.) needs "js".
+# v0.4 (pulled by rand_core 0.10 / ml-kem) needs "wasm_js".
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+getrandom04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
+
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

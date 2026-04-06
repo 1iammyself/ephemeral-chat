@@ -114,6 +114,14 @@ export default defineConfig(({ mode }) => {
       sourcemap: isProd ? false : true, // Disable sourcemaps in prod for security
       minify: 'esbuild',
       rollupOptions: {
+        // Capacitor plugins are native-only; externalize so the web build doesn't fail.
+        // The attestation-provider uses dynamic imports with try/catch fallbacks,
+        // so these will safely resolve to empty modules at web runtime.
+        external: [
+          '@capacitor/device',
+          '@anuradev/capacitor-play-integrity',
+          '@capacitor-community/apple-sign-in',
+        ],
         output: {
           // Use a function to place very large deps in their own chunks.
           // This helps keep the main chunk smaller and allows browsers to cache

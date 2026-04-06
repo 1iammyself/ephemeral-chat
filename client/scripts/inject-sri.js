@@ -13,10 +13,12 @@
  * Combined with CSP require-sri-for, this blocks unsigned scripts entirely.
  */
 
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import { fileURLToPath } from 'url';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST_DIR = path.join(__dirname, '..', 'dist');
 const INDEX_HTML = path.join(DIST_DIR, 'index.html');
 
@@ -39,21 +41,39 @@ function computeHash(filePath) {
 
 /**
  * Resolve a src/href to an absolute path in dist/.
- * Returns null if it's an external URL or can't be resolved.
+ * Handles both relative paths (/assets/foo.js) and absolute URLs
+ * that point to local assets (https://chat.kyere.me/assets/foo.js).
+ * Returns null if it's a truly external URL that can't be resolved locally.
  */
 function resolvePath(src) {
-  if (!src || src.startsWith('http://') || src.startsWith('https://') || src.startsWith('//')) {
-    return null; // External — don't hash
+  if (!src) return null;
+
+  let relative = src;
+
+  // Strip known absolute base URLs (Vite may embed them in production builds)
+  const knownBases = [
+    /^https?:\/\/[^/]+\//,  // any origin — strip to get the path
+  ];
+  for (const re of knownBases) {
+    const match = src.match(re);
+    if (match) {
+      relative = src.slice(match[0].length - 1); // keep leading /
+      break;
+    }
   }
+
+  if (relative.startsWith('//')) return null; // protocol-relative external
+
   // Strip leading /
-  const relative = src.replace(/^\//, '');
+  relative = relative.replace(/^\//, '');
   const absolute = path.join(DIST_DIR, relative);
   return fs.existsSync(absolute) ? absolute : null;
 }
 
-// Process <script src="..."> tags
+// Process <script src="..."> tags (handles any attribute order, including Vite's
+// `<script type="module" crossorigin src="...">` pattern)
 html = html.replace(
-  /<script([^>]*)\s+src="([^"]+)"([^>]*)>/g,
+  /<script([^>]*?)\bsrc="([^"]+)"([^>]*)>/g,
   (match, before, src, after) => {
     if (match.includes('integrity=')) return match; // Already has SRI
     const filePath = resolvePath(src);
@@ -61,8 +81,11 @@ html = html.replace(
     try {
       const hash = computeHash(filePath);
       injected++;
-      console.log(`[SRI] <script> ${src} → sha384-${hash.slice(0, 8)}...`);
-      return `<script${before} src="${src}" integrity="sha384-${hash}" crossorigin="anonymous"${after}>`;
+      console.log(`[SRI] <script> ${path.basename(src)} → sha384-${hash.slice(0, 8)}...`);
+      // Remove any existing crossorigin attr from before/after to avoid duplicates
+      const cleanBefore = before.replace(/\s*crossorigin(?:="[^"]*")?/g, '');
+      const cleanAfter = after.replace(/\s*crossorigin(?:="[^"]*")?/g, '');
+      return `<script${cleanBefore} src="${src}" integrity="sha384-${hash}" crossorigin="anonymous"${cleanAfter}>`;
     } catch (err) {
       failed++;
       console.warn(`[SRI] Failed to hash ${src}:`, err.message);
@@ -71,19 +94,23 @@ html = html.replace(
   },
 );
 
-// Process <link rel="stylesheet" href="..."> tags
+// Process <link rel="stylesheet" href="..."> and <link rel="modulepreload" href="..."> tags
 html = html.replace(
-  /<link([^>]*)\s+href="([^"]+)"([^>]*)\/?>/g,
+  /<link([^>]*?)\bhref="([^"]+)"([^>]*?)\/?>/g,
   (match, before, href, after) => {
     if (match.includes('integrity=')) return match; // Already has SRI
-    if (!match.includes('stylesheet')) return match; // Only stylesheet links
+    const isStylesheet = match.includes('stylesheet');
+    const isModulePreload = match.includes('modulepreload');
+    if (!isStylesheet && !isModulePreload) return match;
     const filePath = resolvePath(href);
     if (!filePath) return match;
     try {
       const hash = computeHash(filePath);
       injected++;
-      console.log(`[SRI] <link> ${href} → sha384-${hash.slice(0, 8)}...`);
-      return `<link${before} href="${href}" integrity="sha384-${hash}" crossorigin="anonymous"${after}/>`;
+      console.log(`[SRI] <link> ${path.basename(href)} → sha384-${hash.slice(0, 8)}...`);
+      const cleanBefore = before.replace(/\s*crossorigin(?:="[^"]*")?/g, '');
+      const cleanAfter = after.replace(/\s*crossorigin(?:="[^"]*")?/g, '');
+      return `<link${cleanBefore} href="${href}" integrity="sha384-${hash}" crossorigin="anonymous"${cleanAfter}/>`;
     } catch (err) {
       failed++;
       console.warn(`[SRI] Failed to hash ${href}:`, err.message);

@@ -32,6 +32,7 @@
     "@noble/curves": "^1.8.1",
     "agora-token": "^2.0.5",
     "bcryptjs": "^2.4.3",
+    "cbor": "^10.0.12",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
