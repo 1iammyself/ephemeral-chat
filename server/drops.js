@@ -61,7 +61,7 @@ class DropManager {
      *   fileName: string|null,               // Original file name (for file drops)
      *   mimeType: string|null,               // MIME type
      *   fileSize: number|null,               // Size in bytes
-     *   hint: string|null,                   // Optional hint from creator (e.g. "From Alice")
+     *   encryptedHint: {iv, ciphertext}|null, // AES-256-GCM encrypted hint (M4: server never sees plaintext)
      * }
      */
     this.drops = new Map();
@@ -171,7 +171,7 @@ class DropManager {
    * @param {string|null} [params.fileName] - Original file name
    * @param {string|null} [params.mimeType] - MIME type
    * @param {number|null} [params.fileSize] - File size in bytes
-   * @param {string|null} [params.hint] - Optional hint to display
+   * @param {{iv: string, ciphertext: string}|null} [params.encryptedHint] - AES-256-GCM encrypted hint blob
    * @returns {Object} { dropId, verbalCode, expiresAt, ephPacket }
    */
   async createDrop(params) {
@@ -188,7 +188,7 @@ class DropManager {
       fileName = null,
       mimeType = null,
       fileSize = null,
-      hint = null,
+      encryptedHint = null,
     } = params;
 
     // ── Validation ──────────────────────────────────────────
@@ -276,7 +276,7 @@ class DropManager {
       fileName,
       mimeType,
       fileSize,
-      hint,
+      encryptedHint,
     };
 
     // Store
@@ -306,7 +306,7 @@ class DropManager {
       type: 'ephemeral-drop',
       dropId,
       server: process.env.APP_URL || 'https://chat.kyere.me',
-      hint: hint || null,
+      encryptedHint: encryptedHint || null, // opaque blob — server never sees plaintext
       ts: ephTimestamp,
       sig: ephSignature,
     };
@@ -348,7 +348,7 @@ class DropManager {
       fileName: drop.fileName,
       mimeType: drop.mimeType,
       fileSize: drop.fileSize,
-      hint: drop.hint,
+      encryptedHint: drop.encryptedHint,
       salt: drop.salt,
       verbalCode: drop.verbalCode,
     };

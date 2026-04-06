@@ -99,7 +99,7 @@ function createDropRoutes(dropManager, options = {}) {
         fileName,
         mimeType,
         fileSize,
-        hint,
+        encryptedHint,
       } = req.body;
 
       if (!encryptedPayload || !iv || !salt || !contentType || !wrappedKeys || !recipientHashes || !creatorId) {
@@ -108,6 +108,13 @@ function createDropRoutes(dropManager, options = {}) {
 
       if (creatorId && !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(creatorId)) {
         return res.status(400).json({ error: 'Invalid creator ID format' });
+      }
+
+      // Validate encryptedHint structure if present
+      if (encryptedHint !== null && encryptedHint !== undefined) {
+        if (typeof encryptedHint !== 'object' || !encryptedHint.iv || !encryptedHint.ciphertext) {
+          return res.status(400).json({ error: 'Invalid encryptedHint format' });
+        }
       }
 
       const result = await dropManager.createDrop({
@@ -123,7 +130,7 @@ function createDropRoutes(dropManager, options = {}) {
         fileName,
         mimeType,
         fileSize,
-        hint,
+        encryptedHint: encryptedHint || null,
       });
 
       res.status(201).json({
@@ -287,8 +294,8 @@ function createDropRoutes(dropManager, options = {}) {
         return res.status(404).json({ error: 'Drop not found or has expired' });
       }
 
-      const buffer = generateEphFileBuffer(dropId, info.hint);
-      const rawFilename = suggestFilename(dropId, info.hint);
+      const buffer = generateEphFileBuffer(dropId, info.encryptedHint);
+      const rawFilename = suggestFilename(dropId, null); // hint is encrypted — don't use in filename
       // Strip any characters that could break the Content-Disposition header value
       // (quotes, backslashes, control chars, path separators)
       const safeFilename = rawFilename.replace(/[^\w.\-]/g, '_').substring(0, 100);

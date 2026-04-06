@@ -7,6 +7,7 @@ import { useTheme } from '../context/ThemeContext';
 import { hapticSuccess, hapticError } from '../utils/platform';
 import {
   getDropInfoAPI, claimDropAPI, resolveVerbalCodeAPI, hashUsername,
+  decryptHint, unwrapMasterKey, deriveWrappingKey,
 } from '../utils/drops';
 import {
   parseEphFile, validateEphFile, handleEphFileInput, EPH_EXTENSION,
@@ -150,11 +151,25 @@ const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCo
 
       const result = await claimDropAPI(resolvedDropId, usernameHash);
 
+      // Decrypt hint if present — requires masterKey (unwrapped after auth)
+      let decryptedHint = null;
+      const encryptedHint = dropInfo?.drop?.encryptedHint || ephPacket?.encryptedHint;
+      if (encryptedHint && result.wrappedKey) {
+        try {
+          const wrappingKey = await deriveWrappingKey(trimmedUsername, salt);
+          const masterKey = await unwrapMasterKey(result.wrappedKey, wrappingKey);
+          decryptedHint = await decryptHint(encryptedHint, masterKey);
+        } catch {
+          // Hint decryption failure is non-fatal
+        }
+      }
+
       hapticSuccess();
       onDropClaimed({
         dropId: resolvedDropId,
         username: trimmedUsername,
         salt, // pass salt for decryption
+        hint: decryptedHint,
         ...result,
       });
     } catch (err) {
@@ -342,9 +357,9 @@ const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCo
                         <p className="text-sm font-medium text-green-700 dark:text-green-300">
                           {ephFile?.name || 'Valid .eph file'}
                         </p>
-                        {ephPacket.hint && (
+                        {ephPacket.encryptedHint && (
                           <p className="text-xs text-green-600 dark:text-green-400">
-                            Hint: {ephPacket.hint}
+                            Hint available after authentication
                           </p>
                         )}
                         <button
@@ -393,9 +408,9 @@ const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCo
                   <p className="text-xs font-medium text-purple-700 dark:text-purple-300 mb-1">
                     Drop Found
                   </p>
-                  {dropInfo.drop.hint && (
+                  {dropInfo.drop.encryptedHint && (
                     <p className="text-sm text-purple-600 dark:text-purple-400 mb-1">
-                      &ldquo;{dropInfo.drop.hint}&rdquo;
+                      Hint available after authentication
                     </p>
                   )}
                   <div className="flex items-center gap-3 text-xs text-purple-600 dark:text-purple-400">

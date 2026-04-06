@@ -211,13 +211,14 @@ export async function unwrapMasterKey(wrappedKeyBase64, wrappingKey) {
 /**
  * Encrypt a drop for multiple recipients
  * This is the main function used by the CreateDrop UI
- * 
+ *
  * @param {string|ArrayBuffer|Uint8Array} content - The content to encrypt
  * @param {string[]} usernames - Array of recipient usernames (plaintext)
+ * @param {string|null} [hint] - Optional creator hint (encrypted with masterKey)
  * @returns {Promise<Object>} Everything needed to send to the server:
- *   { encryptedPayload, iv, salt, wrappedKeys, recipientHashes }
+ *   { encryptedPayload, iv, salt, wrappedKeys, recipientHashes, encryptedHint }
  */
-export async function encryptDrop(content, usernames) {
+export async function encryptDrop(content, usernames, hint = null) {
   // 1. Generate random salt
   const salt = generateDropSalt();
 
@@ -227,7 +228,14 @@ export async function encryptDrop(content, usernames) {
   // 3. Encrypt the content
   const { ciphertext, iv } = await encryptContent(content, masterKey);
 
-  // 4. For each recipient: hash username + wrap master key
+  // 4. Encrypt hint if provided — server never sees plaintext hint (M4)
+  let encryptedHint = null;
+  if (hint && typeof hint === 'string' && hint.trim().length > 0) {
+    const { ciphertext: hintCt, iv: hintIv } = await encryptContent(hint.trim(), masterKey);
+    encryptedHint = { iv: hintIv, ciphertext: hintCt };
+  }
+
+  // 5. For each recipient: hash username + wrap master key
   const wrappedKeys = {};
   const recipientHashes = [];
 
@@ -246,7 +254,20 @@ export async function encryptDrop(content, usernames) {
     salt,
     wrappedKeys,
     recipientHashes,
+    encryptedHint,
   };
+}
+
+/**
+ * Decrypt the hint field of a drop using the unwrapped master key.
+ *
+ * @param {{ iv: string, ciphertext: string }} encryptedHint - From server drop info
+ * @param {CryptoKey} masterKey - Unwrapped master key for this drop
+ * @returns {Promise<string>} Plaintext hint
+ */
+export async function decryptHint(encryptedHint, masterKey) {
+  const plaintext = await decryptContent(encryptedHint.ciphertext, encryptedHint.iv, masterKey);
+  return new TextDecoder().decode(plaintext);
 }
 
 /**

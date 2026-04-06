@@ -162,7 +162,7 @@ function validateEphPacket(input) {
     return {
       valid: true,
       dropId: packet.dropId,
-      hint: packet.hint || null,
+      encryptedHint: packet.encryptedHint || null,
       server: packet.server || null,
       ts: packet.ts,
     };

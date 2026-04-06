@@ -207,8 +207,8 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
       // 2. Get valid recipient usernames
       const usernames = recipients.map(r => r.trim()).filter(Boolean);
 
-      // 3. Encrypt
-      const encrypted = await encryptDrop(contentBuffer, usernames);
+      // 3. Encrypt (hint is encrypted with masterKey — server never sees plaintext)
+      const encrypted = await encryptDrop(contentBuffer, usernames, hint.trim() || null);
 
       // 4. Send to server — flatten contentMeta to match server API
       const result = await createDropAPI({
@@ -224,13 +224,13 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
         fileSize: contentMeta.size || null,
         ttl,
         viewOnce,
-        hint: hint.trim() || undefined,
+        encryptedHint: encrypted.encryptedHint || null,
+        // hint is NOT sent — server stores only encrypted blob
       });
 
       hapticSuccess();
       onDropCreated({
         ...result,
-        hint: hint.trim() || null,
         viewOnce,
         recipientCount: recipients.filter(r => r.trim()).length,
       });
