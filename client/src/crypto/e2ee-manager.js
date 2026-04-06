@@ -46,6 +46,7 @@ import {
   destroySenderKey,
 } from './sender-key.js';
 import { storeKeyBundle, getKeyBundle, destroyKeyBundle } from './key-store.js';
+import { verifyServerSignature, isServerSigningReady } from './server-signing.js';
 
 // ─── Session State ──────────────────────────────────────────
 
@@ -95,8 +96,17 @@ export async function initE2EE(roomCode, socketManager) {
     eventCleanups.set(roomCode, cleanups);
 
     // Handler: roster of existing peers' bundles
-    const handleRoster = async ({ bundles: roster, roomCode: rc }) => {
-      if (rc !== roomCode) return;
+    const handleRoster = async (payload) => {
+      if (payload.roomCode !== roomCode) return;
+      // Verify server signature if signing is active — warn and skip on failure
+      if (isServerSigningReady()) {
+        const valid = await verifyServerSignature(payload);
+        if (!valid) {
+          dbg('[E2EE] ⚠️ key-bundle-roster signature INVALID — dropping');
+          return;
+        }
+      }
+      const { bundles: roster } = payload;
       if (!roster || roster.length === 0) return;
       const myBundle = getKeyBundle(roomCode);
       if (!myBundle) return;
@@ -109,8 +119,17 @@ export async function initE2EE(roomCode, socketManager) {
     // Normal case: they will send us a key-bundle-offer shortly (they got our bundle in the roster).
     // Simultaneous join case: both peers get an empty roster; neither side has a DR session yet.
     // Tie-break: the peer with the lexicographically smaller socket ID acts as initiator.
-    const handlePeerBundle = async ({ socketId: peerId, bundle: peerBundleData, roomCode: rc }) => {
+    const handlePeerBundle = async (payload) => {
+      const { socketId: peerId, bundle: peerBundleData, roomCode: rc } = payload;
       if (rc !== roomCode) return;
+      // Verify server signature if signing is active
+      if (isServerSigningReady()) {
+        const valid = await verifyServerSignature(payload);
+        if (!valid) {
+          dbg('[E2EE] ⚠️ peer-key-bundle signature INVALID — dropping');
+          return;
+        }
+      }
       // If session already exists (normal case), nothing to do.
       if (drSessions.get(roomCode)?.has(peerId)) {
         dbg(`[E2EE] 👤 New peer joined: ${peerId} — session already established`);

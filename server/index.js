@@ -47,6 +47,7 @@ const { attachWebAuthnRoutes } = require('./webauthn');
 const { trafficPaddingMiddleware, startServerChaff, stopServerChaff, isChaff, stripPadding, padResponseMiddleware } = require('./traffic-padding');
 const { LinkPreviewService } = require('./link-preview');
 const { initializeAttestation } = require('./device-attestation-verifier');
+const { initSigningKey, signSocketPayload, getPublicKeyBase64 } = require('./middleware/response-signing');
 
 // Initialize Cap.js for proof-of-work CAPTCHA
 if (!process.env.CAP_SECRET) {
@@ -127,6 +128,14 @@ async function initializeServer() {
     initializeAttestation();
   } catch (e) {
     logger.warn('⚠️  Device attestation init failed (non-fatal):', e.message);
+  }
+
+  // Ed25519 response signing — clients verify key-bundle events
+  try {
+    initSigningKey();
+    logger.info('✅ Ed25519 response signing initialized');
+  } catch (e) {
+    logger.warn('⚠️  Response signing init failed (non-fatal):', e.message);
   }
 
   // Start e2ecp relay process - REMOVED (Lazy loaded now)
@@ -372,6 +381,13 @@ app.get('/', (req, res) => {
 
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
+});
+
+// Server Ed25519 public key — clients pin this for TOFU signature verification
+app.get('/api/server-key', (req, res) => {
+  const publicKey = getPublicKeyBase64();
+  if (!publicKey) return res.status(503).json({ error: 'Signing key not initialised' });
+  res.json({ publicKey, algorithm: 'Ed25519' });
 });
 
 // Runtime configuration endpoint — consumed by Electron and Capacitor clients
@@ -5418,7 +5434,7 @@ io.on('connection', (socket) => {
       return;
     }
     // Broadcast to other room members so they can initiate key exchange
-    socket.to(roomCode).emit('peer-key-bundle', { socketId: socket.id, bundle, roomCode });
+    socket.to(roomCode).emit('peer-key-bundle', signSocketPayload({ socketId: socket.id, bundle, roomCode }));
     logger.info(`🔑 Key bundle registered for socket ${socket.id} in room ${roomCode}`);
   });
 
@@ -5426,7 +5442,7 @@ io.on('connection', (socket) => {
   socket.on('request-key-bundles', ({ roomCode }) => {
     if (!roomCode) return;
     const bundles = keyRegistry.getBundlesForRoom(roomCode, socket.id);
-    socket.emit('key-bundle-roster', { bundles, roomCode });
+    socket.emit('key-bundle-roster', signSocketPayload({ bundles, roomCode }));
   });
 
   // Forward key-bundle-offer to a specific peer (Alice → Bob)

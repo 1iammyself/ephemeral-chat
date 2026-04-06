@@ -1,6 +1,7 @@
 import { io } from 'socket.io-client';
 import { resolveBaseUrl } from './utils/resolve-url.js';
 import { AttestationProvider } from './capacitor/attestation-provider';
+import { initServerSigning } from './crypto/server-signing.js';
 
 /**
  * Simplified Socket.IO Manager based on working branch implementation
@@ -52,6 +53,11 @@ class SocketManager {
     this.socket.on('connect', () => {
       console.log('✅ Socket connected:', this.socket.id);
       this.isConnected = true;
+
+      // Pin server's Ed25519 signing key on first connect (TOFU)
+      initServerSigning().catch(err => {
+        console.warn('⚠️ Server signing init failed (non-fatal):', err.message);
+      });
 
       // Re-apply listeners
       this.listeners.forEach((callbacks, event) => {
