@@ -48,6 +48,7 @@ const { trafficPaddingMiddleware, startServerChaff, stopServerChaff, isChaff, st
 const { LinkPreviewService } = require('./link-preview');
 const { initializeAttestation } = require('./device-attestation-verifier');
 const { initSigningKey, signSocketPayload, getPublicKeyBase64 } = require('./middleware/response-signing');
+const { initAuditLogger, logAuditEvent } = require('./audit-logger');
 
 // Initialize Cap.js for proof-of-work CAPTCHA
 if (!process.env.CAP_SECRET) {
@@ -136,6 +137,14 @@ async function initializeServer() {
     logger.info('✅ Ed25519 response signing initialized');
   } catch (e) {
     logger.warn('⚠️  Response signing init failed (non-fatal):', e.message);
+  }
+
+  // Encrypted audit log — forensic trail for security-critical events
+  try {
+    initAuditLogger();
+    logger.info('✅ Encrypted audit logger initialized');
+  } catch (e) {
+    logger.warn('⚠️  Audit logger init failed (non-fatal):', e.message);
   }
 
   // Start e2ecp relay process - REMOVED (Lazy loaded now)
@@ -1199,6 +1208,7 @@ io.on('connection', (socket) => {
         totpSecret: totpSecret || undefined, // undefined = TOTP not required
       };
 
+      logAuditEvent('room-created', { socketId: socket.id, roomCode });
       callback({ success: true, roomCode, totpSecret }); // creator receives the secret to share
     } catch (error) {
       logger.error('Error creating room:', error);
@@ -5245,6 +5255,9 @@ io.on('connection', (socket) => {
         socketId,
         userCount: socketRoomSize
       });
+      // Emit peer-left so remaining clients can rekey their group sender key
+      io.to(roomCode).emit('peer-left', { socketId, roomCode });
+      logAuditEvent('peer-left-room', { socketId, roomCode });
 
       if (roomData[roomCode]) {
         const enrichedUsers = getEnrichedUsers(roomCode);
@@ -5436,6 +5449,7 @@ io.on('connection', (socket) => {
     // Broadcast to other room members so they can initiate key exchange
     socket.to(roomCode).emit('peer-key-bundle', signSocketPayload({ socketId: socket.id, bundle, roomCode }));
     logger.info(`🔑 Key bundle registered for socket ${socket.id} in room ${roomCode}`);
+    logAuditEvent('key-bundle-registered', { socketId: socket.id, roomCode });
   });
 
   // Client requests bundles for all existing room members
@@ -5460,6 +5474,7 @@ io.on('connection', (socket) => {
     const targetSocket = io.sockets.sockets.get(to);
     if (targetSocket) {
       targetSocket.emit('key-bundle-answer', { from: socket.id, roomCode });
+      logAuditEvent('key-exchange-complete', { initiator: to, responder: socket.id, roomCode });
     }
   });
 
