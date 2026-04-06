@@ -41,7 +41,7 @@ const keyRegistry = require('./key-registry');
 const { initGatewayKeys, ohttpGatewayMiddleware, startKeyRotation: startOHTTPKeyRotation, stopKeyRotation: stopOHTTPKeyRotation } = require('./ohttp-gateway');
 const { initIssuer, attachPrivacyPassRoutes, privacyPassAuth, startCleanup: startPPCleanup, stopCleanup: stopPPCleanup } = require('./privacy-pass-issuer');
 const { attachICESignaling } = require('./ice-signaling');
-const { startOHTTPRelay, stopOHTTPRelay } = require('./ohttp-relay-server');
+// OHTTP relay is a separate Render service — not started from this process
 const { attachMASQUEProxy } = require('./masque-proxy');
 const { attachWebAuthnRoutes } = require('./webauthn');
 const { trafficPaddingMiddleware, startServerChaff, stopServerChaff, isChaff, stripPadding, padResponseMiddleware } = require('./traffic-padding');
@@ -99,13 +99,6 @@ async function initializeServer() {
     logger.info('🕳️  ICE Signaling attached for P2P hole punching');
   } catch (e) {
     logger.warn('⚠️  ICE Signaling init failed (non-fatal):', e.message);
-  }
-
-  // OHTTP Relay — RFC 9458 separate-origin relay (PORT+1)
-  try {
-    startOHTTPRelay();
-  } catch (e) {
-    logger.warn('⚠️  OHTTP Relay start failed (non-fatal):', e.message);
   }
 
   // MASQUE CONNECT-UDP Proxy — RFC 9297/9298 (WebSocket transport)
@@ -391,20 +384,8 @@ app.get('/api/config', (req, res) => {
   const publicUrl = process.env.PUBLIC_URL ||
     `${req.protocol}://${req.get('host')}`;
 
-  // OHTTP relay: prefer explicit env var, then derive from relay port.
-  const { RELAY_PORT: ohttpRelayPort } = require('./ohttp-relay-server');
-  let ohttpRelayUrl;
-  if (process.env.OHTTP_RELAY_URL) {
-    ohttpRelayUrl = process.env.OHTTP_RELAY_URL;
-  } else {
-    // Strip any existing port from publicUrl then append relay port
-    try {
-      const _pu = new URL(publicUrl);
-      ohttpRelayUrl = `${_pu.protocol}//${_pu.hostname}:${ohttpRelayPort}/ohttp/request`;
-    } catch (_) {
-      ohttpRelayUrl = `${getPublicUrl()}/ohttp/request`.replace(`:${process.env.PORT || 3001}`, `:${ohttpRelayPort}`);
-    }
-  }
+  // OHTTP relay is deployed as a separate service — URL must be set explicitly
+  const ohttpRelayUrl = process.env.OHTTP_RELAY_URL || null;
 
   const wsBase = publicUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
 

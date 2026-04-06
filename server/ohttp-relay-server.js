@@ -19,12 +19,19 @@ const https = require('https');
 const { logger } = require('./utils');
 const relayAuth = require('./config/relay-auth');
 
-const RELAY_PORT = parseInt(process.env.OHTTP_RELAY_PORT || (parseInt(process.env.PORT || '3001') + 1));
-// Prefer an explicit env var; fall back to PUBLIC_URL; last resort derived from url-config
-const GATEWAY_URL = process.env.OHTTP_GATEWAY_URL ||
-  (process.env.PUBLIC_URL
-    ? `${process.env.PUBLIC_URL}/ohttp/request`
-    : `${require('./url-config').getPublicUrl()}/ohttp/request`);
+// When running as a standalone Render service, use the PORT Render assigns.
+// When co-located (local dev), fall back to OHTTP_RELAY_PORT or PORT+1.
+const isStandalone = !module.parent;
+const RELAY_PORT = parseInt(
+  process.env.OHTTP_RELAY_PORT ||
+  (isStandalone ? process.env.PORT : null) ||
+  (parseInt(process.env.PORT || '3001') + 1)
+);
+
+if (!process.env.OHTTP_GATEWAY_URL) {
+  throw new Error('[OHTTP Relay] OHTTP_GATEWAY_URL is required (e.g. https://ephemeral-chat-10bb.onrender.com/ohttp/request)');
+}
+const GATEWAY_URL = process.env.OHTTP_GATEWAY_URL;
 
 let relayServer = null;
 
@@ -94,7 +101,7 @@ function startOHTTPRelay() {
       const proxyReq = transport.request(options, (proxyRes) => {
         res.writeHead(proxyRes.statusCode, {
           'content-type': proxyRes.headers['content-type'] || 'message/ohttp-chunked-res',
-          'access-control-allow-origin': process.env.PUBLIC_URL || process.env.BASE_URL || 'null',
+          'access-control-allow-origin': process.env.ALLOWED_ORIGIN || 'null',
         });
         proxyRes.pipe(res);
       });
@@ -140,3 +147,10 @@ function stopOHTTPRelay() {
 }
 
 module.exports = { startOHTTPRelay, stopOHTTPRelay, RELAY_PORT };
+
+// Standalone entry point — used when deployed as a separate Render service
+// Start command: node server/ohttp-relay-server.js
+if (require.main === module) {
+  require('dotenv').config();
+  startOHTTPRelay();
+}
