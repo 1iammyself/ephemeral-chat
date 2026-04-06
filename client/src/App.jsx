@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Home from './components/Home';
 import ChatRoom from './components/ChatRoom';
-import JoinRoomModal from './components/JoinRoomModal';
 import InviteHandler from './components/InviteHandler.jsx';
 import PWAHandler from './components/PWAHandler';
 import MyRooms from './components/MyRooms'; // Import MyRooms component
@@ -51,11 +50,7 @@ function App() {
           <Route path="/drop/:dropId" element={<DropPage />} />
           <Route path="/nearby" element={<NearbyTransfer />} />
           <Route path="/room/:roomCode" element={<ChatRoom />} />
-          <Route path="/join" element={
-            <Home>
-              <JoinRoomModal />
-            </Home>
-          } />
+          <Route path="/join" element={<Navigate to="/" replace />} />
           <Route path="/invite/:token" element={<InviteHandler />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="*" element={<Navigate to="/" replace />} />

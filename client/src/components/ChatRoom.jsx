@@ -821,7 +821,7 @@ const ChatRoom = () => {
         setIsJoined(true);
         setShowJoinModal(false);
         setIsProcessingInvite(false);
-        setIsWaitingForHost(false);
+        setIsWaitingForHost(false); // Clear here, after join is confirmed
         setIsReconnecting(false);
         setError(null);
 
@@ -917,8 +917,9 @@ const ChatRoom = () => {
       }
       setError(response.error || 'Failed to join room');
       setIsProcessingInvite(false);
-      setIsWaitingForHost(false);
+      setIsWaitingForHost(false); // Clear on failure too, so modal shows error
       setIsReconnecting(false); // Stop spinner
+      setShowJoinModal(true); // Re-show the join modal so the error is visible
       if (response.error && response.error.includes('not found')) {
         setIsJoined(false); // Kick user out if room is gone
       }
@@ -1177,7 +1178,12 @@ const ChatRoom = () => {
     };
 
     const handleKnockApproved = ({ isHost }) => {
-      setIsWaitingForHost(false);
+      // Keep the waiting/processing state active — do NOT clear isWaitingForHost
+      // here. Clearing it now would cause JoinRoomModal to revert to form mode
+      // between knock-approved and the join-room callback, which produces a blank
+      // screen flash when React flushes the intermediate state.
+      // setIsWaitingForHost(false) and setShowJoinModal(false) are handled
+      // inside performJoin's success/failure callback.
       if (isHost) setIsHost(true);
       if (joinParamsRef.current) performJoin(joinParamsRef.current);
     };
