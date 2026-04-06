@@ -1003,7 +1003,7 @@ const ChatRoom = () => {
   }, [spawnReaction]);
 
   useEffect(() => {
-    const socket = socketManager.connect();
+    socketManager.connect();
     const handleConnect = () => {
       setIsConnected(true);
       // Read current state from ref to avoid dependency cycle
@@ -1021,10 +1021,9 @@ const ChatRoom = () => {
         });
       }
     };
-    socket.on('connect', handleConnect);
 
     // Initial check (only if not already joined, to avoid double-join logic)
-    if (socket.connected && !stateRef.current.isJoined) {
+    if (socketManager.isConnected && !stateRef.current.isJoined) {
       handleConnect();
     }
 
