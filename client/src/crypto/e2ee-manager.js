@@ -68,6 +68,17 @@ const handshakeReady = new Map();
 /** @type {Map<string, Array<Function>>} roomCode → cleanup callbacks */
 const eventCleanups = new Map();
 
+// ─── Key Rotation Schedule ──────────────────────────────────
+
+/** Max messages sent before rotating our sender key */
+const SENDER_KEY_MSG_LIMIT = 100_000;
+
+/** Max milliseconds before rotating our sender key (7 days) */
+const SENDER_KEY_AGE_LIMIT_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** @type {Map<string, { count: number, createdAt: number }>} roomCode → rotation tracking */
+const rotationCounters = new Map();
+
 // ─── Public API ─────────────────────────────────────────────
 
 /**
@@ -235,17 +246,27 @@ export async function encryptE2EE(plaintext, roomCode) {
   if (!mySenderKey) {
     mySenderKey = await generateSenderKey();
     mySenderKeys.set(roomCode, mySenderKey);
+    rotationCounters.set(roomCode, { count: 0, createdAt: Date.now() });
     // Distribute to all peers
-    const socketManager = socketManagers.get(roomCode);
     for (const peerId of sessions.keys()) {
       await _distributeSenderKey(roomCode, peerId, socketManager);
     }
   }
 
-  const { ct, iv, counter, skId } = await encryptWithSenderKey(mySenderKey, plaintext);
+  // Check scheduled rotation limits before encrypting
+  await _maybeRotateSenderKey(roomCode, sessions, socketManager);
+
+  // Re-fetch in case rotation just replaced the key
+  const activeSenderKey = mySenderKeys.get(roomCode);
+  const { ct, iv, counter, skId, epoch } = await encryptWithSenderKey(activeSenderKey, plaintext);
+
+  // Track message count for rotation schedule
+  const rotCounter = rotationCounters.get(roomCode);
+  if (rotCounter) rotCounter.count++;
+
   return {
     v: 5,
-    sk: { ct, iv, counter },
+    sk: { ct, iv, counter, epoch },
     skId,
     from: mySocketId,
     isEncrypted: true,
@@ -332,6 +353,7 @@ export function destroyE2EESession(roomCode) {
   destroyKeyBundle(roomCode);
   socketManagers.delete(roomCode);
   handshakeReady.delete(roomCode);
+  rotationCounters.delete(roomCode);
 
   dbg('[E2EE] 🗑️ Session destroyed for room:', roomCode);
 }
@@ -485,4 +507,55 @@ async function _rekeyAfterPeerLeave(roomCode, departedPeerId, socketManager) {
   } catch (e) {
     dbg('[E2EE] Rekey after peer leave failed:', e.message);
   }
+}
+
+// ─── Internal — Scheduled Key Rotation ─────────────────────
+
+/**
+ * Check if our sender key for a group room has exceeded the message-count
+ * or time-based rotation limit. If so, rotate and redistribute.
+ *
+ * Thresholds:
+ *   - SENDER_KEY_MSG_LIMIT messages sent (default 100,000)
+ *   - SENDER_KEY_AGE_LIMIT_MS elapsed since key creation (default 7 days)
+ *
+ * Silently skips if rotation conditions are not met.
+ */
+async function _maybeRotateSenderKey(roomCode, sessions, socketManager) {
+  const counter = rotationCounters.get(roomCode);
+  if (!counter) return;
+
+  const msgLimitReached = counter.count >= SENDER_KEY_MSG_LIMIT;
+  const ageMs = Date.now() - counter.createdAt;
+  const ageLimitReached = ageMs >= SENDER_KEY_AGE_LIMIT_MS;
+
+  if (!msgLimitReached && !ageLimitReached) return;
+
+  const reason = msgLimitReached ? `${SENDER_KEY_MSG_LIMIT} messages sent` : `${Math.round(ageMs / 86400000)}d age limit`;
+  dbg(`[E2EE] 🔄 Scheduled sender key rotation (${reason}) for room: ${roomCode}`);
+
+  const mySenderKey = mySenderKeys.get(roomCode);
+  if (!mySenderKey) return;
+
+  // Rotate — generates fresh key, bumps epoch
+  await rotateSenderKey(mySenderKey);
+
+  // Reset rotation tracking
+  rotationCounters.set(roomCode, { count: 0, createdAt: Date.now() });
+
+  // Distribute the new key to all current peers
+  for (const peerId of sessions.keys()) {
+    await _distributeSenderKey(roomCode, peerId, socketManager);
+  }
+
+  dbg(`[E2EE] ✅ Scheduled rotation complete — new epoch: ${mySenderKey.epoch}`);
+}
+
+/**
+ * Expose rotation counters for testing.
+ * @param {string} roomCode
+ * @returns {{ count: number, createdAt: number } | undefined}
+ */
+export function _getRotationCounter(roomCode) {
+  return rotationCounters.get(roomCode);
 }
