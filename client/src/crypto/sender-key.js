@@ -182,19 +182,22 @@ export function serializeSenderKey(state) {
     key: _toBase64(state.key),
     counter: state.counter,
     id: state.id,
+    epoch: state.epoch ?? 0,
   };
 }
 
 /**
  * Deserialize a received sender key distribution.
- * @param {{ key: string, counter: number, id: string }} data
- * @returns {{ key: Uint8Array, counter: number, id: string }}
+ * @param {{ key: string, counter: number, id: string, epoch?: number }} data
+ * @returns {{ key: Uint8Array, counter: number, id: string, epoch: number, epochBarrier: number }}
  */
 export function deserializeSenderKey(data) {
   return {
     key: _fromBase64(data.key),
     counter: data.counter,
     id: data.id,
+    epoch: data.epoch ?? 0,
+    epochBarrier: 0, // receiver starts with no barrier; set via setEpochBarrier() after rotation
   };
 }
 
