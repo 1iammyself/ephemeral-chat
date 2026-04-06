@@ -16,7 +16,7 @@ use ml_kem::{
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::errors::CryptoError;
 use crate::Result;
@@ -122,9 +122,9 @@ impl PQXDHResponder {
         const KEM_CT_LEN: usize = 1088;
         const EXPECTED: usize = X25519_PUB_LEN + KEM_CT_LEN;
 
-        if initiator_message.len() < EXPECTED {
+        if initiator_message.len() != EXPECTED {
             return Err(CryptoError::InvalidInput(format!(
-                "initiator message too short: expected {EXPECTED} bytes, got {}",
+                "initiator message must be exactly {EXPECTED} bytes, got {}",
                 initiator_message.len()
             )));
         }
@@ -136,14 +136,16 @@ impl PQXDHResponder {
         let initiator_ephem_pub = X25519PublicKey::from(ephem_bytes);
 
         // X25519 DH operations.
-        let dh1 = self
-            .signed_prekey_secret
-            .diffie_hellman(&initiator_ephem_pub)
-            .to_bytes();
-        let dh2 = self
-            .ephemeral_prekey_secret
-            .diffie_hellman(&initiator_ephem_pub)
-            .to_bytes();
+        let dh1 = Zeroizing::new(
+            self.signed_prekey_secret
+                .diffie_hellman(&initiator_ephem_pub)
+                .to_bytes(),
+        );
+        let dh2 = Zeroizing::new(
+            self.ephemeral_prekey_secret
+                .diffie_hellman(&initiator_ephem_pub)
+                .to_bytes(),
+        );
 
         // ML-KEM-768 decapsulation.
         let kem_ct_bytes = &initiator_message[X25519_PUB_LEN..EXPECTED];
@@ -165,7 +167,8 @@ pub struct PQXDHInitiator {
     ephemeral_secret: StaticSecret,
     kem_ciphertext: Vec<u8>,
     kem_shared_secret: Vec<u8>,
-    bundle: PQXDHPublicBundle,
+    signed_prekey: X25519PublicKey,
+    ephemeral_prekey: X25519PublicKey,
 }
 
 impl Drop for PQXDHInitiator {
@@ -198,11 +201,17 @@ impl PQXDHInitiator {
         // ML-KEM-768 encapsulation.
         let (kem_ct, kem_ss) = encapsulate_kem768(&bundle.kem_public_key)?;
 
+        // Extract only the needed public keys from the bundle (avoids retaining
+        // the 1184-byte KEM encapsulation key in memory after this point).
+        let signed_prekey = X25519PublicKey::from(bundle.signed_prekey);
+        let ephemeral_prekey = X25519PublicKey::from(bundle.ephemeral_prekey);
+
         Ok(PQXDHInitiator {
             ephemeral_secret: StaticSecret::random_from_rng(OsRng),
             kem_ciphertext: kem_ct,
             kem_shared_secret: kem_ss,
-            bundle: bundle.clone(),
+            signed_prekey,
+            ephemeral_prekey,
         })
     }
 
@@ -212,11 +221,17 @@ impl PQXDHInitiator {
     /// `initial_message = [ephemeral_pub (32 B) || ML-KEM-768 ciphertext (1088 B)]`.
     pub fn create_initial_message(&self) -> Result<([u8; 32], Vec<u8>)> {
         let ephem_pub = X25519PublicKey::from(&self.ephemeral_secret);
-        let spk_pub = X25519PublicKey::from(self.bundle.signed_prekey);
-        let ek_pub = X25519PublicKey::from(self.bundle.ephemeral_prekey);
 
-        let dh1 = self.ephemeral_secret.diffie_hellman(&spk_pub).to_bytes();
-        let dh2 = self.ephemeral_secret.diffie_hellman(&ek_pub).to_bytes();
+        let dh1 = Zeroizing::new(
+            self.ephemeral_secret
+                .diffie_hellman(&self.signed_prekey)
+                .to_bytes(),
+        );
+        let dh2 = Zeroizing::new(
+            self.ephemeral_secret
+                .diffie_hellman(&self.ephemeral_prekey)
+                .to_bytes(),
+        );
 
         let shared = combine_secrets(&dh1, &dh2, &self.kem_shared_secret)?;
 
@@ -235,12 +250,12 @@ impl PQXDHInitiator {
 
 /// HKDF-SHA256 over `DH1 || DH2 || KEM_SS` → 32-byte shared secret.
 fn combine_secrets(dh1: &[u8; 32], dh2: &[u8; 32], kem_ss: &[u8]) -> Result<[u8; 32]> {
-    let mut ikm = Vec::with_capacity(32 + 32 + kem_ss.len());
+    let mut ikm = Zeroizing::new(Vec::with_capacity(32 + 32 + kem_ss.len()));
     ikm.extend_from_slice(dh1);
     ikm.extend_from_slice(dh2);
     ikm.extend_from_slice(kem_ss);
 
-    let deriver = crate::hkdf::HKDFDeriver::new(&ikm, None);
+    let deriver = crate::hkdf::HKDFDeriver::new(&ikm, Some(&[0u8; 32]));
     deriver.derive::<32>(b"ephchat-pqxdh-v1")
 }
 
