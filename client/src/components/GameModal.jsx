@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Send, Dices, Sparkles, HelpCircle, ChevronLeft, Hash, Trophy, Puzzle, Skull, Zap } from 'lucide-react';
 import { GAME_TYPES, getRandomWYR, getRandomTrivia, WYR_TOPIC_LIST, TRIVIA_TOPIC_LIST } from '../utils/games';
+import { isQuickSendGame } from '../utils/game-contract';
 import { getVibeById } from '../utils/vibes';
 
 const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL }) => {
@@ -57,6 +58,13 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
     if (!isOpen) return null;
 
     const handlePickGame = (type) => {
+        // Legacy UX: quick-send selected classic games instantly
+        if (isQuickSendGame(type)) {
+            const sent = onSend({ gameType: type, mode: 'pvp' });
+            if (sent !== false) handleClose();
+            return;
+        }
+
         setGameType(type);
         setMatchMode('pvp');
         setTypingMode('pvp');
@@ -289,7 +297,7 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                                 <span className="hidden sm:block text-[9px] text-gray-600 dark:text-gray-400 mt-0.5 text-center">Classic Strategy</span>
                             </button>
                         </div>
-                    ) : (gameType === GAME_TYPES.TIC_TAC_TOE || gameType === GAME_TYPES.ROCK_PAPER_SCISSORS || gameType === GAME_TYPES.CHESS) ? (
+                    ) : (gameType === GAME_TYPES.CHESS) ? (
                         <div className="space-y-3">
                             <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
                                 Choose how to play this match in chat.
@@ -313,7 +321,7 @@ const GameModal = ({ isOpen, onClose, onSend, roomVibe, initialGameType, roomTTL
                             </div>
 
                             <button onClick={handleSend} style={{ backgroundColor: vibeColor }} className="w-full py-2 rounded-xl font-bold text-white text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all">
-                                <Send className="w-3.5 h-3.5" /> Send {gameType === GAME_TYPES.TIC_TAC_TOE ? 'Tic-Tac-Toe' : gameType === GAME_TYPES.ROCK_PAPER_SCISSORS ? 'RPS' : 'Chess'} · {matchMode === 'cpu' ? 'Vs CPU' : 'Vs Player'}
+                                <Send className="w-3.5 h-3.5" /> Send Chess · {matchMode === 'cpu' ? 'Vs CPU' : 'Vs Player'}
                             </button>
                         </div>
                     ) : (gameType === GAME_TYPES.WYR || gameType === GAME_TYPES.TRIVIA) && !selectedTopic && !(wyrData || triviaData) ? (

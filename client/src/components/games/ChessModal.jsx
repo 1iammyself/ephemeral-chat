@@ -1,10 +1,15 @@
 import ChessGame from './ChessGame';
 import { getVibeById } from '../../utils/vibes';
 import { Chess } from '../../utils/chess-lib';
-import { Trophy, X, Info, Swords, Shield, History } from 'lucide-react';
+import { Trophy, X, Info, Swords, Shield, History, Maximize2, Minimize2, Move } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 const ChessModal = ({ isOpen, onClose, message, currentUserId, currentNickname, users, onMove, roomVibe }) => {
     if (!isOpen || !message) return null;
+
+    const [position, setPosition] = useState({ x: 0, y: 0 });
+    const [isMaximized, setIsMaximized] = useState(false);
+    const dragRef = useRef({ dragging: false, startX: 0, startY: 0, baseX: 0, baseY: 0 });
 
     const { gameData } = message;
     const vibe = getVibeById(roomVibe);
@@ -69,6 +74,48 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, currentNickname, 
         return icons[type];
     };
 
+    useEffect(() => {
+        if (!isOpen) {
+            setPosition({ x: 0, y: 0 });
+            setIsMaximized(false);
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        const handleMove = (e) => {
+            if (!dragRef.current.dragging) return;
+            const dx = e.clientX - dragRef.current.startX;
+            const dy = e.clientY - dragRef.current.startY;
+            setPosition({ x: dragRef.current.baseX + dx, y: dragRef.current.baseY + dy });
+        };
+
+        const handleUp = () => {
+            dragRef.current.dragging = false;
+        };
+
+        window.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleUp);
+        return () => {
+            window.removeEventListener('mousemove', handleMove);
+            window.removeEventListener('mouseup', handleUp);
+        };
+    }, []);
+
+    const onDragStart = (e) => {
+        if (isMaximized || e.button !== 0) return;
+        dragRef.current = {
+            dragging: true,
+            startX: e.clientX,
+            startY: e.clientY,
+            baseX: position.x,
+            baseY: position.y,
+        };
+    };
+
+    const windowStyle = isMaximized
+        ? { width: 'calc(100vw - 1.25rem)', height: 'calc(100vh - 1.25rem)' }
+        : { transform: `translate(${position.x}px, ${position.y}px)` };
+
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
             {/* Backdrop */}
@@ -78,10 +125,10 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, currentNickname, 
             />
 
             {/* Modal Container — full-height scroll on mobile */}
-            <div className={`relative w-full max-w-2xl bg-gray-50 dark:bg-gray-950 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-gray-300 dark:border-white/10 flex flex-col max-h-[95vh] sm:max-h-[90vh] animate-in zoom-in-95 duration-300`}>
+            <div style={windowStyle} className={`relative w-full ${isMaximized ? 'max-w-none rounded-xl' : 'max-w-2xl rounded-2xl sm:rounded-3xl'} bg-gray-50 dark:bg-gray-950 shadow-2xl overflow-hidden border border-gray-300 dark:border-white/10 flex flex-col max-h-[95vh] sm:max-h-[90vh] animate-in zoom-in-95 duration-300`}>
 
                 {/* Header */}
-                <div className={`p-3 sm:p-4 ${headerClass} flex items-center justify-between shrink-0`}>
+                <div className={`p-3 sm:p-4 ${headerClass} flex items-center justify-between shrink-0 ${isMaximized ? '' : 'cursor-move'}`} onMouseDown={onDragStart}>
                     <div className="flex items-center gap-2">
                         <div className="p-1.5 sm:p-2 bg-white/20 rounded-xl">
                             <Trophy className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
@@ -93,12 +140,22 @@ const ChessModal = ({ isOpen, onClose, message, currentUserId, currentNickname, 
                             </p>
                         </div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-1.5 sm:p-2 hover:bg-white/20 rounded-full text-white transition-colors"
-                    >
-                        <X className="w-5 h-5 sm:w-6 sm:h-6" />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                        {!isMaximized && <Move className="w-4 h-4 text-white/80" />}
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setIsMaximized(v => !v); }}
+                            className="p-1.5 sm:p-2 hover:bg-white/20 rounded-full text-white transition-colors"
+                            title={isMaximized ? 'Restore window' : 'Maximize window'}
+                        >
+                            {isMaximized ? <Minimize2 className="w-4 h-4 sm:w-5 sm:h-5" /> : <Maximize2 className="w-4 h-4 sm:w-5 sm:h-5" />}
+                        </button>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onClose(); }}
+                            className="p-1.5 sm:p-2 hover:bg-white/20 rounded-full text-white transition-colors"
+                        >
+                            <X className="w-5 h-5 sm:w-6 sm:h-6" />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-3 sm:p-6 flex flex-col md:flex-row gap-4 sm:gap-6 items-center md:items-start justify-start md:justify-center">

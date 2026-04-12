@@ -86,6 +86,7 @@ import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess } from '../utils/
 import FileTransferModal from './FileTransferModal';
 import ChessModal from './games/ChessModal';
 import { GAME_TYPES, GAME_CONFIG } from '../utils/games';
+import { isSingleRecipientGame, isSupportedGameType, normalizeGamePayload } from '../utils/game-contract';
 import { toast } from 'react-toastify';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
@@ -1043,6 +1044,7 @@ const ChatRoom = () => {
 
     const handleRoomJoined = async (data) => {
       setIsConnected(true);
+      setIsReconnecting(false);
       setRoom(data.room);
       setUsers(data.users || []);
       let msgs = data.messages || [];
@@ -1358,6 +1360,7 @@ const ChatRoom = () => {
     socketManager.on('user-joined', handleUserJoined);
     socketManager.on('user-left', handleUserLeft);
     socketManager.on('room-error', handleError);
+    socketManager.on('error', handleError);
     socketManager.on('latency-pong', handlePong);
     socketManager.on('mls-key-package', handleMLSKeyPackage);
     socketManager.on('mls-welcome', handleMLSWelcome);
@@ -1551,6 +1554,7 @@ const ChatRoom = () => {
       socketManager.off('user-joined', handleUserJoined);
       socketManager.off('user-left', handleUserLeft);
       socketManager.off('room-error', handleError);
+      socketManager.off('error', handleError);
       socketManager.off('latency-pong', handlePong);
       socketManager.off('mls-key-package', handleMLSKeyPackage);
       socketManager.off('mls-welcome', handleMLSWelcome);
@@ -2130,11 +2134,24 @@ const ChatRoom = () => {
   };
 
   const handleSendGame = (gameData) => {
-    // Games are NOT encrypted — server must create and track game state (board, players, moves).
-    if (!isConnected) return false;
+    const normalizedGameData = normalizeGamePayload(gameData);
+    if (!normalizedGameData || !isSupportedGameType(normalizedGameData.gameType)) {
+      toast.error('Unsupported game type.', { autoClose: 2500 });
+      return false;
+    }
 
-    // Match games (TTT, RPS, Chess) only allow 1 recipient
-    if (selectedRecipients.length > 1 && (gameData.gameType === 'tic-tac-toe' || gameData.gameType === 'rock-paper-scissors' || gameData.gameType === 'chess')) {
+    // Games are NOT encrypted — server must create and track game state (board, players, moves).
+    if (!isConnected && !socketManager.isConnected) {
+      toast.error('Not connected — please wait a moment and try again.', { autoClose: 3000 });
+      return false;
+    }
+    if (isReconnecting) {
+      toast.warn('Reconnecting to room — please try again in a moment.', { autoClose: 3000 });
+      return false;
+    }
+
+    // Contract-based recipient guardrail
+    if (selectedRecipients.length > 1 && isSingleRecipientGame(normalizedGameData.gameType)) {
       setError('Match games can only be sent to one person at a time.');
       return false;
     }
@@ -2149,17 +2166,17 @@ const ChatRoom = () => {
     // (no recipient restriction for these)
 
     // Anonymous mode applies to games except chess and typing-race (both need real identity for player tracking)
-    const isChessGame = gameData.gameType === 'chess';
-    const isTypingRaceGame = gameData.gameType === GAME_TYPES.TYPING_RACE;
+    const isChessGame = normalizedGameData.gameType === 'chess';
+    const isTypingRaceGame = normalizedGameData.gameType === GAME_TYPES.TYPING_RACE;
 
     socketManager.emit('send-message', {
       messageType: 'game',
-      gameData,
+      gameData: normalizedGameData,
       recipients: selectedRecipients,
       userId: persistentUserId,
       isAnonymous: (isChessGame || isTypingRaceGame) ? false : isAnonymousMode,
       // Add game-specific TTL from GAME_CONFIG
-      gameTTL: GAME_CONFIG[gameData.gameType]?.ttl || roomTTL
+      gameTTL: GAME_CONFIG[normalizedGameData.gameType]?.ttl || roomTTL
     });
 
     return true;
@@ -2174,10 +2191,19 @@ const ChatRoom = () => {
     socketManager.emit('game-answer', { messageId, answer });
   };
 
+  const handleChessTimeout = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('chess-timeout', { messageId });
+  };
+
   const handleTicTacToeMove = (messageId, action, position) => {
     if (!isConnected) return;
     if (action === 'chess-move') {
       socketManager.emit('chess-move', { messageId, move: position, userId: persistentUserId });
+    } else if (action === 'chess-timeout') {
+      socketManager.emit('chess-timeout', { messageId });
+    } else if (action === 'chess-resign') {
+      socketManager.emit('chess-resign', { messageId });
     } else if (action === 'chess-join') {
       socketManager.emit('chess-join', { messageId, userId: persistentUserId });
     } else if (action === 'chess-swap') {
