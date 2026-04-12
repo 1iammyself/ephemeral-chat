@@ -41,10 +41,10 @@ Unlike other encrypted messengers that rely on simple symmetric keys, Ephemeral 
 
 Privacy doesn’t have to mean compromising on usability:
 
-*   **Slash Commands:** Effortlessly trigger features via chat: `/camera`, `/poll`, `/game` (Chess, Tic-Tac-Toe, Rock-Paper-Scissors), `/timer`, `/vibe`, and `/pulse`. 
+*   **Slash Commands:** Effortlessly trigger features via chat: `/camera`, `/poll`, `/timer`, `/vibe`, and `/pulse`. 
 *   **Watch Party 2.0:** Use `/media <youtube/soundcloud url>` to sync playback for the entire room instantly. Works collaboratively.
 *   **Offline Proximity Mesh:** Powered by **mDNS-SD and a Native Capacitor Plugin**, allowing local device-to-device file transfers when the internet drops.
-*   **Games & Polls:** Fully synchronized client-side without permanent server storage.
+*   **Polls:** Fully synchronized client-side without permanent server storage.
 *   **Rich File Transfers:** P2P file transfers powered by WebRTC for large files, gracefully falling back to heavily-encrypted Socket.IO chunking if NAT traversal fails.
 
 ---

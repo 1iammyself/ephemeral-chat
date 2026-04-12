@@ -5,7 +5,6 @@ import { useTheme } from '../context/ThemeContext';
 import ImageViewer from './ImageViewer';
 import AudioPlayer from './AudioPlayer';
 import PollMessage from './PollMessage';
-import GameMessage from './GameMessage';
 import ThreadView from './ThreadView';
 import socketManager from '../socket';
 import { getVibeById } from '../utils/vibes';
@@ -18,7 +17,7 @@ import { FileOpener } from '@capacitor-community/file-opener';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀', '🍕', '🍔', '🍦', '🍩', '🍺', '🎸', '🎮', '🚀', '🌈', '🍄'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onGameAnswer, onTicTacToeMove, onRPSAction, onLaunchChess, roomVibe, linkPreviews = {}, onOpenEmojiPicker, onHangmanJoin, onHangmanGuess, onHangmanHint, onAnagramJoin, onAnagramSubmit, onAnagramNextRound, onAnagramReveal, onAnagramHint, onTypingRaceJoin, onTypingRaceStart, onTypingRaceProgress, onTypingRaceFinish, onRematch, onShareResult }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, roomVibe, linkPreviews = {}, onOpenEmojiPicker }) => {
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
   const { theme } = useTheme();
@@ -31,12 +30,6 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   const [playingAudioId, setPlayingAudioId] = useState(null);
   const [newMessages, setNewMessages] = useState(new Set());
   const [linkPreviewUrl, setLinkPreviewUrl] = useState(null);
-
-  const isGameMessageTerminal = useCallback((message) => {
-    if (message?.messageType !== 'game' || !message?.gameData) return true;
-    const gd = message.gameData;
-    return !!gd.winner || gd.gameOver === true || !!gd.endedAt || gd.status === 'finished';
-  }, []);
 
   // Swipe to reply / Long press to react states
   const touchState = React.useRef({
@@ -77,13 +70,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   // Set up timers for messages with TTL
   useEffect(() => {
     messages.forEach(message => {
-      const isGame = message.messageType === 'game' && !!message.gameData;
-      const isActiveGame = isGame && !isGameMessageTerminal(message);
-      const isChess = (message.messageType === 'game' && message.gameData?.gameType === 'chess') || (message.gameData?.type === 'chess');
-      // Active game messages never expire client-side until they reach terminal state.
-      const ttl = isActiveGame
-        ? 0
-        : (isChess ? (message.overrideTtl || 0) : (message.overrideTtl || messageTTL));
+      const ttl = message.overrideTtl || messageTTL;
 
       if (ttl && ttl > 0 && message.type !== 'system' && !messageTimers.has(message.id)) {
         const messageTime = new Date(message.timestamp).getTime();
@@ -107,7 +94,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
     return () => {
       messageTimers.forEach(timer => { if (typeof timer === 'object') clearTimeout(timer); });
     };
-  }, [messages, messageTTL, isGameMessageTerminal]);
+  }, [messages, messageTTL]);
 
   // Read Receipt Observer
   useEffect(() => {
@@ -146,10 +133,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   };
 
   const getTimeLeft = (message) => {
-    const isActiveGame = message?.messageType === 'game' && !!message?.gameData && !isGameMessageTerminal(message);
-    if (isActiveGame) return null;
-    const isChess = (message.messageType === 'game' && message.gameData?.gameType === 'chess') || (message.gameData?.type === 'chess');
-    const ttl = isChess ? (message.overrideTtl || 0) : (message.overrideTtl || messageTTL);
+  const ttl = message.overrideTtl || messageTTL;
     if (!ttl || ttl === 0 || message.type === 'system') return null;
     const messageTime = new Date(message.timestamp).getTime();
     const expiryTime = messageTime + (ttl * 1000);
@@ -370,12 +354,10 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
               <div className="relative group/bubble w-fit max-w-[80%] sm:max-w-lg md:max-w-xl">
                 <div
                   className={`relative z-10 w-fit rounded-2xl transition-all duration-300 ${message.messageType === 'poll' ? 'shadow-sm' :
-                    message.messageType === 'game' ? '' :
-                      'shadow-sm px-2.5 py-1.5 sm:px-3 sm:py-2 box-border'
-                    } ${message.messageType === 'game' ? '' :
-                      (isOwnMessage
-                        ? currentVibe.messageClass
-                        : `bg-blue-50 dark:bg-gray-800 border border-${uiAccentColor}-300 dark:border-${uiAccentColor}-500/10 dark:text-gray-100 rounded-tl-none`)
+                    'shadow-sm px-2.5 py-1.5 sm:px-3 sm:py-2 box-border'
+                    } ${isOwnMessage
+                      ? currentVibe.messageClass
+                      : `bg-blue-50 dark:bg-gray-800 border border-${uiAccentColor}-300 dark:border-${uiAccentColor}-500/10 dark:text-gray-100 rounded-tl-none`
                     }`}
                 >
                   {/* Content Container */}
@@ -440,31 +422,6 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                       </div>
                     ) : message.messageType === 'poll' ? (
                       <PollMessage message={message} currentUser={currentUser} onVote={onVote} roomVibe={roomVibe} />
-                    ) : message.messageType === 'game' ? (
-                      <GameMessage
-                        message={message}
-                        currentUser={currentUser}
-                        onGameAnswer={onGameAnswer}
-                        onTicTacToeMove={onTicTacToeMove}
-                        onRPSAction={onRPSAction}
-                        onLaunchChess={onLaunchChess}
-                        onDelete={onDelete}
-                        roomVibe={roomVibe}
-                        onHangmanJoin={onHangmanJoin}
-                        onHangmanGuess={onHangmanGuess}
-                        onHangmanHint={onHangmanHint}
-                        onAnagramJoin={onAnagramJoin}
-                        onAnagramSubmit={onAnagramSubmit}
-                        onAnagramNextRound={onAnagramNextRound}
-                        onAnagramReveal={onAnagramReveal}
-                        onAnagramHint={onAnagramHint}
-                        onTypingRaceJoin={onTypingRaceJoin}
-                        onTypingRaceStart={onTypingRaceStart}
-                        onTypingRaceProgress={onTypingRaceProgress}
-                        onTypingRaceFinish={onTypingRaceFinish}
-                        onRematch={onRematch}
-                        onShareResult={onShareResult}
-                      />
                     ) : message.messageType === 'file' ? (
                       <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 w-full max-w-[260px]">
                         <div className="p-1.5 sm:p-2 bg-black/10 dark:bg-white/10 rounded-lg shrink-0"><FileText className="w-4 h-4 sm:w-5 sm:h-5" /></div>

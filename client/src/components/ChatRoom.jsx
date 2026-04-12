@@ -24,7 +24,6 @@ import {
   Camera,
   PanelLeft,
   PanelRight,
-  Dices,
   Ghost,
   EyeOff,
   Snowflake,
@@ -40,7 +39,6 @@ import MessageList from './MessageList';
 import UserList from './UserList';
 import AudioCallModal from './AudioCallModal';
 import PollModal from './PollModal';
-import GameModal from './GameModal';
 import webRTCService, { CallState } from '../webrtc';
 import {
   initMLS,
@@ -84,9 +82,6 @@ import { RefreshButton } from './PWAHandler';
 import { getCreatorId } from '../utils/creator';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess } from '../utils/platform';
 import FileTransferModal from './FileTransferModal';
-import ChessModal from './games/ChessModal';
-import { GAME_TYPES, GAME_CONFIG } from '../utils/games';
-import { isSingleRecipientGame, isSupportedGameType, normalizeGamePayload } from '../utils/game-contract';
 import { toast } from 'react-toastify';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
@@ -94,7 +89,6 @@ import { Keyboard } from '@capacitor/keyboard';
 const SLASH_COMMANDS = [
   { icon: Camera, label: 'Camera', value: '/camera', desc: 'Take a photo' },
   { icon: BarChart2, label: 'Poll', value: '/poll', desc: 'Create a new poll' },
-  { icon: Dices, label: 'Game', value: '/game', desc: 'Start a mini-game' },
   { icon: Phone, label: 'Voice Call', value: '/call', desc: 'Start a voice call' },
   { icon: ImageIcon, label: 'Photo', value: '/photo', desc: 'Upload an image' },
   { icon: Mic, label: 'Voice Note', value: '/voice', desc: 'Record a voice note' },
@@ -540,9 +534,6 @@ const ChatRoom = () => {
   const [inviteToken, setInviteToken] = useState(null);
   const [showCallModal, setShowCallModal] = useState(false);
   const [activePoll, setActivePoll] = useState(null);
-  const [activeChessMatch, setActiveChessMatch] = useState(null);
-  const [chessApprovalRequest, setChessApprovalRequest] = useState(null); // { type: 'swap'|'replace', messageId, ... }
-  const [showGameModal, setShowGameModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [callState, setCallState] = useState({ state: CallState.IDLE });
   const [isRecording, setIsRecording] = useState(false);
@@ -573,7 +564,6 @@ const ChatRoom = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [reactionTargetId, setReactionTargetId] = useState(null);
   const [showPollModal, setShowPollModal] = useState(false);
-  const [initialGameType, setInitialGameType] = useState(null);
   const [showFeatureMenu, setShowFeatureMenu] = useState(false);
   const [roomVibe, setRoomVibe] = useState('default');
   const [roomTopic, setRoomTopic] = useState('');
@@ -790,9 +780,6 @@ const ChatRoom = () => {
               const result = { ...msg, content: decrypted, isEncrypted: false };
               if (msg.messageType === 'poll' && !msg.pollData) {
                 try { result.pollData = JSON.parse(decrypted); } catch { }
-              }
-              if (msg.messageType === 'game' && !msg.gameData) {
-                try { result.gameData = JSON.parse(decrypted); } catch { }
               }
               return result;
             } catch (e) {
@@ -1057,9 +1044,6 @@ const ChatRoom = () => {
             if (msg.messageType === 'poll' && !msg.pollData) {
               try { result.pollData = JSON.parse(decrypted); } catch { }
             }
-            if (msg.messageType === 'game' && !msg.gameData) {
-              try { result.gameData = JSON.parse(decrypted); } catch { }
-            }
             return result;
           } catch (e) {
             return { ...msg, content: '⚠️ Decryption failed' };
@@ -1124,9 +1108,6 @@ const ChatRoom = () => {
           message.isEncrypted = false;
           if (message.messageType === 'poll' && !message.pollData) {
             try { message.pollData = JSON.parse(decrypted); } catch { }
-          }
-          if (message.messageType === 'game' && !message.gameData) {
-            try { message.gameData = JSON.parse(decrypted); } catch { }
           }
         } catch (e) {
           console.warn('[ChatRoom] Decrypt error:', e.message);
@@ -1217,17 +1198,12 @@ const ChatRoom = () => {
           if (finalMessage.messageType === 'poll' && !finalMessage.pollData) {
             try { finalMessage.pollData = JSON.parse(decrypted); } catch { }
           }
-          if (finalMessage.messageType === 'game' && !finalMessage.gameData) {
-            try { finalMessage.gameData = JSON.parse(decrypted); } catch { }
-          }
         } catch (e) {
           console.warn('[ChatRoom] Update decrypt error:', e.message);
           finalMessage.content = '⚠️ Decryption failed';
         }
       }
       setMessages(prev => prev.map(m => m.id === finalMessage.id ? finalMessage : m));
-      // Keep active chess modal in sync
-      setActiveChessMatch(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
     };
 
     // Role and moderation event handlers
@@ -1331,26 +1307,6 @@ const ChatRoom = () => {
       setLatency(Date.now() - startTime);
     };
 
-    // Chess swap/replace approval handlers
-    const handleChessSwapApproval = ({ messageId, requestedBy }) => {
-      setChessApprovalRequest({ type: 'swap', messageId, requestedBy });
-    };
-    const handleChessReplaceApproval = ({ messageId, role, newPlayerName, requestedBy }) => {
-      setChessApprovalRequest({ type: 'replace', messageId, role, newPlayerName, requestedBy });
-    };
-    const handleChessSwapDeclined = ({ messageId, declinedBy }) => {
-      setError(`Swap request declined by ${declinedBy}`);
-    };
-    const handleChessReplaceDeclined = ({ messageId, declinedBy }) => {
-      setError(`Replace request declined by ${declinedBy}`);
-    };
-    const handleChessSwapPending = ({ messageId, waitingFor }) => {
-      // Host notification — swap request sent, waiting for approval
-    };
-    const handleChessReplacePending = ({ messageId, role, waitingFor }) => {
-      // Host notification — replace request sent, waiting for approval
-    };
-
     socketManager.on('connect', handleConnect);
     socketManager.on('disconnect', handleDisconnect);
     socketManager.on('room-joined', handleRoomJoined);
@@ -1383,12 +1339,6 @@ const ChatRoom = () => {
     socketManager.on('user-stop-typing', handleUserStopTyping);
     socketManager.on('room-reaction', handleRoomReaction);
     socketManager.on('file-transfer-invite', handleFileTransferInvite);
-    socketManager.on('chess-swap-approval-needed', handleChessSwapApproval);
-    socketManager.on('chess-replace-approval-needed', handleChessReplaceApproval);
-    socketManager.on('chess-swap-declined', handleChessSwapDeclined);
-    socketManager.on('chess-replace-declined', handleChessReplaceDeclined);
-    socketManager.on('chess-swap-pending', handleChessSwapPending);
-    socketManager.on('chess-replace-pending', handleChessReplacePending);
 
     // Screenshot detection handler
     const handleScreenshotDetected = ({ nickname, timestamp }) => {
@@ -1577,12 +1527,6 @@ const ChatRoom = () => {
       socketManager.off('user-stop-typing', handleUserStopTyping);
       socketManager.off('room-reaction', handleRoomReaction);
       socketManager.off('file-transfer-invite', handleFileTransferInvite);
-      socketManager.off('chess-swap-approval-needed', handleChessSwapApproval);
-      socketManager.off('chess-replace-approval-needed', handleChessReplaceApproval);
-      socketManager.off('chess-swap-declined', handleChessSwapDeclined);
-      socketManager.off('chess-replace-declined', handleChessReplaceDeclined);
-      socketManager.off('chess-swap-pending', handleChessSwapPending);
-      socketManager.off('chess-replace-pending', handleChessReplacePending);
       socketManager.off('screenshot-detected', handleScreenshotDetected);
       socketManager.off('auto-approve-updated', handleAutoApproveUpdated);
       socketManager.off('pre-approved-list-updated', handlePreApprovedListUpdated);
@@ -1623,19 +1567,6 @@ const ChatRoom = () => {
     }, 5000);
     return () => clearInterval(interval);
   }, [isConnected]);
-
-  // Auto-decline chess approval dialog after 30 seconds of inactivity
-  useEffect(() => {
-    if (!chessApprovalRequest) return;
-    const timeout = setTimeout(() => {
-      socketManager.emit(chessApprovalRequest.type === 'swap' ? 'chess-swap-response' : 'chess-replace-response', {
-        messageId: chessApprovalRequest.messageId,
-        approved: false
-      });
-      setChessApprovalRequest(null);
-    }, 30_000);
-    return () => clearTimeout(timeout);
-  }, [chessApprovalRequest]);
 
   // High-Assurance Quick Actions (Electron only, Option C)
   useEffect(() => {
@@ -1919,33 +1850,6 @@ const ChatRoom = () => {
       switch (cmd) {
         case '/camera': setShowCameraModal(true); break;
         case '/poll': setShowPollModal(true); break;
-        case '/game':
-        case '/games':
-          const gameArg = args.toLowerCase().trim();
-          let initialGame = null;
-
-          if (['ttt', 'tic-tac-toe', 'tictactoe'].includes(gameArg)) {
-            initialGame = GAME_TYPES.TIC_TAC_TOE;
-          } else if (['chess'].includes(gameArg)) {
-            initialGame = GAME_TYPES.CHESS;
-          } else if (['wyr', 'would-you-rather', 'wouldyourather'].includes(gameArg)) {
-            initialGame = GAME_TYPES.WYR;
-          } else if (['trivia', 'quiz'].includes(gameArg)) {
-            initialGame = GAME_TYPES.TRIVIA;
-          } else if (['rps', 'rock-paper-scissors'].includes(gameArg)) {
-            initialGame = GAME_TYPES.ROCK_PAPER_SCISSORS;
-          } else if (['hmg', 'hangman'].includes(gameArg)) {
-            initialGame = GAME_TYPES.HANGMAN;
-          } else if (['agm', 'anagram'].includes(gameArg)) {
-            initialGame = GAME_TYPES.ANAGRAM;
-          } else if (['trg', 'typing', 'typing-race'].includes(gameArg)) {
-            initialGame = GAME_TYPES.TYPING_RACE;
-          }
-
-          setInitialGameType(initialGame);
-          setShowGameModal(true);
-          if (cmd === '/games') { setNewMessage(''); return; }
-          break;
         case '/call':
           if (users.length > 7) setError('Voice calls are disabled in rooms with more than 7 users for stability.');
           else handleStartCall();
@@ -2053,9 +1957,6 @@ const ChatRoom = () => {
             case 'image': return 'Image';
             case 'audio': return 'Voice Note';
             case 'file': return replyingTo.fileName || 'File';
-            case 'game': return replyingTo.gameData?.gameType
-              ? `Game: ${replyingTo.gameData.gameType.replace(/-/g, ' ')}`
-              : 'Game';
             case 'poll': return replyingTo.pollData?.question || 'Poll';
             default: return replyingTo.content;
           }
@@ -2117,144 +2018,10 @@ const ChatRoom = () => {
     });
   };
 
-  const handleSendGame = (gameData) => {
-    const normalizedGameData = normalizeGamePayload(gameData);
-    if (!normalizedGameData || !isSupportedGameType(normalizedGameData.gameType)) {
-      toast.error('Unsupported game type.', { autoClose: 2500 });
-      return false;
-    }
-
-    // Games are NOT encrypted — server must create and track game state (board, players, moves).
-    if (!isConnected && !socketManager.isConnected) {
-      toast.error('Not connected — please wait a moment and try again.', { autoClose: 3000 });
-      return false;
-    }
-    if (isReconnecting) {
-      toast.warn('Reconnecting to room — please try again in a moment.', { autoClose: 3000 });
-      return false;
-    }
-
-    // Contract-based recipient guardrail
-    if (selectedRecipients.length > 1 && isSingleRecipientGame(normalizedGameData.gameType)) {
-      setError('Match games can only be sent to one person at a time.');
-      return false;
-    }
-
-    // Hangman is also 1-on-1 only
-    if (selectedRecipients.length > 1 && gameData.gameType === GAME_TYPES.HANGMAN) {
-      setError('Hangman can only be played 1-on-1.');
-      return false;
-    }
-
-    // Anagrams and TypingRace support both 1-on-1 and broadcast
-    // (no recipient restriction for these)
-
-    // Anonymous mode applies to games except chess and typing-race (both need real identity for player tracking)
-    const isChessGame = normalizedGameData.gameType === 'chess';
-    const isTypingRaceGame = normalizedGameData.gameType === GAME_TYPES.TYPING_RACE;
-
-    socketManager.emit('send-message', {
-      messageType: 'game',
-      gameData: normalizedGameData,
-      recipients: selectedRecipients,
-      userId: persistentUserId,
-      isAnonymous: (isChessGame || isTypingRaceGame) ? false : isAnonymousMode,
-      // Add game-specific TTL from GAME_CONFIG
-      gameTTL: GAME_CONFIG[normalizedGameData.gameType]?.ttl || roomTTL
-    });
-
-    return true;
-  };
-
   const handleDeleteMessage = (messageId) => {
     socketManager.emit('delete-message', { messageId });
   };
 
-  const handleGameAnswer = (messageId, answer) => {
-    if (!isConnected) return;
-    socketManager.emit('game-answer', { messageId, answer });
-  };
-
-  const handleChessTimeout = (messageId) => {
-    if (!isConnected) return;
-    socketManager.emit('chess-timeout', { messageId });
-  };
-
-  const handleTicTacToeMove = (messageId, action, position) => {
-    if (!isConnected) return;
-    if (action === 'chess-move') {
-      socketManager.emit('chess-move', { messageId, move: position, userId: persistentUserId });
-    } else if (action === 'chess-timeout') {
-      socketManager.emit('chess-timeout', { messageId });
-    } else if (action === 'chess-resign') {
-      socketManager.emit('chess-resign', { messageId });
-    } else if (action === 'chess-join') {
-      socketManager.emit('chess-join', { messageId, userId: persistentUserId });
-    } else if (action === 'chess-swap') {
-      const msg = messages.find(m => m.id === messageId);
-      // Use socketId for socket.io targeting
-      const targetUserId = msg.gameData.players.white?.id === persistentUserId
-        ? msg.gameData.players.black?.socketId
-        : msg.gameData.players.white?.socketId;
-
-      socketManager.emit('chess-swap-request', { messageId, targetUserId });
-    } else if (action === 'chess-replace') {
-      const { targetUserId, role } = position;
-      socketManager.emit('chess-replace-request', {
-        messageId,
-        role: role || 'black',
-        targetUserId // in ChessModal we passed user.socketId
-      });
-    } else {
-      socketManager.emit('tic-tac-toe-move', { messageId, action, position });
-    }
-  };
-
-  const handleLaunchChess = (message) => {
-    setActiveChessMatch(message);
-    hapticLight();
-  };
-
-  const handleRPSAction = (messageId, action, move) => {
-    if (!isConnected) return;
-    socketManager.emit('rps-action', { messageId, action, move });
-  };
-
-  // ── Hangman handlers ──────────────────────────────────────────────
-  const handleHangmanJoin = (messageId) => {
-    if (!isConnected) return;
-    socketManager.emit('hangman-join', { messageId });
-  };
-  const handleHangmanGuess = (messageId, letter) => {
-    if (!isConnected) return;
-    socketManager.emit('hangman-guess', { messageId, letter });
-  };
-  const handleHangmanHint = (messageId) => {
-    if (!isConnected) return;
-    socketManager.emit('hangman-hint', { messageId });
-  };
-
-  // ── Anagram handlers ──────────────────────────────────────────────
-  const handleAnagramJoin = (messageId) => {
-    if (!isConnected) return;
-    socketManager.emit('anagram-join', { messageId });
-  };
-  const handleAnagramSubmit = (messageId, word, powerUps = {}) => {
-    if (!isConnected) return;
-    socketManager.emit('anagram-submit', { messageId, word, powerUps });
-  };
-  const handleAnagramNextRound = (messageId) => {
-    if (!isConnected) return;
-    socketManager.emit('anagram-next-round', { messageId });
-  };
-  const handleAnagramReveal = (messageId) => {
-    if (!isConnected) return;
-    socketManager.emit('anagram-reveal', { messageId });
-  };
-  const handleAnagramHint = (messageId) => {
-    if (!isConnected) return;
-    socketManager.emit('anagram-hint', { messageId });
-  };
 
   // ── Share result handler ──────────────────────────────────────────
   const handleShareResult = (text) => {
@@ -2262,47 +2029,6 @@ const ChatRoom = () => {
     socketManager.emit('send-message', { content: text });
   };
 
-  // ── Typing race handlers ──────────────────────────────────────────
-  const handleTypingRaceJoin = (messageId) => {
-    if (!isConnected) return;
-    socketManager.emit('typing-race-join', { messageId });
-  };
-  const handleTypingRaceStart = (messageId) => {
-    if (!isConnected) return;
-    socketManager.emit('typing-race-start', { messageId });
-  };
-  const handleTypingRaceProgress = (messageId, progress, wpm, accuracy, errors) => {
-    if (!isConnected) return;
-    socketManager.emit('typing-race-progress', { messageId, progress, wpm, accuracy, errors });
-  };
-  const handleTypingRaceFinish = (messageId, wpm, accuracy, errors, time) => {
-    if (!isConnected) return;
-    socketManager.emit('typing-race-finish', { messageId, wpm, accuracy, errors, time });
-  };
-
-  // ── Rematch handler ───────────────────────────────────────────────
-  const handleRematch = (messageId) => {
-    if (!isConnected) return;
-    const origMsg = messages.find(m => m.id === messageId);
-    if (!origMsg?.gameData) return;
-    const gd = origMsg.gameData;
-    const userId = currentUser?.id || currentUser?.socketId;
-    const allPlayers = gd.gameType === 'typing-race'
-      ? Object.values(gd.players || {})
-      : (gd.players || []);
-    const recipients = gd.isTargeted
-      ? allPlayers.filter(p => p.id !== userId).map(p => p.id).filter(Boolean)
-      : [];
-    socketManager.emit('send-message', {
-      messageType: 'game',
-      gameData: {
-        gameType: gd.gameType,
-        difficulty: gd.difficulty,
-        ...(gd.totalRounds ? { rounds: gd.totalRounds } : {}),
-      },
-      recipients,
-    });
-  };
 
   const handleVote = (messageId, optionId) => {
     if (!isConnected) return;
@@ -3005,26 +2731,9 @@ const ChatRoom = () => {
               onReply={handleReply}
               onReact={handleReaction}
               onEdit={handleEditMessage}
-              onGameAnswer={handleGameAnswer}
-              onTicTacToeMove={handleTicTacToeMove}
-              onRPSAction={handleRPSAction}
-              onLaunchChess={handleLaunchChess}
               onDelete={handleDeleteMessage}
               roomVibe={roomVibe}
-              onHangmanJoin={handleHangmanJoin}
-              onHangmanGuess={handleHangmanGuess}
-              onHangmanHint={handleHangmanHint}
-              onAnagramJoin={handleAnagramJoin}
-              onAnagramSubmit={handleAnagramSubmit}
-              onAnagramNextRound={handleAnagramNextRound}
-              onAnagramReveal={handleAnagramReveal}
-              onAnagramHint={handleAnagramHint}
               onShareResult={handleShareResult}
-              onTypingRaceJoin={handleTypingRaceJoin}
-              onTypingRaceStart={handleTypingRaceStart}
-              onTypingRaceProgress={handleTypingRaceProgress}
-              onTypingRaceFinish={handleTypingRaceFinish}
-              onRematch={handleRematch}
               linkPreviews={linkPreviews}
               onOpenEmojiPicker={(messageId) => {
                 setReactionTargetId(messageId);
@@ -3204,11 +2913,6 @@ const ChatRoom = () => {
                                 <Snowflake className="w-4 h-4 text-cyan-500" />
                               </div>
                               <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Icebreaker</span>
-                            </button>
-                            <button type="button" onClick={() => { setShowGameModal(true); setShowFeatureMenu(false); }} disabled={!isConnected} className="flex sm:hidden items-center justify-center p-1.5 rounded-lg bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group" title="Games">
-                              <div className="flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <Dices className="w-4 h-4 text-orange-500" />
-                              </div>
                             </button>
                             <button type="button" onClick={() => { setShowWatchPartyModal(true); setShowFeatureMenu(false); }} disabled={!isConnected} className="flex sm:hidden items-center justify-center p-1.5 rounded-lg bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group" title="Watch Party">
                               <div className="flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -3638,75 +3342,6 @@ const ChatRoom = () => {
         initialContent={editingMessage?.content}
       />
       <PollModal isOpen={showPollModal} onClose={() => setShowPollModal(false)} onSend={handleSendPoll} roomVibe={roomVibe} />
-      <GameModal
-        isOpen={showGameModal}
-        onClose={() => { setShowGameModal(false); setInitialGameType(null); }}
-        onSend={handleSendGame}
-        roomVibe={roomVibe}
-        initialGameType={initialGameType}
-        roomTTL={room?.settings?.messageTTL || 60}
-      />
-
-      <ChessModal
-        isOpen={!!activeChessMatch}
-        onClose={() => setActiveChessMatch(null)}
-        message={activeChessMatch}
-        currentUserId={currentUser?.id || currentUser?.socketId}
-        currentNickname={currentUser?.nickname}
-        users={users}
-        onMove={handleTicTacToeMove}
-        roomVibe={roomVibe}
-      />
-
-      {/* Chess Swap/Replace Approval Dialog */}
-      {chessApprovalRequest && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => {
-            socketManager.emit(chessApprovalRequest.type === 'swap' ? 'chess-swap-response' : 'chess-replace-response', {
-              messageId: chessApprovalRequest.messageId,
-              approved: false
-            });
-            setChessApprovalRequest(null);
-          }} />
-          <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-sm w-full border border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-black text-gray-900 dark:text-white mb-2">
-              {chessApprovalRequest.type === 'swap' ? '♟ Swap Request' : '♟ Replace Request'}
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              {chessApprovalRequest.type === 'swap'
-                ? `${chessApprovalRequest.requestedBy} wants to swap White and Black sides. Do you approve?`
-                : `${chessApprovalRequest.requestedBy} wants to replace you with ${chessApprovalRequest.newPlayerName}. Do you approve?`
-              }
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  socketManager.emit(chessApprovalRequest.type === 'swap' ? 'chess-swap-response' : 'chess-replace-response', {
-                    messageId: chessApprovalRequest.messageId,
-                    approved: true
-                  });
-                  setChessApprovalRequest(null);
-                }}
-                className={`flex-1 py-2.5 ${getVibeById(roomVibe).accentClass} rounded-xl text-sm font-bold transition-all hover:scale-[1.02] active:scale-95`}
-              >
-                Approve
-              </button>
-              <button
-                onClick={() => {
-                  socketManager.emit(chessApprovalRequest.type === 'swap' ? 'chess-swap-response' : 'chess-replace-response', {
-                    messageId: chessApprovalRequest.messageId,
-                    approved: false
-                  });
-                  setChessApprovalRequest(null);
-                }}
-                className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-red-500 hover:text-white text-gray-600 dark:text-gray-400 rounded-xl text-sm font-bold transition-all"
-              >
-                Decline
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       <DragDropOverlay isDragging={isDragging} />
       <PrivacyOverlay />
 

@@ -29,7 +29,6 @@ Just type these directly into the chat box and hit Enter/Send:
 *   `/camera` or `/photo` - Instantly take a photo or pick an image to share securely.
 *   `/voice` or `/note` - Record an encrypted voice note.
 *   `/poll` - Create an interactive, secure poll for everyone in the room to vote on.
-*   `/game` - Open the mini-games menu. (e.g., play `/game chess`, `/game tic-tac-toe` or send a `/game trivia`).
 *   `/pulse` - Send a physical device vibration to everyone in the room to get their attention!
 *   `/ice` - Drops a random icebreaker question into the chat automatically.
 *   `/media [youtube-url]` - Start a synchronized Watch Party. The video will play simultaneously for everyone in the room!

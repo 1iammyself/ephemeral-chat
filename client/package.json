@@ -8,7 +8,6 @@
     "dev": "vite",
     "build": "vite build && node scripts/inject-sri.js",
     "preview": "vite preview",
-    "test:games-contract": "node --test tests/games-contract.test.mjs",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },

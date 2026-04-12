@@ -440,25 +440,7 @@ class RoomManager {
     const room = await this.getRoom(roomCode);
     if (!room) return;
 
-    // Check if any game is in terminal state
-    let isGameTerminal = false;
-    if (message.messageType === 'game' && message.gameData) {
-      isGameTerminal =
-        !!message.gameData.winner ||           // Chess, TypingRace, etc.
-        message.gameData.gameOver === true ||  // Hangman, Anagram, TypingRace
-        !!message.gameData.endedAt;            // Alternative terminal marker
-    }
-
-    const isActiveGame = message.messageType === 'game' && !isGameTerminal;
-
-    // Messages that should NEVER expire (overrideTtl === 0 means "no expiry")
-    const neverExpire = isActiveGame || message.overrideTtl === 0;
-
-    // Active games NEVER have an expiry until finished
-    if (isActiveGame) {
-      delete message.expiresAt;
-      delete message.overrideTtl;
-    }
+    const neverExpire = message.overrideTtl === 0;
 
     if (this.redis && room.settings.messageTTL > 0) {
       const messageKey = `message:${roomCode}:${message.id}`;
@@ -484,16 +466,7 @@ class RoomManager {
 
       // Safety cap: prevent memory exhaustion (keep last 500 messages max)
       if (room.messages.length > 500) {
-        // Keep all active games (any game without terminal state)
-        const activeGames = room.messages.filter(m => {
-          if (m.messageType !== 'game' || !m.gameData) return false;
-          // Game is active if it hasn't reached terminal state
-          const isTerminal = !!m.gameData.winner || m.gameData.gameOver === true || !!m.gameData.endedAt;
-          return !isTerminal;
-        });
-        const others = room.messages.filter(m => !activeGames.includes(m));
-        const otherCount = Math.max(0, 500 - activeGames.length);
-        room.messages = [...activeGames, ...others.slice(-otherCount)];
+        room.messages = room.messages.slice(-500);
       }
 
       await this.saveRoom(roomCode, room);
@@ -515,29 +488,6 @@ class RoomManager {
     }
 
     if (!message.timestamp) message.timestamp = new Date().toISOString();
-
-    // GAME TTL LOGIC: NO GAME gets TTL until it reaches terminal state
-    // Terminal states: winner/draw/gameOver = true
-    // Once finished, games get 2-min TTL countdown
-    if (message.messageType === 'game' && message.gameData) {
-      const gameType = message.gameData.gameType;
-
-      // Check if game is in terminal state
-      const isTerminal =
-        !!message.gameData.winner ||           // Chess, TypingRace, etc.
-        message.gameData.gameOver === true ||  // Hangman, Anagram, TypingRace
-        !!message.gameData.endedAt;            // Alternative terminal marker
-
-      if (isTerminal) {
-        // Game finished: set 2-min TTL if not already set
-        if (!message.overrideTtl) {
-          message.overrideTtl = 120;
-        }
-      } else {
-        // Game in progress: NO TTL (delete if present)
-        delete message.overrideTtl;
-      }
-    }
 
     // Handle per-message override TTL (e.g., 10s override)
     if (message.overrideTtl && message.overrideTtl > 0) {
@@ -594,7 +544,7 @@ class RoomManager {
   /**
    * Get messages for a room
    * @param {string} roomCode - Room code
-   * @param {string} [userId] - Optional user ID to filter private messages and mask game data
+  * @param {string} [userId] - Optional user ID to filter private messages
    * @param {string} [persistentId] - Optional persistent user ID for additional matching
    * @returns {Promise<Array>} Array of messages
    */
@@ -623,11 +573,6 @@ class RoomManager {
 
       // Filter messages that haven't expired
       const validMessages = room.messages.filter(msg => {
-        const isChess = msg.messageType === 'game' && msg.gameData?.gameType === 'chess';
-        if (isChess && !(msg.gameData?.winner || msg.gameData?.endedAt)) {
-          return true; // Active Chess persists until manually deleted or room ends
-        }
-
         // 1. Check if message has its own expiry override
         if (msg.expiresAt) {
           return new Date(msg.expiresAt) > now;
@@ -635,8 +580,6 @@ class RoomManager {
 
         // 2. Fallback to room default TTL if set
         if (defaultTtlMs > 0) {
-          // Finished Chess games will use their overrideTtl or fall back here
-
           const msgTime = new Date(msg.timestamp);
           return (now - msgTime) < defaultTtlMs;
         }
@@ -653,7 +596,7 @@ class RoomManager {
       messages = validMessages;
     }
 
-    // Filter private messages and mask game data if userId is provided
+    // Filter private messages if userId is provided
     if (userId) {
       const matchesUser = (id) => id === userId || (persistentId && id === persistentId);
       messages = messages
@@ -661,145 +604,15 @@ class RoomManager {
           // If no recipients defined, it's a broadcast message (everyone sees it)
           if (!msg.recipients || msg.recipients.length === 0) return true;
 
-          // Chess games are ALWAYS visible to everyone in the room (for spectating)
-          if (msg.messageType === 'game' && msg.gameData?.gameType === 'chess') return true;
-
           // If I am the sender, I can see it
           if (matchesUser(msg.sender.socketId) || matchesUser(msg.sender.id)) return true;
 
           // If I am in the recipients list, I can see it
           return msg.recipients.some(r => matchesUser(r));
-        })
-        .map(msg => this.maskMessageForUser(msg, userId, persistentId));
+        });
     }
 
     return messages;
-  }
-
-  /**
-   * Mask sensitive game data for non-senders
-   * @param {object} message - The message to mask
-   * @param {string} userId - The socket ID of the requesting user
-   * @param {string} [persistentId] - The persistent user ID of the requesting user
-   */
-  maskMessageForUser(message, userId, persistentId) {
-    if (message.messageType !== 'game' || !message.gameData) {
-      return message;
-    }
-
-    const { gameType } = message.gameData;
-
-    // RPS move masking: hide pending (unrevealed) moves from non-players and the opponent
-    if (gameType === 'rock-paper-scissors') {
-      const gd = message.gameData;
-      const isP1 = gd.players.P1.id === userId || gd.players.P1.id === persistentId ||
-        gd.players.P1.socketId === userId ||
-        (persistentId && gd.players.P1.socketId === persistentId);
-      const isP2 = gd.players.P2.id && (gd.players.P2.id === userId || gd.players.P2.id === persistentId ||
-        gd.players.P2.socketId === userId ||
-        (persistentId && gd.players.P2.socketId === persistentId));
-
-      // If the round is complete (both moved) or the game has a winner, show everything
-      if (gd.winner || (gd.players.P1.move && gd.players.P2.move)) {
-        return message;
-      }
-
-      // Otherwise mask pending moves: each player sees their own move but not the opponent's
-      const maskedP1 = { ...gd.players.P1 };
-      const maskedP2 = { ...gd.players.P2 };
-
-      if (!isP1) {
-        // Non-P1 users: hide P1's pending move (show that they HAVE moved, not WHAT)
-        maskedP1.move = maskedP1.move ? 'locked' : null;
-      }
-      if (!isP2) {
-        // Non-P2 users: hide P2's pending move
-        maskedP2.move = maskedP2.move ? 'locked' : null;
-      }
-
-      return {
-        ...message,
-        gameData: {
-          ...gd,
-          players: {
-            P1: maskedP1,
-            P2: maskedP2
-          }
-        }
-      };
-    }
-
-    // Anagram masking: hide word + opponent answers until revealed
-    if (gameType === 'anagram') {
-      const gd = message.gameData;
-      if (gd.revealed || gd.gameOver) return message;
-      // Custom word setter (host) can see their own word but not others' answers
-      const isHost = gd.isCustomWord && (
-        socketId === message.sender?.socketId || userId === message.sender?.id ||
-        (persistentId && persistentId === message.sender?.id)
-      );
-      const maskedAnswers = {};
-      if (gd.answers) {
-        if (gd.answers[userId] !== undefined) maskedAnswers[userId] = gd.answers[userId];
-        if (persistentId && gd.answers[persistentId] !== undefined) maskedAnswers[persistentId] = gd.answers[persistentId];
-      }
-      if (isHost) return { ...message, gameData: { ...gd, answers: maskedAnswers } };
-      return { ...message, gameData: { ...gd, word: null, answers: maskedAnswers, isMasked: true } };
-    }
-
-    // Hangman masking: hide word until game over
-    if (gameType === 'hangman') {
-      const gd = message.gameData;
-      if (gd.gameOver) return message;
-      // Custom word setter (host) can always see their own word
-      const isHost = gd.isCustomWord && (
-        socketId === message.sender?.socketId || userId === message.sender?.id ||
-        (persistentId && persistentId === message.sender?.id)
-      );
-      if (isHost) return message;
-      return { ...message, gameData: { ...gd, word: null } };
-    }
-
-    // WYR / Trivia answer masking
-    if (!message.gameData.answers) {
-      return message;
-    }
-
-    // Senders see everything
-    if (message.sender.socketId === userId || message.sender.id === userId ||
-      (persistentId && message.sender.id === persistentId)) {
-      return message;
-    }
-
-    const { answers } = message.gameData;
-    if (gameType === 'would-you-rather' || gameType === 'trivia') {
-      const stats = {};
-      Object.values(answers).forEach(val => {
-        stats[val] = (stats[val] || 0) + 1;
-      });
-
-      // Include only their own answer (check both socketId and persistentId keys)
-      const maskedAnswers = {};
-      if (answers[userId] !== undefined) {
-        maskedAnswers[userId] = answers[userId];
-      }
-      if (persistentId && answers[persistentId] !== undefined) {
-        maskedAnswers[persistentId] = answers[persistentId];
-      }
-
-      return {
-        ...message,
-        gameData: {
-          ...message.gameData,
-          answers: maskedAnswers,
-          answerNicknames: undefined, // Strip nicknames from non-sender view
-          stats: stats,
-          isMasked: true
-        }
-      };
-    }
-
-    return message;
   }
 
   /**
@@ -815,12 +628,6 @@ class RoomManager {
       const originalCount = room.messages.length;
 
       room.messages = room.messages.filter(msg => {
-        // Active Chess games NEVER expire via pruning
-        const isChess = msg.messageType === 'game' && msg.gameData?.gameType === 'chess';
-        if (isChess && !msg.gameData?.winner && !msg.gameData?.endedAt) {
-          return true; // Keep active chess games forever
-        }
-
         // Messages with overrideTtl === 0 are "never expire"
         if (msg.overrideTtl === 0) return true;
 
