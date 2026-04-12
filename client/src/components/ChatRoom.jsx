@@ -1925,37 +1925,21 @@ const ChatRoom = () => {
           let initialGame = null;
 
           if (['ttt', 'tic-tac-toe', 'tictactoe'].includes(gameArg)) {
-            if (selectedRecipients.length > 1) { setError('Tic Tac Toe can only be sent to one person.'); return; }
-            handleSendGame({ gameType: 'tic-tac-toe' }); setNewMessage(''); return;
+            initialGame = GAME_TYPES.TIC_TAC_TOE;
           } else if (['chess'].includes(gameArg)) {
-            if (selectedRecipients.length > 1) { setError('Chess can only be sent to one person.'); return; }
-            handleSendGame({ gameType: 'chess' }); setNewMessage(''); return;
+            initialGame = GAME_TYPES.CHESS;
           } else if (['wyr', 'would-you-rather', 'wouldyourather'].includes(gameArg)) {
-            initialGame = 'would-you-rather';
+            initialGame = GAME_TYPES.WYR;
           } else if (['trivia', 'quiz'].includes(gameArg)) {
-            initialGame = 'trivia';
+            initialGame = GAME_TYPES.TRIVIA;
           } else if (['rps', 'rock-paper-scissors'].includes(gameArg)) {
-            if (selectedRecipients.length > 1) { setError('Rock Paper Scissors can only be sent to one person.'); return; }
-            handleSendGame({ gameType: 'rock-paper-scissors' }); setNewMessage(''); return;
+            initialGame = GAME_TYPES.ROCK_PAPER_SCISSORS;
           } else if (['hmg', 'hangman'].includes(gameArg)) {
-            // Hangman: 1-on-1 only
-            if (selectedRecipients.length > 1) { setError('Hangman can only be played 1-on-1.'); return; }
-            setShowGameModal(true);
-            setInitialGameType(GAME_TYPES.HANGMAN);
-            setNewMessage('');
-            return;
+            initialGame = GAME_TYPES.HANGMAN;
           } else if (['agm', 'anagram'].includes(gameArg)) {
-            // Anagrams: 1-on-1 or broadcast
-            setShowGameModal(true);
-            setInitialGameType(GAME_TYPES.ANAGRAM);
-            setNewMessage('');
-            return;
+            initialGame = GAME_TYPES.ANAGRAM;
           } else if (['trg', 'typing', 'typing-race'].includes(gameArg)) {
-            // TypingRace: 1-on-1 or broadcast
-            setShowGameModal(true);
-            setInitialGameType(GAME_TYPES.TYPING_RACE);
-            setNewMessage('');
-            return;
+            initialGame = GAME_TYPES.TYPING_RACE;
           }
 
           setInitialGameType(initialGame);

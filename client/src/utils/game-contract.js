@@ -21,13 +21,13 @@ export const GAME_REGISTRY = {
   [GAME_TYPES.TIC_TAC_TOE]: {
     label: 'Tic-Tac-Toe',
     uiMode: GAME_UI_MODES.LEGACY_INLINE,
-    quickSend: true,
+    quickSend: false,
     singleRecipientOnly: true,
   },
   [GAME_TYPES.ROCK_PAPER_SCISSORS]: {
     label: 'Rock Paper Scissors',
     uiMode: GAME_UI_MODES.LEGACY_INLINE,
-    quickSend: true,
+    quickSend: false,
     singleRecipientOnly: true,
   },
   [GAME_TYPES.CHESS]: {

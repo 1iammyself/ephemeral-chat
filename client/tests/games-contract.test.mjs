@@ -7,6 +7,7 @@ import {
   EXCLUSIVE_WINDOW_GAME_TYPES,
   LEGACY_INLINE_GAME_TYPES,
   SUPPORTED_GAME_TYPES,
+  isQuickSendGame,
   isSingleRecipientGame,
   isSupportedGameType,
 } from '../src/utils/game-contract.js';
@@ -64,6 +65,35 @@ test('single-recipient restriction stays limited to match games', () => {
       shouldBeSingle,
       `${gameType} single-recipient policy mismatch`,
     );
+  }
+});
+
+test('all games use shared modal/send route (no quick-send bypass)', () => {
+  for (const gameType of EXPECTED_GAME_TYPES) {
+    assert.equal(
+      isQuickSendGame(gameType),
+      false,
+      `${gameType} should not bypass shared modal/send route`,
+    );
+  }
+});
+
+test('slash game aliases route through modal entrypoint', async () => {
+  const chatRoom = await readFile('./src/components/ChatRoom.jsx', 'utf8');
+
+  const requiredInitialAssignments = [
+    'initialGame = GAME_TYPES.TIC_TAC_TOE',
+    'initialGame = GAME_TYPES.CHESS',
+    'initialGame = GAME_TYPES.WYR',
+    'initialGame = GAME_TYPES.TRIVIA',
+    'initialGame = GAME_TYPES.ROCK_PAPER_SCISSORS',
+    'initialGame = GAME_TYPES.HANGMAN',
+    'initialGame = GAME_TYPES.ANAGRAM',
+    'initialGame = GAME_TYPES.TYPING_RACE',
+  ];
+
+  for (const marker of requiredInitialAssignments) {
+    assert.equal(chatRoom.includes(marker), true, `Missing slash-modal route marker: ${marker}`);
   }
 });
 
