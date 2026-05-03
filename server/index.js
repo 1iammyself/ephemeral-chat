@@ -1840,7 +1840,7 @@ io.on('connection', (socket) => {
               messages,
               nickname: socket.nickname,
               sessionToken,
-              activeMedia: getActiveMediaArray(roomCode)
+              activeMedia: []
             });
           }
         } else if (gracePeriodSession && gracePeriodSession.roomCode === roomCode) {
@@ -2034,7 +2034,7 @@ io.on('connection', (socket) => {
           isInviteOnly: result.room.settings?.isInviteOnly || false,
           inactivityTimeoutMs: securityManager.INACTIVITY_TIMEOUT_MS,
           sessionToken,
-          activeMedia: getActiveMediaArray(roomCode)
+          activeMedia: []
         });
 
         // Notify others
@@ -2947,8 +2947,6 @@ io.on('connection', (socket) => {
     }
 
     // Note: Media watcher cleanup is handled inside handleUserDeparture
-    // Note: Do NOT delete io._activeMedia on disconnect — media persists for the room
-    // It will be cleaned up when the room is deleted or host closes media
 
     // Handle user departure logic (also cleans _mediaWatchers)
     await handleUserDeparture(false);
