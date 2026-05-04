@@ -13,6 +13,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ProximityPlugin.class);
         registerPlugin(NowPlayingPlugin.class);
         registerPlugin(BiometricPlugin.class);
+        registerPlugin(KeystorePlugin.class);
         
         super.onCreate(savedInstanceState);
         
