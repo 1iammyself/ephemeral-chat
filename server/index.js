@@ -45,7 +45,7 @@ const { attachMASQUEProxy } = require('./masque-proxy');
 const { attachWebAuthnRoutes } = require('./webauthn');
 const { trafficPaddingMiddleware, startServerChaff, stopServerChaff, isChaff, stripPadding, padResponseMiddleware } = require('./traffic-padding');
 const { LinkPreviewService } = require('./link-preview');
-const { initializeAttestation } = require('./device-attestation-verifier');
+const { initializeAttestation, verifyAndroidAttestation } = require('./device-attestation-verifier');
 const { initSigningKey, signSocketPayload, getPublicKeyBase64 } = require('./middleware/response-signing');
 
 // Initialize Cap.js for proof-of-work CAPTCHA
@@ -943,6 +943,78 @@ app.post('/api/creator-token', creatorTokenLimiter, express.json(), (req, res) =
     .update(creatorId)
     .digest('hex');
   res.json({ token });
+});
+
+// ─── Play Integrity API Endpoints ──────────────────────────────────────────
+// In-memory nonce store — entries expire after 10 minutes.
+// Rate-limited naturally by Play Integrity's own per-app quota; an explicit
+// RateLimit on the nonce endpoint prevents bulk pre-generation.
+const pendingNonces = new Map(); // nonce -> { createdAt: number, used: boolean }
+
+const integrityLimiter = RateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 20, // 20 integrity operations per IP per window
+  message: { error: 'Too many integrity requests' },
+});
+
+// GET /api/integrity/nonce — Issue a server-generated nonce for Play Integrity.
+// Clients pass this nonce to IntegrityPlugin.requestIntegrityToken(), then
+// POST the resulting token + nonce to /api/integrity/verify.
+app.get('/api/integrity/nonce', integrityLimiter, (req, res) => {
+  const nonce = nodeCrypto.randomBytes(24).toString('base64');
+  pendingNonces.set(nonce, { createdAt: Date.now(), used: false });
+
+  // Prune nonces older than 10 minutes to bound memory growth
+  const TEN_MIN = 10 * 60 * 1000;
+  for (const [k, v] of pendingNonces) {
+    if (Date.now() - v.createdAt > TEN_MIN) pendingNonces.delete(k);
+  }
+
+  res.json({ nonce });
+});
+
+// POST /api/integrity/verify — Verify a Play Integrity token (log-only mode).
+// Validates nonce provenance and replay protection, calls verifyAndroidAttestation,
+// then logs the verdict without blocking the client (enforcement disabled until
+// 1-2 weeks of production data confirms normal verdict distribution).
+app.post('/api/integrity/verify', integrityLimiter, express.json(), async (req, res) => {
+  const { token, nonce } = req.body;
+
+  if (!token || !nonce) {
+    return res.status(400).json({ error: 'token and nonce required' });
+  }
+
+  // Verify nonce was issued by us and has not been replayed
+  const nonceEntry = pendingNonces.get(nonce);
+  if (!nonceEntry) {
+    return res.status(400).json({ error: 'Unknown or expired nonce' });
+  }
+  if (nonceEntry.used) {
+    return res.status(400).json({ error: 'Nonce already used' });
+  }
+
+  // Mark nonce as used before the async call to prevent concurrent replays
+  pendingNonces.set(nonce, { ...nonceEntry, used: true });
+
+  try {
+    const result = await verifyAndroidAttestation(token, nonce);
+
+    // LOG-ONLY mode: record verdict but always return success.
+    // Enable enforcement (return 403 on failed verdict) after reviewing
+    // production data for 1-2 weeks.
+    logger.info('[Integrity] Verdict (log-only):', {
+      deviceTrusted: result.verdict.deviceTrusted,
+      appAuthentic: result.verdict.appAuthentic,
+      unconfigured: result.verdict.unconfigured,
+    });
+
+    return res.json({ valid: true, logOnly: true });
+
+  } catch (err) {
+    // LOG-ONLY: log failure but do not block the client
+    logger.warn('[Integrity] Token verification failed (log-only, not blocking):', err.message);
+    return res.json({ valid: true, logOnly: true, warning: err.message });
+  }
 });
 
 // GET /api/my-rooms — List rooms created or joined by this creator.

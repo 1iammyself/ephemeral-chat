@@ -14,6 +14,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NowPlayingPlugin.class);
         registerPlugin(BiometricPlugin.class);
         registerPlugin(KeystorePlugin.class);
+        registerPlugin(IntegrityPlugin.class);
         
         super.onCreate(savedInstanceState);
         
