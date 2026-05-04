@@ -14,7 +14,6 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.security.InvalidAlgorithmParameterException;
-import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 
@@ -130,7 +129,7 @@ public class BiometricPlugin extends Plugin {
             JSObject r = new JSObject();
             r.put("success", true);
             call.resolve(r);
-        } catch (KeyStoreException | NoSuchAlgorithmException | NoSuchProviderException
+        } catch (NoSuchAlgorithmException | NoSuchProviderException
                  | InvalidAlgorithmParameterException e) {
             String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
             call.reject("Failed to generate biometric-bound key: " + msg);
