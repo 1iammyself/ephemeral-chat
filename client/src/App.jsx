@@ -18,8 +18,12 @@ import PrivacyPolicy from './components/PrivacyPolicy';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+let isAuthRunning = false;
+
 async function runBiometricGate(setIsLocked) {
   if (Capacitor.getPlatform() !== 'android') return;
+  if (isAuthRunning) return;
+  isAuthRunning = true;
 
   try {
     const { available } = await BiometricPlugin.isAvailable();
@@ -34,10 +38,12 @@ async function runBiometricGate(setIsLocked) {
       cancelLabel: 'Cancel',
     });
 
-    setIsLocked(!result.success);
+    setIsLocked(result.success !== true);
   } catch {
     // On unexpected errors, don't block the user on non-critical failure
     setIsLocked(false);
+  } finally {
+    isAuthRunning = false;
   }
 }
 
