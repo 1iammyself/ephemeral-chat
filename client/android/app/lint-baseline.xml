@@ -1,0 +1,579 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 8.9.1" type="baseline" client="gradle" dependencies="false" name="AGP (8.9.1)" variant="all" version="8.9.1">
+
+    <issue
+        id="DefaultLocale"
+        message="Implicitly using the default locale is a common source of bugs: Use `toLowerCase(Locale)` instead. For strings meant to be internal use `Locale.ROOT`, otherwise `Locale.getDefault()`."
+        errorLine1="                if (line.toLowerCase().startsWith(&quot;content-length:&quot;)) {"
+        errorLine2="                         ~~~~~~~~~~~">
+        <location
+            file="src/main/java/me/kyere/chat/ProximityPlugin.java"
+            line="223"
+            column="26"/>
+    </issue>
+
+    <issue
+        id="DefaultLocale"
+        message="Implicitly using the default locale is a common source of bugs: Use `String.format(Locale, ...)` instead"
+        errorLine1="                String ip = String.format(&quot;%d.%d.%d.%d&quot;,"
+        errorLine2="                            ^">
+        <location
+            file="src/main/java/me/kyere/chat/ProximityPlugin.java"
+            line="797"
+            column="29"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 28 (current min is 24): `android.security.keystore.KeyGenParameterSpec.Builder#setUnlockedDeviceRequired`"
+        errorLine1="                    .setUnlockedDeviceRequired(true)"
+        errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/me/kyere/chat/BiometricPlugin.java"
+            line="121"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 28 (current min is 24): `android.security.keystore.KeyGenParameterSpec.Builder#setUnlockedDeviceRequired`"
+        errorLine1="                    .setUnlockedDeviceRequired(true)"
+        errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/me/kyere/chat/KeystorePlugin.java"
+            line="61"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26 (current min is 24): `android.net.wifi.WifiManager#startLocalOnlyHotspot`"
+        errorLine1="            wifiManager.startLocalOnlyHotspot(new WifiManager.LocalOnlyHotspotCallback() {"
+        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/me/kyere/chat/ProximityPlugin.java"
+            line="839"
+            column="25"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Class requires API level 26 (current min is 24): `android.net.wifi.WifiManager.LocalOnlyHotspotCallback`"
+        errorLine1="            wifiManager.startLocalOnlyHotspot(new WifiManager.LocalOnlyHotspotCallback() {"
+        errorLine2="                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/me/kyere/chat/ProximityPlugin.java"
+            line="839"
+            column="51"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Implicit cast to `LocalOnlyHotspotCallback` requires API level 26 (current min is 24)"
+        errorLine1="            wifiManager.startLocalOnlyHotspot(new WifiManager.LocalOnlyHotspotCallback() {"
+        errorLine2="                                              ^">
+        <location
+            file="src/main/java/me/kyere/chat/ProximityPlugin.java"
+            line="839"
+            column="47"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26 (current min is 24): `android.net.wifi.WifiManager.LocalOnlyHotspotReservation#getWifiConfiguration`"
+        errorLine1="                        android.net.wifi.WifiConfiguration c = reservation.getWifiConfiguration();"
+        errorLine2="                                                                           ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/me/kyere/chat/ProximityPlugin.java"
+            line="849"
+            column="76"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26 (current min is 24): `android.net.wifi.WifiManager.LocalOnlyHotspotReservation#close`"
+        errorLine1="        if (hotspotReservation != null) { hotspotReservation.close(); hotspotReservation = null; resolve(call, true, null); }"
+        errorLine2="                                                             ~~~~~">
+        <location
+            file="src/main/java/me/kyere/chat/ProximityPlugin.java"
+            line="867"
+            column="62"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 26 (current min is 24): `android.net.wifi.WifiManager.LocalOnlyHotspotReservation#close`"
+        errorLine1="        try { if (hotspotReservation != null) hotspotReservation.close(); } catch (Exception ignored) {}"
+        errorLine2="                                                                 ~~~~~">
+        <location
+            file="src/main/java/me/kyere/chat/ProximityPlugin.java"
+            line="966"
+            column="66"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `usesPermissionFlags` is only used in API level 31 and higher (current min is 24)"
+        errorLine1="        android:usesPermissionFlags=&quot;neverForLocation&quot; />"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="168"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `usesPermissionFlags` is only used in API level 31 and higher (current min is 24)"
+        errorLine1="        android:usesPermissionFlags=&quot;neverForLocation&quot; />"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="177"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="ManifestOrder"
+        message="`&lt;uses-permission>` tag appears after `&lt;application>` tag"
+        errorLine1="    &lt;uses-permission android:name=&quot;android.permission.INTERNET&quot; />"
+        errorLine2="     ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="135"
+            column="6"/>
+    </issue>
+
+    <issue
+        id="NetworkSecurityConfig"
+        message="Invalid pin digest"
+        errorLine1="            &lt;pin digest=&quot;SHA-256&quot;>REPLACE_WITH_PRIMARY_PIN_BASE64==&lt;/pin>"
+        errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/xml/network_security_config.xml"
+            line="9"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="NetworkSecurityConfig"
+        message="Invalid pin digest"
+        errorLine1="            &lt;pin digest=&quot;SHA-256&quot;>REPLACE_WITH_BACKUP_PIN_BASE64==&lt;/pin>"
+        errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/xml/network_security_config.xml"
+            line="11"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of com.google.android.play:integrity than 1.4.0 is available: 1.6.0"
+        errorLine1="    implementation &apos;com.google.android.play:integrity:1.4.0&apos;"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="65"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="PermissionImpliesUnsupportedChromeOsHardware"
+        message="Permission exists without corresponding hardware `&lt;uses-feature android:name=&quot;android.hardware.camera&quot; required=&quot;false&quot;>` tag"
+        errorLine1="    &lt;uses-permission android:name=&quot;android.permission.CAMERA&quot; />"
+        errorLine2="     ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="136"
+            column="6"/>
+    </issue>
+
+    <issue
+        id="HardwareIds"
+        message="Using `getString` to get device identifiers is not recommended"
+        errorLine1="        myDeviceId = android.provider.Settings.Secure.getString("
+        errorLine2="                     ^">
+        <location
+            file="src/main/java/me/kyere/chat/ProximityPlugin.java"
+            line="132"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="DataExtractionRules"
+        message="The attribute `android:allowBackup` is deprecated from Android 12 and higher and may be removed in future versions. Consider adding the attribute `android:dataExtractionRules` specifying an `@xml` resource which configures cloud backups and device transfers on Android 12 and higher."
+        errorLine1="        android:allowBackup=&quot;false&quot;"
+        errorLine2="                             ~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="6"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `SDK_INT` is always >= 24"
+        errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/me/kyere/chat/ProximityPlugin.java"
+            line="331"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `SDK_INT` is always >= 24"
+        errorLine1="                            Map&lt;String, byte[]&gt; attrs = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)"
+        errorLine2="                                                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/me/kyere/chat/ProximityPlugin.java"
+            line="373"
+            column="58"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `SDK_INT` is never &lt; 24"
+        errorLine1="        if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.LOLLIPOP) {"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/me/kyere/chat/ProximityPlugin.java"
+            line="465"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `SDK_INT` is never &lt; 24"
+        errorLine1="        if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.LOLLIPOP) {"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/me/kyere/chat/ProximityPlugin.java"
+            line="530"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `SDK_INT` is never &lt; 24"
+        errorLine1="        if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.LOLLIPOP) { reject(call, &quot;GATT needs Android 5+&quot;); return; }"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/me/kyere/chat/ProximityPlugin.java"
+            line="628"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="This folder configuration (`v24`) is unnecessary; `minSdkVersion` is 24. Merge all the resources in this folder into `drawable`.">
+        <location
+            file="src/main/res/drawable-v24"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.layout.activity_main` appears to be unused"
+        errorLine1="&lt;androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;"
+        errorLine2="^">
+        <location
+            file="src/main/res/layout/activity_main.xml"
+            line="2"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.color.shortcut_background` appears to be unused"
+        errorLine1="    &lt;color name=&quot;shortcut_background&quot;>#4F46E5&lt;/color>"
+        errorLine2="           ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/colors.xml"
+            line="6"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.xml.config` appears to be unused"
+        errorLine1="&lt;widget version=&quot;1.0.0&quot; xmlns=&quot;http://www.w3.org/ns/widgets&quot; xmlns:cdv=&quot;http://cordova.apache.org/ns/1.0&quot;>"
+        errorLine2="^">
+        <location
+            file="src/main/res/xml/config.xml"
+            line="2"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.drawable.ic_launcher_background` appears to be unused"
+        errorLine1="&lt;vector xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;"
+        errorLine2="^">
+        <location
+            file="src/main/res/drawable/ic_launcher_background.xml"
+            line="2"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.mipmap.ic_launcher_foreground` appears to be unused">
+        <location
+            file="src/main/res/mipmap-hdpi/ic_launcher_foreground.png"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.drawable.ic_launcher_foreground` appears to be unused"
+        errorLine1="&lt;vector xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;"
+        errorLine2="^">
+        <location
+            file="src/main/res/drawable-v24/ic_launcher_foreground.xml"
+            line="1"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.drawable.ic_notification_icon` appears to be unused">
+        <location
+            file="src/main/res/drawable-hdpi/ic_notification_icon.png"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.drawable.shortcut_0` appears to be unused">
+        <location
+            file="src/main/res/drawable-hdpi/shortcut_0.png"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.drawable.shortcut_legacy_background` appears to be unused"
+        errorLine1="&lt;inset xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;"
+        errorLine2="^">
+        <location
+            file="src/main/res/drawable-anydpi/shortcut_legacy_background.xml"
+            line="16"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.package_name` appears to be unused"
+        errorLine1="    &lt;string name=&quot;package_name&quot;>me.kyere.chat&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="5"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.custom_url_scheme` appears to be unused"
+        errorLine1="    &lt;string name=&quot;custom_url_scheme&quot;>me.kyere.chat&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="6"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.style.AppTheme_NoActionBar` appears to be unused"
+        errorLine1="    &lt;style name=&quot;AppTheme.NoActionBar&quot; parent=&quot;Theme.AppCompat.DayNight.NoActionBar&quot;>"
+        errorLine2="           ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/styles.xml"
+            line="12"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-hdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-mdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-xhdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-xxhdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-xxxhdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icon used as round icon did not have a circular shape">
+        <location
+            file="src/main/res/mipmap-hdpi/ic_launcher_round.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icon used as round icon did not have a circular shape">
+        <location
+            file="src/main/res/mipmap-mdpi/ic_launcher_round.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icon used as round icon did not have a circular shape">
+        <location
+            file="src/main/res/mipmap-xhdpi/ic_launcher_round.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icon used as round icon did not have a circular shape">
+        <location
+            file="src/main/res/mipmap-xxhdpi/ic_launcher_round.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icon used as round icon did not have a circular shape">
+        <location
+            file="src/main/res/mipmap-xxxhdpi/ic_launcher_round.png"/>
+    </issue>
+
+    <issue
+        id="MonochromeLauncherIcon"
+        message="The application adaptive icon is missing a monochrome tag"
+        errorLine1="&lt;adaptive-icon xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;>"
+        errorLine2="^">
+        <location
+            file="src/main/res/mipmap-anydpi-v26/ic_launcher.xml"
+            line="2"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="MonochromeLauncherIcon"
+        message="The application adaptive roundIcon is missing a monochrome tag"
+        errorLine1="&lt;adaptive-icon xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;>"
+        errorLine2="^">
+        <location
+            file="src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml"
+            line="2"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="IconDipSize"
+        message="The image `splash.png` varies significantly in its density-independent (dip) size across the various density versions: drawable-land-hdpi/splash.png: 533x320 dp (800x480 px), drawable-land-mdpi/splash.png: 480x320 dp (480x320 px), drawable-land-xhdpi/splash.png: 640x360 dp (1280x720 px), drawable-land-xxhdpi/splash.png: 533x320 dp (1600x960 px), drawable-land-xxxhdpi/splash.png: 480x320 dp (1920x1280 px)">
+        <location
+            file="src/main/res/drawable-land-xxxhdpi/splash.png"/>
+        <location
+            file="src/main/res/drawable-land-mdpi/splash.png"/>
+        <location
+            file="src/main/res/drawable-land-xxhdpi/splash.png"/>
+        <location
+            file="src/main/res/drawable-land-hdpi/splash.png"/>
+        <location
+            file="src/main/res/drawable-land-xhdpi/splash.png"/>
+    </issue>
+
+    <issue
+        id="IconDuplicatesConfig"
+        message="The `splash.png` icon has identical contents in the following configuration folders: drawable-land-mdpi, drawable">
+        <location
+            file="src/main/res/drawable/splash.png"/>
+        <location
+            file="src/main/res/drawable-land-mdpi/splash.png"/>
+    </issue>
+
+    <issue
+        id="IconLocation"
+        message="Found bitmap drawable `res/drawable/splash.png` in densityless folder">
+        <location
+            file="src/main/res/drawable/splash.png"/>
+    </issue>
+
+    <issue
+        id="IconDuplicates"
+        message="The following unrelated icon files have identical contents: ic_launcher.png, ic_launcher_foreground.png, ic_launcher_round.png">
+        <location
+            file="src/main/res/mipmap-xxhdpi/ic_launcher_round.png"/>
+        <location
+            file="src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png"/>
+        <location
+            file="src/main/res/mipmap-xxhdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconDuplicates"
+        message="The following unrelated icon files have identical contents: ic_launcher.png, ic_launcher_foreground.png, ic_launcher_round.png">
+        <location
+            file="src/main/res/mipmap-xxxhdpi/ic_launcher_round.png"/>
+        <location
+            file="src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png"/>
+        <location
+            file="src/main/res/mipmap-xxxhdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconDuplicates"
+        message="The following unrelated icon files have identical contents: ic_notification_icon.png, ic_launcher.png, ic_launcher_foreground.png, ic_launcher_round.png">
+        <location
+            file="src/main/res/mipmap-hdpi/ic_launcher_round.png"/>
+        <location
+            file="src/main/res/mipmap-hdpi/ic_launcher_foreground.png"/>
+        <location
+            file="src/main/res/mipmap-hdpi/ic_launcher.png"/>
+        <location
+            file="src/main/res/drawable-xxhdpi/ic_notification_icon.png"/>
+    </issue>
+
+    <issue
+        id="IconDuplicates"
+        message="The following unrelated icon files have identical contents: ic_notification_icon.png, ic_launcher.png, ic_launcher_foreground.png, ic_launcher_round.png">
+        <location
+            file="src/main/res/mipmap-mdpi/ic_launcher_round.png"/>
+        <location
+            file="src/main/res/mipmap-mdpi/ic_launcher_foreground.png"/>
+        <location
+            file="src/main/res/mipmap-mdpi/ic_launcher.png"/>
+        <location
+            file="src/main/res/drawable-xhdpi/ic_notification_icon.png"/>
+    </issue>
+
+    <issue
+        id="IconDuplicates"
+        message="The following unrelated icon files have identical contents: ic_notification_icon.png, ic_launcher.png, ic_launcher_foreground.png, ic_launcher_round.png">
+        <location
+            file="src/main/res/mipmap-xhdpi/ic_launcher_round.png"/>
+        <location
+            file="src/main/res/mipmap-xhdpi/ic_launcher_foreground.png"/>
+        <location
+            file="src/main/res/mipmap-xhdpi/ic_launcher.png"/>
+        <location
+            file="src/main/res/drawable-xxxhdpi/ic_notification_icon.png"/>
+    </issue>
+
+</issues>
