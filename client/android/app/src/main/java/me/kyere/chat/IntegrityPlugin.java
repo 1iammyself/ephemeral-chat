@@ -5,10 +5,9 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
-import com.google.android.play.integrity.IntegrityManager;
-import com.google.android.play.integrity.IntegrityManagerFactory;
-import com.google.android.play.integrity.IntegrityTokenRequest;
-import com.google.android.play.integrity.IntegrityTokenResponse;
+import com.google.android.play.core.integrity.IntegrityManager;
+import com.google.android.play.core.integrity.IntegrityManagerFactory;
+import com.google.android.play.core.integrity.IntegrityTokenRequest;
 
 @CapacitorPlugin(name = "Integrity")
 public class IntegrityPlugin extends Plugin {
