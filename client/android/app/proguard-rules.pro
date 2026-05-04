@@ -27,6 +27,11 @@
     @com.getcapacitor.annotation.PluginMethod public *;
 }
 
+# Capacitor JS bridge — keep @JavascriptInterface methods so R8 doesn't strip them
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+
 # Keep custom plugins
 -keep class me.kyere.chat.** { *; }
 
@@ -35,3 +40,7 @@
 
 # Keep AndroidX Biometric
 -keep class androidx.biometric.** { *; }
+
+# Preserve line numbers in stack traces for crash reporting
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
