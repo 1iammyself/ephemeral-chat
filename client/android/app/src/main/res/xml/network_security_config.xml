@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">chat.kyere.me</domain>
+        <pin-set expiration="2027-01-01">
+            <!-- Primary pin: SHA-256 of server leaf cert public key -->
+            <!-- Run: openssl s_client -connect chat.kyere.me:443 | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64 -->
+            <pin digest="SHA-256">REPLACE_WITH_PRIMARY_PIN_BASE64==</pin>
+            <!-- Backup pin: SHA-256 of CA intermediate or backup cert -->
+            <pin digest="SHA-256">REPLACE_WITH_BACKUP_PIN_BASE64==</pin>
+        </pin-set>
+    </domain-config>
+</network-security-config>
