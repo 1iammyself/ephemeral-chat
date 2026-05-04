@@ -45,7 +45,7 @@ import {
   deserializeSenderKey,
   destroySenderKey,
 } from './sender-key.js';
-import { storeKeyBundle, getKeyBundle, destroyKeyBundle } from './key-store.js';
+import { storeKeyBundle, getKeyBundle, destroyKeyBundle, encryptForRoom, decryptForRoom, ensureKeystoreKey } from './key-store.js';
 import { verifyServerSignature, isServerSigningReady } from './server-signing.js';
 
 // ─── Session State ──────────────────────────────────────────
@@ -101,6 +101,9 @@ export async function initE2EE(roomCode, socketManager) {
     // Generate our key bundle — private keys stay in memory
     const bundle = await generateKeyBundle();
     storeKeyBundle(roomCode, bundle);
+
+    // Android: provision hardware-backed AES key for this room session
+    await ensureKeystoreKey('ks_' + roomCode);
     const publicBundle = serializeKeyBundle(bundle);
 
     const cleanups = [];
@@ -234,11 +237,21 @@ export async function encryptE2EE(plaintext, roomCode) {
   const mySocketId = socketManager?.socket?.id;
   if (!mySocketId) throw new Error('[E2EE] Socket not connected yet');
 
+  // Android: hardware-wrap the plaintext with the per-room Keystore key before
+  // it enters the Double Ratchet / Megolm layer, so message content is never
+  // held in cleartext in the JS heap on a hardware-attested device.
+  const encoder = new TextEncoder();
+  const ksResult = await encryptForRoom('ks_' + roomCode, encoder.encode(plaintext));
+  const innerPlaintext = ksResult
+    ? JSON.stringify({ ct: ksResult.ciphertext, iv: ksResult.iv })
+    : plaintext;
+  const ks = !!ksResult;
+
   if (sessions.size === 1) {
     // 1:1 room — use Double Ratchet
     const [, drState] = sessions.entries().next().value;
-    const { header, ciphertext, iv } = await ratchetEncrypt(drState, plaintext);
-    return { v: 5, dr: { header, ciphertext, iv }, from: mySocketId, isEncrypted: true };
+    const { header, ciphertext, iv } = await ratchetEncrypt(drState, innerPlaintext);
+    return { v: 5, dr: { header, ciphertext, iv }, from: mySocketId, isEncrypted: true, ks };
   }
 
   // Group room — use Megolm-style sender key
@@ -258,7 +271,7 @@ export async function encryptE2EE(plaintext, roomCode) {
 
   // Re-fetch in case rotation just replaced the key
   const activeSenderKey = mySenderKeys.get(roomCode);
-  const { ct, iv, counter, skId, epoch } = await encryptWithSenderKey(activeSenderKey, plaintext);
+  const { ct, iv, counter, skId, epoch } = await encryptWithSenderKey(activeSenderKey, innerPlaintext);
 
   // Track message count for rotation schedule
   const rotCounter = rotationCounters.get(roomCode);
@@ -270,6 +283,7 @@ export async function encryptE2EE(plaintext, roomCode) {
     skId,
     from: mySocketId,
     isEncrypted: true,
+    ks,
   };
 }
 
@@ -282,22 +296,31 @@ export async function encryptE2EE(plaintext, roomCode) {
 export async function decryptE2EE(payload, roomCode) {
   const { from: fromSocketId } = payload;
 
+  let innerPlaintext;
   if (payload.dr) {
     const drState = drSessions.get(roomCode)?.get(fromSocketId);
     if (!drState) throw new Error('[E2EE] No DR session for sender ' + fromSocketId);
     const { header, ciphertext, iv } = payload.dr;
-    return ratchetDecrypt(drState, header, ciphertext, iv);
-  }
-
-  if (payload.sk) {
+    innerPlaintext = await ratchetDecrypt(drState, header, ciphertext, iv);
+  } else if (payload.sk) {
     const keyId = fromSocketId + ':' + payload.skId;
     const keyData = senderKeys.get(roomCode)?.get(keyId);
     if (!keyData) throw new Error('[E2EE] No sender key for ' + keyId);
     // Pass the mutable state — decryptWithSenderKey advances the chain in-place
-    return decryptWithSenderKey(keyData, payload.sk);
+    innerPlaintext = await decryptWithSenderKey(keyData, payload.sk);
+  } else {
+    throw new Error('[E2EE] Unknown v5 payload format');
   }
 
-  throw new Error('[E2EE] Unknown v5 payload format');
+  // Android: unwrap the inner payload with the hardware Keystore key
+  if (payload.ks) {
+    const ksData = JSON.parse(innerPlaintext);
+    const plainbytes = await decryptForRoom('ks_' + roomCode, ksData.ct, ksData.iv);
+    if (!plainbytes) throw new Error('[E2EE] Keystore decrypt returned null — platform mismatch?');
+    return new TextDecoder().decode(plainbytes);
+  }
+
+  return innerPlaintext;
 }
 
 /**

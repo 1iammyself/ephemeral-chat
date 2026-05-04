@@ -2,10 +2,10 @@
  * Device Attestation Verifier for Android (Play Integrity) and iOS (App Attest).
  *
  * Security: flags rooted/jailbroken devices and modified app binaries.
- * Graceful degradation: if credentials not configured, logs a warning and
- * allows through — does NOT block the app from starting.
+ * All four environment variables are required. The server refuses to start if
+ * any are missing.
  *
- * Environment variables (all optional):
+ * Environment variables (all required):
  *   PLAY_INTEGRITY_DECRYPTION_KEY   — base64 AES key from Play Console
  *   PLAY_INTEGRITY_VERIFICATION_KEY — base64 RSA public key from Play Console
  *   APPLE_APP_ID                    — Apple App ID (e.g., "TEAMID.com.example.app")
@@ -15,33 +15,24 @@
 const crypto = require('crypto');
 const { logger } = require('./utils');
 
-// ─── Configuration ────────────────────────────────────────
 
-const ANDROID_CONFIGURED = !!(
-  process.env.PLAY_INTEGRITY_DECRYPTION_KEY &&
-  process.env.PLAY_INTEGRITY_VERIFICATION_KEY
-);
-
-const IOS_CONFIGURED = !!(
-  process.env.APPLE_APP_ID &&
-  process.env.APPLE_TEAM_ID
-);
 
 /**
- * Log attestation configuration status at startup.
+ * Assert attestation credentials are present. Throws at startup if any are missing.
  */
 function initializeAttestation() {
-  if (ANDROID_CONFIGURED) {
-    logger.info('🔒 Android Play Integrity attestation configured');
-  } else {
-    logger.warn('⚠️  [Attestation] WARNING: Android attestation not configured — skipping verification for Android clients');
+  const missing = [];
+  if (!process.env.PLAY_INTEGRITY_DECRYPTION_KEY) missing.push('PLAY_INTEGRITY_DECRYPTION_KEY');
+  if (!process.env.PLAY_INTEGRITY_VERIFICATION_KEY) missing.push('PLAY_INTEGRITY_VERIFICATION_KEY');
+  if (!process.env.APPLE_APP_ID) missing.push('APPLE_APP_ID');
+  if (!process.env.APPLE_TEAM_ID) missing.push('APPLE_TEAM_ID');
+
+  if (missing.length > 0) {
+    throw new Error(`[Attestation] Missing required environment variables: ${missing.join(', ')}`);
   }
 
-  if (IOS_CONFIGURED) {
-    logger.info('🔒 iOS App Attest attestation configured');
-  } else {
-    logger.warn('⚠️  [Attestation] WARNING: iOS attestation not configured — skipping verification for iOS clients');
-  }
+  logger.info('🔒 Android Play Integrity attestation configured');
+  logger.info('🔒 iOS App Attest attestation configured');
 }
 
 // ─── Android: Play Integrity ──────────────────────────────
@@ -62,27 +53,34 @@ function fromBase64Url(str) {
  * (AES-256-GCM) with the decryption key, then verifies the inner JWT
  * signature with the verification key.
  *
- * If not configured, returns {valid: true, verdict: {unconfigured: true}}.
- *
  * @param {string} token - Play Integrity API token from client
  * @param {string} expectedNonce - The nonce sent to the client (hex string)
  * @returns {{valid: boolean, verdict: object}}
  */
 async function verifyAndroidAttestation(token, expectedNonce) {
-  if (!ANDROID_CONFIGURED) {
-    logger.warn('[Attestation] Android attestation not configured — passing through');
-    return { valid: true, verdict: { unconfigured: true } };
-  }
-
   try {
-    // Play Integrity response is a JWE (RFC 7516) with AES-256-GCM content encryption.
+    // Play Integrity response is a JWE (RFC 7516) compact serialization.
     // Format: base64url(header).base64url(encryptedKey).base64url(iv).base64url(ciphertext).base64url(tag)
     const parts = token.split('.');
     if (parts.length !== 5) {
       throw new Error('Invalid Play Integrity token format — expected 5 JWE parts');
     }
 
-    const [, encryptedKey, ivB64, ciphertextB64, tagB64] = parts;
+    const [headerB64, encryptedKey, ivB64, ciphertextB64, tagB64] = parts;
+
+    // Verify the JWE header declares the expected algorithms (A256KW + A256GCM)
+    let jweHeader;
+    try {
+      jweHeader = JSON.parse(fromBase64Url(headerB64).toString('utf8'));
+    } catch {
+      throw new Error('Invalid Play Integrity JWE header — could not parse');
+    }
+    if (jweHeader.alg !== 'A256KW') {
+      throw new Error(`Unexpected JWE alg: ${jweHeader.alg} (expected A256KW)`);
+    }
+    if (jweHeader.enc !== 'A256GCM') {
+      throw new Error(`Unexpected JWE enc: ${jweHeader.enc} (expected A256GCM)`);
+    }
 
     // Decrypt the content encryption key with our AES-256-GCM wrapping key
     const decryptionKey = Buffer.from(process.env.PLAY_INTEGRITY_DECRYPTION_KEY, 'base64');
@@ -150,13 +148,46 @@ async function verifyAndroidAttestation(token, expectedNonce) {
 }
 
 /**
- * Unwrap an AES-256-GCM wrapped key (stub — real impl would use RFC 3394).
- * For now, treat as raw — replace with proper AES-KW if Play Console uses it.
+ * RFC 3394 AES-256 Key Unwrap.
+ *
+ * Play Integrity JWE uses alg=A256KW, which is exactly this algorithm.
+ * Implemented manually using AES-ECB so no extra packages are required.
+ *
+ * Throws on integrity check failure (tampered or wrong KEK).
  */
 function _unwrapAES(kek, wrappedKey) {
-  // Placeholder: in a real deployment, use node-jose or similar for JWE AES-KW
-  // This stub returns the wrapped key directly for skeleton purposes
-  return wrappedKey.slice(0, 32);
+  const DEFAULT_IV = Buffer.from('A6A6A6A6A6A6A6A6', 'hex');
+  const n = wrappedKey.length / 8 - 1;
+  if (n < 1) throw new Error('AES Key Unwrap: wrapped key too short');
+
+  let A = Buffer.from(wrappedKey.slice(0, 8));
+  const R = Array.from({ length: n + 1 }, (_, i) =>
+    i === 0 ? null : Buffer.from(wrappedKey.slice(i * 8, (i + 1) * 8))
+  );
+
+  for (let j = 5; j >= 0; j--) {
+    for (let i = n; i >= 1; i--) {
+      const t = n * j + i;
+      const tBuf = Buffer.alloc(8);
+      tBuf.writeBigUInt64BE(BigInt(t));
+      const Axort = Buffer.from(A.map((b, k) => b ^ tBuf[k]));
+
+      const B = _aesEcbDecrypt(kek, Buffer.concat([Axort, R[i]]));
+      A = B.slice(0, 8);
+      R[i] = B.slice(8, 16);
+    }
+  }
+
+  if (!A.equals(DEFAULT_IV)) {
+    throw new Error('AES Key Unwrap: integrity check failed — wrong KEK or tampered token');
+  }
+  return Buffer.concat(R.slice(1));
+}
+
+function _aesEcbDecrypt(key, block) {
+  const d = crypto.createDecipheriv('aes-256-ecb', key, null);
+  d.setAutoPadding(false);
+  return Buffer.concat([d.update(block), d.final()]);
 }
 
 // ─── iOS: App Attest ──────────────────────────────────────
@@ -176,11 +207,6 @@ function _unwrapAES(kek, wrappedKey) {
  * @returns {{valid: boolean, verdict: object}}
  */
 async function verifyIOSAttestation(attestationB64, clientDataB64, expectedNonce) {
-  if (!IOS_CONFIGURED) {
-    logger.warn('[Attestation] iOS attestation not configured — passing through');
-    return { valid: true, verdict: { unconfigured: true } };
-  }
-
   try {
     // Full App Attest verification requires:
     // 1. CBOR-decode the attestation object
@@ -273,15 +299,10 @@ function requireDeviceAttestation(req, res, next) {
   const nonce = req.headers['x-attestation-nonce'];
 
   if (!attestationToken || !nonce) {
-    // Only reject if attestation IS configured for this platform
-    if ((isAndroid && ANDROID_CONFIGURED) || (isIOS && IOS_CONFIGURED)) {
-      return res.status(401).json({
-        error: 'Device attestation required for mobile clients',
-        code: 'ATTESTATION_REQUIRED',
-      });
-    }
-    // Not configured — allow through
-    return next();
+    return res.status(401).json({
+      error: 'Device attestation required for mobile clients',
+      code: 'ATTESTATION_REQUIRED',
+    });
   }
 
   req.deviceAttestation = {

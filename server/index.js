@@ -45,7 +45,7 @@ const { attachMASQUEProxy } = require('./masque-proxy');
 const { attachWebAuthnRoutes } = require('./webauthn');
 const { trafficPaddingMiddleware, startServerChaff, stopServerChaff, isChaff, stripPadding, padResponseMiddleware } = require('./traffic-padding');
 const { LinkPreviewService } = require('./link-preview');
-const { initializeAttestation, verifyAndroidAttestation } = require('./device-attestation-verifier');
+const { initializeAttestation, verifyAndroidAttestation, requireDeviceAttestation } = require('./device-attestation-verifier');
 const { initSigningKey, signSocketPayload, getPublicKeyBase64 } = require('./middleware/response-signing');
 
 // Initialize Cap.js for proof-of-work CAPTCHA
@@ -710,9 +710,25 @@ app.post('/api/verbal-join', async (req, res) => {
   }
 });
 
-app.post('/api/rooms', async (req, res) => {
+app.post('/api/rooms', requireDeviceAttestation, async (req, res) => {
   try {
     const { messageTTL, password, maxUsers, capToken, creatorId, persistenceMode, customCode, hp_email, hp_website, hp_timestamp, autoApprove, preApprovedList } = req.body;
+
+    // Verify Play Integrity token for Android clients (middleware sets req.deviceAttestation)
+    if (req.deviceAttestation?.platform === 'android') {
+      const { token: attToken, nonce: attNonce } = req.deviceAttestation;
+      const nonceEntry = pendingNonces.get(attNonce);
+      if (!nonceEntry || nonceEntry.used) {
+        return res.status(403).json({ error: 'Invalid or replayed attestation nonce', code: 'ATTESTATION_FAILED' });
+      }
+      pendingNonces.set(attNonce, { ...nonceEntry, used: true });
+      try {
+        await verifyAndroidAttestation(attToken, attNonce);
+      } catch (err) {
+        logger.warn('[Integrity] Room creation blocked:', err.message);
+        return res.status(403).json({ error: 'Device integrity check failed', code: 'ATTESTATION_FAILED' });
+      }
+    }
 
     // Honeypot validation - bots fill these hidden fields, humans don't
     if (hp_email || hp_website) {
@@ -973,10 +989,9 @@ app.get('/api/integrity/nonce', integrityLimiter, (req, res) => {
   res.json({ nonce });
 });
 
-// POST /api/integrity/verify — Verify a Play Integrity token (log-only mode).
-// Validates nonce provenance and replay protection, calls verifyAndroidAttestation,
-// then logs the verdict without blocking the client (enforcement disabled until
-// 1-2 weeks of production data confirms normal verdict distribution).
+// POST /api/integrity/verify — Verify a Play Integrity token (enforcement active).
+// Validates nonce provenance and replay protection, then enforces device integrity.
+// Returns 403 if the device fails the integrity check.
 app.post('/api/integrity/verify', integrityLimiter, express.json(), async (req, res) => {
   const { token, nonce } = req.body;
 
@@ -999,21 +1014,26 @@ app.post('/api/integrity/verify', integrityLimiter, express.json(), async (req, 
   try {
     const result = await verifyAndroidAttestation(token, nonce);
 
-    // LOG-ONLY mode: record verdict but always return success.
-    // Enable enforcement (return 403 on failed verdict) after reviewing
-    // production data for 1-2 weeks.
-    logger.info('[Integrity] Verdict (log-only):', {
+    logger.info('[Integrity] Verdict:', {
       deviceTrusted: result.verdict.deviceTrusted,
       appAuthentic: result.verdict.appAuthentic,
-      unconfigured: result.verdict.unconfigured,
     });
 
-    return res.json({ valid: true, logOnly: true });
+    if (!result.verdict.deviceTrusted) {
+      return res.status(403).json({
+        error: 'Device integrity check failed',
+        code: 'DEVICE_NOT_TRUSTED',
+      });
+    }
+
+    return res.json({ valid: true });
 
   } catch (err) {
-    // LOG-ONLY: log failure but do not block the client
-    logger.warn('[Integrity] Token verification failed (log-only, not blocking):', err.message);
-    return res.json({ valid: true, logOnly: true, warning: err.message });
+    logger.error('[Integrity] Token verification failed:', err.message);
+    return res.status(403).json({
+      error: 'Device attestation failed',
+      code: 'ATTESTATION_FAILED',
+    });
   }
 });
 

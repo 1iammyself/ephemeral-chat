@@ -10,6 +10,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import { secureFetch } from '../utils/secure-fetch.js';
 import { API_BASE } from '../utils/resolve-url.js';
+import { IntegrityPlugin } from '../capacitor/security-plugins';
 // Removed @cap.js/widget - using honeypot instead
 
 const CreateRoomModal = ({ onClose, onRoomCreated }) => {
@@ -121,6 +122,17 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
       // Get or generate creator ID
       const creatorId = getCreatorId();
 
+      // Android: fetch Play Integrity token and bind it to this room creation request
+      const integrityHeaders = {};
+      if (Capacitor.getPlatform() === 'android') {
+        const nonceRes = await secureFetch(`${API_BASE}/api/integrity/nonce`);
+        if (!nonceRes.ok) throw new Error('Failed to obtain attestation nonce');
+        const { nonce } = await nonceRes.json();
+        const { token: attToken } = await IntegrityPlugin.requestIntegrityToken({ nonce });
+        integrityHeaders['x-device-attestation'] = attToken;
+        integrityHeaders['x-attestation-nonce'] = nonce;
+      }
+
       // Retry logic for transient network failures
       let response;
       let lastError;
@@ -130,6 +142,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              ...integrityHeaders,
             },
             body: JSON.stringify({
               messageTTL: roomSettings.messageTTL !== 'none' ? roomSettings.messageTTL : undefined,
