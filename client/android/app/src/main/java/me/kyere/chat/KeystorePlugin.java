@@ -69,8 +69,6 @@ public class KeystorePlugin extends Plugin {
             JSObject result = new JSObject();
             result.put("success", true);
             call.resolve(result);
-        } catch (KeyStoreException e) {
-            call.reject("KeyStore error during key generation: " + messageOf(e));
         } catch (NoSuchAlgorithmException e) {
             call.reject("Algorithm not supported: " + messageOf(e));
         } catch (NoSuchProviderException e) {
