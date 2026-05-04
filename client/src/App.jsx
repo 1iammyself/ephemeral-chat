@@ -1,5 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
+import { BiometricPlugin } from './capacitor/security-plugins';
 import Home from './components/Home';
 import ChatRoom from './components/ChatRoom';
 import InviteHandler from './components/InviteHandler.jsx';
@@ -15,7 +18,57 @@ import PrivacyPolicy from './components/PrivacyPolicy';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+async function runBiometricGate(setIsLocked) {
+  if (Capacitor.getPlatform() !== 'android') return;
+
+  try {
+    const { available } = await BiometricPlugin.isAvailable();
+    if (!available) {
+      setIsLocked(false);
+      return;
+    }
+
+    const result = await BiometricPlugin.authenticate({
+      title: 'Unlock Ephemeral Chat',
+      subtitle: 'Confirm your identity to continue',
+      cancelLabel: 'Cancel',
+    });
+
+    setIsLocked(!result.success);
+  } catch {
+    // On unexpected errors, don't block the user on non-critical failure
+    setIsLocked(false);
+  }
+}
+
 function App() {
+  const isAndroid = Capacitor.getPlatform() === 'android';
+  const [isLocked, setIsLocked] = useState(isAndroid);
+
+  // Run biometric gate on mount
+  useEffect(() => {
+    runBiometricGate(setIsLocked);
+  }, []);
+
+  // Re-run biometric gate whenever the app returns to the foreground
+  useEffect(() => {
+    if (!isAndroid) return;
+
+    let listenerHandle;
+    CapApp.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) {
+        setIsLocked(true);
+        runBiometricGate(setIsLocked);
+      }
+    }).then((handle) => {
+      listenerHandle = handle;
+    });
+
+    return () => {
+      if (listenerHandle) listenerHandle.remove();
+    };
+  }, [isAndroid]);
+
   // Global copy/cut/paste guard with a small whitelist
   useEffect(() => {
     const handler = (e) => {
@@ -35,6 +88,15 @@ function App() {
       document.removeEventListener('paste', handler);
     };
   }, []);
+
+  if (isLocked) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    height: '100vh', background: '#111', color: '#fff', fontSize: '1.1rem' }}>
+        Authentication required
+      </div>
+    );
+  }
 
   return (
     <Router>

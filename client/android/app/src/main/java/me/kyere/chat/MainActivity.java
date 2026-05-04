@@ -12,6 +12,7 @@ public class MainActivity extends BridgeActivity {
         // Register Capacitor plugins before super.onCreate
         registerPlugin(ProximityPlugin.class);
         registerPlugin(NowPlayingPlugin.class);
+        registerPlugin(BiometricPlugin.class);
         
         super.onCreate(savedInstanceState);
         
