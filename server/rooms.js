@@ -218,7 +218,7 @@ class RoomManager {
         // Use the actual remaining time, with a safety minimum of 60s and max of 24h
         redisTtlSec = Math.max(60, Math.min(remaining, 86400));
       }
-      await this.redis.setex(`room:${roomCode}`, redisTtlSec, JSON.stringify(roomData));
+      await this.redis.setEx(`room:${roomCode}`, redisTtlSec, JSON.stringify(roomData));
     } else {
       this.rooms.set(roomCode, roomData);
     }
@@ -453,7 +453,7 @@ class RoomManager {
         // 1. If message has positive override (e.g. 120s for finished chess), use it
         // 2. Otherwise use room default
         let ttl = (message.overrideTtl && message.overrideTtl > 0) ? message.overrideTtl : room.settings.messageTTL;
-        await this.redis.setex(messageKey, ttl, JSON.stringify(message));
+        await this.redis.setEx(messageKey, ttl, JSON.stringify(message));
       }
     } else if (!this.redis) {
       // In-memory: update or push

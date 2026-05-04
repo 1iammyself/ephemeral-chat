@@ -1153,7 +1153,8 @@ const ChatRoom = () => {
       if (!showActivityLogs) setHasNewLogs(true);
     };
 
-    const handleError = ({ message }) => {
+    const handleError = ({ code, message }) => {
+      if (code === 'INVALID_KEY_BUNDLE') return;
       setError(message);
       setTimeout(() => setError(null), 5000);
       if (message.includes('Invalid') || message.includes('expired')) setShowJoinModal(true);

@@ -21,7 +21,7 @@ const roomMembers = new Map();
  */
 function isValidBundle(bundle) {
   if (!bundle || typeof bundle !== 'object') return false;
-  const requiredFields = ['identityKey', 'ephemeralKey'];
+  const requiredFields = ['ik', 'ek'];
   for (const field of requiredFields) {
     const v = bundle[field];
     if (typeof v !== 'string') return false;
