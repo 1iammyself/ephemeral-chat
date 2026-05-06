@@ -1136,6 +1136,9 @@ function cleanupRoomChaff(roomCode) {
 io.on('connection', (socket) => {
   // logger.info(`🔌 User connected: ${socket.id}`);
 
+  // Per-socket rate limit for confetti bomb (10 s cooldown)
+  let lastConfettiTime = 0;
+
   // Reusable inactivity timeout handler
   const handleInactivityTimeout = (socketId, userId, roomCode) => {
     // logger.info(`⏰ User ${userId} timed out, disconnecting...`);
@@ -2966,6 +2969,51 @@ io.on('connection', (socket) => {
       payload: data.payload,
       from: socket.id,
       timestamp: Date.now()
+    });
+  });
+
+  // ─── Typing Indicators ──────────────────────────────────────
+  socket.on('typing', () => {
+    if (!socket.roomCode) return;
+    socket.to(socket.roomCode).emit('user-typing', {
+      nickname: socket.nickname,
+      socketId: socket.id,
+    });
+  });
+
+  socket.on('stop-typing', () => {
+    if (!socket.roomCode) return;
+    socket.to(socket.roomCode).emit('user-stop-typing', {
+      nickname: socket.nickname,
+      socketId: socket.id,
+    });
+  });
+
+  // ─── Floating Room Reactions ────────────────────────────────
+  socket.on('send-room-reaction', ({ emoji }) => {
+    if (!socket.roomCode || !emoji) return;
+    socket.to(socket.roomCode).emit('room-reaction', {
+      emoji,
+      nickname: socket.nickname,
+    });
+  });
+
+  // ─── Pulse (haptic shake for all devices) ──────────────────
+  socket.on('send-pulse', ({ roomCode: pulseRoom }) => {
+    if (!socket.roomCode || socket.roomCode !== pulseRoom) return;
+    socket.to(socket.roomCode).emit('pulse-received', {
+      from: socket.nickname || 'Someone',
+    });
+  });
+
+  // ─── Confetti Bomb (rate-limited: 1 per 10 s per socket) ───
+  socket.on('send-confetti-bomb', () => {
+    if (!socket.roomCode) return;
+    const now = Date.now();
+    if (now - lastConfettiTime < 10000) return;
+    lastConfettiTime = now;
+    io.to(socket.roomCode).emit('confetti-bomb', {
+      nickname: socket.nickname || 'Someone',
     });
   });
 

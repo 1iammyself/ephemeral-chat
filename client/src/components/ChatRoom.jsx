@@ -29,7 +29,10 @@ import {
   Snowflake,
   RefreshCw,
   ArrowDown,
-  Keyboard as KeyboardIcon
+  Keyboard as KeyboardIcon,
+  Sparkles,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -81,6 +84,7 @@ import { getRandomIcebreaker } from '../utils/icebreakers';
 import { RefreshButton } from './PWAHandler';
 import { getCreatorId } from '../utils/creator';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess } from '../utils/platform';
+import { useSoundFX } from '../hooks/useSoundFX';
 import FileTransferModal from './FileTransferModal';
 import { toast } from 'react-toastify';
 import { Capacitor } from '@capacitor/core';
@@ -94,10 +98,17 @@ const SLASH_COMMANDS = [
   { icon: Mic, label: 'Voice Note', value: '/voice', desc: 'Record a voice note' },
   { icon: Snowflake, label: 'Icebreaker', value: '/ice', desc: 'Send a random question' },
   { icon: Zap, label: 'Pulse', value: '/pulse', desc: 'Shake the room' },
+  { icon: Sparkles, label: 'Confetti', value: '/confetti', desc: 'Launch a confetti bomb!' },
   { icon: Edit2, label: 'Topic', value: '/topic', desc: 'Set room topic', adminOnly: true },
   { icon: Clock, label: 'Timer', value: '/timer', desc: 'Start a countdown', adminOnly: true },
   { icon: Activity, label: 'Vibe', value: '/vibe', desc: 'Change room vibe', adminOnly: true },
   { icon: Activity, label: 'Watch Party', value: '/media', desc: 'Share YouTube/SoundCloud' },
+];
+
+const CONFETTI_COLORS = [
+  '#FF6B6B', '#FFE66D', '#4ECDC4', '#45B7D1', '#96CEB4',
+  '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE',
+  '#F0B27A', '#AED6F1', '#F9A8D4', '#6EE7B7', '#FCA5A5',
 ];
 
 // Safari detection (robust hybrid check)
@@ -553,6 +564,18 @@ const ChatRoom = () => {
   const reactionLayerRef = useRef(null);
   const lastReactionTime = useRef(0);
 
+  // Sound FX
+  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('soundFX_enabled') !== 'false');
+  const { playMessageSound } = useSoundFX();
+
+  const toggleSound = useCallback(() => {
+    setSoundEnabled(prev => {
+      const next = !prev;
+      localStorage.setItem('soundFX_enabled', next ? 'true' : 'false');
+      return next;
+    });
+  }, []);
+
   // Knock-to-Join & Host State
   const [isWaitingForHost, setIsWaitingForHost] = useState(false);
   const [pendingGuests, setPendingGuests] = useState([]);
@@ -941,6 +964,59 @@ const ChatRoom = () => {
     spawnReaction(emoji);
   }, [spawnReaction]);
 
+  const triggerConfettiBomb = useCallback(() => {
+    const layer = reactionLayerRef.current;
+    if (!layer) return;
+
+    const PIECE_COUNT = 90;
+    for (let i = 0; i < PIECE_COUNT; i++) {
+      setTimeout(() => {
+        const el = document.createElement('div');
+        el.className = 'confetti-piece';
+
+        const isCircle = Math.random() > 0.55;
+        const w = isCircle ? Math.random() * 7 + 4 : Math.random() * 8 + 4;
+        const h = isCircle ? w : Math.random() * 14 + 6;
+        const color = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * 52 + 22;
+        const ex = (Math.cos(angle) * dist).toFixed(1);
+        const ey = (Math.sin(angle) * dist - 25).toFixed(1);
+        const spin = ((Math.random() - 0.5) * 1440).toFixed(0);
+        const dur = (Math.random() * 1.4 + 1.2).toFixed(2);
+
+        el.style.cssText = [
+          `width:${w}px`, `height:${h}px`, `background:${color}`,
+          `border-radius:${isCircle ? '50%' : '2px'}`,
+          `--ex:${ex}vw`, `--ey:${ey}vh`,
+          `--spin:${spin}deg`, `--dur:${dur}s`,
+          `margin-left:-${(w / 2).toFixed(1)}px`,
+          `margin-top:-${(h / 2).toFixed(1)}px`,
+        ].join(';');
+
+        el.addEventListener('animationend', () => el.remove(), { once: true });
+        layer.appendChild(el);
+      }, Math.random() * 450);
+    }
+  }, []);
+
+  const lastConfettiLocalTime = useRef(0);
+
+  const handleSendConfetti = useCallback(() => {
+    const now = Date.now();
+    if (now - lastConfettiLocalTime.current < 10000) return;
+    lastConfettiLocalTime.current = now;
+    socketManager.emit('send-confetti-bomb');
+    triggerConfettiBomb();
+    hapticMedium();
+  }, [triggerConfettiBomb]);
+
+  const handleConfettiBomb = useCallback(() => {
+    triggerConfettiBomb();
+    hapticLight();
+  }, [triggerConfettiBomb]);
+
   const handleFileTransferInvite = useCallback(({ from, fromId, roomCode: targetRoomCode, recipients: targetedTo }) => {
     // Determine if we should show this
     const myId = socketManager.socket?.id;
@@ -1100,6 +1176,8 @@ const ChatRoom = () => {
 
     // ─── AES-GCM / E2EE Message Handler ─────────────────────
     const handleNewMessage = async (message) => {
+      const isOwnMessage = message.sender?.socketId === socketManager.socket?.id;
+
       // v5 (PQXDH+DR), v4 (AES-GCM), or legacy v3 (MLS) encrypted messages
       if (message.isEncrypted && (message.v === 5 || message.v === 4 || (message.v === 3 && message.mls))) {
         try {
@@ -1113,10 +1191,12 @@ const ChatRoom = () => {
           console.warn('[ChatRoom] Decrypt error:', e.message);
           message.content = '⚠️ Decryption failed';
         }
+        if (!isOwnMessage) playMessageSound();
         setMessages(prev => [...prev, message]);
         return;
       }
       // Unencrypted — show as-is
+      if (!isOwnMessage) playMessageSound();
       setMessages(prev => [...prev, message]);
     };
 
@@ -1339,6 +1419,7 @@ const ChatRoom = () => {
     socketManager.on('user-typing', handleUserTyping);
     socketManager.on('user-stop-typing', handleUserStopTyping);
     socketManager.on('room-reaction', handleRoomReaction);
+    socketManager.on('confetti-bomb', handleConfettiBomb);
     socketManager.on('file-transfer-invite', handleFileTransferInvite);
 
     // Screenshot detection handler
@@ -1527,6 +1608,7 @@ const ChatRoom = () => {
       socketManager.off('user-typing', handleUserTyping);
       socketManager.off('user-stop-typing', handleUserStopTyping);
       socketManager.off('room-reaction', handleRoomReaction);
+      socketManager.off('confetti-bomb', handleConfettiBomb);
       socketManager.off('file-transfer-invite', handleFileTransferInvite);
       socketManager.off('screenshot-detected', handleScreenshotDetected);
       socketManager.off('auto-approve-updated', handleAutoApproveUpdated);
@@ -1861,6 +1943,7 @@ const ChatRoom = () => {
         case '/note': startRecording(); break;
         case '/ice': handleSendIcebreaker(); break;
         case '/pulse': handleSendPulse(); break;
+        case '/confetti': handleSendConfetti(); break;
         case '/topic':
           if (canManageRoom(currentUserRole)) {
             if (args) handleSaveTopic(args);
@@ -2625,6 +2708,15 @@ const ChatRoom = () => {
               {sidebarPosition === 'right' ? <PanelLeft className="w-5 h-5" /> : <PanelRight className="w-5 h-5" />}
             </button>
             <RefreshButton />
+            <button
+              onClick={toggleSound}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              title={soundEnabled ? 'Sound FX on — click to mute' : 'Sound FX off — click to enable'}
+            >
+              {soundEnabled
+                ? <Volume2 className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                : <VolumeX className="w-5 h-5 text-gray-400 dark:text-gray-500" />}
+            </button>
             <ThemeToggle />
             <button onClick={() => setShowMobileMenu(true)} className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 relative">
               <Users className="w-5 h-5" />
@@ -2869,9 +2961,18 @@ const ChatRoom = () => {
                               onClick={handleSendPulse}
                               disabled={!isConnected}
                               className={`w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center ${getVibeById(roomVibe).accentClass} rounded sm:rounded-lg transition-all hover:scale-110 active:scale-95 shadow-sm group flex-shrink-0`}
-                              title="Pulse"
+                              title="Pulse — shake everyone's device"
                             >
                               <Zap className="w-3 h-3 sm:w-4 sm:h-4 fill-current" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { handleSendConfetti(); setShowFeatureMenu(false); }}
+                              disabled={!isConnected}
+                              className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center bg-gradient-to-br from-pink-500 to-yellow-400 rounded sm:rounded-lg transition-all hover:scale-110 active:scale-95 shadow-sm flex-shrink-0"
+                              title="Confetti bomb! (10 s cooldown)"
+                            >
+                              <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
                             </button>
                           </div>
 
