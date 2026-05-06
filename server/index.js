@@ -115,12 +115,8 @@ async function initializeServer() {
     logger.warn('⚠️  WebAuthn routes init failed (non-fatal):', e.message);
   }
 
-  // Device Attestation — Android/iOS authenticity verification
-  try {
-    initializeAttestation();
-  } catch (e) {
-    logger.warn('⚠️  Device attestation init failed (non-fatal):', e.message);
-  }
+  // Device Attestation — Android/iOS authenticity verification (optional; logs status)
+  initializeAttestation();
 
   // Ed25519 response signing — clients verify key-bundle events
   try {
@@ -1013,6 +1009,10 @@ app.post('/api/integrity/verify', integrityLimiter, express.json(), async (req, 
 
   try {
     const result = await verifyAndroidAttestation(token, nonce);
+
+    if (result.verdict.unconfigured) {
+      return res.json({ valid: true, unconfigured: true });
+    }
 
     logger.info('[Integrity] Verdict:', {
       deviceTrusted: result.verdict.deviceTrusted,

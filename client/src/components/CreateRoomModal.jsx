@@ -122,15 +122,22 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
       // Get or generate creator ID
       const creatorId = getCreatorId();
 
-      // Android: fetch Play Integrity token and bind it to this room creation request
+      // Android: attach Play Integrity token when available.
+      // Gracefully skipped for sideloaded APKs or when server attestation is unconfigured —
+      // the server passes through requests without headers when enforcement is off.
       const integrityHeaders = {};
       if (Capacitor.getPlatform() === 'android') {
-        const nonceRes = await secureFetch(`${API_BASE}/api/integrity/nonce`);
-        if (!nonceRes.ok) throw new Error('Failed to obtain attestation nonce');
-        const { nonce } = await nonceRes.json();
-        const { token: attToken } = await IntegrityPlugin.requestIntegrityToken({ nonce });
-        integrityHeaders['x-device-attestation'] = attToken;
-        integrityHeaders['x-attestation-nonce'] = nonce;
+        try {
+          const nonceRes = await secureFetch(`${API_BASE}/api/integrity/nonce`);
+          if (nonceRes.ok) {
+            const { nonce } = await nonceRes.json();
+            const { token: attToken } = await IntegrityPlugin.requestIntegrityToken({ nonce });
+            integrityHeaders['x-device-attestation'] = attToken;
+            integrityHeaders['x-attestation-nonce'] = nonce;
+          }
+        } catch {
+          // Play Integrity unavailable (sideloaded APK, emulator, unconfigured keys) — proceed without
+        }
       }
 
       // Retry only on network errors (fetch throws). HTTP error responses mean the

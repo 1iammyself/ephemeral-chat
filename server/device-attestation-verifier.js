@@ -15,24 +15,36 @@
 const crypto = require('crypto');
 const { logger } = require('./utils');
 
-
+// Runtime flags — set by initializeAttestation(), read by middleware and verifiers
+let ANDROID_ATTESTATION_ENABLED = false;
+let IOS_ATTESTATION_ENABLED = false;
 
 /**
- * Assert attestation credentials are present. Throws at startup if any are missing.
+ * Detect which attestation platforms are configured and log their status.
+ * Both platforms are optional — missing keys disable that platform's enforcement
+ * rather than preventing the server from starting.
  */
 function initializeAttestation() {
-  const missing = [];
-  if (!process.env.PLAY_INTEGRITY_DECRYPTION_KEY) missing.push('PLAY_INTEGRITY_DECRYPTION_KEY');
-  if (!process.env.PLAY_INTEGRITY_VERIFICATION_KEY) missing.push('PLAY_INTEGRITY_VERIFICATION_KEY');
-  if (!process.env.APPLE_APP_ID) missing.push('APPLE_APP_ID');
-  if (!process.env.APPLE_TEAM_ID) missing.push('APPLE_TEAM_ID');
+  ANDROID_ATTESTATION_ENABLED = !!(
+    process.env.PLAY_INTEGRITY_DECRYPTION_KEY &&
+    process.env.PLAY_INTEGRITY_VERIFICATION_KEY
+  );
+  IOS_ATTESTATION_ENABLED = !!(
+    process.env.APPLE_APP_ID &&
+    process.env.APPLE_TEAM_ID
+  );
 
-  if (missing.length > 0) {
-    throw new Error(`[Attestation] Missing required environment variables: ${missing.join(', ')}`);
+  if (ANDROID_ATTESTATION_ENABLED) {
+    logger.info('🔒 Android Play Integrity attestation configured');
+  } else {
+    logger.warn('⚠️  Android Play Integrity not configured — attestation skipped for Android clients');
   }
 
-  logger.info('🔒 Android Play Integrity attestation configured');
-  logger.info('🔒 iOS App Attest attestation configured');
+  if (IOS_ATTESTATION_ENABLED) {
+    logger.info('🔒 iOS App Attest attestation configured');
+  } else {
+    logger.warn('⚠️  iOS App Attest not configured — attestation skipped for iOS clients');
+  }
 }
 
 // ─── Android: Play Integrity ──────────────────────────────
@@ -58,6 +70,11 @@ function fromBase64Url(str) {
  * @returns {{valid: boolean, verdict: object}}
  */
 async function verifyAndroidAttestation(token, expectedNonce) {
+  if (!ANDROID_ATTESTATION_ENABLED) {
+    logger.warn('[Attestation] Android Play Integrity not configured — passing through');
+    return { valid: true, verdict: { unconfigured: true } };
+  }
+
   try {
     // Play Integrity response is a JWE (RFC 7516) compact serialization.
     // Format: base64url(header).base64url(encryptedKey).base64url(iv).base64url(ciphertext).base64url(tag)
@@ -289,11 +306,13 @@ async function verifyIOSAttestation(attestationB64, clientDataB64, expectedNonce
 function requireDeviceAttestation(req, res, next) {
   const ua = req.headers['user-agent'] || '';
   const isAndroid = ua.includes('Android');
-  const isIOS = ua.includes('iPhone') || ua.includes('iPad') || ua.includes('AppleWebKit') && ua.includes('Mobile');
+  const isIOS = (ua.includes('iPhone') || ua.includes('iPad')) && ua.includes('Mobile');
 
-  if (!isAndroid && !isIOS) {
-    return next();
-  }
+  if (!isAndroid && !isIOS) return next();
+
+  // Skip enforcement when the platform's attestation keys are not configured
+  if (isAndroid && !ANDROID_ATTESTATION_ENABLED) return next();
+  if (isIOS && !IOS_ATTESTATION_ENABLED) return next();
 
   const attestationToken = req.headers['x-device-attestation'];
   const nonce = req.headers['x-attestation-nonce'];
