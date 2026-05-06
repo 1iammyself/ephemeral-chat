@@ -45,7 +45,7 @@ import {
   deserializeSenderKey,
   destroySenderKey,
 } from './sender-key.js';
-import { storeKeyBundle, getKeyBundle, destroyKeyBundle, encryptForRoom, decryptForRoom, ensureKeystoreKey } from './key-store.js';
+import { storeKeyBundle, getKeyBundle, destroyKeyBundle, decryptForRoom, ensureKeystoreKey } from './key-store.js';
 import { verifyServerSignature, isServerSigningReady } from './server-signing.js';
 
 // ─── Session State ──────────────────────────────────────────
@@ -237,21 +237,17 @@ export async function encryptE2EE(plaintext, roomCode) {
   const mySocketId = socketManager?.socket?.id;
   if (!mySocketId) throw new Error('[E2EE] Socket not connected yet');
 
-  // Android: hardware-wrap the plaintext with the per-room Keystore key before
-  // it enters the Double Ratchet / Megolm layer, so message content is never
-  // held in cleartext in the JS heap on a hardware-attested device.
-  const encoder = new TextEncoder();
-  const ksResult = await encryptForRoom('ks_' + roomCode, encoder.encode(plaintext));
-  const innerPlaintext = ksResult
-    ? JSON.stringify({ ct: ksResult.ciphertext, iv: ksResult.iv })
-    : plaintext;
-  const ks = !!ksResult;
+  // The Keystore key is device-local hardware (TEE) and cannot be shared.
+  // Wrapping the wire payload here would make messages unreadable on any other
+  // device (different Android or web). Keystore is reserved for at-rest key
+  // protection only — it must NOT appear on the wire payload.
+  const innerPlaintext = plaintext;
 
   if (sessions.size === 1) {
     // 1:1 room — use Double Ratchet
     const [, drState] = sessions.entries().next().value;
     const { header, ciphertext, iv } = await ratchetEncrypt(drState, innerPlaintext);
-    return { v: 5, dr: { header, ciphertext, iv }, from: mySocketId, isEncrypted: true, ks };
+    return { v: 5, dr: { header, ciphertext, iv }, from: mySocketId, isEncrypted: true };
   }
 
   // Group room — use Megolm-style sender key
@@ -283,7 +279,6 @@ export async function encryptE2EE(plaintext, roomCode) {
     skId,
     from: mySocketId,
     isEncrypted: true,
-    ks,
   };
 }
 
@@ -312,12 +307,18 @@ export async function decryptE2EE(payload, roomCode) {
     throw new Error('[E2EE] Unknown v5 payload format');
   }
 
-  // Android: unwrap the inner payload with the hardware Keystore key
+  // Legacy: ks:true was briefly used to Keystore-wrap the wire payload, but the
+  // Keystore key is device-local and cannot be shared — it made messages unreadable
+  // on any other device. If a ks:true payload arrives (from an old build), attempt
+  // the unwrap on Android only; on all other platforms return the raw innerPlaintext
+  // so the message is not silently dropped.
   if (payload.ks) {
     const ksData = JSON.parse(innerPlaintext);
     const plainbytes = await decryptForRoom('ks_' + roomCode, ksData.ct, ksData.iv);
-    if (!plainbytes) throw new Error('[E2EE] Keystore decrypt returned null — platform mismatch?');
-    return new TextDecoder().decode(plainbytes);
+    if (plainbytes) return new TextDecoder().decode(plainbytes);
+    // Non-Android receiver or different device — return raw JSON (message is still
+    // DR/Megolm authenticated; it just can't be unwrapped without the sender's TEE key)
+    return innerPlaintext;
   }
 
   return innerPlaintext;

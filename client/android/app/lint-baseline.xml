@@ -145,28 +145,6 @@
     </issue>
 
     <issue
-        id="NetworkSecurityConfig"
-        message="Invalid pin digest"
-        errorLine1="            &lt;pin digest=&quot;SHA-256&quot;>REPLACE_WITH_PRIMARY_PIN_BASE64==&lt;/pin>"
-        errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/xml/network_security_config.xml"
-            line="9"
-            column="35"/>
-    </issue>
-
-    <issue
-        id="NetworkSecurityConfig"
-        message="Invalid pin digest"
-        errorLine1="            &lt;pin digest=&quot;SHA-256&quot;>REPLACE_WITH_BACKUP_PIN_BASE64==&lt;/pin>"
-        errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/xml/network_security_config.xml"
-            line="11"
-            column="35"/>
-    </issue>
-
-    <issue
         id="GradleDependency"
         message="A newer version of com.google.android.play:integrity than 1.4.0 is available: 1.6.0"
         errorLine1="    implementation &apos;com.google.android.play:integrity:1.4.0&apos;"

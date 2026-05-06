@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only override of network_security_config.xml.
+  Release builds use src/main/res/xml/network_security_config.xml (strict cert pins, no cleartext).
+  This file is never included in release APKs.
+-->
+<network-security-config>
+    <!-- Trust system CAs + user-installed CAs (enables Charles/mitmproxy for debugging) -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+    <!-- Allow cleartext to localhost and Android emulator host; no cert pins -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

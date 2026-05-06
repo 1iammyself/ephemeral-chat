@@ -102,31 +102,19 @@ export class AttestationProvider {
   // ─── Android ─────────────────────────────────────────
 
   /**
-   * Obtain a Google Play Integrity token.
+   * Obtain a Google Play Integrity token using the native IntegrityPlugin.
    *
-   * Requires: Google Play Integrity API configured in Google Play Console.
-   * The nonce is embedded in the token to bind it to this auth attempt.
-   *
-   * Full integration steps:
-   * 1. Install: npm install @anuradev/capacitor-play-integrity
-   * 2. npx cap sync
-   * 3. Configure PLAY_INTEGRITY_PROJECT_ID in server env
+   * Requires: Play Integrity API enabled in Google Play Console.
+   * The nonce is embedded in the token to bind it to this connection attempt.
    */
   private static async _getAndroidAttestation(nonce: string): Promise<AttestationResult> {
     try {
-      // Dynamic import — only present when plugin is installed
-      const { PlayIntegrity } = await import('@anuradev/capacitor-play-integrity');
-
-      const result = await PlayIntegrity.requestIntegrityToken({ nonce });
-      return {
-        token: result.token,
-        nonce,
-        platform: 'android',
-      };
+      const { IntegrityPlugin } = await import('./security-plugins');
+      const result = await (IntegrityPlugin as { requestIntegrityToken: (args: { nonce: string }) => Promise<{ token: string }> })
+        .requestIntegrityToken({ nonce });
+      return { token: result.token, nonce, platform: 'android' };
     } catch (err) {
       console.warn('[Attestation] Android Play Integrity unavailable:', (err as Error).message);
-      // Graceful degradation: return empty attestation
-      // Server will allow through if PLAY_INTEGRITY keys are not configured
       return { token: '', nonce: '', platform: 'android' };
     }
   }

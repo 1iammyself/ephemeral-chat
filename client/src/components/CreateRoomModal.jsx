@@ -133,7 +133,9 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
         integrityHeaders['x-attestation-nonce'] = nonce;
       }
 
-      // Retry logic for transient network failures
+      // Retry only on network errors (fetch throws). HTTP error responses mean the
+      // server received the request and marked the attestation nonce as used — retrying
+      // with the same nonce would hit replay protection and fail with 403.
       let response;
       let lastError;
       for (let attempt = 0; attempt < 3; attempt++) {
@@ -153,18 +155,17 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
               hp_email: honeypot.hp_email,
               hp_website: honeypot.hp_website,
               hp_timestamp: honeypot.hp_timestamp,
-              creatorId: creatorId, // NEW: Include creator ID
-              persistenceMode: roomSettings.persistenceMode, // NEW: Include persistence mode
+              creatorId: creatorId,
+              persistenceMode: roomSettings.persistenceMode,
               autoApprove: autoApproveEnabled,
               preApprovedList: preApprovedEntries.length > 0 ? preApprovedEntries : undefined
             }),
           });
-          if (response.ok) break; // Success, exit retry loop
-          lastError = `Server responded with ${response.status}`;
+          break; // Got an HTTP response (ok or error) — don't retry
         } catch (fetchError) {
+          // Network-level failure (no response from server) — safe to retry with same nonce
           lastError = fetchError.message;
           if (attempt < 2) {
-            // Wait before retry
             await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
           }
         }
