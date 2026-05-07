@@ -4,6 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import { BiometricPlugin } from './capacitor/security-plugins';
 import Home from './components/Home';
+import LandingRedirect from './components/LandingRedirect';
 import ChatRoom from './components/ChatRoom';
 import InviteHandler from './components/InviteHandler.jsx';
 import PWAHandler from './components/PWAHandler';
@@ -112,7 +113,7 @@ function App() {
         <DeepLinkHandler />
         <AppRestrictionBanner />
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<LandingRedirect />} />
           <Route path="/my-rooms" element={<MyRooms />} /> {/* Add MyRooms route */}
           <Route path="/my-drops" element={<MyDrops />} />
           <Route path="/drop/:dropId" element={<DropPage />} />
