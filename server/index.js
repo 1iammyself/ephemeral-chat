@@ -2559,6 +2559,46 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('message-viewed', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      await roomManager.markMessageViewed(
+        messageId,
+        socket.persistentUserId || socket.id,
+        socket.roomCode,
+        socket.nickname || null
+      );
+    } catch (error) {
+      logger.error('Error marking message viewed:', error);
+    }
+  });
+
+  socket.on('add-reaction', async ({ messageId, emoji }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      if (!emoji || typeof emoji !== 'string' || emoji.length > 16) return;
+
+      const updatedMessage = await roomManager.addReaction(
+        socket.roomCode,
+        messageId,
+        emoji,
+        socket.persistentUserId || socket.id
+      );
+
+      if (!updatedMessage) return;
+
+      io.to(socket.roomCode).emit('message-updated', updatedMessage);
+      io.to(socket.roomCode).emit('message-reaction', {
+        messageId,
+        emoji,
+        fromSocketId: socket.id,
+        fromNickname: socket.nickname || 'Someone',
+      });
+    } catch (error) {
+      logger.error('Error adding reaction:', error);
+    }
+  });
+
 
   // WebRTC Call Signaling Events
 

@@ -693,7 +693,7 @@ class RoomManager {
   /**
    * Mark a message as viewed by a specific user
    */
-  async markMessageViewed(messageId, userId, roomCode = null) {
+  async markMessageViewed(messageId, userId, roomCode = null, nickname = null) {
     // If roomCode is provided, we can be much more efficient
     if (roomCode) {
       const msg = await this.getMessage(roomCode, messageId);
@@ -701,13 +701,24 @@ class RoomManager {
         if (!msg.viewedBy) msg.viewedBy = [];
         if (!msg.viewedBy.includes(userId)) {
           msg.viewedBy.push(userId);
+          if (nickname && typeof nickname === 'string') {
+            if (!msg.seenBy) msg.seenBy = [];
+            if (!msg.seenBy.includes(nickname)) {
+              msg.seenBy.push(nickname);
+            }
+          }
 
           // Save back to storage using unified logic
           await this.saveMessage(roomCode, msg);
 
           // Broadcast via socket.io if available
           if (this._io) {
-            this._io.to(roomCode).emit('message-viewed', { messageId, userId });
+            this._io.to(roomCode).emit('message-viewed', {
+              messageId,
+              userId,
+              nickname: nickname || null,
+              seenBy: msg.seenBy || null,
+            });
           }
           return true;
         }
@@ -723,10 +734,21 @@ class RoomManager {
         if (!msg.viewedBy) msg.viewedBy = [];
         if (!msg.viewedBy.includes(userId)) {
           msg.viewedBy.push(userId);
+          if (nickname && typeof nickname === 'string') {
+            if (!msg.seenBy) msg.seenBy = [];
+            if (!msg.seenBy.includes(nickname)) {
+              msg.seenBy.push(nickname);
+            }
+          }
           await this.saveRoom(rCode, room);
 
           if (this._io) {
-            this._io.to(rCode).emit('message-viewed', { messageId, userId });
+            this._io.to(rCode).emit('message-viewed', {
+              messageId,
+              userId,
+              nickname: nickname || null,
+              seenBy: msg.seenBy || null,
+            });
           }
           return true;
         }

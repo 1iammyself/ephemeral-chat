@@ -39,6 +39,7 @@ import { useTheme } from '../context/ThemeContext';
 import socketManager from '../socket';
 import JoinRoomModal from './JoinRoomModal';
 import MessageList from './MessageList';
+import ReactionOverlay from './ReactionOverlay';
 import UserList from './UserList';
 import AudioCallModal from './AudioCallModal';
 import PollModal from './PollModal';
@@ -562,6 +563,7 @@ const ChatRoom = () => {
 
   // Floating Reactions State
   const reactionLayerRef = useRef(null);
+  const messageReactionOverlayRef = useRef(null);
   const lastReactionTime = useRef(0);
 
   // Sound FX
@@ -957,6 +959,14 @@ const ChatRoom = () => {
     });
 
     reactionLayerRef.current.appendChild(el);
+  }, []);
+
+  const spawnMessageReaction = useCallback((messageId, emoji) => {
+    const target = messageId ? document.getElementById(messageId) : null;
+    const rect = target?.getBoundingClientRect?.();
+    const x = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+    const y = rect ? rect.top + rect.height / 2 : window.innerHeight - 120;
+    messageReactionOverlayRef.current?.spawn?.({ emoji, x, y });
   }, []);
 
   const handleRoomReaction = useCallback((data) => {
@@ -1388,12 +1398,40 @@ const ChatRoom = () => {
       setLatency(Date.now() - startTime);
     };
 
+    const handleMessageReaction = ({ messageId, emoji, fromSocketId }) => {
+      const mySocketId = socketManager.socket?.id;
+      if (fromSocketId && mySocketId && fromSocketId === mySocketId) return;
+      spawnMessageReaction(messageId, emoji);
+    };
+
+    const handleMessageViewed = ({ messageId, userId, nickname, seenBy }) => {
+      if (!messageId || !userId) return;
+      setMessages(prev => prev.map(m => {
+        if (m.id !== messageId) return m;
+        const viewedBy = Array.isArray(m.viewedBy) ? m.viewedBy : [];
+        const nextViewedBy = viewedBy.includes(userId) ? viewedBy : [...viewedBy, userId];
+
+        const existingSeenBy = Array.isArray(m.seenBy) ? m.seenBy : [];
+        const incoming = Array.isArray(seenBy) ? seenBy.filter(n => typeof n === 'string' && n) : [];
+        const withIncoming = incoming.length > 0
+          ? Array.from(new Set([...existingSeenBy, ...incoming]))
+          : (nickname && typeof nickname === 'string' && !existingSeenBy.includes(nickname))
+            ? [...existingSeenBy, nickname]
+            : existingSeenBy;
+
+        if (nextViewedBy === viewedBy && withIncoming === existingSeenBy) return m;
+        return { ...m, viewedBy: nextViewedBy, seenBy: withIncoming };
+      }));
+    };
+
     socketManager.on('connect', handleConnect);
     socketManager.on('disconnect', handleDisconnect);
     socketManager.on('room-joined', handleRoomJoined);
     socketManager.on('new-message', handleNewMessage);
     socketManager.on('message-deleted', handleMessageDeleted);
     socketManager.on('message-updated', handleMessageUpdated);
+    socketManager.on('message-reaction', handleMessageReaction);
+    socketManager.on('message-viewed', handleMessageViewed);
     socketManager.on('user-joined', handleUserJoined);
     socketManager.on('user-left', handleUserLeft);
     socketManager.on('room-error', handleError);
@@ -1583,6 +1621,8 @@ const ChatRoom = () => {
       socketManager.off('new-message', handleNewMessage);
       socketManager.off('message-deleted', handleMessageDeleted);
       socketManager.off('message-updated', handleMessageUpdated);
+      socketManager.off('message-reaction', handleMessageReaction);
+      socketManager.off('message-viewed', handleMessageViewed);
       socketManager.off('user-joined', handleUserJoined);
       socketManager.off('user-left', handleUserLeft);
       socketManager.off('room-error', handleError);
@@ -2162,6 +2202,7 @@ const ChatRoom = () => {
   };
 
   const handleReaction = (messageId, emoji) => {
+    spawnMessageReaction(messageId, emoji);
     socketManager.emit('add-reaction', { messageId, emoji });
   };
 
@@ -3449,6 +3490,7 @@ const ChatRoom = () => {
 
       {/* Zoom-style Reaction Layer */}
       <div id="reaction-layer" ref={reactionLayerRef} />
+      <ReactionOverlay ref={messageReactionOverlayRef} />
 
       {
         isJoined && currentUser && (

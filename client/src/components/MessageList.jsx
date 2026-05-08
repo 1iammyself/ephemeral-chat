@@ -465,6 +465,12 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                   )}
                 </div>
 
+                {message.type !== 'system' && Array.isArray(message.seenBy) && message.seenBy.length > 0 && (
+                  <div className={`mt-1 flex items-center gap-1 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+                    {renderSeenBy(message.seenBy)}
+                  </div>
+                )}
+
                 {/* Mobile / Desktop Reaction Menu overlayed absolutely relative to the message bubble */}
                 {activeReactionId === message.id && (
                   <div className={`reaction-container absolute z-50 flex flex-col items-center top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 sm:top-1/2 sm:left-auto sm:-translate-x-0 ${desktopPickerClass}`}>
@@ -723,4 +729,47 @@ function renderMessageContent(content, currentUser, onLinkClick) {
     }
     return part;
   });
+}
+
+function renderSeenBy(names) {
+  const unique = Array.from(new Set((names || []).filter(n => typeof n === 'string' && n.trim().length > 0)));
+  const shown = unique.slice(0, 3);
+  const extra = unique.length - shown.length;
+
+  return (
+    <>
+      {shown.map((n) => (
+        <span
+          key={n}
+          className="w-5 h-5 rounded-full text-[9px] font-black flex items-center justify-center border border-white/70 dark:border-gray-900/70 shadow-sm"
+          style={{
+            background: `hsl(${hashHue(n)} 70% 45% / 0.16)`,
+            color: `hsl(${hashHue(n)} 70% 40% / 1)`,
+          }}
+          title={n}
+        >
+          {getInitials(n)}
+        </span>
+      ))}
+      {extra > 0 && (
+        <span className="px-1.5 h-5 rounded-full text-[9px] font-black flex items-center justify-center bg-black/5 dark:bg-white/5 text-gray-500 dark:text-gray-400 border border-white/70 dark:border-gray-900/70">
+          +{extra}
+        </span>
+      )}
+    </>
+  );
+}
+
+function getInitials(nickname) {
+  const parts = String(nickname).replace(/[^\p{L}\p{N}\s]/gu, ' ').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+function hashHue(input) {
+  let h = 0;
+  const s = String(input);
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h % 360;
 }

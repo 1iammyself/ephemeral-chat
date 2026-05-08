@@ -488,6 +488,54 @@
   will-change: transform, opacity;
 }
 
+.message-reaction-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+@keyframes messageReactionFly {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(0.95);
+    opacity: 1;
+  }
+  45% {
+    transform: translate(calc(var(--dx) * 0.55), var(--upY)) rotate(calc(var(--spin) * 0.55)) scale(1.2);
+    opacity: 1;
+  }
+  82% {
+    transform: translate(calc(var(--dx) * 0.92), var(--downY)) rotate(calc(var(--spin) * 0.92)) scale(0.98);
+    opacity: 1;
+  }
+  92% {
+    transform: translate(calc(var(--dx) * 0.98), calc(var(--downY) - 14px)) rotate(calc(var(--spin) * 0.98)) scale(1.05);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(var(--dx), calc(var(--downY) + 10px)) rotate(var(--spin)) scale(0.9);
+    opacity: 0;
+  }
+}
+
+.message-reaction-sprite {
+  position: absolute;
+  transform: translate(0, 0);
+  font-size: 28px;
+  transform-origin: center;
+  animation: messageReactionFly var(--dur) cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform, opacity;
+  filter: drop-shadow(0 8px 14px var(--shadow));
+  user-select: none;
+}
+
+@media (min-width: 640px) {
+  .message-reaction-sprite {
+    font-size: 36px;
+  }
+}
+
 /* Cap.js widget dark mode styling */
 .dark cap-widget,
 .dark cap-widget * {
