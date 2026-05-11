@@ -77,6 +77,18 @@ export default defineConfig(({ mode }) => {
               if (id.includes('socket.io-client')) {
                 return 'socketio';
               }
+              if (id.includes('/yjs/') || id.includes('y-protocols') || id.includes('y-codemirror') || id.includes('yjs')) {
+                return 'yjs';
+              }
+              if (id.includes('@codemirror/') || id.includes('@lezer/') || id.includes('codemirror')) {
+                return 'codemirror';
+              }
+              if (id.includes('lucide-react')) {
+                return 'lucide';
+              }
+              if (id.includes('tweetnacl') || id.includes('libsodium') || id.includes('openmls')) {
+                return 'crypto-libs';
+              }
               // fallback vendor chunk for other node_modules
               return 'vendor';
             }
@@ -85,7 +97,7 @@ export default defineConfig(({ mode }) => {
       },
       // Raise the warning limit slightly so large but split bundles don't spam warnings.
       // Still keep it reasonably low to encourage further splitting if necessary.
-      chunkSizeWarningLimit: 700
+      chunkSizeWarningLimit: 1000
     },
     esbuild: {
       drop: isProd ? ['console', 'debugger'] : []
