@@ -107,7 +107,21 @@ export function useSyncPlayback(isHost) {
 
   const play = useCallback((url, title) => {
     if (!isHost) return;
-    const position = audioRef.current?.currentTime || 0;
+    const audio = audioRef.current;
+    const position = audio?.currentTime || 0;
+
+    // Call play() synchronously here so the browser grants autoplay permission
+    // (this is invoked inside the click handler, i.e. a user-gesture context).
+    // If the URL changed we also reload; the browser queues the play until canplay fires.
+    if (audio && url) {
+      const resolvedUrl = new URL(url, window.location.origin).href;
+      if (audio.src !== resolvedUrl) {
+        audio.src = url;
+        audio.load();
+      }
+      audio.play().catch(() => {});
+    }
+
     socketManager.emit('music-play', { url, title: title || url, position });
   }, [isHost]);
 

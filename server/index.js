@@ -335,6 +335,15 @@ app.get('/audio/:filename', (req, res) => {
   const name = path.basename(req.params.filename);
   const filePath = path.join(AUDIO_DIR, name);
   if (!fs.existsSync(filePath)) return res.status(404).end();
+  // Explicitly set audio/* Content-Type — some extensions (mp3→mpeg, m4a, weba) default to
+  // video/* in Express's mime lookup which causes browsers to reject them in <audio> elements.
+  const AUDIO_MIME = {
+    mp3: 'audio/mpeg', mpeg: 'audio/mpeg', m4a: 'audio/mp4', mp4: 'audio/mp4',
+    weba: 'audio/webm', webm: 'audio/webm', ogg: 'audio/ogg', oga: 'audio/ogg',
+    wav: 'audio/wav', aac: 'audio/aac', flac: 'audio/flac',
+  };
+  const ext = path.extname(name).slice(1).toLowerCase();
+  if (AUDIO_MIME[ext]) res.setHeader('Content-Type', AUDIO_MIME[ext]);
   res.setHeader('Cache-Control', 'no-store');
   res.sendFile(filePath);
 });
@@ -3458,7 +3467,14 @@ io.on('connection', (socket) => {
       const base64 = data.replace(/^data:[^,]+,/, '');
       const buf = Buffer.from(base64, 'base64');
       if (buf.length > 8 * 1024 * 1024) { socket.emit('music-upload-error', { error: 'File exceeds 8 MB limit' }); return; }
-      const ext = mime.split('/')[1].replace(/[^a-z0-9]/g, '').substring(0, 8) || 'bin';
+      // Map audio/* MIME subtypes to file extensions that Express maps to correct audio/* types
+      const AUDIO_EXT_MAP = {
+        mpeg: 'mp3', mp3: 'mp3', mp4: 'm4a', xm4a: 'm4a',
+        webm: 'weba', ogg: 'ogg', oga: 'oga',
+        wav: 'wav', aac: 'aac', flac: 'flac',
+      };
+      const rawSub = mime.split('/')[1].replace(/[^a-z0-9]/g, '').substring(0, 8) || 'bin';
+      const ext = AUDIO_EXT_MAP[rawSub] || rawSub;
       const fileId = nodeCrypto.randomBytes(12).toString('hex');
       const storedName = `${fileId}.${ext}`;
       const filePath = path.join(AUDIO_DIR, storedName);

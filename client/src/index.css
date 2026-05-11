@@ -855,6 +855,22 @@ input[type="range"]::-moz-range-thumb {
   background-color: #eaf0f6 !important;
 }
 
+/* ─── Light Mode: Darken Muted / Secondary Text ─── */
+/* Default gray-400/500 are near-invisible against the softer backgrounds.
+   Shift them two stops darker so all text reads clearly in light theme. */
+:root:not(.dark) .text-gray-400 {
+  color: #4b5563 !important; /* gray-600 */
+}
+:root:not(.dark) .text-gray-500 {
+  color: #374151 !important; /* gray-700 */
+}
+:root:not(.dark) .text-slate-400 {
+  color: #4b5563 !important;
+}
+:root:not(.dark) .text-slate-500 {
+  color: #374151 !important;
+}
+
 /* Hide emoji category names/headings in the picker without breaking virtualization */
 .EmojiPickerReact .epr-emoji-category-label {
   height: 1px !important;
