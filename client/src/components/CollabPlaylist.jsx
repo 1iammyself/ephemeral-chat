@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Music, Plus, X, ChevronRight, Play, ExternalLink } from 'lucide-react';
+import { Music, X, ChevronRight, Play, ExternalLink, Upload, Loader2 } from 'lucide-react';
 import socketManager from '../socket';
 import { detectMediaUrl } from './SharedMediaPlayer';
+
+const MAX_FILE_MB = 8;
+const ACCEPT = 'audio/mpeg,audio/ogg,audio/wav,audio/aac,audio/flac,audio/mp4,audio/webm,audio/x-m4a';
 
 function TrackRow({ track, isCurrent, index }) {
   return (
@@ -16,13 +19,13 @@ function TrackRow({ track, isCurrent, index }) {
 }
 
 export default function CollabPlaylist({ isOpen, onClose, isHost, currentUser, roomCode, embedded = false, noAudio = false }) {
-  // Combined state prevents stale-closure bugs in socket handlers
   const [playlistState, setPlaylistState] = useState({ queue: [], currentIndex: -1 });
   const { queue, currentIndex } = playlistState;
 
-  const [urlInput, setUrlInput] = useState('');
-  const [error, setError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr] = useState('');
   const audioRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     const handlePlaying = ({ url, startedAt }) => {
@@ -31,7 +34,6 @@ export default function CollabPlaylist({ isOpen, onClose, isHost, currentUser, r
         return { ...prev, currentIndex: idx >= 0 ? idx : prev.currentIndex };
       });
       const detected = detectMediaUrl(url);
-      // Only play via <audio> for non-YouTube URLs
       if ((!detected || detected.type !== 'youtube') && audioRef.current) {
         audioRef.current.src = url;
         const offset = (Date.now() - startedAt) / 1000;
@@ -56,29 +58,51 @@ export default function CollabPlaylist({ isOpen, onClose, isHost, currentUser, r
       socketManager.off('playlist-track-added', handleAdded);
       socketManager.off('playlist-sync', handleSync);
     };
-  }, []); // empty — no stale closures; all state accessed via functional updates
+  }, []);
 
-  const addUrl = useCallback(() => {
-    const url = urlInput.trim();
-    if (!url) return;
-    try {
-      const parsed = new URL(url);
-      if (!['http:', 'https:'].includes(parsed.protocol)) {
-        setError('Only HTTP/HTTPS URLs are supported');
-        return;
-      }
-    } catch {
-      setError('Please enter a valid URL');
+  const handleFileChange = useCallback(async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setUploadErr('');
+
+    if (file.size > MAX_FILE_MB * 1024 * 1024) {
+      setUploadErr(`File too large — max ${MAX_FILE_MB} MB`);
       return;
     }
-    const detected = detectMediaUrl(url);
-    const title = detected
-      ? (detected.type === 'youtube' ? `YouTube: ${detected.id}` : url)
-      : url;
-    socketManager.emit('playlist-add', { url, title, addedBy: currentUser?.nickname || 'Someone' });
-    setUrlInput('');
-    setError('');
-  }, [urlInput, currentUser]);
+    if (!file.type.startsWith('audio/')) {
+      setUploadErr('Only audio files are supported');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = ev => resolve(ev.target.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const res = await fetch(`/upload-audio/${roomCode}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: base64, filename: file.name }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setUploadErr(json.error || 'Upload failed'); return; }
+
+      socketManager.emit('playlist-add', {
+        url: json.audioUrl,
+        title: json.title || file.name,
+        addedBy: currentUser?.nickname || 'Someone',
+      });
+    } catch {
+      setUploadErr('Upload failed — check your connection');
+    } finally {
+      setUploading(false);
+    }
+  }, [roomCode, currentUser]);
 
   const nextTrack = useCallback(() => {
     socketManager.emit('playlist-next');
@@ -88,8 +112,6 @@ export default function CollabPlaylist({ isOpen, onClose, isHost, currentUser, r
   const currentDetected = currentTrack ? detectMediaUrl(currentTrack.url) : null;
   const isYouTube = currentDetected?.type === 'youtube';
 
-  // Audio element always in DOM so playback continues even when drawer is closed
-  // noAudio=true when rendered inside MusicRoom (the ChatRoom-level instance handles audio)
   const audioEl = noAudio ? null : <audio ref={audioRef} className="hidden" />;
 
   if (!isOpen && !embedded) return audioEl;
@@ -138,7 +160,7 @@ export default function CollabPlaylist({ isOpen, onClose, isHost, currentUser, r
         {/* Queue */}
         <div className="flex-1 overflow-y-auto py-1 px-2">
           {queue.length === 0
-            ? <p className="text-center text-xs text-gray-400 py-6">Queue is empty — add a URL below</p>
+            ? <p className="text-center text-xs text-gray-400 py-6">Queue is empty — upload a track below</p>
             : queue.map((t, i) => <TrackRow key={`${t.url}-${i}`} track={t} isCurrent={i === currentIndex} index={i} />)
           }
         </div>
@@ -161,23 +183,22 @@ export default function CollabPlaylist({ isOpen, onClose, isHost, currentUser, r
               <Play className="w-4 h-4" /> Start Playlist
             </button>
           )}
-          <div className="flex gap-2">
-            <input
-              value={urlInput}
-              onChange={(e) => { setUrlInput(e.target.value); setError(''); }}
-              onKeyDown={(e) => e.key === 'Enter' && addUrl()}
-              placeholder="Paste audio URL…"
-              className={`flex-1 px-3 py-2 text-xs rounded-lg focus:outline-none focus:ring-1 ${embedded ? 'border border-white/10 bg-white/5 text-gray-200 placeholder-gray-600 focus:ring-indigo-500/50' : 'border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white focus:ring-indigo-400/40 focus:ring-2'}`}
-            />
-            <button
-              onClick={addUrl}
-              disabled={!urlInput.trim()}
-              className="p-2 rounded-lg bg-indigo-500 text-white disabled:opacity-40 hover:bg-indigo-600 transition-colors active:scale-95"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </div>
-          {error && <p className="text-xs text-red-500">{error}</p>}
+
+          <input ref={fileInputRef} type="file" accept={ACCEPT} className="hidden" onChange={handleFileChange} />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${
+              embedded
+                ? 'border-white/10 text-gray-400 hover:border-indigo-500/50 hover:text-indigo-300 hover:bg-indigo-500/5'
+                : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400 dark:hover:border-indigo-500/50'
+            }`}
+          >
+            {uploading
+              ? <><Loader2 className="w-4 h-4 animate-spin" /><span className="text-xs font-medium">Uploading…</span></>
+              : <><Upload className="w-4 h-4" /><span className="text-xs font-medium">Add audio to queue</span></>}
+          </button>
+          {uploadErr && <p className="text-xs text-red-500 text-center">{uploadErr}</p>}
         </div>
       </div>
       </div>

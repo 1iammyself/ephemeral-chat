@@ -40,6 +40,16 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: false,
           ws: true
+        },
+        '/upload-audio': {
+          target: 'http://127.0.0.1:3001',
+          changeOrigin: true,
+          secure: false
+        },
+        '/audio': {
+          target: 'http://127.0.0.1:3001',
+          changeOrigin: true,
+          secure: false
         }
       },
       host: '0.0.0.0',

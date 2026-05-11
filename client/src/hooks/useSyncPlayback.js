@@ -39,7 +39,8 @@ export function useSyncPlayback(isHost) {
       setServerState(state);
       if (!state.url) return;
 
-      const urlChanged = audio.src !== state.url && state.url;
+      const absUrl = state.url ? new URL(state.url, window.location.origin).href : null;
+      const urlChanged = absUrl && audio.src !== absUrl;
       if (urlChanged) {
         audio.src = state.url;
         audio.load();
