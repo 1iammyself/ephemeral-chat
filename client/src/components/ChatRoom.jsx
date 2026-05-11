@@ -37,6 +37,9 @@ import {
   Eye,
   MessageCircle,
   Code2,
+  Lock,
+  ListMusic,
+  LayoutGrid,
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -97,6 +100,7 @@ import { canManageRoom } from '../utils/roles';
 import { getRandomIcebreaker } from '../utils/icebreakers';
 import { AppRefreshButton } from './AppRefreshButton';
 import CodeShareModal from './CodeShareModal';
+import RoomToolsPanel from './RoomToolsPanel';
 import { getCreatorId } from '../utils/creator';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess } from '../utils/platform';
 import { useSoundFX } from '../hooks/useSoundFX';
@@ -663,7 +667,8 @@ const ChatRoom = () => {
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const messagesContainerRef = useRef(null);
   const [offsets, setOffsets] = useState({ topic: 0, timer: 0 });
-  const [showDesktopSidebar, setShowDesktopSidebar] = useState(true);
+  const [showDesktopSidebar, setShowDesktopSidebar] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState('people');
   const [dragState, setDragState] = useState(null); // { type: 'topic' | 'timer', startX: number, startOffset: number }
   const [sessionToken, setSessionToken] = useState(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
@@ -2948,6 +2953,7 @@ const ChatRoom = () => {
                 )}
                 <button
                   onClick={() => {
+                    setSidebarTab('people');
                     if (window.innerWidth >= 1024) {
                       setShowDesktopSidebar(prev => !prev);
                     } else {
@@ -2955,7 +2961,7 @@ const ChatRoom = () => {
                     }
                   }}
                   className="flex items-center space-x-1 hover:bg-black/5 dark:hover:bg-white/5 px-1.5 py-0.5 rounded cursor-pointer transition-colors"
-                  title="Toggle Participants"
+                  title="Show participants"
                 >
                   <Users className="w-4 h-4" />
                   <span>{users.length}</span>
@@ -2982,16 +2988,7 @@ const ChatRoom = () => {
               </div>
             </div>
           </div>
-          <div className="flex items-center space-x-2 sm:space-x-3">
-
-            <button
-              onClick={() => setSidebarPosition(prev => prev === 'right' ? 'left' : 'right')}
-              className="hidden lg:flex p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300"
-              title={`Move sidebar to ${sidebarPosition === 'right' ? 'left' : 'right'}`}
-            >
-              {sidebarPosition === 'right' ? <PanelLeft className="w-5 h-5" /> : <PanelRight className="w-5 h-5" />}
-            </button>
-            <AppRefreshButton />
+          <div className="flex items-center space-x-1 sm:space-x-2">
             <button
               onClick={() => { setShowSearch(s => !s); if (showSearch) clearSearch(); }}
               className={`p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors ${showSearch ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300'}`}
@@ -3000,24 +2997,28 @@ const ChatRoom = () => {
               <Search className="w-5 h-5" />
             </button>
             <button
-              onClick={() => { const next = !previewEnabled; setPreviewEnabled(next); localStorage.setItem('typingPreview_enabled', String(next)); }}
-              className={`p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors ${previewEnabled ? 'text-teal-600 dark:text-teal-400' : 'text-gray-400 dark:text-gray-500'}`}
-              title={previewEnabled ? 'Live preview on — others see your typing' : 'Live preview off'}
-            >
-              <Eye className="w-4 h-4" />
-            </button>
-            <button
               onClick={toggleSound}
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              title={soundEnabled ? 'Sound FX on — click to mute' : 'Sound FX off — click to enable'}
+              title={soundEnabled ? 'Sound on' : 'Sound off'}
             >
               {soundEnabled
                 ? <Volume2 className="w-5 h-5 text-gray-600 dark:text-gray-300" />
                 : <VolumeX className="w-5 h-5 text-gray-400 dark:text-gray-500" />}
             </button>
             <ThemeToggle />
-            <button onClick={() => setShowMobileMenu(true)} className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 relative">
-              <Users className="w-5 h-5" />
+            {/* Unified panel toggle — People & Tools */}
+            <button
+              onClick={() => {
+                if (window.innerWidth >= 1024) {
+                  setShowDesktopSidebar(prev => !prev);
+                } else {
+                  setShowMobileMenu(true);
+                }
+              }}
+              className={`p-2 rounded-lg transition-colors relative ${showDesktopSidebar ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
+              title="People & Tools"
+            >
+              <LayoutGrid className="w-5 h-5" />
               {isHost && pendingGuests.length > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-gray-800" />}
             </button>
           </div>
@@ -3721,32 +3722,68 @@ const ChatRoom = () => {
               <div className="w-0.5 h-8 bg-gray-300 dark:bg-gray-600 rounded-full" />
             </div>
 
-            <UserList
-              users={users}
-              currentUser={currentUser}
-              pendingGuests={pendingGuests}
-              isHost={isHost}
-              onApprove={handleApproveGuest}
-              onDeny={handleDenyGuest}
-              selectedRecipients={selectedRecipients}
-              onToggleRecipient={toggleRecipient}
-              onSetUserRole={handleSetUserRole}
-              onKickUser={handleKickUser}
-              currentUserRole={currentUserRole}
-              onShowActivityLogs={() => { setShowActivityLogs(true); setHasNewLogs(false); }}
-              hasNewLogs={hasNewLogs}
-              verbalCode={verbalCode}
-              roomVibe={roomVibe}
-              nowPlayingMap={nowPlayingMap}
-              onWatchParty={() => setShowWatchPartyModal(true)}
-              autoApprove={autoApprove}
-              onToggleAutoApprove={handleToggleAutoApprove}
-              preApprovedList={preApprovedList}
-              onUpdatePreApprovedList={handleUpdatePreApprovedList}
-              onPreApprovedFileUpload={handlePreApprovedFileUpload}
-              parsePreApprovedText={parsePreApprovedText}
-              onForkRoom={handleForkRoom}
-            />
+            {/* Tab bar */}
+            <div className="flex shrink-0 border-b border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => setSidebarTab('people')}
+                className={`flex-1 py-2.5 text-xs font-bold transition-colors ${sidebarTab === 'people' ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500 dark:border-indigo-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+              >
+                People
+              </button>
+              <button
+                onClick={() => setSidebarTab('tools')}
+                className={`flex-1 py-2.5 text-xs font-bold transition-colors ${sidebarTab === 'tools' ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500 dark:border-indigo-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+              >
+                Tools
+              </button>
+            </div>
+
+            {sidebarTab === 'people' ? (
+              <UserList
+                users={users}
+                currentUser={currentUser}
+                pendingGuests={pendingGuests}
+                isHost={isHost}
+                onApprove={handleApproveGuest}
+                onDeny={handleDenyGuest}
+                selectedRecipients={selectedRecipients}
+                onToggleRecipient={toggleRecipient}
+                onSetUserRole={handleSetUserRole}
+                onKickUser={handleKickUser}
+                currentUserRole={currentUserRole}
+                onShowActivityLogs={() => { setShowActivityLogs(true); setHasNewLogs(false); }}
+                hasNewLogs={hasNewLogs}
+                verbalCode={verbalCode}
+                roomVibe={roomVibe}
+                nowPlayingMap={nowPlayingMap}
+                onWatchParty={() => setShowWatchPartyModal(true)}
+                autoApprove={autoApprove}
+                onToggleAutoApprove={handleToggleAutoApprove}
+                preApprovedList={preApprovedList}
+                onUpdatePreApprovedList={handleUpdatePreApprovedList}
+                onPreApprovedFileUpload={handlePreApprovedFileUpload}
+                parsePreApprovedText={parsePreApprovedText}
+                onForkRoom={handleForkRoom}
+              />
+            ) : (
+              <RoomToolsPanel
+                vibeAccent={vibeAccent}
+                previewEnabled={previewEnabled}
+                setPreviewEnabled={setPreviewEnabled}
+                sidebarPosition={sidebarPosition}
+                setSidebarPosition={setSidebarPosition}
+                hasNewLogs={hasNewLogs}
+                setShowMusicRoom={setShowMusicRoom}
+                setShowStegoModal={setShowStegoModal}
+                setShowWhisperModal={setShowWhisperModal}
+                setShowCodeShare={setShowCodeShare}
+                setShowWatchPartyModal={setShowWatchPartyModal}
+                setShowPlaylist={setShowPlaylist}
+                setShowActivityLogs={setShowActivityLogs}
+                setHasNewLogs={setHasNewLogs}
+                onClose={null}
+              />
+            )}
           </div>
         )}
       </div>
@@ -3756,34 +3793,71 @@ const ChatRoom = () => {
           <div className="fixed inset-0 z-50 lg:hidden">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileMenu(false)} />
             <div className={`absolute right-0 top-0 bottom-0 w-64 max-w-[70vw] ${getVibeById(roomVibe).sidebarClass} backdrop-blur-md shadow-xl flex flex-col`}>
-              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700"><h2 className="text-lg font-semibold text-gray-900 dark:text-white">Room Details</h2><button onClick={() => setShowMobileMenu(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 dark:text-gray-400"><X className="w-5 h-5" /></button></div>
+              {/* Mobile drawer header with tabs */}
+              <div className="flex shrink-0 border-b border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={() => setSidebarTab('people')}
+                  className={`flex-1 py-3 text-xs font-bold transition-colors ${sidebarTab === 'people' ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 dark:text-gray-400'}`}
+                >
+                  People
+                </button>
+                <button
+                  onClick={() => setSidebarTab('tools')}
+                  className={`flex-1 py-3 text-xs font-bold transition-colors ${sidebarTab === 'tools' ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 dark:text-gray-400'}`}
+                >
+                  Tools
+                </button>
+                <button onClick={() => setShowMobileMenu(false)} className="px-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
               <div className="flex-1 overflow-y-auto">
-                <UserList
-                  users={users}
-                  currentUser={currentUser}
-                  pendingGuests={pendingGuests}
-                  isHost={isHost}
-                  onApprove={handleApproveGuest}
-                  onDeny={handleDenyGuest}
-                  selectedRecipients={selectedRecipients}
-                  onToggleRecipient={toggleRecipient}
-                  onSetUserRole={handleSetUserRole}
-                  onKickUser={handleKickUser}
-                  currentUserRole={currentUserRole}
-                  onShowActivityLogs={() => { setShowActivityLogs(true); setHasNewLogs(false); }}
-                  hasNewLogs={hasNewLogs}
-                  verbalCode={verbalCode}
-                  roomVibe={roomVibe}
-                  nowPlayingMap={nowPlayingMap}
-                  onWatchParty={() => { setShowMobileMenu(false); setShowWatchPartyModal(true); }}
-                  autoApprove={autoApprove}
-                  onToggleAutoApprove={handleToggleAutoApprove}
-                  preApprovedList={preApprovedList}
-                  onUpdatePreApprovedList={handleUpdatePreApprovedList}
-                  onPreApprovedFileUpload={handlePreApprovedFileUpload}
-                  parsePreApprovedText={parsePreApprovedText}
-                  onForkRoom={handleForkRoom}
-                />
+                {sidebarTab === 'people' ? (
+                  <UserList
+                    users={users}
+                    currentUser={currentUser}
+                    pendingGuests={pendingGuests}
+                    isHost={isHost}
+                    onApprove={handleApproveGuest}
+                    onDeny={handleDenyGuest}
+                    selectedRecipients={selectedRecipients}
+                    onToggleRecipient={toggleRecipient}
+                    onSetUserRole={handleSetUserRole}
+                    onKickUser={handleKickUser}
+                    currentUserRole={currentUserRole}
+                    onShowActivityLogs={() => { setShowActivityLogs(true); setHasNewLogs(false); }}
+                    hasNewLogs={hasNewLogs}
+                    verbalCode={verbalCode}
+                    roomVibe={roomVibe}
+                    nowPlayingMap={nowPlayingMap}
+                    onWatchParty={() => { setShowMobileMenu(false); setShowWatchPartyModal(true); }}
+                    autoApprove={autoApprove}
+                    onToggleAutoApprove={handleToggleAutoApprove}
+                    preApprovedList={preApprovedList}
+                    onUpdatePreApprovedList={handleUpdatePreApprovedList}
+                    onPreApprovedFileUpload={handlePreApprovedFileUpload}
+                    parsePreApprovedText={parsePreApprovedText}
+                    onForkRoom={handleForkRoom}
+                  />
+                ) : (
+                  <RoomToolsPanel
+                    vibeAccent={vibeAccent}
+                    previewEnabled={previewEnabled}
+                    setPreviewEnabled={setPreviewEnabled}
+                    sidebarPosition={sidebarPosition}
+                    setSidebarPosition={setSidebarPosition}
+                    hasNewLogs={hasNewLogs}
+                    setShowMusicRoom={setShowMusicRoom}
+                    setShowStegoModal={setShowStegoModal}
+                    setShowWhisperModal={setShowWhisperModal}
+                    setShowCodeShare={setShowCodeShare}
+                    setShowWatchPartyModal={setShowWatchPartyModal}
+                    setShowPlaylist={setShowPlaylist}
+                    setShowActivityLogs={setShowActivityLogs}
+                    setHasNewLogs={setHasNewLogs}
+                    onClose={() => setShowMobileMenu(false)}
+                  />
+                )}
               </div>
             </div>
           </div>
