@@ -3418,6 +3418,17 @@ io.on('connection', (socket) => {
   });
 
   // ─── Music Room (synchronized playback) ─────────────────────
+
+  // Set track URL without starting playback (host loads file, others preload)
+  socket.on('music-set-track', ({ url, title = '' } = {}) => {
+    const rc = socket.roomCode;
+    if (!rc) return;
+    const rd = roomData[rc];
+    if (!rd || rd.hostId !== socket.id || !url) return;
+    rd.musicState = { url, title, playing: false, startedAt: null, pausePosition: 0 };
+    io.to(rc).emit('music-state', rd.musicState);
+  });
+
   socket.on('music-play', ({ url, title = '', position = 0 } = {}) => {
     const rc = socket.roomCode;
     if (!rc) return;
@@ -3484,6 +3495,36 @@ io.on('connection', (socket) => {
       socket.emit('music-upload-done', { audioUrl: `/audio/${storedName}`, title: filename });
     } catch {
       socket.emit('music-upload-error', { error: 'Upload failed on server' });
+    }
+  });
+
+  // ─── Collaborative Playlist: file upload via Socket.IO ───────────────────
+  socket.on('playlist-upload', ({ data, filename } = {}) => {
+    const rc = socket.roomCode;
+    if (!rc || !data || !filename) return;
+    try {
+      const mimeMatch = data.match(/^data:(audio\/[a-zA-Z0-9+.-]+);base64,/);
+      if (!mimeMatch) { socket.emit('playlist-upload-error', { error: 'Only audio files are allowed' }); return; }
+      const mime = mimeMatch[1];
+      const base64 = data.replace(/^data:[^,]+,/, '');
+      const buf = Buffer.from(base64, 'base64');
+      if (buf.length > 8 * 1024 * 1024) { socket.emit('playlist-upload-error', { error: 'File exceeds 8 MB limit' }); return; }
+      const AUDIO_EXT_MAP = {
+        mpeg: 'mp3', mp3: 'mp3', mp4: 'm4a', xm4a: 'm4a',
+        webm: 'weba', ogg: 'ogg', oga: 'oga',
+        wav: 'wav', aac: 'aac', flac: 'flac',
+      };
+      const rawSub = mime.split('/')[1].replace(/[^a-z0-9]/g, '').substring(0, 8) || 'bin';
+      const ext = AUDIO_EXT_MAP[rawSub] || rawSub;
+      const fileId = nodeCrypto.randomBytes(12).toString('hex');
+      const storedName = `${fileId}.${ext}`;
+      const filePath = path.join(AUDIO_DIR, storedName);
+      fs.writeFileSync(filePath, buf);
+      if (!roomAudioFiles[rc]) roomAudioFiles[rc] = [];
+      roomAudioFiles[rc].push(storedName);
+      socket.emit('playlist-upload-done', { audioUrl: `/audio/${storedName}`, title: filename });
+    } catch {
+      socket.emit('playlist-upload-error', { error: 'Upload failed on server' });
     }
   });
 

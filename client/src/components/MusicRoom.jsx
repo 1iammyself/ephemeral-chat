@@ -15,7 +15,7 @@ const MAX_FILE_MB = 8;
 const ACCEPT = 'audio/mpeg,audio/ogg,audio/wav,audio/aac,audio/flac,audio/mp4,audio/webm,audio/x-m4a';
 
 export default function MusicRoom({ isOpen, onClose, isHost, embedded = false, roomCode, currentUser }) {
-  const { audioRef, serverState, displayPosition, duration, handleDurationChange, play, pause, seek, stop } = useSyncPlayback(isHost);
+  const { audioRef, serverState, displayPosition, duration, handleDurationChange, play, pause, seek, stop, setTrack } = useSyncPlayback(isHost);
 
   const [tab,        setTab]        = useState('player');
   const [isMuted,    setIsMuted]    = useState(false);
@@ -93,7 +93,9 @@ export default function MusicRoom({ isOpen, onClose, isHost, embedded = false, r
         const onDone = ({ audioUrl, title }) => {
           if (settled) return; settled = true;
           cleanup();
-          play(audioUrl, title || file.name);
+          // Load track + broadcast URL without auto-playing.
+          // Host must press Play — audio.play() needs a user gesture.
+          setTrack(audioUrl, title || file.name);
           resolve();
         };
         const onErr = ({ error }) => {
@@ -123,6 +125,7 @@ export default function MusicRoom({ isOpen, onClose, isHost, embedded = false, r
   const audioElement = (
     <audio
       ref={audioRef}
+      preload="metadata"
       muted={isMuted}
       onDurationChange={handleDurationChange}
       onEnded={() => { if (isHost) stop(); }}

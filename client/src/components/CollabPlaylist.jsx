@@ -84,25 +84,45 @@ export default function CollabPlaylist({ isOpen, onClose, isHost, currentUser, r
         reader.readAsDataURL(file);
       });
 
-      const res = await fetch(`/upload-audio/${roomCode}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: base64, filename: file.name }),
+      // Use Socket.IO upload (same reliable path as Music Room) to avoid
+      // HTTP body-parser size limits and potential proxy issues.
+      await new Promise((resolve, reject) => {
+        let settled = false;
+        const cleanup = () => {
+          socketManager.off('playlist-upload-done', onDone);
+          socketManager.off('playlist-upload-error', onErr);
+          clearTimeout(timer);
+        };
+        const onDone = ({ audioUrl, title }) => {
+          if (settled) return; settled = true;
+          cleanup();
+          socketManager.emit('playlist-add', {
+            url: audioUrl,
+            title: title || file.name,
+            addedBy: currentUser?.nickname || 'Someone',
+          });
+          resolve();
+        };
+        const onErr = ({ error }) => {
+          if (settled) return; settled = true;
+          cleanup();
+          reject(new Error(error || 'Upload failed'));
+        };
+        const timer = setTimeout(() => {
+          if (settled) return; settled = true;
+          cleanup();
+          reject(new Error('Upload timed out — try a smaller file'));
+        }, 30000);
+        socketManager.on('playlist-upload-done', onDone);
+        socketManager.on('playlist-upload-error', onErr);
+        socketManager.emit('playlist-upload', { data: base64, filename: file.name });
       });
-      const json = await res.json();
-      if (!res.ok) { setUploadErr(json.error || 'Upload failed'); return; }
-
-      socketManager.emit('playlist-add', {
-        url: json.audioUrl,
-        title: json.title || file.name,
-        addedBy: currentUser?.nickname || 'Someone',
-      });
-    } catch {
-      setUploadErr('Upload failed — check your connection');
+    } catch (err) {
+      setUploadErr(err.message || 'Upload failed — try again');
     } finally {
       setUploading(false);
     }
-  }, [roomCode, currentUser]);
+  }, [currentUser]);
 
   const nextTrack = useCallback(() => {
     socketManager.emit('playlist-next');
