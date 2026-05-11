@@ -2272,7 +2272,7 @@ io.on('connection', (socket) => {
       // ─── v3 MLS fields (RFC 9420 MLS group encryption) ───
       // ─── v4 AES-GCM fields (room-key symmetric encryption) ───
       // ─── v5 PQXDH + Double Ratchet / Megolm-style group encryption ───
-      let { content, messageType = 'text', isViewOnce = false, imageData, pollData, recipients = [], replyTo, isEncrypted, iv, fileName, mimeType, fileSize, isAnonymous, overrideTtl,
+      let { content, messageType = 'text', isViewOnce = false, imageData, pollData, recipients = [], replyTo, parentId, isEncrypted, iv, fileName, mimeType, fileSize, isAnonymous, overrideTtl,
         v: payloadVersion, header: ratchetHeader, ciphertext: ratchetCiphertext, ratchet: isRatchet, mls: mlsCiphertext,
         ct: aesCiphertext, dr: drPayload, sk: skPayload } = data;
 
@@ -2480,7 +2480,8 @@ io.on('connection', (socket) => {
           ciphertext: ratchetCiphertext,
           ratchet: true,
         } : {}),
-        replyTo: replyTo || null, // Store reply text/preview
+        replyTo: replyTo || null,
+        parentId: parentId || null, // Thread reply — groups under parent message
         reactions: {}, // Initialize reactions
         hasBeenViewed: false,
         isAnonymous: !!isAnonymous, // Anonymous confession flag

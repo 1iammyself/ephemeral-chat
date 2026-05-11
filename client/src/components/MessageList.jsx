@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, FileText, Download, Check, CheckCheck, Pencil, X, Pin } from 'lucide-react';
+import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, FileText, Download, Check, CheckCheck, Pencil, X, Pin, MessageSquare } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
 import ImageViewer from './ImageViewer';
 import AudioPlayer from './AudioPlayer';
 import PollMessage from './PollMessage';
-import ThreadView from './ThreadView';
 import socketManager from '../socket';
 import { getVibeById } from '../utils/vibes';
 import LinkPreviewModal, { isDomainTrusted } from './LinkPreviewModal';
@@ -17,14 +16,13 @@ import { FileOpener } from '@capacitor-community/file-opener';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀', '🍕', '🍔', '🍦', '🍩', '🍺', '🎸', '🎮', '🚀', '🌈', '🍄'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onPin, isHost, pinnedMessageId, roomVibe, linkPreviews = {}, onOpenEmojiPicker, highlightMap = {}, focusedMessageId = null }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onPin, onViewThread, isHost, pinnedMessageId, roomVibe, linkPreviews = {}, onOpenEmojiPicker, highlightMap = {}, focusedMessageId = null }) => {
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
-  const [contextMenu, setContextMenu] = useState(null); // { messageId, x, y }
+  const [contextMenu, setContextMenu] = useState(null); // { messageId, x, y, messageText, senderNickname }
   const { theme } = useTheme();
   const currentVibe = getVibeById(roomVibe);
   const [messageTimers, setMessageTimers] = useState(new Map());
-  const [expandedThreads, setExpandedThreads] = useState(new Set());
   const [viewingImage, setViewingImage] = useState(null);
   const [currentImageUrl, setCurrentImageUrl] = useState(null);
   const [viewedMessages, setViewedMessages] = useState(new Set());
@@ -288,7 +286,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
 
   return (
     <div className="flex flex-col space-y-2 sm:space-y-3 pb-4 px-2 sm:px-4">
-      {messages.filter(m => messageTimers.get(m.id) !== 'expired').map((message, index) => {
+      {messages.filter(m => messageTimers.get(m.id) !== 'expired' && !m.parentId).map((message, index) => {
         const isOwnMessage = currentUser && (
           message.sender.socketId === currentUser.socketId ||
           message.sender.id === currentUser.id ||
@@ -573,59 +571,54 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
               </div>
             )}
 
-            {/* Thread: View Thread button + inline ThreadView */}
+            {/* Thread replies badge — opens ThreadView side panel */}
             {(() => {
-              const replyCount = messages.filter(m => m.replyTo?.id === message.id).length;
+              const replyCount = messages.filter(m => m.parentId === message.id).length;
               if (replyCount === 0) return null;
-              const isExpanded = expandedThreads.has(message.id);
               return (
-                <>
-                  <button
-                    onClick={() => setExpandedThreads(prev => {
-                      const next = new Set(prev);
-                      if (next.has(message.id)) next.delete(message.id);
-                      else next.add(message.id);
-                      return next;
-                    })}
-                    className={`mt-1 px-2 py-0.5 text-[10px] font-bold text-${uiAccentColor}-500 dark:text-${uiAccentColor}-400 hover:text-${uiAccentColor}-600 dark:hover:text-${uiAccentColor}-300 hover:bg-${uiAccentColor}-50 dark:hover:bg-${uiAccentColor}-900/20 rounded-full transition-colors flex items-center space-x-1`}
-                  >
-                    <span>{isExpanded ? '▾' : '▸'} {replyCount} {replyCount === 1 ? 'reply' : 'replies'}</span>
-                  </button>
-                  {isExpanded && (
-                    <ThreadView
-                      parentMessage={message}
-                      allMessages={messages}
-                      onReply={onReply}
-                      onClose={() => setExpandedThreads(prev => {
-                        const next = new Set(prev);
-                        next.delete(message.id);
-                        return next;
-                      })}
-                    />
-                  )}
-                </>
+                <button
+                  onClick={() => onViewThread?.(message)}
+                  className={`mt-1 px-2 py-0.5 text-[10px] font-bold text-${uiAccentColor}-500 dark:text-${uiAccentColor}-400 hover:text-${uiAccentColor}-600 dark:hover:text-${uiAccentColor}-300 hover:bg-${uiAccentColor}-50 dark:hover:bg-${uiAccentColor}-900/20 rounded-full transition-colors flex items-center gap-1`}
+                >
+                  <span>💬 {replyCount} {replyCount === 1 ? 'reply' : 'replies'}</span>
+                </button>
               );
             })()}
           </div>
         );
       })}
 
-      {/* Context menu for host pin action */}
-      {contextMenu && isHost && (
+      {/* Context menu — available to all users */}
+      {contextMenu && (
         <div
-          className="msg-context-menu fixed z-[200] bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 py-1 min-w-[140px] animate-in fade-in zoom-in-95 duration-150"
-          style={{ top: contextMenu.y, left: Math.min(contextMenu.x, window.innerWidth - 160) }}
+          className="msg-context-menu fixed z-[200] bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 py-1 min-w-[160px] animate-in fade-in zoom-in-95 duration-150"
+          style={{ top: contextMenu.y, left: Math.min(contextMenu.x, window.innerWidth - 180) }}
         >
-          <button
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-amber-50 dark:hover:bg-amber-900/20 text-gray-700 dark:text-gray-200 transition-colors"
-            onClick={() => {
-              onPin?.({ messageId: contextMenu.messageId, text: contextMenu.messageText, senderNickname: contextMenu.senderNickname });
-              setContextMenu(null);
-            }}
-          >
-            <Pin className="w-3.5 h-3.5 text-amber-500" />
-            {pinnedMessageId === contextMenu.messageId ? 'Unpin' : 'Pin message'}
-          </button>
+          {onViewThread && (
+            <button
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-gray-700 dark:text-gray-200 transition-colors"
+              onClick={() => {
+                const msg = messages.find(m => m.id === contextMenu.messageId);
+                if (msg) onViewThread(msg);
+                setContextMenu(null);
+              }}
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-indigo-500" />
+              Reply in thread
+            </button>
+          )}
+          {isHost && (
+            <button
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-amber-50 dark:hover:bg-amber-900/20 text-gray-700 dark:text-gray-200 transition-colors"
+              onClick={() => {
+                onPin?.({ messageId: contextMenu.messageId, text: contextMenu.messageText, senderNickname: contextMenu.senderNickname });
+                setContextMenu(null);
+              }}
+            >
+              <Pin className="w-3.5 h-3.5 text-amber-500" />
+              {pinnedMessageId === contextMenu.messageId ? 'Unpin' : 'Pin message'}
+            </button>
+          )}
         </div>
       )}
 

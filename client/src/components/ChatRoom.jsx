@@ -75,6 +75,7 @@ import TopicEditor from './TopicEditor';
 import TimerModal from './TimerModal';
 import PinnedMessageBanner from './PinnedMessageBanner';
 import RoomCountdown from './RoomCountdown';
+import ThreadView from './ThreadView';
 import HotSeat from './HotSeat';
 import TypingPreview from './TypingPreview';
 import CollabPlaylist from './CollabPlaylist';
@@ -596,6 +597,9 @@ const ChatRoom = () => {
 
   // Collaborative Playlist (M7)
   const [showPlaylist, setShowPlaylist] = useState(false);
+
+  // Message Threads (M4)
+  const [threadParent, setThreadParent] = useState(null);
   const { query: searchQuery, setQuery: setSearchQuery, results: searchResults, highlightMap, focusedMessageId, focusedIndex, next: searchNext, prev: searchPrev, clear: clearSearch } = useMessageSearch(messages);
 
   useEffect(() => {
@@ -2319,6 +2323,22 @@ const ChatRoom = () => {
     socketManager.emit('fork-room', { targetSocketIds });
   }, []);
 
+  const handleThreadReply = useCallback(async (parentId, content) => {
+    if (!content.trim() || !isConnected) return;
+    try {
+      const v2Payload = await encryptMLSMessage(content.trim(), roomCode);
+      socketManager.emit('send-message', {
+        ...v2Payload,
+        messageType: 'text',
+        parentId,
+        isEncrypted: true,
+        isAnonymous: isAnonymousMode,
+      });
+    } catch (e) {
+      console.error('Thread reply encryption failed:', e.message);
+    }
+  }, [isConnected, roomCode, isAnonymousMode]);
+
   const handleReaction = (messageId, emoji) => {
     spawnMessageReaction(messageId, emoji);
     socketManager.emit('add-reaction', { messageId, emoji });
@@ -3044,6 +3064,7 @@ const ChatRoom = () => {
               onEdit={handleEditMessage}
               onDelete={handleDeleteMessage}
               onPin={handlePinMessage}
+              onViewThread={setThreadParent}
               isHost={isHost}
               pinnedMessageId={pinnedMessage?.messageId}
               roomVibe={roomVibe}
@@ -3680,6 +3701,15 @@ const ChatRoom = () => {
           onEnd={() => socketManager.emit('hotSeat-end')}
         />
       )}
+      <ThreadView
+        parentMessage={threadParent}
+        messages={messages}
+        currentUser={currentUser}
+        isOpen={!!threadParent}
+        onClose={() => setThreadParent(null)}
+        onSend={handleThreadReply}
+        roomVibe={roomVibe}
+      />
       <CollabPlaylist
         isOpen={showPlaylist}
         onClose={() => setShowPlaylist(false)}
