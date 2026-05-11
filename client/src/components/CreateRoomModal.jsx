@@ -46,6 +46,8 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const [customCode, setCustomCode] = useState('');
   const [customCodeError, setCustomCodeError] = useState('');
   const [autoApproveEnabled, setAutoApproveEnabled] = useState(false);
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduledFor, setScheduledFor] = useState(''); // ISO datetime-local string
   const [preApprovedText, setPreApprovedText] = useState('');
   const [preApprovedEntries, setPreApprovedEntries] = useState([]);
   const preApprovedFileRef = useRef(null);
@@ -165,7 +167,8 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
               creatorId: creatorId,
               persistenceMode: roomSettings.persistenceMode,
               autoApprove: autoApproveEnabled,
-              preApprovedList: preApprovedEntries.length > 0 ? preApprovedEntries : undefined
+              preApprovedList: preApprovedEntries.length > 0 ? preApprovedEntries : undefined,
+              scheduledFor: scheduleEnabled && scheduledFor ? new Date(scheduledFor).toISOString() : undefined,
             }),
           });
           break; // Got an HTTP response (ok or error) — don't retry
@@ -795,6 +798,36 @@ Verbal Code: ${verbalCode || 'N/A'}`;
                 value={honeypot.hp_website}
                 onChange={(e) => setHoneypot(prev => ({ ...prev, hp_website: e.target.value }))}
               />
+            </div>
+
+            {/* Schedule for Later */}
+            <div className="flex flex-col gap-2 p-3 rounded-lg border border-gray-200 dark:border-gray-700 mt-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-medium text-sm dark:text-white flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-gray-400" />
+                    Schedule for Later
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Room opens at a future time; link is shareable now</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setScheduleEnabled(s => !s)}
+                  className={`flex-shrink-0 transition-all active:scale-95 ${scheduleEnabled ? 'text-indigo-500' : 'text-gray-400 dark:text-gray-500'}`}
+                >
+                  {scheduleEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
+                </button>
+              </div>
+              {scheduleEnabled && (
+                <input
+                  type="datetime-local"
+                  value={scheduledFor}
+                  min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+                  onChange={(e) => setScheduledFor(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  required={scheduleEnabled}
+                />
+              )}
             </div>
 
             {/* Actions */}

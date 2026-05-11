@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Users, Crown, User, Check, X, ChevronDown, Shield, UserX, Info, Zap, Music, Radio, ToggleLeft, ToggleRight, Upload, Plus, Trash2, ClipboardList } from 'lucide-react';
+import { Users, Crown, User, Check, X, ChevronDown, Shield, UserX, Info, Zap, Music, Radio, ToggleLeft, ToggleRight, Upload, Plus, Trash2, ClipboardList, GitFork } from 'lucide-react';
 import { ROLES, ROLE_INFO, canKick, canChangeRole, canManageGuests, getAssignableRoles } from '../utils/roles';
 import { hapticSuccess } from '../utils/platform';
 import NowPlayingBadge from './NowPlayingBadge';
@@ -29,9 +29,12 @@ const UserList = ({
   onUpdatePreApprovedList,
   onPreApprovedFileUpload,
   parsePreApprovedText,
+  onForkRoom,
 }) => {
   const [expandedUser, setExpandedUser] = useState(null);
   const [showPreApprovedPanel, setShowPreApprovedPanel] = useState(false);
+  const [forkMode, setForkMode] = useState(false);
+  const [forkTargets, setForkTargets] = useState(new Set());
   const [newPreApprovedName, setNewPreApprovedName] = useState('');
   const [newPreApprovedRole, setNewPreApprovedRole] = useState('none');
   const fileInputRef = useRef(null);
@@ -295,6 +298,34 @@ const UserList = ({
         </div>
       )}
 
+      {/* Fork Room bar */}
+      {forkMode && (
+        <div className="px-3 py-2 flex items-center gap-2 bg-indigo-50 dark:bg-indigo-900/20 border-b border-indigo-100 dark:border-indigo-800/30">
+          <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium flex-1">
+            {forkTargets.size === 0 ? 'Select users to fork with' : `${forkTargets.size} selected`}
+          </span>
+          <button
+            onClick={() => {
+              if (forkTargets.size > 0 && onForkRoom) {
+                onForkRoom([...forkTargets]);
+                setForkMode(false);
+                setForkTargets(new Set());
+              }
+            }}
+            disabled={forkTargets.size === 0}
+            className="px-3 py-1 text-xs font-bold rounded-lg bg-indigo-500 text-white disabled:opacity-40 hover:bg-indigo-600 transition-colors active:scale-95"
+          >
+            Fork Room
+          </button>
+          <button
+            onClick={() => { setForkMode(false); setForkTargets(new Set()); }}
+            className="p-1 rounded hover:bg-indigo-100 dark:hover:bg-indigo-800/40 transition-colors"
+          >
+            <X className="w-3.5 h-3.5 text-indigo-500" />
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="p-3 sm:p-4 transition-colors duration-200 flex items-center justify-between bg-black/10 dark:bg-white/5 backdrop-blur-sm border-b border-black/5 dark:border-white/5">
         <div className="flex items-center space-x-2">
@@ -315,6 +346,15 @@ const UserList = ({
             >
               <Zap className="w-3 h-3" />
               <span className="font-black text-[9px] uppercase tracking-widest">Code</span>
+            </button>
+          )}
+          {isHost && onForkRoom && users.length > 1 && (
+            <button
+              onClick={() => { setForkMode(f => !f); setForkTargets(new Set()); }}
+              className={`p-1.5 rounded-lg transition-all ${forkMode ? 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              title="Fork Room — invite a subset of users into a new room"
+            >
+              <GitFork className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           )}
           {onShowActivityLogs && (
@@ -358,6 +398,14 @@ const UserList = ({
                         : `hover:bg-${vibeAccent}-50 dark:hover:bg-gray-800/80 border border-transparent`
                       }`}
                     onClick={() => {
+                      if (forkMode && !isCurrentUser) {
+                        setForkTargets(prev => {
+                          const next = new Set(prev);
+                          next.has(user.socketId) ? next.delete(user.socketId) : next.add(user.socketId);
+                          return next;
+                        });
+                        return;
+                      }
                       if (!isCurrentUser && onToggleRecipient) {
                         onToggleRecipient(user.socketId);
                       }
@@ -367,10 +415,13 @@ const UserList = ({
                       <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-[10px] sm:text-xs text-white font-black tracking-tighter shadow-md shadow-black/10 ring-2 ring-white/10 ${getAvatarColor(user.nickname)}`}>
                         {getInitials(user.nickname)}
                       </div>
-                      {!isCurrentUser && onToggleRecipient && (
-                        <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center ${selectedRecipients.includes(user.socketId) ? `bg-${vibeAccent}-500` : 'bg-gray-200 dark:bg-gray-600'
+                      {!isCurrentUser && (forkMode || onToggleRecipient) && (
+                        <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center ${
+                          forkMode
+                            ? forkTargets.has(user.socketId) ? 'bg-indigo-500' : 'bg-gray-200 dark:bg-gray-600'
+                            : selectedRecipients.includes(user.socketId) ? `bg-${vibeAccent}-500` : 'bg-gray-200 dark:bg-gray-600'
                           }`}>
-                          {selectedRecipients.includes(user.socketId) && <Check className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white stroke-[3]" />}
+                          {(forkMode ? forkTargets.has(user.socketId) : selectedRecipients.includes(user.socketId)) && <Check className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white stroke-[3]" />}
                         </div>
                       )}
                     </div>

@@ -708,7 +708,7 @@ app.post('/api/verbal-join', async (req, res) => {
 
 app.post('/api/rooms', requireDeviceAttestation, async (req, res) => {
   try {
-    const { messageTTL, password, maxUsers, capToken, creatorId, persistenceMode, customCode, hp_email, hp_website, hp_timestamp, autoApprove, preApprovedList } = req.body;
+    const { messageTTL, password, maxUsers, capToken, creatorId, persistenceMode, customCode, hp_email, hp_website, hp_timestamp, autoApprove, preApprovedList, scheduledFor } = req.body;
 
     // Verify Play Integrity token for Android clients (middleware sets req.deviceAttestation)
     if (req.deviceAttestation?.platform === 'android') {
@@ -780,6 +780,21 @@ app.post('/api/rooms', requireDeviceAttestation, async (req, res) => {
       roomData[roomCode] = { hostId: null, lobbyLimit: 100, lobbyCount: 0, userRoles: {} };
     }
     roomData[roomCode].autoApprove = !!autoApprove;
+
+    // Scheduled room support
+    if (scheduledFor) {
+      const ts = new Date(scheduledFor).getTime();
+      if (!isNaN(ts) && ts > Date.now()) {
+        roomData[roomCode].scheduledFor = ts;
+        const delay = ts - Date.now();
+        setTimeout(() => {
+          if (roomData[roomCode]) roomData[roomCode].scheduledFor = null;
+          io.to(`waiting:${roomCode}`).emit('room-opening', { roomCode });
+          io.to(roomCode).emit('room-opening', { roomCode });
+        }, delay);
+      }
+    }
+
     if (Array.isArray(preApprovedList)) {
       roomData[roomCode].preApprovedList = preApprovedList
         .filter(entry => entry && typeof entry.name === 'string' && entry.name.trim().length > 0)
@@ -794,7 +809,7 @@ app.post('/api/rooms', requireDeviceAttestation, async (req, res) => {
       roomData[roomCode].preApprovedList = [];
     }
 
-    res.json({ success: true, roomCode });
+    res.json({ success: true, roomCode, scheduledFor: roomData[roomCode]?.scheduledFor || null });
   } catch (error) {
     logger.error('Error creating room via HTTP:', error);
     // Never expose raw error.message in production — it can leak internal paths and logic
@@ -1171,7 +1186,7 @@ io.on('connection', (socket) => {
 
   socket.on('create-room', async (data, callback) => {
     try {
-      const { messageTTL, password, maxUsers, customCode, totpEnabled } = data || {};
+      const { messageTTL, password, maxUsers, customCode, totpEnabled, scheduledFor } = data || {};
 
       // logger.info('Creating room with data:', { messageTTL, password, maxUsers });
 
@@ -1209,15 +1224,37 @@ io.on('connection', (socket) => {
         }
       }
 
+      // Validate and store scheduledFor timestamp
+      let parsedScheduledFor = null;
+      if (scheduledFor) {
+        const ts = new Date(scheduledFor).getTime();
+        if (!isNaN(ts) && ts > Date.now()) {
+          parsedScheduledFor = ts;
+        }
+      }
+
       // Initialize room metadata for Lobby/Host logic
       roomData[roomCode] = {
         hostId: socket.id,
         lobbyLimit: (settings.maxUsers || 50) * 2, // Default 2x max users
         lobbyCount: 0,
         totpSecret: totpSecret || undefined, // undefined = TOTP not required
+        scheduledFor: parsedScheduledFor,
       };
 
-      callback({ success: true, roomCode, totpSecret }); // creator receives the secret to share
+      // Schedule room-opening broadcast
+      if (parsedScheduledFor) {
+        const delay = parsedScheduledFor - Date.now();
+        setTimeout(() => {
+          if (roomData[roomCode]) roomData[roomCode].scheduledFor = null;
+          // Notify waiters in the waiting room
+          io.to(`waiting:${roomCode}`).emit('room-opening', { roomCode });
+          // Also notify the host who is already in the room
+          io.to(roomCode).emit('room-opening', { roomCode });
+        }, delay);
+      }
+
+      callback({ success: true, roomCode, totpSecret, scheduledFor: parsedScheduledFor }); // creator receives the secret to share
     } catch (error) {
       logger.error('Error creating room:', error);
       callback({ success: false, error: 'Failed to create room' });
@@ -2065,6 +2102,14 @@ io.on('connection', (socket) => {
         // Successful join - clear any failed attempts
         securityManager.clearFailedAttempts(socket.id);
 
+        // Scheduled room — block entry until open time (host may still join)
+        const rd = roomData[roomCode];
+        if (rd?.scheduledFor && socket.id !== rd.hostId) {
+          // Put waiter in a waiting room so they receive room-opening
+          socket.join(`waiting:${roomCode}`);
+          return callback({ success: false, scheduledFor: rd.scheduledFor, error: 'room-not-open-yet' });
+        }
+
         // logger.info(`User ${userNickname} (${socket.id}) successfully joined room ${roomCode}`);
         socket.join(roomCode);
         ensureRoomChaff(roomCode); // Start traffic-analysis-resistant chaff
@@ -2111,6 +2156,9 @@ io.on('connection', (socket) => {
           autoApprove: roomData[roomCode].autoApprove || false,
           preApprovedList: roomData[roomCode].preApprovedList || [],
           pinnedMessage: roomData[roomCode].pinnedMessage || null,
+          playlist: roomData[roomCode].playlist || [],
+          playlistIndex: roomData[roomCode].playlistIndex ?? -1,
+          playlistStartedAt: roomData[roomCode].playlistStartedAt || null,
         };
 
         const enrichedUsers = getEnrichedUsers(roomCode);
@@ -3037,6 +3085,16 @@ io.on('connection', (socket) => {
     });
   });
 
+  // ─── Live Typing Preview (opt-in ghost text) ────────────────
+  socket.on('typing-preview', ({ partial } = {}) => {
+    if (!socket.roomCode || typeof partial !== 'string') return;
+    socket.to(socket.roomCode).emit('typing-preview-received', {
+      partial: partial.slice(0, 500), // safety cap
+      nickname: socket.nickname,
+      socketId: socket.id,
+    });
+  });
+
   // ─── Floating Room Reactions ────────────────────────────────
   socket.on('send-room-reaction', ({ emoji }) => {
     if (!socket.roomCode || !emoji) return;
@@ -3071,6 +3129,114 @@ io.on('connection', (socket) => {
     if (!rd || rd.hostId !== socket.id) return; // host only
     rd.pinnedMessage = null;
     io.to(socket.roomCode).emit('message-unpinned');
+  });
+
+  // ─── Room Forking (host only) ───
+  socket.on('fork-room', async ({ targetSocketIds } = {}) => {
+    const roomCode = socket.roomCode;
+    if (!roomCode || !Array.isArray(targetSocketIds) || targetSocketIds.length === 0) return;
+    const rd = roomData[roomCode];
+    if (!rd || rd.hostId !== socket.id) return; // host only
+
+    try {
+      const parentRoom = await roomManager.getRoom(roomCode);
+      const newSettings = {
+        password: parentRoom?.settings?.password || '',
+        maxUsers: parentRoom?.settings?.maxUsers || 50,
+      };
+      const newRoomCode = await roomManager.createRoom(newSettings);
+      roomData[newRoomCode] = {
+        hostId: socket.id,
+        lobbyLimit: (newSettings.maxUsers || 50) * 2,
+        lobbyCount: 0,
+        userRoles: {},
+        vibe: rd.vibe || 'default',
+        topic: '',
+        timer: null,
+      };
+      // Notify each target
+      targetSocketIds.forEach(sid => {
+        const target = io.sockets.sockets.get(sid);
+        if (target) {
+          target.emit('room-fork-invite', {
+            newRoomCode,
+            fromNickname: socket.nickname || 'Host',
+          });
+        }
+      });
+      // Host gets the new room code too
+      socket.emit('room-fork-invite', { newRoomCode, fromNickname: socket.nickname || 'Host', isHost: true });
+    } catch (err) {
+      logger.error('fork-room error:', err);
+    }
+  });
+
+  // ─── Collaborative Playlist ───
+  socket.on('playlist-add', ({ url, title, addedBy } = {}) => {
+    const rc = socket.roomCode;
+    if (!rc || !url || typeof url !== 'string') return;
+    const rd = roomData[rc];
+    if (!rd) return;
+    rd.playlist = rd.playlist || [];
+    const track = { url: url.slice(0, 1000), title: (title || url).slice(0, 100), addedBy: addedBy || socket.nickname || 'Someone' };
+    rd.playlist.push(track);
+    io.to(rc).emit('playlist-track-added', { track });
+  });
+
+  socket.on('playlist-next', () => {
+    const rc = socket.roomCode;
+    if (!rc) return;
+    const rd = roomData[rc];
+    if (!rd?.playlist?.length) return;
+    rd.playlistIndex = (rd.playlistIndex ?? -1) + 1;
+    const track = rd.playlist[rd.playlistIndex];
+    if (!track) return;
+    const startedAt = Date.now();
+    rd.playlistStartedAt = startedAt;
+    io.to(rc).emit('playlist-playing', { url: track.url, title: track.title, startedAt });
+  });
+
+  // ─── Hot Seat ───
+  socket.on('hotSeat-start', ({ targetNickname } = {}) => {
+    const rc = socket.roomCode;
+    if (!rc || !targetNickname) return;
+    const rd = roomData[rc];
+    if (!rd || rd.hostId !== socket.id) return;
+    rd.hotSeatTarget = targetNickname;
+    rd.hotSeatQueue = [];
+    io.to(rc).emit('hotSeat-started', { targetNickname });
+  });
+
+  socket.on('hotSeat-question', ({ text } = {}) => {
+    const rc = socket.roomCode;
+    if (!rc || !text || typeof text !== 'string') return;
+    const rd = roomData[rc];
+    if (!rd?.hotSeatTarget) return;
+    const safe = text.trim().slice(0, 200);
+    if (!safe) return;
+    rd.hotSeatQueue = rd.hotSeatQueue || [];
+    rd.hotSeatQueue.push(safe);
+    // Broadcast anonymously — no sender info
+    io.to(rc).emit('hotSeat-question-received', { text: safe });
+  });
+
+  socket.on('hotSeat-next', () => {
+    const rc = socket.roomCode;
+    if (!rc) return;
+    const rd = roomData[rc];
+    if (!rd?.hotSeatTarget || !Array.isArray(rd.hotSeatQueue)) return;
+    const q = rd.hotSeatQueue.shift() || null;
+    io.to(rc).emit('hotSeat-next-question', { question: q });
+  });
+
+  socket.on('hotSeat-end', () => {
+    const rc = socket.roomCode;
+    if (!rc) return;
+    const rd = roomData[rc];
+    if (!rd || rd.hostId !== socket.id) return;
+    rd.hotSeatTarget = null;
+    rd.hotSeatQueue = [];
+    io.to(rc).emit('hotSeat-ended');
   });
 
   // ─── Confetti Bomb (rate-limited: 1 per 10 s per socket) ───

@@ -33,6 +33,7 @@ import {
   Sparkles,
   Volume2,
   VolumeX,
+  Search,
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -72,6 +73,10 @@ import GhostWatermark from './GhostWatermark';
 import TopicEditor from './TopicEditor';
 import TimerModal from './TimerModal';
 import PinnedMessageBanner from './PinnedMessageBanner';
+import RoomCountdown from './RoomCountdown';
+import HotSeat from './HotSeat';
+import TypingPreview from './TypingPreview';
+import CollabPlaylist from './CollabPlaylist';
 import EditMessageModal from './EditMessageModal';
 import DragDropOverlay from './DragDropOverlay';
 import ActivityLog from './ActivityLog';
@@ -87,6 +92,8 @@ import { RefreshButton } from './PWAHandler';
 import { getCreatorId } from '../utils/creator';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess } from '../utils/platform';
 import { useSoundFX } from '../hooks/useSoundFX';
+import { useMessageSearch } from '../hooks/useMessageSearch';
+import MessageSearch from './MessageSearch';
 import FileTransferModal from './FileTransferModal';
 import { toast } from 'react-toastify';
 import { Capacitor } from '@capacitor/core';
@@ -104,7 +111,9 @@ const SLASH_COMMANDS = [
   { icon: Edit2, label: 'Topic', value: '/topic', desc: 'Set room topic', adminOnly: true },
   { icon: Clock, label: 'Timer', value: '/timer', desc: 'Start a countdown', adminOnly: true },
   { icon: Activity, label: 'Vibe', value: '/vibe', desc: 'Change room vibe', adminOnly: true },
+  { icon: Sparkles, label: 'Hot Seat', value: '/hotSeat', desc: 'Put someone in the hot seat', adminOnly: true },
   { icon: Activity, label: 'Watch Party', value: '/media', desc: 'Share YouTube/SoundCloud' },
+  { icon: Activity, label: 'Playlist', value: '/playlist', desc: 'Open collab playlist' },
 ];
 
 const CONFETTI_COLORS = [
@@ -365,6 +374,8 @@ const ChatRoom = () => {
   const location = useLocation();
   const [isConnected, setIsConnected] = useState(socketManager.isConnected);
   const [isJoined, setIsJoined] = useState(false);
+  const [roomOpensAt, setRoomOpensAt] = useState(null); // ms timestamp — non-null = show countdown
+  const [hotSeatTarget, setHotSeatTarget] = useState(null); // nickname of hot seat subject
   const [showJoinModal, setShowJoinModal] = useState(true);
   const [isProcessingInvite, setIsProcessingInvite] = useState(false);
   const [showFileModal, setShowFileModal] = useState(false);
@@ -574,6 +585,24 @@ const ChatRoom = () => {
   // Sound FX
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('soundFX_enabled') !== 'false');
   const { playMessageSound } = useSoundFX();
+
+  // Message Search (M1)
+  const [showSearch, setShowSearch] = useState(false);
+
+  // Live Typing Preview (M6)
+  const [previewEnabled, setPreviewEnabled] = useState(() => localStorage.getItem('typingPreview_enabled') !== 'false');
+  const previewDebounceRef = useRef(null);
+
+  // Collaborative Playlist (M7)
+  const [showPlaylist, setShowPlaylist] = useState(false);
+  const { query: searchQuery, setQuery: setSearchQuery, results: searchResults, highlightMap, focusedMessageId, focusedIndex, next: searchNext, prev: searchPrev, clear: clearSearch } = useMessageSearch(messages);
+
+  useEffect(() => {
+    if (focusedMessageId) {
+      const el = document.getElementById(focusedMessageId);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [focusedMessageId]);
 
   const toggleSound = useCallback(() => {
     setSoundEnabled(prev => {
@@ -796,6 +825,12 @@ const ChatRoom = () => {
         navigate(`/room/${response.roomCode}`, {
           state: { fromInvite: true, nickname, inviteToken }
         });
+        return;
+      }
+      if (!response.success && response.error === 'room-not-open-yet' && response.scheduledFor) {
+        setRoomOpensAt(response.scheduledFor);
+        setShowJoinModal(false);
+        setIsProcessingInvite(false);
         return;
       }
       if (response.success) {
@@ -1474,6 +1509,24 @@ const ChatRoom = () => {
     socketManager.on('confetti-bomb', handleConfettiBomb);
     socketManager.on('message-pinned', handleMessagePinned);
     socketManager.on('message-unpinned', handleMessageUnpinned);
+    socketManager.on('room-opening', () => setRoomOpensAt(null));
+    socketManager.on('hotSeat-started', ({ targetNickname }) => setHotSeatTarget(targetNickname));
+    socketManager.on('hotSeat-ended', () => setHotSeatTarget(null));
+    socketManager.on('room-fork-invite', ({ newRoomCode, fromNickname, isHost: forkIsHost }) => {
+      toast(
+        <div className="flex flex-col gap-1">
+          <span className="font-bold text-sm">{forkIsHost ? 'Forked room created!' : `${fromNickname} forked the room`}</span>
+          <span className="text-xs text-gray-500">{forkIsHost ? `Room ${newRoomCode} is ready.` : 'You\'ve been invited to a forked room.'}</span>
+          <button
+            onClick={() => { navigate(`/room/${newRoomCode}`); }}
+            className="mt-1 px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 w-fit"
+          >
+            Join {newRoomCode}
+          </button>
+        </div>,
+        { autoClose: 15000 }
+      );
+    });
     socketManager.on('file-transfer-invite', handleFileTransferInvite);
 
     // Screenshot detection handler
@@ -1667,6 +1720,10 @@ const ChatRoom = () => {
       socketManager.off('confetti-bomb', handleConfettiBomb);
       socketManager.off('message-pinned', handleMessagePinned);
       socketManager.off('message-unpinned', handleMessageUnpinned);
+      socketManager.off('room-opening');
+      socketManager.off('room-fork-invite');
+      socketManager.off('hotSeat-started');
+      socketManager.off('hotSeat-ended');
       socketManager.off('file-transfer-invite', handleFileTransferInvite);
       socketManager.off('screenshot-detected', handleScreenshotDetected);
       socketManager.off('auto-approve-updated', handleAutoApproveUpdated);
@@ -2024,6 +2081,17 @@ const ChatRoom = () => {
             if (vibe) handleUpdateVibe(vibe.id);
           }
           break;
+        case '/playlist':
+          setShowPlaylist(true);
+          break;
+        case '/hotseat':
+        case '/hotSeat':
+          if (isHost) {
+            const targetNick = args.trim() || users.find(u => u.nickname !== currentUser?.nickname)?.nickname;
+            if (targetNick) socketManager.emit('hotSeat-start', { targetNickname: targetNick });
+            else setError('Usage: /hotSeat <nickname>');
+          } else setError('Only the host can start Hot Seat');
+          break;
         case '/media':
         case '/watch':
         case '/watchparty':
@@ -2130,6 +2198,11 @@ const ChatRoom = () => {
       // during isSending to prevent the OS from auto-blurring (which hides keyboard).
       setNewMessage('');
       setReplyingTo(null);
+      // Clear live preview for others
+      if (previewEnabled) {
+        if (previewDebounceRef.current) clearTimeout(previewDebounceRef.current);
+        socketManager.emit('typing-preview', { partial: '' });
+      }
 
       // Focus the input to ensure keyboard stays up
       if (messageInputRef.current) {
@@ -2234,6 +2307,10 @@ const ChatRoom = () => {
     socketManager.emit('unpin-message');
   }, []);
 
+  const handleForkRoom = useCallback((targetSocketIds) => {
+    socketManager.emit('fork-room', { targetSocketIds });
+  }, []);
+
   const handleReaction = (messageId, emoji) => {
     spawnMessageReaction(messageId, emoji);
     socketManager.emit('add-reaction', { messageId, emoji });
@@ -2262,13 +2339,20 @@ const ChatRoom = () => {
     e.stopPropagation();
   };
 
-  const handleTyping = () => {
+  const handleTyping = (partial) => {
     if (isStealthMode || isAnonymousMode) return; // Block typing indicator in stealth/anon mode
     socketManager.emit('typing', { roomCode });
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
       socketManager.emit('stop-typing', { roomCode });
     }, 1000);
+    // Live preview — debounced at 200ms
+    if (previewEnabled && typeof partial === 'string') {
+      if (previewDebounceRef.current) clearTimeout(previewDebounceRef.current);
+      previewDebounceRef.current = setTimeout(() => {
+        socketManager.emit('typing-preview', { partial });
+      }, 200);
+    }
   };
 
   const handleSendPulse = () => {
@@ -2783,6 +2867,20 @@ const ChatRoom = () => {
             </button>
             <RefreshButton />
             <button
+              onClick={() => { setShowSearch(s => !s); if (showSearch) clearSearch(); }}
+              className={`p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors ${showSearch ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300'}`}
+              title="Search messages"
+            >
+              <Search className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => { const next = !previewEnabled; setPreviewEnabled(next); localStorage.setItem('typingPreview_enabled', String(next)); }}
+              className={`p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-xs font-black ${previewEnabled ? 'text-teal-600 dark:text-teal-400' : 'text-gray-400 dark:text-gray-500'}`}
+              title={previewEnabled ? 'Live preview on — others see your typing' : 'Live preview off'}
+            >
+              👁
+            </button>
+            <button
               onClick={toggleSound}
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               title={soundEnabled ? 'Sound FX on — click to mute' : 'Sound FX off — click to enable'}
@@ -2816,6 +2914,14 @@ const ChatRoom = () => {
 
       <div className={`flex-1 flex overflow-hidden min-h-0 ${sidebarPosition === 'left' ? 'flex-row-reverse' : ''}`}>
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
+          {/* ── Scheduled room countdown ── */}
+          {roomOpensAt && (
+            <RoomCountdown
+              opensAt={roomOpensAt}
+              roomCode={roomCode}
+              onOpen={() => setRoomOpensAt(null)}
+            />
+          )}
           {/* ── Compact info bar: now inside the center column for better sidebar alignment ── */}
           {(getVibeById(roomVibe)?.moodSound || roomTopic || activeTimer) && (
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full mx-4 my-2 shadow-sm w-fit max-w-[calc(100%-2rem)] ${getVibeById(roomVibe).panelClass} overflow-x-auto scrollbar-none shrink-0 animate-in fade-in slide-in-from-top-2 duration-300`}>
@@ -2867,6 +2973,25 @@ const ChatRoom = () => {
               }
             }}
           />
+          {hotSeatTarget && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-red-50/90 dark:bg-red-900/20 border-b border-red-100 dark:border-red-800/30">
+              <span className="text-base">🎤</span>
+              <span className="text-xs font-bold text-red-700 dark:text-red-400 flex-1 truncate">
+                {hotSeatTarget} is in the Hot Seat!
+              </span>
+            </div>
+          )}
+          {showSearch && (
+            <MessageSearch
+              query={searchQuery}
+              setQuery={setSearchQuery}
+              results={searchResults}
+              focusedIndex={focusedIndex}
+              onNext={searchNext}
+              onPrev={searchPrev}
+              onClose={() => { setShowSearch(false); clearSearch(); }}
+            />
+          )}
           <div
             ref={messagesContainerRef}
             onScroll={handleScroll}
@@ -2920,6 +3045,8 @@ const ChatRoom = () => {
                 setReactionTargetId(messageId);
                 setShowEmojiPicker(true);
               }}
+              highlightMap={highlightMap}
+              focusedMessageId={focusedMessageId}
             />
             <div ref={messagesEndRef} />
           </div>
@@ -2952,6 +3079,7 @@ const ChatRoom = () => {
               </div>
             )}
 
+            {!isStealthMode && <TypingPreview />}
             {typingUsers.size > 0 && !isStealthMode && (
               <div className="px-4 py-1 text-xs text-gray-600 dark:text-gray-400 italic animate-pulse bg-black/5 dark:bg-white/5">
                 {Array.from(typingUsers.values()).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
@@ -3295,7 +3423,7 @@ const ChatRoom = () => {
                         ref={messageInputRef}
                         type="text"
                         value={newMessage}
-                        onChange={(e) => { setNewMessage(e.target.value); handleTyping(); }}
+                        onChange={(e) => { setNewMessage(e.target.value); handleTyping(e.target.value); }}
                         onKeyDown={handleKeyDown}
                         onCopy={(e) => e.preventDefault()}
                         onCut={(e) => e.preventDefault()}
@@ -3490,6 +3618,7 @@ const ChatRoom = () => {
               onUpdatePreApprovedList={handleUpdatePreApprovedList}
               onPreApprovedFileUpload={handlePreApprovedFileUpload}
               parsePreApprovedText={parsePreApprovedText}
+              onForkRoom={handleForkRoom}
             />
           </div>
         )}
@@ -3526,6 +3655,7 @@ const ChatRoom = () => {
                   onUpdatePreApprovedList={handleUpdatePreApprovedList}
                   onPreApprovedFileUpload={handlePreApprovedFileUpload}
                   parsePreApprovedText={parsePreApprovedText}
+                  onForkRoom={handleForkRoom}
                 />
               </div>
             </div>
@@ -3534,6 +3664,21 @@ const ChatRoom = () => {
       }
 
       {showCallModal && <AudioCallModal isOpen={showCallModal} onClose={() => setShowCallModal(false)} roomCode={roomCode} />}
+      {hotSeatTarget && (
+        <HotSeat
+          hotSeatTarget={hotSeatTarget}
+          isHotSeat={currentUser?.nickname === hotSeatTarget}
+          isHost={isHost}
+          onEnd={() => socketManager.emit('hotSeat-end')}
+        />
+      )}
+      <CollabPlaylist
+        isOpen={showPlaylist}
+        onClose={() => setShowPlaylist(false)}
+        isHost={isHost}
+        currentUser={currentUser}
+        roomCode={roomCode}
+      />
       <WatchPartyModal
         isOpen={showWatchPartyModal}
         onClose={() => setShowWatchPartyModal(false)}

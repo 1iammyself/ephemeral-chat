@@ -17,7 +17,7 @@ import { FileOpener } from '@capacitor-community/file-opener';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀', '🍕', '🍔', '🍦', '🍩', '🍺', '🎸', '🎮', '🚀', '🌈', '🍄'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onPin, isHost, pinnedMessageId, roomVibe, linkPreviews = {}, onOpenEmojiPicker }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onPin, isHost, pinnedMessageId, roomVibe, linkPreviews = {}, onOpenEmojiPicker, highlightMap = {}, focusedMessageId = null }) => {
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
   const [contextMenu, setContextMenu] = useState(null); // { messageId, x, y }
@@ -447,7 +447,9 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                       </div>
                     ) : (
                       <div className="text-[15px] leading-[1.35] select-text whitespace-pre-wrap break-words">
-                        {renderMessageContent(message.content, currentUser, handleLinkClick)}
+                        {highlightMap[message.id]
+                          ? renderHighlightedContent(message.content, highlightMap[message.id], message.id === focusedMessageId, currentUser, handleLinkClick)
+                          : renderMessageContent(message.content, currentUser, handleLinkClick)}
                         {message.isEdited && <span className="text-[10px] opacity-50 italic ml-1">(edited)</span>}
                       </div>
                     )}
@@ -741,6 +743,20 @@ async function downloadFile(base64Content, mimeType, fileName) {
       window.open(`data:${safeType};base64,${base64Content}`, '_blank');
     } catch (_) { /* silent */ }
   }
+}
+
+function renderHighlightedContent(content, { start, end }, isFocused, currentUser, onLinkClick) {
+  if (!content || start == null) return renderMessageContent(content, currentUser, onLinkClick);
+  const before = content.slice(0, start);
+  const match = content.slice(start, end);
+  const after = content.slice(end);
+  return (
+    <>
+      {renderMessageContent(before, currentUser, onLinkClick)}
+      <mark className={`rounded px-px ${isFocused ? 'bg-orange-400 text-white' : 'bg-yellow-200 dark:bg-yellow-700/60 text-inherit'}`}>{match}</mark>
+      {renderMessageContent(after, currentUser, onLinkClick)}
+    </>
+  );
 }
 
 function renderMessageContent(content, currentUser, onLinkClick) {
