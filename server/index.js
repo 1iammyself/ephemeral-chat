@@ -2280,7 +2280,7 @@ io.on('connection', (socket) => {
           isInviteOnly: result.room.settings?.isInviteOnly || false,
           inactivityTimeoutMs: securityManager.INACTIVITY_TIMEOUT_MS,
           sessionToken,
-          activeMedia: []
+          activeMedia: rd?.activeMedia || []
         });
 
         // Sync active hot seat to late joiners
@@ -3443,6 +3443,133 @@ io.on('connection', (socket) => {
     if (!rd || rd.hostId !== socket.id) return;
     rd.musicState = null;
     io.to(rc).emit('music-state', { url: null, title: '', playing: false, startedAt: null, pausePosition: 0 });
+  });
+
+  // ─── Music Room: file upload via Socket.IO (bypasses HTTP body limits) ───
+  socket.on('music-upload', ({ data, filename } = {}) => {
+    const rc = socket.roomCode;
+    if (!rc || !data || !filename) return;
+    const rd = roomData[rc];
+    if (!rd || rd.hostId !== socket.id) return;
+    try {
+      const mimeMatch = data.match(/^data:(audio\/[a-zA-Z0-9+.-]+);base64,/);
+      if (!mimeMatch) { socket.emit('music-upload-error', { error: 'Only audio files are allowed' }); return; }
+      const mime = mimeMatch[1];
+      const base64 = data.replace(/^data:[^,]+,/, '');
+      const buf = Buffer.from(base64, 'base64');
+      if (buf.length > 8 * 1024 * 1024) { socket.emit('music-upload-error', { error: 'File exceeds 8 MB limit' }); return; }
+      const ext = mime.split('/')[1].replace(/[^a-z0-9]/g, '').substring(0, 8) || 'bin';
+      const fileId = nodeCrypto.randomBytes(12).toString('hex');
+      const storedName = `${fileId}.${ext}`;
+      const filePath = path.join(AUDIO_DIR, storedName);
+      fs.writeFileSync(filePath, buf);
+      if (!roomAudioFiles[rc]) roomAudioFiles[rc] = [];
+      roomAudioFiles[rc].push(storedName);
+      socket.emit('music-upload-done', { audioUrl: `/audio/${storedName}`, title: filename });
+    } catch {
+      socket.emit('music-upload-error', { error: 'Upload failed on server' });
+    }
+  });
+
+  // ─── Watch Party (synchronized media sharing) ────────────────────────────
+  const SAFE_MEDIA_TYPES_WP = new Set(['youtube', 'soundcloud', 'figma', 'gdrive', 'docs']);
+  const SAFE_MEDIA_ORIGINS_WP = {
+    youtube: /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)\//,
+    soundcloud: /^https?:\/\/(www\.)?soundcloud\.com\//,
+    figma: /^https?:\/\/(www\.)?figma\.com\//,
+    gdrive: /^https?:\/\/(www\.|docs\.|drive\.)?google\.com\//,
+    docs: /^https?:\/\/(www\.|docs\.|drive\.)?google\.com\//,
+  };
+
+  socket.on('media-share', (data) => {
+    const rc = socket.roomCode;
+    if (!rc) return;
+    // Relay encrypted payloads without validation (clients decrypt and validate)
+    if ((data?.v === 4 && data?.ct) || (data?.v === 3 && data?.mls)) {
+      io.to(rc).emit('media-share', data);
+      return;
+    }
+    const type = typeof data?.type === 'string' ? data.type : '';
+    if (!SAFE_MEDIA_TYPES_WP.has(type)) return;
+    const url = typeof data?.url === 'string' ? data.url : '';
+    if (!url || url.length > 2048) return;
+    const lower = url.toLowerCase().trim();
+    if (lower.startsWith('javascript:') || lower.startsWith('data:') || lower.startsWith('vbscript:')) return;
+    if (!SAFE_MEDIA_ORIGINS_WP[type]?.test(url)) return;
+    if (type === 'youtube' && (!data?.id || !/^[a-zA-Z0-9_-]{11}$/.test(data.id))) return;
+    const mediaId = (typeof data?.mediaId === 'string' && data.mediaId.length < 80)
+      ? data.mediaId
+      : `m-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const mediaItem = {
+      mediaId, type,
+      id: data?.id || null,
+      service: data?.service || null,
+      query: data?.query || null,
+      url,
+      sharedBy: typeof data?.sharedBy === 'string' ? data.sharedBy.substring(0, 30) : 'Someone',
+    };
+    const rd = roomData[rc];
+    if (rd) {
+      if (!rd.activeMedia) rd.activeMedia = [];
+      if (!rd.activeMedia.some(m => m.mediaId === mediaId)) rd.activeMedia.push(mediaItem);
+    }
+    io.to(rc).emit('media-share', mediaItem);
+  });
+
+  socket.on('media-sync', (data) => {
+    const rc = socket.roomCode;
+    if (!rc) return;
+    socket.to(rc).emit('media-sync', data);
+  });
+
+  socket.on('media-close', (data) => {
+    const rc = socket.roomCode;
+    if (!rc) return;
+    const mediaId = data?.mediaId;
+    const rd = roomData[rc];
+    if (rd?.activeMedia) {
+      rd.activeMedia = mediaId
+        ? rd.activeMedia.filter(m => m.mediaId !== mediaId)
+        : [];
+    }
+    io.to(rc).emit('media-close', { mediaId });
+  });
+
+  socket.on('media-join', () => {
+    const rc = socket.roomCode;
+    if (!rc) return;
+    if (!io._mediaWatchers) io._mediaWatchers = {};
+    if (!io._mediaWatchers[rc]) io._mediaWatchers[rc] = new Set();
+    io._mediaWatchers[rc].add(socket.id);
+    io.to(rc).emit('media-sync-count', { count: io._mediaWatchers[rc].size });
+  });
+
+  socket.on('media-leave', () => {
+    const rc = socket.roomCode;
+    if (!rc) return;
+    if (io._mediaWatchers?.[rc]) {
+      io._mediaWatchers[rc].delete(socket.id);
+      const count = io._mediaWatchers[rc].size;
+      if (count === 0) delete io._mediaWatchers[rc];
+      else io.to(rc).emit('media-sync-count', { count });
+    }
+  });
+
+  socket.on('media-request-sync', ({ mediaId } = {}) => {
+    const rc = socket.roomCode;
+    if (!rc) return;
+    socket.to(rc).emit('media-request-sync', { mediaId, requesterId: socket.id });
+  });
+
+  socket.on('media-recover-request', (data = {}) => {
+    const rc = socket.roomCode;
+    if (!rc) return;
+    socket.to(rc).emit('media-recover-request', { ...data, requesterId: socket.id });
+  });
+
+  socket.on('media-recover-response', (data = {}) => {
+    const requesterId = data?.requesterId;
+    if (requesterId) io.to(requesterId).emit('media-share', data);
   });
 
   // ─── Confetti Bomb (rate-limited: 1 per 10 s per socket) ───

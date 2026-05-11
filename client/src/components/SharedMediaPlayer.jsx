@@ -113,6 +113,27 @@ function loadYouTubeApi() {
   });
 }
 
+// ─── SoundCloud Widget API loader ──────────────────────────────────────
+let scApiLoaded = false;
+let scApiCallbacks = [];
+
+function loadSoundCloudApi() {
+  return new Promise((resolve) => {
+    if (scApiLoaded && window.SC?.Widget) { resolve(); return; }
+    scApiCallbacks.push(resolve);
+    if (document.querySelector('script[src*="w.soundcloud.com/player/api.js"]')) return;
+
+    const tag = document.createElement('script');
+    tag.src = 'https://w.soundcloud.com/player/api.js';
+    tag.onload = () => {
+      scApiLoaded = true;
+      scApiCallbacks.forEach(cb => cb());
+      scApiCallbacks = [];
+    };
+    document.head.appendChild(tag);
+  });
+}
+
 // ─── Formatters ────────────────────────────────────────────────────────
 function formatTime(seconds) {
   if (!seconds || isNaN(seconds)) return '0:00';

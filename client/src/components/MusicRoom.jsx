@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { Music, Play, Pause, Volume2, VolumeX, Wifi, WifiOff, Square, ListMusic, Upload, Loader2 } from 'lucide-react';
 import { useSyncPlayback } from '../hooks/useSyncPlayback';
 import CollabPlaylist from './CollabPlaylist';
+import socketManager from '../socket';
 
 function formatTime(secs) {
   if (!isFinite(secs) || isNaN(secs)) return '0:00';
@@ -77,22 +78,40 @@ export default function MusicRoom({ isOpen, onClose, isHost, embedded = false, r
     try {
       const base64 = await new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = e => resolve(e.target.result);
+        reader.onload = ev => resolve(ev.target.result);
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
 
-      const res = await fetch(`/upload-audio/${roomCode}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: base64, filename: file.name }),
+      await new Promise((resolve, reject) => {
+        let settled = false;
+        const cleanup = () => {
+          socketManager.off('music-upload-done', onDone);
+          socketManager.off('music-upload-error', onErr);
+          clearTimeout(timer);
+        };
+        const onDone = ({ audioUrl, title }) => {
+          if (settled) return; settled = true;
+          cleanup();
+          play(audioUrl, title || file.name);
+          resolve();
+        };
+        const onErr = ({ error }) => {
+          if (settled) return; settled = true;
+          cleanup();
+          reject(new Error(error || 'Upload failed'));
+        };
+        const timer = setTimeout(() => {
+          if (settled) return; settled = true;
+          cleanup();
+          reject(new Error('Upload timed out — try a smaller file'));
+        }, 30000);
+        socketManager.on('music-upload-done', onDone);
+        socketManager.on('music-upload-error', onErr);
+        socketManager.emit('music-upload', { data: base64, filename: file.name });
       });
-      const json = await res.json();
-      if (!res.ok) { setUploadErr(json.error || 'Upload failed'); return; }
-
-      play(json.audioUrl, json.title || file.name);
-    } catch {
-      setUploadErr('Upload failed — check your connection');
+    } catch (err) {
+      setUploadErr(err.message || 'Upload failed — try again');
     } finally {
       setUploading(false);
     }
