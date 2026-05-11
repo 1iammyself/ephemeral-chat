@@ -119,7 +119,7 @@ let scApiCallbacks = [];
 
 function loadSoundCloudApi() {
   return new Promise((resolve) => {
-    if (scApiLoaded && window.SC?.Widget) { resolve(); return; }
+    if (window.SC?.Widget) { scApiLoaded = true; resolve(); return; }
     scApiCallbacks.push(resolve);
     if (document.querySelector('script[src*="w.soundcloud.com/player/api.js"]')) return;
 
@@ -127,8 +127,12 @@ function loadSoundCloudApi() {
     tag.src = 'https://w.soundcloud.com/player/api.js';
     tag.onload = () => {
       scApiLoaded = true;
-      scApiCallbacks.forEach(cb => cb());
-      scApiCallbacks = [];
+      const cbs = scApiCallbacks.splice(0);
+      cbs.forEach(cb => cb());
+    };
+    tag.onerror = () => {
+      const cbs = scApiCallbacks.splice(0);
+      cbs.forEach(cb => cb()); // resolve anyway — Widget check handles failure
     };
     document.head.appendChild(tag);
   });
@@ -405,26 +409,26 @@ const SingleMediaPlayer = ({
         });
       });
     } else if (mediaInfo.type === 'soundcloud') {
+      // Iframe src is already set in JSX — just load the Widget API and bind events.
+      // SC.Widget() buffers commands until the READY event fires internally,
+      // so we don't need to wait for iframe.onload.
       loadSoundCloudApi().then(() => {
         const iframe = document.getElementById(embedId);
-        if (!iframe) return;
-        iframe.src = `https://w.soundcloud.com/player/?url=${encodeURIComponent(mediaInfo.url)}&auto_play=false&show_artwork=true&visual=true&color=%236366f1`;
-        iframe.onload = () => {
-          const widget = window.SC.Widget(iframe);
-          scWidgetRef.current = widget;
-          widget.bind(window.SC.Widget.Events.READY, () => {
-            widget.getDuration((d) => setDuration(d / 1000));
-          });
-          widget.bind(window.SC.Widget.Events.PLAY, () => setIsPlaying(true));
-          widget.bind(window.SC.Widget.Events.PAUSE, () => setIsPlaying(false));
-          widget.bind(window.SC.Widget.Events.PLAY_PROGRESS, (e) => {
-            setCurrentTime(e.currentPosition / 1000);
-          });
-          widget.bind(window.SC.Widget.Events.FINISH, () => {
-            setIsPlaying(false);
-            setCurrentTime(0);
-          });
-        };
+        if (!iframe || !window.SC?.Widget) return;
+        const widget = window.SC.Widget(iframe);
+        scWidgetRef.current = widget;
+        widget.bind(window.SC.Widget.Events.READY, () => {
+          widget.getDuration((d) => setDuration(d / 1000));
+        });
+        widget.bind(window.SC.Widget.Events.PLAY, () => setIsPlaying(true));
+        widget.bind(window.SC.Widget.Events.PAUSE, () => setIsPlaying(false));
+        widget.bind(window.SC.Widget.Events.PLAY_PROGRESS, (e) => {
+          setCurrentTime(e.currentPosition / 1000);
+        });
+        widget.bind(window.SC.Widget.Events.FINISH, () => {
+          setIsPlaying(false);
+          setCurrentTime(0);
+        });
       });
     } else if (mediaInfo.type === 'figma') {
       const iframe = document.getElementById(embedId);
@@ -656,6 +660,16 @@ const SingleMediaPlayer = ({
             {/* Unique embed ID per card */}
             {mediaInfo.type === 'youtube' ? (
               <div id={embedId} className="w-full h-full" />
+            ) : mediaInfo.type === 'soundcloud' ? (
+              <iframe
+                id={embedId}
+                className="w-full h-full"
+                src={`https://w.soundcloud.com/player/?url=${encodeURIComponent(mediaInfo.url)}&auto_play=false&show_artwork=true&visual=true&color=6366f1`}
+                scrolling="no"
+                frameBorder="no"
+                allow="autoplay; fullscreen"
+                referrerPolicy="strict-origin-when-cross-origin"
+              />
             ) : (
               <iframe
                 id={embedId}
