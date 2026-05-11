@@ -46,28 +46,28 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default', embed
   if (!isOpen && !embedded) return null;
 
   const modalContent = (
-    <div className={embedded ? "w-full h-full bg-white dark:bg-gray-900 overflow-hidden" : "relative w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-black/10 dark:border-white/10 overflow-hidden animate-in zoom-in-95 duration-200"}>
-        {/* Header */}
-        <div className={`flex items-center justify-between px-5 py-4 border-b border-black/10 dark:border-white/10 bg-gradient-to-r from-${vibeAccent}-50/50 dark:from-${vibeAccent}-950/30 to-transparent`}>
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 flex items-center justify-center`}>
-              <Radio className={`w-5 h-5 text-${vibeAccent}-500`} />
+    <div className={embedded ? "w-full h-full flex flex-col overflow-hidden" : "relative w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-black/10 dark:border-white/10 overflow-hidden animate-in zoom-in-95 duration-200"}>
+
+        {/* Header — hide when inside FloatingPanel */}
+        {!embedded && (
+          <div className={`flex items-center justify-between px-5 py-4 border-b border-black/10 dark:border-white/10 bg-gradient-to-r from-${vibeAccent}-50/50 dark:from-${vibeAccent}-950/30 to-transparent`}>
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/40 flex items-center justify-center`}>
+                <Radio className={`w-5 h-5 text-${vibeAccent}-500`} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">Watch Party</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Share media with everyone in the room</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">Watch Party</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Share media with everyone in the room</p>
-            </div>
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors">
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
-          >
-            <X className="w-5 h-5 text-gray-400" />
-          </button>
-        </div>
+        )}
 
         {/* Body */}
-        <div className="p-5 space-y-4">
+        <div className={embedded ? "flex-1 overflow-y-auto p-5 space-y-4" : "p-5 space-y-4"}>
           {/* URL Input */}
           <div className={`flex items-center gap-3 bg-gray-50 dark:bg-gray-800/80 border-2 rounded-xl px-4 py-3 transition-colors ${detected ? `border-${vibeAccent}-400 dark:border-${vibeAccent}-500` : 'border-gray-200 dark:border-gray-700 focus-within:border-gray-300 dark:focus-within:border-gray-600'} `}>
             <Link className={`w-5 h-5 flex-shrink-0 ${detected ? `text-${vibeAccent}-500` : 'text-gray-500 dark:text-gray-400'}`} />
@@ -138,7 +138,7 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default', embed
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-black/10 dark:border-white/10 flex items-center justify-end gap-3">
+        <div className={`px-5 py-4 flex items-center justify-end gap-3 flex-shrink-0 ${embedded ? 'border-t border-white/[0.07]' : 'border-t border-black/10 dark:border-white/10'}`}>
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
@@ -162,7 +162,7 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default', embed
       </div>
   );
 
-  if (embedded) return <div className="w-full h-full overflow-auto">{modalContent}</div>;
+  if (embedded) return <div className="w-full h-full">{modalContent}</div>;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">

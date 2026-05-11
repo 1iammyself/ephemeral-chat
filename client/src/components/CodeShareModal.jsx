@@ -96,25 +96,24 @@ export default function CodeShareModal({ isOpen, onClose, roomCode, onSendCode, 
     >
       <div className={embedded ? "w-full h-full flex flex-col bg-white dark:bg-gray-900 overflow-hidden" : "relative w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden"}>
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <Code2 className="w-5 h-5 text-blue-500" />
-            <span className="font-semibold text-sm dark:text-white">Code Share</span>
-            <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
-              Live · everyone in room can edit
-            </span>
+        {/* Header — hide when inside FloatingPanel */}
+        {!embedded && (
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <Code2 className="w-5 h-5 text-blue-500" />
+              <span className="font-semibold text-sm dark:text-white">Code Share</span>
+              <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
+                Live · everyone in room can edit
+              </span>
+            </div>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+              <X className="w-4 h-4 text-gray-500" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          >
-            <X className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
+        )}
 
         {/* Language selector */}
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 overflow-x-auto">
+        <div className={`flex items-center gap-2 px-4 py-2 flex-shrink-0 overflow-x-auto ${embedded ? 'border-b border-white/[0.07] bg-white/[0.03]' : 'border-b border-gray-200 dark:border-gray-700'}`}>
           {LANGUAGES.map((l) => (
             <button
               key={l.id}
@@ -122,7 +121,9 @@ export default function CodeShareModal({ isOpen, onClose, roomCode, onSendCode, 
               className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                 langId === l.id
                   ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                  : embedded
+                    ? 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-gray-200 border border-white/10'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
               }`}
             >
               {l.label}
@@ -134,7 +135,7 @@ export default function CodeShareModal({ isOpen, onClose, roomCode, onSendCode, 
         <div className="flex-1 overflow-auto min-h-0">
           <CodeMirror
             height="100%"
-            theme={isDark ? oneDark : 'light'}
+            theme={embedded || isDark ? oneDark : 'light'}
             extensions={extensions}
             basicSetup={{
               lineNumbers: true,
@@ -150,12 +151,12 @@ export default function CodeShareModal({ isOpen, onClose, roomCode, onSendCode, 
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+        <div className={`flex items-center justify-between gap-2 px-4 py-3 flex-shrink-0 ${embedded ? 'border-t border-white/[0.07]' : 'border-t border-gray-200 dark:border-gray-700'}`}>
           <span className="text-xs text-gray-400">Changes sync instantly with everyone in the room</span>
           <div className="flex items-center gap-2">
             <button
               onClick={handleCopy}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors dark:text-gray-300"
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors ${embedded ? 'border border-white/10 bg-white/5 text-gray-300 hover:bg-white/10' : 'border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 dark:text-gray-300'}`}
             >
               {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
               {copied ? 'Copied!' : 'Copy'}

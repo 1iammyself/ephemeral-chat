@@ -101,30 +101,33 @@ export default function CollabPlaylist({ isOpen, onClose, isHost, currentUser, r
         onClick={embedded ? undefined : (e) => e.target === e.currentTarget && onClose()}
       >
       <div className={embedded ? "w-full h-full bg-white dark:bg-gray-900 overflow-hidden flex flex-col" : "w-full sm:w-80 bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 flex flex-col max-h-[60vh]"}>
-        {/* Header */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800 shrink-0">
-          <Music className="w-4 h-4 text-indigo-500" />
-          <span className="font-black text-sm text-gray-900 dark:text-white flex-1">Collab Playlist</span>
-          {queue.length > 0 && (
-            <span className="text-xs text-gray-400">{Math.max(0, currentIndex + 1)}/{queue.length}</span>
-          )}
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-            <X className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
+        {/* Header — hide when inside FloatingPanel */}
+        {!embedded && (
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800 shrink-0">
+            <Music className="w-4 h-4 text-indigo-500" />
+            <span className="font-black text-sm text-gray-900 dark:text-white flex-1">Collab Playlist</span>
+            {queue.length > 0 && <span className="text-xs text-gray-400">{Math.max(0, currentIndex + 1)}/{queue.length}</span>}
+            <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+              <X className="w-4 h-4 text-gray-500" />
+            </button>
+          </div>
+        )}
+
+        {/* Embedded track counter */}
+        {embedded && queue.length > 0 && (
+          <div className="flex items-center justify-between px-4 pt-3 pb-0 flex-shrink-0">
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Queue</span>
+            <span className="text-[10px] text-gray-600">{Math.max(0, currentIndex + 1)} / {queue.length}</span>
+          </div>
+        )}
 
         {/* Now Playing */}
         {currentTrack && (
-          <div className="px-4 py-3 bg-indigo-50 dark:bg-indigo-900/20 border-b border-indigo-100 dark:border-indigo-800/30 shrink-0">
+          <div className={`px-4 py-3 border-b shrink-0 ${embedded ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800/30'}`}>
             <p className="text-[10px] text-indigo-400 uppercase tracking-widest font-bold mb-0.5">Now Playing</p>
-            <p className="text-sm text-indigo-700 dark:text-indigo-300 font-bold truncate">{currentTrack.title || currentTrack.url}</p>
+            <p className={`text-sm font-bold truncate ${embedded ? 'text-indigo-300' : 'text-indigo-700 dark:text-indigo-300'}`}>{currentTrack.title || currentTrack.url}</p>
             {isYouTube && (
-              <a
-                href={currentTrack.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 mt-1 text-[10px] text-indigo-500 hover:underline"
-              >
+              <a href={currentTrack.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1 text-[10px] text-indigo-500 hover:underline">
                 <ExternalLink className="w-3 h-3" /> Open in YouTube
               </a>
             )}
@@ -140,11 +143,11 @@ export default function CollabPlaylist({ isOpen, onClose, isHost, currentUser, r
         </div>
 
         {/* Controls */}
-        <div className="px-3 py-3 border-t border-gray-100 dark:border-gray-800 space-y-2 shrink-0">
+        <div className={`px-3 py-3 space-y-2 shrink-0 ${embedded ? 'border-t border-white/[0.07]' : 'border-t border-gray-100 dark:border-gray-800'}`}>
           {isHost && currentIndex >= 0 && currentIndex < queue.length - 1 && (
             <button
               onClick={nextTrack}
-              className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-bold hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors"
+              className={`w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${embedded ? 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-900/50'}`}
             >
               <ChevronRight className="w-4 h-4" /> Next Track
             </button>
@@ -163,7 +166,7 @@ export default function CollabPlaylist({ isOpen, onClose, isHost, currentUser, r
               onChange={(e) => { setUrlInput(e.target.value); setError(''); }}
               onKeyDown={(e) => e.key === 'Enter' && addUrl()}
               placeholder="Paste audio URL…"
-              className="flex-1 px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400/40"
+              className={`flex-1 px-3 py-2 text-xs rounded-lg focus:outline-none focus:ring-1 ${embedded ? 'border border-white/10 bg-white/5 text-gray-200 placeholder-gray-600 focus:ring-indigo-500/50' : 'border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white focus:ring-indigo-400/40 focus:ring-2'}`}
             />
             <button
               onClick={addUrl}
