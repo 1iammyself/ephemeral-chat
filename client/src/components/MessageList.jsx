@@ -16,7 +16,7 @@ import { FileOpener } from '@capacitor-community/file-opener';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀', '🍕', '🍔', '🍦', '🍩', '🍺', '🎸', '🎮', '🚀', '🌈', '🍄'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onPin, onViewThread, isHost, pinnedMessageId, roomVibe, linkPreviews = {}, onOpenEmojiPicker, highlightMap = {}, focusedMessageId = null }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onPin, onViewThread, isHost, pinnedMessageId, roomVibe, linkPreviews = {}, onOpenEmojiPicker, highlightMap = {}, focusedMessageId = null, onStegoExtract }) => {
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
   const [contextMenu, setContextMenu] = useState(null); // { messageId, x, y, messageText, senderNickname }
@@ -413,7 +413,19 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                             <span className="text-xs font-bold uppercase tracking-wide">Tap to View</span>
                           </div>
                         ) : (
-                          <img src={message.content} alt="shared" className="max-w-[160px] sm:max-w-md max-h-40 sm:max-h-96 object-cover rounded-xl sm:rounded-2xl shadow-inner" />
+                          <div className="relative inline-block">
+                            <img src={message.content} alt="shared" className="max-w-[160px] sm:max-w-md max-h-40 sm:max-h-96 object-cover rounded-xl sm:rounded-2xl shadow-inner" />
+                            {onStegoExtract && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); onStegoExtract(message.content); }}
+                                className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/60 hover:bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded-full backdrop-blur-sm transition-colors"
+                                title="Extract hidden message"
+                              >
+                                <Lock className="w-2.5 h-2.5" />
+                                Decode
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     ) : isAudio ? (

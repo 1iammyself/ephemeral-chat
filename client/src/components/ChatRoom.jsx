@@ -376,11 +376,11 @@ const VibeEffects = ({ effectType }) => {
   return null;
 };
 
-function SecretsPanel({ handleSendStego, onClose }) {
+function SecretsPanel({ handleSendStego, onClose, initialExtractImage }) {
   return (
     <div className="w-full h-full flex flex-col overflow-hidden">
       <div className="flex-1 min-h-0 overflow-hidden">
-        <StegoModal embedded onClose={onClose} onSendStego={handleSendStego} />
+        <StegoModal embedded onClose={onClose} onSendStego={handleSendStego} initialExtractImage={initialExtractImage} />
       </div>
     </div>
   );
@@ -650,7 +650,8 @@ const ChatRoom = () => {
   const [showCameraModal, setShowCameraModal] = useState(false);
   // Feature floating panels
   const { openPanel, closePanel, focusPanel, isOpen: isPanelOpen, getZ } = usePanelManager();
-  const setShowStegoModal = (v) => v ? openPanel('secrets') : closePanel('secrets');
+  const [stegoExtractImage, setStegoExtractImage] = useState(null);
+  const setShowStegoModal = (v) => { if (!v) setStegoExtractImage(null); v ? openPanel('secrets') : closePanel('secrets'); };
   const setShowCodeShare    = (v) => v ? openPanel('code')    : closePanel('code');
   const [activeTimer, setActiveTimer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
@@ -2563,6 +2564,15 @@ const ChatRoom = () => {
     uploadFile(file, { isViewOnce: false });
   };
 
+  const handleStegoExtract = (dataUrl) => {
+    const [header, b64] = dataUrl.split(',');
+    const mime = header.match(/:(.*?);/)[1];
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    const blob = new Blob([bytes], { type: mime });
+    setStegoExtractImage(blob);
+    openPanel('secrets');
+  };
+
   const handleEditMessage = (message) => {
     setEditingMessage(message);
   };
@@ -2987,6 +2997,7 @@ const ChatRoom = () => {
               pinnedMessageId={pinnedMessage?.messageId}
               roomVibe={roomVibe}
               onShareResult={handleShareResult}
+              onStegoExtract={handleStegoExtract}
               linkPreviews={linkPreviews}
               onOpenEmojiPicker={(messageId) => {
                 setReactionTargetId(messageId);
@@ -3777,7 +3788,8 @@ const ChatRoom = () => {
           defaultWidth={560} defaultHeight={520} defaultX={160} defaultY={90}>
           <SecretsPanel
             handleSendStego={handleSendStego}
-            onClose={() => closePanel('secrets')}
+            onClose={() => { setStegoExtractImage(null); closePanel('secrets'); }}
+            initialExtractImage={stegoExtractImage}
           />
         </FloatingPanel>
       )}

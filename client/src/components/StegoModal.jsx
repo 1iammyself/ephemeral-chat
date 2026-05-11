@@ -1,8 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { X, Lock, Eye, EyeOff, Download, Send, Image as ImageIcon, AlertCircle, CheckCircle } from 'lucide-react';
 import { embed, extract } from '../crypto/steganography';
 
-export default function StegoModal({ isOpen, onClose, onSendStego, embedded = false }) {
+export default function StegoModal({ isOpen, onClose, onSendStego, embedded = false, initialExtractImage = null }) {
   const [tab, setTab] = useState('hide');
 
   const [carrierFile, setCarrierFile] = useState(null);
@@ -22,6 +22,17 @@ export default function StegoModal({ isOpen, onClose, onSendStego, embedded = fa
 
   const hideFileRef = useRef(null);
   const extractFileRef = useRef(null);
+
+  // When a received image is passed in, auto-switch to extract tab and pre-load it
+  useEffect(() => {
+    if (!initialExtractImage) return;
+    if (extractPreview) URL.revokeObjectURL(extractPreview);
+    const url = URL.createObjectURL(initialExtractImage);
+    setExtractFile(initialExtractImage);
+    setExtractPreview(url);
+    setExtractResult(null);
+    setTab('extract');
+  }, [initialExtractImage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const reset = () => {
     setTab('hide');
