@@ -17,6 +17,7 @@ export function useSyncPlayback(isHost) {
   const [displayPosition, setDisplayPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const rafRef = useRef(null);
+  const pendingCanPlayRef = useRef(null);
 
   // Update displayed position every animation frame when playing
   useEffect(() => {
@@ -37,33 +38,67 @@ export function useSyncPlayback(isHost) {
 
     const handleState = (state) => {
       setServerState(state);
-      if (!state.url) return;
+      if (!state.url) {
+        // Clear any pending canplay listener when track is stopped
+        if (pendingCanPlayRef.current) {
+          audio.removeEventListener('canplay', pendingCanPlayRef.current);
+          pendingCanPlayRef.current = null;
+        }
+        return;
+      }
 
-      const absUrl = state.url ? new URL(state.url, window.location.origin).href : null;
-      const urlChanged = absUrl && audio.src !== absUrl;
+      // Cancel stale canplay listener before any URL/state change
+      if (pendingCanPlayRef.current) {
+        audio.removeEventListener('canplay', pendingCanPlayRef.current);
+        pendingCanPlayRef.current = null;
+      }
+
+      const absUrl = new URL(state.url, window.location.origin).href;
+      const urlChanged = audio.src !== absUrl;
+
       if (urlChanged) {
         audio.src = state.url;
         audio.load();
+
+        if (state.playing) {
+          const startedAt = state.startedAt;
+          const onCanPlay = () => {
+            pendingCanPlayRef.current = null;
+            const offset = Math.max(0, (Date.now() - startedAt) / 1000);
+            audio.currentTime = offset;
+            audio.play().catch(() => {});
+          };
+          pendingCanPlayRef.current = onCanPlay;
+          audio.addEventListener('canplay', onCanPlay, { once: true });
+        }
+        return;
       }
 
+      // Same URL — just sync playback state
       if (state.playing) {
-        const offset = (Date.now() - state.startedAt) / 1000;
-        const seekTo = Math.max(0, offset);
-        // Only hard-seek if more than 1 second out of sync
-        if (Math.abs(audio.currentTime - seekTo) > 1 || urlChanged) {
-          audio.currentTime = seekTo;
+        const offset = Math.max(0, (Date.now() - state.startedAt) / 1000);
+        if (Math.abs(audio.currentTime - offset) > 1) {
+          audio.currentTime = offset;
         }
         audio.play().catch(() => {});
       } else {
-        if (Math.abs(audio.currentTime - (state.pausePosition || 0)) > 0.5) {
-          audio.currentTime = state.pausePosition || 0;
+        const target = state.pausePosition || 0;
+        if (Math.abs(audio.currentTime - target) > 0.5) {
+          audio.currentTime = target;
         }
         audio.pause();
       }
     };
 
     socketManager.on('music-state', handleState);
-    return () => socketManager.off('music-state', handleState);
+    return () => {
+      socketManager.off('music-state', handleState);
+      // Clean up any pending listener on unmount
+      if (pendingCanPlayRef.current) {
+        audio.removeEventListener('canplay', pendingCanPlayRef.current);
+        pendingCanPlayRef.current = null;
+      }
+    };
   }, []);
 
   const handleDurationChange = useCallback(() => {
