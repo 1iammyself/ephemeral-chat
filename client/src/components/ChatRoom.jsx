@@ -40,6 +40,7 @@ import {
   Lock,
   ListMusic,
   LayoutGrid,
+  Music,
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
