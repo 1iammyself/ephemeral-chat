@@ -3785,7 +3785,7 @@ const ChatRoom = () => {
         <FloatingPanel title="Code Studio" icon={Code2} iconColor="text-blue-400"
           onClose={() => closePanel('code')} onFocus={() => focusPanel('code')} zIndex={getZ('code')}
           defaultWidth={820} defaultHeight={580} defaultX={80} defaultY={70}>
-          <CodeShareModal embedded onClose={() => closePanel('code')} roomCode={roomCode}
+          <CodeShareModal embedded onClose={() => closePanel('code')} roomCode={roomCode} currentUser={currentUser}
             onSendCode={(code, lang) => { sendTextMessage(`\`\`\`${lang}\n${code}\n\`\`\``); }} />
         </FloatingPanel>
       )}
