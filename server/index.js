@@ -289,73 +289,9 @@ const PORT = process.env.PORT || 3001
 // Elevated limit for encrypted file drop endpoints FIRST (base64-encoded payloads can be large)
 // Must come before the global 1 MB middleware so large drop bodies aren't rejected early.
 app.use('/api/drops', express.json({ limit: '50mb' }));
-// Audio upload — 8 MB cap (base64 adds ~33% overhead so body limit is 12 MB)
-app.use('/upload-audio', express.json({ limit: '12mb' }));
 // Global JSON limit — 1 MB for all other routes
 app.use(express.json({ limit: '1mb' }));
 
-// ─── Ephemeral Audio Upload ──────────────────────────────────────────────────
-const AUDIO_DIR = path.join(os.tmpdir(), 'ephemeral-audio');
-if (!fs.existsSync(AUDIO_DIR)) fs.mkdirSync(AUDIO_DIR, { recursive: true });
-// roomAudioFiles[roomCode] = [filename, ...]
-const roomAudioFiles = {};
-
-app.post('/upload-audio/:roomCode', (req, res) => {
-  const { roomCode } = req.params;
-  if (!roomCode) return res.status(400).json({ error: 'Missing roomCode' });
-  const { data, filename } = req.body || {};
-  if (!data || !filename) return res.status(400).json({ error: 'Missing data or filename' });
-
-  // Validate MIME — must be audio/*
-  const mimeMatch = data.match(/^data:(audio\/[a-zA-Z0-9+.-]+);base64,/);
-  if (!mimeMatch) return res.status(400).json({ error: 'Only audio files are allowed' });
-  const mime = mimeMatch[1];
-
-  // Strip data URL header and decode
-  const base64 = data.replace(/^data:[^,]+,/, '');
-  const buf = Buffer.from(base64, 'base64');
-
-  // Enforce 8 MB file size
-  if (buf.length > 8 * 1024 * 1024) return res.status(413).json({ error: 'File exceeds 8 MB limit' });
-
-  // Safe extension from MIME
-  const ext = mime.split('/')[1].replace(/[^a-z0-9]/g, '').substring(0, 8) || 'bin';
-  const fileId = nodeCrypto.randomBytes(12).toString('hex');
-  const storedName = `${fileId}.${ext}`;
-  const filePath = path.join(AUDIO_DIR, storedName);
-  fs.writeFileSync(filePath, buf);
-
-  if (!roomAudioFiles[roomCode]) roomAudioFiles[roomCode] = [];
-  roomAudioFiles[roomCode].push(storedName);
-
-  res.json({ audioUrl: `/audio/${storedName}`, title: filename });
-});
-
-app.get('/audio/:filename', (req, res) => {
-  const name = path.basename(req.params.filename);
-  const filePath = path.join(AUDIO_DIR, name);
-  if (!fs.existsSync(filePath)) return res.status(404).end();
-  // Explicitly set audio/* Content-Type — some extensions (mp3→mpeg, m4a, weba) default to
-  // video/* in Express's mime lookup which causes browsers to reject them in <audio> elements.
-  const AUDIO_MIME = {
-    mp3: 'audio/mpeg', mpeg: 'audio/mpeg', m4a: 'audio/mp4', mp4: 'audio/mp4',
-    weba: 'audio/webm', webm: 'audio/webm', ogg: 'audio/ogg', oga: 'audio/ogg',
-    wav: 'audio/wav', aac: 'audio/aac', flac: 'audio/flac',
-  };
-  const ext = path.extname(name).slice(1).toLowerCase();
-  if (AUDIO_MIME[ext]) res.setHeader('Content-Type', AUDIO_MIME[ext]);
-  res.setHeader('Cache-Control', 'no-store');
-  res.sendFile(filePath);
-});
-
-function cleanupRoomAudio(roomCode) {
-  const files = roomAudioFiles[roomCode];
-  if (!files) return;
-  for (const name of files) {
-    try { fs.unlinkSync(path.join(AUDIO_DIR, name)); } catch { /* already gone */ }
-  }
-  delete roomAudioFiles[roomCode];
-}
 
 // ─── Traffic Padding Middleware (RFC-compliant traffic analysis resistance) ──
 // Pads all JSON API responses to fixed bucket sizes so network observers
@@ -1236,7 +1172,6 @@ function ensureRoomChaff(roomCode) {
  */
 function cleanupRoomChaff(roomCode) {
   stopServerChaff(roomCode);
-  cleanupRoomAudio(roomCode);
 }
 
 io.on('connection', (socket) => {
@@ -2263,9 +2198,6 @@ io.on('connection', (socket) => {
           autoApprove: roomData[roomCode].autoApprove || false,
           preApprovedList: roomData[roomCode].preApprovedList || [],
           pinnedMessage: roomData[roomCode].pinnedMessage || null,
-          playlist: roomData[roomCode].playlist || [],
-          playlistIndex: roomData[roomCode].playlistIndex ?? -1,
-          playlistStartedAt: roomData[roomCode].playlistStartedAt || null,
           hotSeatTarget: roomData[roomCode].hotSeatTarget || null,
           geofence: roomData[roomCode].geofence
             ? { radiusMeters: roomData[roomCode].geofence.radiusMeters }
@@ -2296,24 +2228,6 @@ io.on('connection', (socket) => {
         if (rd?.hotSeatTarget) {
           socket.emit('hotSeat-started', { targetNickname: rd.hotSeatTarget });
         }
-        // Sync active playlist to late joiners (queue + current track with seek offset)
-        if (rd && Array.isArray(rd.playlist) && rd.playlist.length > 0) {
-          socket.emit('playlist-sync', { queue: rd.playlist, currentIndex: rd.playlistIndex ?? -1 });
-          const currentTrack = rd.playlist[rd.playlistIndex ?? -1];
-          if (currentTrack && rd.playlistStartedAt) {
-            socket.emit('playlist-playing', {
-              url: currentTrack.url,
-              title: currentTrack.title,
-              startedAt: rd.playlistStartedAt,
-            });
-          }
-        }
-
-        // Sync active music room to late joiners
-        if (rd?.musicState) {
-          socket.emit('music-state', rd.musicState);
-        }
-
         // Notify others
         socket.to(roomCode).emit('user-joined', {
           user: {
@@ -3309,32 +3223,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ─── Collaborative Playlist ───
-  socket.on('playlist-add', ({ url, title, addedBy } = {}) => {
-    const rc = socket.roomCode;
-    if (!rc || !url || typeof url !== 'string') return;
-    const rd = roomData[rc];
-    if (!rd) return;
-    rd.playlist = rd.playlist || [];
-    const track = { url: url.slice(0, 1000), title: (title || url).slice(0, 100), addedBy: addedBy || socket.nickname || 'Someone' };
-    rd.playlist.push(track);
-    io.to(rc).emit('playlist-track-added', { track });
-  });
-
-  socket.on('playlist-next', () => {
-    const rc = socket.roomCode;
-    if (!rc) return;
-    const rd = roomData[rc];
-    if (!rd?.playlist?.length) return;
-    if (rd.hostId !== socket.id) return; // host-only
-    rd.playlistIndex = (rd.playlistIndex ?? -1) + 1;
-    const track = rd.playlist[rd.playlistIndex];
-    if (!track) return;
-    const startedAt = Date.now();
-    rd.playlistStartedAt = startedAt;
-    io.to(rc).emit('playlist-playing', { url: track.url, title: track.title, startedAt });
-  });
-
   // ─── Hot Seat ───
   socket.on('hotSeat-start', ({ targetNickname } = {}) => {
     const rc = socket.roomCode;
@@ -3382,22 +3270,6 @@ io.on('connection', (socket) => {
     io.to(rc).emit('hotSeat-ended');
   });
 
-  // ─── Whisper Chain ──────────────────────────────────────────
-  socket.on('whisper-send', ({ to, ephPubKey, ciphertext, iv, isNative, fromNickname } = {}) => {
-    if (!to || !ephPubKey || !ciphertext || !iv) return;
-    // Validate target is in the same room
-    const targetSocket = io.sockets.sockets.get(to);
-    if (!targetSocket || targetSocket.roomCode !== socket.roomCode) return;
-    targetSocket.emit('whisper-incoming', {
-      from: socket.id,
-      fromNickname: fromNickname || socket.nickname || 'Unknown',
-      ephPubKey,
-      ciphertext,
-      iv,
-      isNative: isNative ?? true,
-    });
-  });
-
   // ─── Code Share — Yjs CRDT relay ────────────────────────────
   socket.on('yjs-update', ({ roomCode: rc, update } = {}) => {
     if (!rc || !Array.isArray(update)) return;
@@ -3415,117 +3287,6 @@ io.on('connection', (socket) => {
     if (typeof callback !== 'function') return;
     if (!rc || socket.roomCode !== rc || !roomData[rc]) return callback([]);
     callback(roomData[rc].yjsUpdates || []);
-  });
-
-  // ─── Music Room (synchronized playback) ─────────────────────
-
-  // Set track URL without starting playback (host loads file, others preload)
-  socket.on('music-set-track', ({ url, title = '' } = {}) => {
-    const rc = socket.roomCode;
-    if (!rc) return;
-    const rd = roomData[rc];
-    if (!rd || rd.hostId !== socket.id || !url) return;
-    rd.musicState = { url, title, playing: false, startedAt: null, pausePosition: 0 };
-    io.to(rc).emit('music-state', rd.musicState);
-  });
-
-  socket.on('music-play', ({ url, title = '', position = 0 } = {}) => {
-    const rc = socket.roomCode;
-    if (!rc) return;
-    const rd = roomData[rc];
-    if (!rd || rd.hostId !== socket.id || !url) return;
-    rd.musicState = { url, title, playing: true, startedAt: Date.now() - position * 1000, pausePosition: 0 };
-    io.to(rc).emit('music-state', rd.musicState);
-  });
-
-  socket.on('music-pause', ({ position = 0 } = {}) => {
-    const rc = socket.roomCode;
-    if (!rc) return;
-    const rd = roomData[rc];
-    if (!rd || rd.hostId !== socket.id || !rd.musicState) return;
-    rd.musicState = { ...rd.musicState, playing: false, pausePosition: position };
-    io.to(rc).emit('music-state', rd.musicState);
-  });
-
-  socket.on('music-seek', ({ position = 0 } = {}) => {
-    const rc = socket.roomCode;
-    if (!rc) return;
-    const rd = roomData[rc];
-    if (!rd || rd.hostId !== socket.id || !rd.musicState) return;
-    rd.musicState = { ...rd.musicState, playing: true, startedAt: Date.now() - position * 1000 };
-    io.to(rc).emit('music-state', rd.musicState);
-  });
-
-  socket.on('music-stop', () => {
-    const rc = socket.roomCode;
-    if (!rc) return;
-    const rd = roomData[rc];
-    if (!rd || rd.hostId !== socket.id) return;
-    rd.musicState = null;
-    io.to(rc).emit('music-state', { url: null, title: '', playing: false, startedAt: null, pausePosition: 0 });
-  });
-
-  // ─── Music Room: file upload via Socket.IO (bypasses HTTP body limits) ───
-  socket.on('music-upload', ({ data, filename } = {}) => {
-    const rc = socket.roomCode;
-    if (!rc || !data || !filename) return;
-    const rd = roomData[rc];
-    if (!rd || rd.hostId !== socket.id) return;
-    try {
-      const mimeMatch = data.match(/^data:(audio\/[a-zA-Z0-9+.-]+);base64,/);
-      if (!mimeMatch) { socket.emit('music-upload-error', { error: 'Only audio files are allowed' }); return; }
-      const mime = mimeMatch[1];
-      const base64 = data.replace(/^data:[^,]+,/, '');
-      const buf = Buffer.from(base64, 'base64');
-      if (buf.length > 8 * 1024 * 1024) { socket.emit('music-upload-error', { error: 'File exceeds 8 MB limit' }); return; }
-      // Map audio/* MIME subtypes to file extensions that Express maps to correct audio/* types
-      const AUDIO_EXT_MAP = {
-        mpeg: 'mp3', mp3: 'mp3', mp4: 'm4a', xm4a: 'm4a',
-        webm: 'weba', ogg: 'ogg', oga: 'oga',
-        wav: 'wav', aac: 'aac', flac: 'flac',
-      };
-      const rawSub = mime.split('/')[1].replace(/[^a-z0-9]/g, '').substring(0, 8) || 'bin';
-      const ext = AUDIO_EXT_MAP[rawSub] || rawSub;
-      const fileId = nodeCrypto.randomBytes(12).toString('hex');
-      const storedName = `${fileId}.${ext}`;
-      const filePath = path.join(AUDIO_DIR, storedName);
-      fs.writeFileSync(filePath, buf);
-      if (!roomAudioFiles[rc]) roomAudioFiles[rc] = [];
-      roomAudioFiles[rc].push(storedName);
-      socket.emit('music-upload-done', { audioUrl: `/audio/${storedName}`, title: filename });
-    } catch {
-      socket.emit('music-upload-error', { error: 'Upload failed on server' });
-    }
-  });
-
-  // ─── Collaborative Playlist: file upload via Socket.IO ───────────────────
-  socket.on('playlist-upload', ({ data, filename } = {}) => {
-    const rc = socket.roomCode;
-    if (!rc || !data || !filename) return;
-    try {
-      const mimeMatch = data.match(/^data:(audio\/[a-zA-Z0-9+.-]+);base64,/);
-      if (!mimeMatch) { socket.emit('playlist-upload-error', { error: 'Only audio files are allowed' }); return; }
-      const mime = mimeMatch[1];
-      const base64 = data.replace(/^data:[^,]+,/, '');
-      const buf = Buffer.from(base64, 'base64');
-      if (buf.length > 8 * 1024 * 1024) { socket.emit('playlist-upload-error', { error: 'File exceeds 8 MB limit' }); return; }
-      const AUDIO_EXT_MAP = {
-        mpeg: 'mp3', mp3: 'mp3', mp4: 'm4a', xm4a: 'm4a',
-        webm: 'weba', ogg: 'ogg', oga: 'oga',
-        wav: 'wav', aac: 'aac', flac: 'flac',
-      };
-      const rawSub = mime.split('/')[1].replace(/[^a-z0-9]/g, '').substring(0, 8) || 'bin';
-      const ext = AUDIO_EXT_MAP[rawSub] || rawSub;
-      const fileId = nodeCrypto.randomBytes(12).toString('hex');
-      const storedName = `${fileId}.${ext}`;
-      const filePath = path.join(AUDIO_DIR, storedName);
-      fs.writeFileSync(filePath, buf);
-      if (!roomAudioFiles[rc]) roomAudioFiles[rc] = [];
-      roomAudioFiles[rc].push(storedName);
-      socket.emit('playlist-upload-done', { audioUrl: `/audio/${storedName}`, title: filename });
-    } catch {
-      socket.emit('playlist-upload-error', { error: 'Upload failed on server' });
-    }
   });
 
   // ─── Watch Party (synchronized media sharing) ────────────────────────────
@@ -3665,7 +3426,7 @@ io.on('connection', (socket) => {
   socket.on('request-key-bundles', ({ roomCode }) => {
     if (!roomCode) return;
     const rawBundles = keyRegistry.getBundlesForRoom(roomCode, socket.id);
-    // Annotate each entry with the socket's nickname for whisper routing
+    // Annotate each entry with the socket's nickname for key bundle routing
     const bundles = rawBundles.map(entry => ({
       ...entry,
       nickname: io.sockets.sockets.get(entry.socketId)?.nickname || null,

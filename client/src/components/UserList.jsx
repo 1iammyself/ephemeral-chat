@@ -1,8 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { Users, Crown, User, Check, X, ChevronDown, Shield, UserX, Info, Zap, Music, Radio, ToggleLeft, ToggleRight, Upload, Plus, Trash2, ClipboardList, GitFork } from 'lucide-react';
+import { Users, Crown, User, Check, X, ChevronDown, Shield, UserX, Info, Zap, Radio, ToggleLeft, ToggleRight, Upload, Plus, Trash2, ClipboardList, GitFork } from 'lucide-react';
 import { ROLES, ROLE_INFO, canKick, canChangeRole, canManageGuests, getAssignableRoles } from '../utils/roles';
 import { hapticSuccess } from '../utils/platform';
-import NowPlayingBadge from './NowPlayingBadge';
 import { getVibeById } from '../utils/vibes';
 
 const UserList = ({
@@ -21,7 +20,6 @@ const UserList = ({
   hasNewLogs = false,
   verbalCode = null,
   roomVibe,
-  nowPlayingMap = {},
   onWatchParty,
   autoApprove = false,
   onToggleAutoApprove,
@@ -426,10 +424,6 @@ const UserList = ({
                           </span>
                         )}
                       </div>
-                      {/* Now Playing Badge */}
-                      {nowPlayingMap[user.socketId] && (
-                        <NowPlayingBadge nowPlaying={nowPlayingMap[user.socketId]} compact={true} />
-                      )}
                     </div>
                     {/* Admin Controls Toggle */}
                     {(canKickUser || canChangeUserRole) && (

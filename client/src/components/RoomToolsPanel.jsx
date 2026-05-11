@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { Music, Lock, Code2, Activity, Eye, PanelLeft, PanelRight, FileText, RefreshCw, Zap, Volume2, VolumeX, Search } from 'lucide-react';
+import { Lock, Code2, Activity, Eye, PanelLeft, PanelRight, FileText, RefreshCw, Zap, Volume2, VolumeX, Search } from 'lucide-react';
 import { hapticSuccess } from '../utils/platform';
 
 const FEATURES = [
-  { icon: Music, label: 'Music',   color: 'purple',  key: 'music' },
   { icon: Lock,  label: 'Secrets', color: 'violet',  key: 'secrets' },
   { icon: Code2, label: 'Code',    color: 'blue',    key: 'code' },
   { icon: Activity, label: 'Watch', color: 'red',    key: 'watch' },
@@ -28,7 +27,6 @@ export default function RoomToolsPanel({
   const [codeCopied, setCodeCopied] = useState(false);
 
   const featureActions = {
-    music:   () => { onOpenPanel?.('music');   onClose?.(); },
     secrets: () => { onOpenPanel?.('secrets'); onClose?.(); },
     code:    () => { onOpenPanel?.('code');    onClose?.(); },
     watch:   () => { onOpenPanel?.('watch');   onClose?.(); },
@@ -58,7 +56,7 @@ export default function RoomToolsPanel({
       {/* Feature grid — 4 items */}
       <div>
         <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1 mb-2">Features</p>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {FEATURES.map(({ icon: Icon, label, color, key }) => (
             <button
               key={key}

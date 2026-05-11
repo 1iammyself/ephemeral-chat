@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { generateInviteLink } from '../utils/api'; // Import API utility
-import CapacitorNowPlaying, { sanitizeNowPlaying } from '../plugins/nowPlaying';
 import {
   Send,
   Users,
@@ -35,11 +34,9 @@ import {
   VolumeX,
   Search,
   Eye,
-  MessageCircle,
   Code2,
   Lock,
   LayoutGrid,
-  Music,
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -69,7 +66,6 @@ import {
   handleIncomingKeyBundle,
 } from '../utils/security';
 import { initTrafficPadding, stopTrafficPadding, withJitter } from '../crypto/traffic-padding';
-import { encryptWhisper, newChainId } from '../crypto/whisper-chain';
 import { getKeyBundle } from '../crypto/key-store';
 import { initOHTTP } from '../crypto/ohttp';
 import { initPrivacyPass, getAuthToken, refreshTokensIfNeeded, isPrivacyPassReady } from '../crypto/privacy-pass';
@@ -85,19 +81,14 @@ import RoomCountdown from './RoomCountdown';
 import ThreadView from './ThreadView';
 import HotSeat from './HotSeat';
 import TypingPreview from './TypingPreview';
-import CollabPlaylist from './CollabPlaylist';
 import EditMessageModal from './EditMessageModal';
 import DragDropOverlay from './DragDropOverlay';
 import ActivityLog from './ActivityLog';
 import CameraModal from './CameraModal';
 import StegoModal from './StegoModal';
-import MusicRoom from './MusicRoom';
-import WhisperModal from './WhisperModal';
 import { getVibeById, getAllVibes } from '../utils/vibes';
-import AmbientPlayer from './AmbientPlayer';
 import SharedMediaPlayer, { detectMediaUrl } from './SharedMediaPlayer';
 import WatchPartyModal from './WatchPartyModal';
-import NowPlayingBadge from './NowPlayingBadge';
 import { canManageRoom } from '../utils/roles';
 import { getRandomIcebreaker } from '../utils/icebreakers';
 import { AppRefreshButton } from './AppRefreshButton';
@@ -129,10 +120,7 @@ const SLASH_COMMANDS = [
   { icon: Activity, label: 'Vibe', value: '/vibe', desc: 'Change room vibe', adminOnly: true },
   { icon: Sparkles, label: 'Hot Seat', value: '/hotSeat', desc: 'Put someone in the hot seat', adminOnly: true },
   { icon: Activity, label: 'Watch Party', value: '/media', desc: 'Share YouTube/SoundCloud' },
-  { icon: Activity, label: 'Playlist', value: '/playlist', desc: 'Open collab playlist' },
   { icon: FileText, label: 'Stego', value: '/stego', desc: 'Hide a secret in a photo' },
-  { icon: Volume2, label: 'Music', value: '/music', desc: 'Synchronized music room' },
-  { icon: MessageCircle, label: 'Whisper', value: '/whisper', desc: 'Send an encrypted whisper' },
   { icon: Code2, label: 'Code Share', value: '/code', desc: 'Collaborative code editor' },
 ];
 
@@ -388,28 +376,11 @@ const VibeEffects = ({ effectType }) => {
   return null;
 };
 
-function SecretsPanel({ secretsTab, setSecretsTab, users, currentUser, roomCode, isAnonymousMode, whisperMaxHops, setWhisperMaxHops, handleSendStego, onClose }) {
+function SecretsPanel({ handleSendStego, onClose }) {
   return (
     <div className="w-full h-full flex flex-col overflow-hidden">
-      {/* Tab bar */}
-      <div className="flex gap-px bg-white/[0.04] flex-shrink-0">
-        {[{ id: 'whisper', label: '🔐 Whisper' }, { id: 'stego', label: '🖼 Stego' }].map(t => (
-          <button
-            key={t.id}
-            onClick={() => setSecretsTab(t.id)}
-            className={`flex-1 py-2.5 text-xs font-bold tracking-wide transition-colors ${
-              secretsTab === t.id ? 'text-violet-300 border-b-2 border-violet-500' : 'text-gray-500 hover:text-gray-300'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
       <div className="flex-1 min-h-0 overflow-hidden">
-        {secretsTab === 'whisper'
-          ? <WhisperModal embedded onClose={onClose} users={users} currentUser={currentUser} roomCode={roomCode}
-              isAnonymous={isAnonymousMode} whisperMaxHops={whisperMaxHops} onWhisperMaxHopsChange={setWhisperMaxHops} />
-          : <StegoModal embedded onClose={onClose} onSendStego={handleSendStego} />}
+        <StegoModal embedded onClose={onClose} onSendStego={handleSendStego} />
       </div>
     </div>
   );
@@ -610,8 +581,7 @@ const ChatRoom = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
 
-  // Watch Party / Now Playing state
-  const [nowPlayingMap, setNowPlayingMap] = useState({}); // { [userId]: { title, artist, source } }
+  // Watch Party state
   const [showMediaPlayer, setShowMediaPlayer] = useState(true);
   const [showWatchPartyModal, setShowWatchPartyModal] = useState(false); // kept for inline + menu triggers
   const [initialMedia, setInitialMedia] = useState(null); // Persisted media state from server on rejoin
@@ -680,9 +650,7 @@ const ChatRoom = () => {
   const [showCameraModal, setShowCameraModal] = useState(false);
   // Feature floating panels
   const { openPanel, closePanel, focusPanel, isOpen: isPanelOpen, getZ } = usePanelManager();
-  const setShowStegoModal   = (v) => { if (v) { setSecretsTab('stego');   openPanel('secrets'); } else closePanel('secrets'); };
-  const setShowMusicRoom    = (v) => v ? openPanel('music')   : closePanel('music');
-  const setShowWhisperModal = (v) => { if (v) { setSecretsTab('whisper'); openPanel('secrets'); } else closePanel('secrets'); };
+  const setShowStegoModal = (v) => v ? openPanel('secrets') : closePanel('secrets');
   const setShowCodeShare    = (v) => v ? openPanel('code')    : closePanel('code');
   const [activeTimer, setActiveTimer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
@@ -750,35 +718,13 @@ const ChatRoom = () => {
   const anonClickCountRef = useRef(0);
   const anonClickTimerRef = useRef(null);
   const anonHoldTimerRef = useRef(null);
-  const isWhisperModeRef = useRef(false);
   const { theme } = useTheme();
 
   const [audioViewOnce, setAudioViewOnce] = useState(true);
   const [isAnonymousMode, setIsAnonymousMode] = useState(false);
-  const [isWhisperMode, setIsWhisperMode] = useState(false);
-  const [whisperTarget, setWhisperTarget] = useState(null);
-  const [whisperMaxHops, setWhisperMaxHops] = useState(3);
-  const [peerKeys, setPeerKeys] = useState({});
-  const [secretsTab, setSecretsTab] = useState('whisper');
 
   // ─── Sync MLS ref with state ───────────────────────────
   useEffect(() => { mlsReadyRef.current = mlsReady; }, [mlsReady]);
-  useEffect(() => { isWhisperModeRef.current = isWhisperMode; }, [isWhisperMode]);
-
-  // ─── Keep peerKeys fresh for inline whisper sends ───────
-  useEffect(() => {
-    if (!roomCode) return;
-    const handleRoster = ({ bundles }) => {
-      const map = {};
-      for (const { socketId, bundle, nickname } of (bundles || [])) {
-        if (nickname && bundle?.ik) map[nickname] = { ik: bundle.ik, isNative: bundle.isNative ?? true, socketId };
-      }
-      setPeerKeys(map);
-    };
-    socketManager.on('key-bundle-roster', handleRoster);
-    socketManager.emit('request-key-bundles', { roomCode });
-    return () => socketManager.off('key-bundle-roster', handleRoster);
-  }, [roomCode]);
 
   // ─── Initialize AES room-key on mount (no WASM needed) ───
   useEffect(() => {
@@ -1622,11 +1568,6 @@ const ChatRoom = () => {
         performJoin(joinParamsRef.current);
       }
     });
-    socketManager.on('whisper-incoming', ({ fromNickname }) => {
-      if (!stateRef.current.isJoined) return;
-      setActivityLogs(prev => [{ id: `log_wh_${Date.now()}`, type: 'system', content: `🔐 Whisper received from ${fromNickname || 'Someone'} — open Whisper to read`, timestamp: new Date().toISOString() }, ...prev].slice(0, 50));
-      setHasNewLogs(true);
-    });
     socketManager.on('hotSeat-started', ({ targetNickname }) => setHotSeatTarget(targetNickname));
     socketManager.on('hotSeat-ended', () => setHotSeatTarget(null));
     socketManager.on('room-fork-invite', ({ newRoomCode, fromNickname, isHost: forkIsHost }) => {
@@ -1701,95 +1642,6 @@ const ChatRoom = () => {
     };
     socketManager.on('link-preview-update', handleLinkPreviewUpdate);
 
-    // Now Playing status from other users
-    const handleNowPlayingUpdate = async (data) => {
-      // ── MLS v3 encrypted payload: decrypt first ──
-      if (data && data.v === 3 && data.mls) {
-        try {
-          const decrypted = decryptMLSMessage(data, roomCode);
-          const parsed = JSON.parse(decrypted);
-          // parsed = { nowPlaying: { title, artist, source } | null }
-          const safe = parsed.nowPlaying ? sanitizeNowPlaying(parsed.nowPlaying) : null;
-          const userId = data.userId;
-          if (userId && safe) {
-            setNowPlayingMap(prev => ({ ...prev, [userId]: safe }));
-          } else if (userId) {
-            setNowPlayingMap(prev => { const copy = { ...prev }; delete copy[userId]; return copy; });
-          }
-        } catch (e) {
-          console.warn('now-playing-update v2 decrypt failed:', e);
-        }
-        return;
-      }
-
-      // ── Cleartext fallback ──
-      if (data.userId && data.nowPlaying && typeof data.nowPlaying === 'object') {
-        // Sanitize incoming now-playing data from other users (defense-in-depth)
-        const safe = sanitizeNowPlaying(data.nowPlaying);
-        if (safe) {
-          setNowPlayingMap(prev => ({ ...prev, [data.userId]: safe }));
-        } else {
-          setNowPlayingMap(prev => { const copy = { ...prev }; delete copy[data.userId]; return copy; });
-        }
-      } else if (data.userId) {
-        setNowPlayingMap(prev => { const copy = { ...prev }; delete copy[data.userId]; return copy; });
-      }
-    };
-    socketManager.on('now-playing-update', handleNowPlayingUpdate);
-
-    // Electron: start polling system media if available
-    if (window.electronAPI?.nowPlaying) {
-      window.electronAPI.nowPlaying.startPolling(4000);
-      window.electronAPI.nowPlaying.onUpdate(async (rawStatus) => {
-        // Sanitize native system media data before broadcasting
-        const status = sanitizeNowPlaying(rawStatus);
-        // Encrypt + jitter if MLS ready
-        try {
-          if (mlsReadyRef.current) {
-            const payload = encryptMLSMessage(JSON.stringify({ nowPlaying: status }), roomCode);
-            await withJitter(() => socketManager.emit('now-playing-update', { ...payload, messageType: 'now-playing' }));
-          } else {
-            await withJitter(() => socketManager.emit('now-playing-update', { nowPlaying: status }));
-          }
-        } catch (e) {
-          console.warn('Now-playing encrypt failed, sending cleartext:', e);
-          await withJitter(() => socketManager.emit('now-playing-update', { nowPlaying: status }));
-        }
-        // Also update local map so our own badge shows
-        const myId = socketManager.id;
-        if (myId && status) {
-          setNowPlayingMap(prev => ({ ...prev, [myId]: status }));
-        } else if (myId) {
-          setNowPlayingMap(prev => { const copy = { ...prev }; delete copy[myId]; return copy; });
-        }
-      });
-    }
-
-    // Capacitor (Android): poll native MediaSession for Spotify, YT Music, etc.
-    // (NowPlaying bridge already sanitizes internally before calling callbacks)
-    if (CapacitorNowPlaying.isAvailable() && !window.electronAPI?.nowPlaying) {
-      CapacitorNowPlaying.startPolling(4000, async (status) => {
-        // Encrypt + jitter if MLS ready
-        try {
-          if (mlsReadyRef.current) {
-            const payload = encryptMLSMessage(JSON.stringify({ nowPlaying: status }), roomCode);
-            await withJitter(() => socketManager.emit('now-playing-update', { ...payload, messageType: 'now-playing' }));
-          } else {
-            await withJitter(() => socketManager.emit('now-playing-update', { nowPlaying: status }));
-          }
-        } catch (e) {
-          console.warn('Now-playing encrypt failed, sending cleartext:', e);
-          await withJitter(() => socketManager.emit('now-playing-update', { nowPlaying: status }));
-        }
-        const myId = socketManager.id;
-        if (myId && status) {
-          setNowPlayingMap(prev => ({ ...prev, [myId]: status }));
-        } else if (myId) {
-          setNowPlayingMap(prev => { const copy = { ...prev }; delete copy[myId]; return copy; });
-        }
-      });
-    }
-
     return () => {
       socketManager.off('connect', handleConnect);
       socketManager.off('disconnect', handleDisconnect);
@@ -1829,7 +1681,6 @@ const ChatRoom = () => {
       socketManager.off('message-unpinned', handleMessageUnpinned);
       socketManager.off('room-opening');
       socketManager.off('room-fork-invite');
-      socketManager.off('whisper-incoming');
       socketManager.off('hotSeat-started');
       socketManager.off('hotSeat-ended');
       socketManager.off('file-transfer-invite', handleFileTransferInvite);
@@ -1838,12 +1689,6 @@ const ChatRoom = () => {
       socketManager.off('pre-approved-list-updated', handlePreApprovedListUpdated);
       socketManager.off('messages-cleared');
       socketManager.off('link-preview-update', handleLinkPreviewUpdate);
-      socketManager.off('now-playing-update', handleNowPlayingUpdate);
-      if (window.electronAPI?.nowPlaying) {
-        window.electronAPI.nowPlaying.stopPolling();
-        window.electronAPI.nowPlaying.offUpdate();
-      }
-      CapacitorNowPlaying.stopPolling();
 
       // ─── MLS Security: Clean up session + padding ───
       destroyMLSSession(roomCode);
@@ -2145,65 +1990,10 @@ const ChatRoom = () => {
     e.target.value = '';
   };
 
-  // ── Inline whisper sender — used when isWhisperMode is active ──
-  const doSendWhisper = async (content, targetNick) => {
-    const peer = peerKeys[targetNick];
-    if (!peer) { setError('Recipient E2EE key not ready — try again shortly'); return false; }
-    const myBundle = getKeyBundle(roomCode);
-    if (!myBundle) { setError('Your encryption keys are not ready yet'); return false; }
-    try {
-      const chainId = newChainId();
-      const { ephPubKey, ciphertext, iv, isNative } = await encryptWhisper(
-        content, peer.ik, peer.isNative, chainId, 1, whisperMaxHops
-      );
-      socketManager.emit('whisper-send', {
-        to: peer.socketId, ephPubKey, ciphertext, iv, isNative,
-        ...(isAnonymousMode ? {} : { fromNickname: currentUser?.nickname }),
-      });
-      return true;
-    } catch {
-      setError('Whisper encryption failed');
-      return false;
-    }
-  };
-
   // Core send logic — called directly (no event needed)
   // This avoids the form submission pipeline that causes Android keyboard blur flash
   const doSendMessage = async () => {
     if (!newMessage.trim() || isSending || !isConnected) return;
-
-    // ── Whisper mode: route through E2EE whisper instead of normal send ──
-    if (isWhisperMode) {
-      let targetNick = whisperTarget?.nickname;
-      let content = newMessage.trim();
-      // Allow @name to select recipient on-the-fly
-      const atMatch = content.match(/^@(\w+)\s*/);
-      if (atMatch) {
-        const nick = atMatch[1].toLowerCase();
-        const matched = users.find(u => u.nickname.toLowerCase() === nick && u.nickname !== currentUser?.nickname);
-        if (matched) { targetNick = matched.nickname; setWhisperTarget(matched); }
-        const stripped = content.substring(atMatch[0].length).trim();
-        if (stripped) content = stripped;
-      }
-      if (!targetNick) { setError('Select a recipient to whisper to'); return; }
-      if (!content) return;
-      setIsSending(true);
-      try {
-        const ok = await doSendWhisper(content, targetNick);
-        if (ok) {
-          setNewMessage('');
-          setReplyingTo(null);
-          hapticLight();
-          if (messageInputRef.current) {
-            messageInputRef.current.focus();
-            setTimeout(() => messageInputRef.current?.focus(), 10);
-          }
-        }
-      } finally {
-        setIsSending(false);
-      }
-      return;
-    }
 
     // 1. Handle Slash Commands
     if (newMessage.trim().startsWith('/')) {
@@ -2244,9 +2034,6 @@ const ChatRoom = () => {
             if (vibe) handleUpdateVibe(vibe.id);
           }
           break;
-        case '/playlist':
-          openPanel('music');
-          break;
         case '/hotseat':
         case '/hotSeat':
           if (isHost) {
@@ -2271,12 +2058,6 @@ const ChatRoom = () => {
           break;
         case '/stego':
           setShowStegoModal(true);
-          break;
-        case '/music':
-          setShowMusicRoom(true);
-          break;
-        case '/whisper':
-          setShowWhisperModal(true);
           break;
         case '/code':
           setShowCodeShare(true);
@@ -3102,14 +2883,8 @@ const ChatRoom = () => {
             />
           )}
           {/* ── Compact info bar: now inside the center column for better sidebar alignment ── */}
-          {(getVibeById(roomVibe)?.moodSound || roomTopic || activeTimer) && (
+          {(roomTopic || activeTimer) && (
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full mx-4 my-2 shadow-sm w-fit max-w-[calc(100%-2rem)] ${getVibeById(roomVibe).panelClass} overflow-x-auto scrollbar-none shrink-0 animate-in fade-in slide-in-from-top-2 duration-300`}>
-              {/* Ambient Player / Mood DJ */}
-              {getVibeById(roomVibe)?.moodSound && (
-                <div className="shrink-0">
-                  <AmbientPlayer moodSound={getVibeById(roomVibe).moodSound} isActive={true} />
-                </div>
-              )}
               {/* Topic Pill */}
               {roomTopic && (
                 <div className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full bg-${vibeAccent}-100/30 dark:bg-${vibeAccent}-900/20`}>
@@ -3195,14 +2970,6 @@ const ChatRoom = () => {
                 roomVibe={roomVibe}
                 mlsReady={mlsReady}
                 initialMedia={initialMedia}
-                onNowPlayingChange={(np) => {
-                  const myId = currentUser?.socketId || currentUser?.id;
-                  if (myId && np) {
-                    setNowPlayingMap(prev => ({ ...prev, [myId]: np }));
-                  } else if (myId) {
-                    setNowPlayingMap(prev => { const copy = { ...prev }; delete copy[myId]; return copy; });
-                  }
-                }}
               />
             )}
             <MessageList
@@ -3287,39 +3054,6 @@ const ChatRoom = () => {
                 <button onClick={() => setSelectedRecipients([])} className={`text-xs text-${vibeAccent}-500 hover:text-${vibeAccent}-700 dark:hover:text-${vibeAccent}-200 underline`}>Clear selection</button>
               </div>
             )}
-            {isWhisperMode && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-violet-500/10 border-b border-violet-500/20 flex-shrink-0 animate-in slide-in-from-top-1 duration-200">
-                <Lock className="w-3 h-3 text-violet-400 flex-shrink-0" />
-                <span className="text-[10px] font-bold text-violet-400 uppercase tracking-widest flex-shrink-0">Whisper to</span>
-                <div className="flex items-center gap-1.5 flex-1 overflow-x-auto no-scrollbar">
-                  {users.filter(u => u.nickname !== currentUser?.nickname).length === 0 ? (
-                    <span className="text-[10px] text-gray-500">No one else in this room</span>
-                  ) : (
-                    users.filter(u => u.nickname !== currentUser?.nickname).map(u => (
-                      <button
-                        key={u.nickname}
-                        type="button"
-                        onClick={() => setWhisperTarget(whisperTarget?.nickname === u.nickname ? null : u)}
-                        className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
-                          whisperTarget?.nickname === u.nickname
-                            ? 'bg-violet-600 text-white ring-1 ring-violet-400/40'
-                            : 'bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 border border-violet-500/20'
-                        }`}
-                      >
-                        {u.nickname}
-                      </button>
-                    ))
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => { setIsWhisperMode(false); setWhisperTarget(null); }}
-                  className="flex-shrink-0 p-1 rounded-full hover:bg-violet-500/20 text-violet-400 transition-colors"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            )}
             <div className="px-0 pt-2 sm:px-4 sm:pt-4 pb-0 sm:pb-4 w-full relative z-10 bg-transparent">
               <form onSubmit={handleSendMessage} className="flex items-center w-full">
                 {isRecording ? (
@@ -3344,7 +3078,7 @@ const ChatRoom = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className={`relative flex items-center w-full ${getVibeById(roomVibe).inputClass} rounded-none sm:rounded-xl px-1 py-0.5 sm:py-1 transition-all ${isWhisperMode ? 'border-violet-500 ring-4 ring-violet-500/20' : isAnonymousMode ? 'border-purple-400 dark:border-purple-600 ring-4 ring-purple-500/20' : ''}`}>
+                  <div className={`relative flex items-center w-full ${getVibeById(roomVibe).inputClass} rounded-none sm:rounded-xl px-1 py-0.5 sm:py-1 transition-all ${isAnonymousMode ? 'border-purple-400 dark:border-purple-600 ring-4 ring-purple-500/20' : ''}`}>
                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" id="image-upload" />
 
                     <div
@@ -3646,7 +3380,7 @@ const ChatRoom = () => {
                         onCopy={(e) => e.preventDefault()}
                         onCut={(e) => e.preventDefault()}
                         onPaste={(e) => e.preventDefault()}
-                        placeholder={isWhisperMode ? (whisperTarget ? `Whisper to ${whisperTarget.nickname}…` : 'Select a recipient above…') : isAnonymousMode ? "Confess anonymously..." : "Type message..."}
+                        placeholder={isAnonymousMode ? "Confess anonymously..." : "Type message..."}
                         className={`w-full bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white text-[15px] sm:text-base py-2.5 min-w-0 placeholder:text-gray-500 dark:placeholder:text-gray-400 ${newMessage.startsWith('🧊 ') ? 'pl-2 pr-10' : 'px-2'}`}
                         disabled={!isConnected}
                         maxLength={500}
@@ -3709,20 +3443,13 @@ const ChatRoom = () => {
                         e.preventDefault();
                         anonHoldTimerRef.current = setTimeout(() => {
                           anonHoldTimerRef.current = null;
-                          const canWhisper = users.filter(u => u.nickname !== currentUser?.nickname).length > 0;
-                          if (!canWhisper) return;
-                          const next = !isWhisperModeRef.current;
-                          setIsWhisperMode(next);
-                          if (!next) setWhisperTarget(null);
-                          setIsAnonymousMode(false);
-                          hapticMedium();
                         }, 500);
                       }}
                       onTouchEnd={() => {
                         if (anonHoldTimerRef.current !== null) {
                           clearTimeout(anonHoldTimerRef.current);
                           anonHoldTimerRef.current = null;
-                          if (!isWhisperModeRef.current) setIsAnonymousMode(prev => !prev);
+                          setIsAnonymousMode(prev => !prev);
                         }
                       }}
                       onClick={() => {
@@ -3731,30 +3458,22 @@ const ChatRoom = () => {
                           anonClickTimerRef.current = setTimeout(() => {
                             anonClickCountRef.current = 0;
                             setIsAnonymousMode(prev => !prev);
-                            if (isWhisperModeRef.current) { setIsWhisperMode(false); setWhisperTarget(null); }
                           }, 280);
                         } else {
                           clearTimeout(anonClickTimerRef.current);
                           anonClickCountRef.current = 0;
-                          const canWhisper = users.filter(u => u.nickname !== currentUser?.nickname).length > 0;
-                          if (!canWhisper) return;
-                          const next = !isWhisperModeRef.current;
-                          setIsWhisperMode(next);
-                          if (!next) setWhisperTarget(null);
-                          setIsAnonymousMode(false);
+                          setIsAnonymousMode(prev => !prev);
                         }
                       }}
                       className={`p-2.5 sm:p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-all text-base sm:text-lg flex-shrink-0 touch-manipulation ${
-                        isWhisperMode
-                          ? 'bg-violet-600/20 text-violet-400 ring-2 ring-violet-500/40'
-                          : isAnonymousMode
-                            ? `${getVibeById(roomVibe).accentClass} ring-2 ring-white/20`
-                            : 'text-gray-400 hover:text-primary-500 hover:bg-black/5 dark:hover:bg-white/5'
+                        isAnonymousMode
+                          ? `${getVibeById(roomVibe).accentClass} ring-2 ring-white/20`
+                          : 'text-gray-400 hover:text-primary-500 hover:bg-black/5 dark:hover:bg-white/5'
                       }`}
                       style={{ WebkitTapHighlightColor: 'transparent' }}
-                      title={isWhisperMode ? 'Whisper mode ON — double-click or hold to disable' : isAnonymousMode ? 'Anonymous mode ON' : 'Tap: anonymous · Double-tap or hold: whisper'}
+                      title={isAnonymousMode ? 'Anonymous mode ON' : 'Tap to send anonymously'}
                     >
-                      {isWhisperMode ? <Lock className="w-4 h-4" /> : '👻'}
+                      👻
                     </button>
                     {newMessage.trim() ? (
                       <button
@@ -3765,10 +3484,10 @@ const ChatRoom = () => {
                           doSendMessage();
                         }}
                         onClick={doSendMessage}
-                        disabled={!isConnected || (isWhisperMode && !whisperTarget)}
-                        className={`flex-shrink-0 ml-1 sm:ml-2 ${isWhisperMode ? 'bg-violet-600 hover:bg-violet-500' : getVibeById(roomVibe).accentClass} h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
+                        disabled={!isConnected}
+                        className={`flex-shrink-0 ml-1 sm:ml-2 ${getVibeById(roomVibe).accentClass} h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
-                        {isWhisperMode ? <Lock className="w-4 h-4 sm:w-5 sm:h-5" /> : <Send className="w-4 h-4 sm:w-5 sm:h-5 -ml-0.5" />}
+                        <Send className="w-4 h-4 sm:w-5 sm:h-5 -ml-0.5" />
                       </button>
                     ) : (
                       <button
@@ -3888,7 +3607,6 @@ const ChatRoom = () => {
                 hasNewLogs={hasNewLogs}
                 verbalCode={verbalCode}
                 roomVibe={roomVibe}
-                nowPlayingMap={nowPlayingMap}
                 onWatchParty={() => setShowWatchPartyModal(true)}
                 autoApprove={autoApprove}
                 onToggleAutoApprove={handleToggleAutoApprove}
@@ -3964,7 +3682,6 @@ const ChatRoom = () => {
                     hasNewLogs={hasNewLogs}
                     verbalCode={verbalCode}
                     roomVibe={roomVibe}
-                    nowPlayingMap={nowPlayingMap}
                     onWatchParty={() => { setShowMobileMenu(false); setShowWatchPartyModal(true); }}
                     autoApprove={autoApprove}
                     onToggleAutoApprove={handleToggleAutoApprove}
@@ -4019,8 +3736,6 @@ const ChatRoom = () => {
         onSend={handleThreadReply}
         roomVibe={roomVibe}
       />
-      {/* Background audio element for CollabPlaylist — always mounted */}
-      <CollabPlaylist isOpen={false} onClose={() => {}} isHost={isHost} currentUser={currentUser} roomCode={roomCode} />
       <WatchPartyModal
         isOpen={showWatchPartyModal}
         onClose={() => setShowWatchPartyModal(false)}
@@ -4056,22 +3771,12 @@ const ChatRoom = () => {
         onCapture={handleCameraCapture}
       />
       {/* ── Floating feature panels ─────────────────────────────────── */}
-      {isPanelOpen('music') && (
-        <FloatingPanel title="Music" icon={Music} iconColor="text-purple-400"
-          onClose={() => closePanel('music')} onFocus={() => focusPanel('music')} zIndex={getZ('music')}
-          defaultWidth={700} defaultHeight={540} defaultX={100} defaultY={80}>
-          <MusicRoom embedded onClose={() => closePanel('music')} isHost={isHost} roomCode={roomCode} currentUser={currentUser} />
-        </FloatingPanel>
-      )}
       {isPanelOpen('secrets') && (
         <FloatingPanel title="Secrets" icon={Lock} iconColor="text-violet-400"
           onClose={() => closePanel('secrets')} onFocus={() => focusPanel('secrets')} zIndex={getZ('secrets')}
           defaultWidth={560} defaultHeight={520} defaultX={160} defaultY={90}>
           <SecretsPanel
-            secretsTab={secretsTab} setSecretsTab={setSecretsTab}
-            users={users} currentUser={currentUser} roomCode={roomCode}
-            isAnonymousMode={isAnonymousMode} whisperMaxHops={whisperMaxHops}
-            setWhisperMaxHops={setWhisperMaxHops} handleSendStego={handleSendStego}
+            handleSendStego={handleSendStego}
             onClose={() => closePanel('secrets')}
           />
         </FloatingPanel>
