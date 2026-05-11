@@ -107,7 +107,6 @@ import { useSoundFX } from '../hooks/useSoundFX';
 import { useMessageSearch } from '../hooks/useMessageSearch';
 import MessageSearch from './MessageSearch';
 import FileTransferModal from './FileTransferModal';
-import { toast } from 'react-toastify';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { useGeofence } from '../hooks/useGeofence';
@@ -863,7 +862,7 @@ const ChatRoom = () => {
       }
       if (!response.success && response.error === 'geofence-location-required') {
         // Room requires GPS — fetch location and retry once
-        toast.info('This room requires your location. Requesting GPS…', { autoClose: 3000 });
+        setActivityLogs(prev => [{ id: `log_geo_${Date.now()}`, type: 'system', content: 'This room requires your location. Requesting GPS…', timestamp: new Date().toISOString() }, ...prev].slice(0, 50));
         const pos = await fetchGeoPosition();
         if (pos) {
           performJoin({ ...params, lat: pos.lat, lng: pos.lng });
@@ -1202,13 +1201,14 @@ const ChatRoom = () => {
     const handleDisconnect = (reason) => {
       setIsConnected(false);
       if (reason === 'io server disconnect') {
-        setError('You have been disconnected by the server');
+        setActivityLogs(prev => [{ id: `log_dc_${Date.now()}`, type: 'system', content: 'You have been disconnected by the server', timestamp: new Date().toISOString() }, ...prev].slice(0, 50));
+        setHasNewLogs(true);
       } else if (reason === 'transport close' || reason === 'ping timeout') {
-        // Don't show full screen error for background disconnects if we can rejoin
         if (stateRef.current.isJoined) {
           setIsReconnecting(true);
         } else {
-          setError('Connection lost. Trying to reconnect...');
+          setActivityLogs(prev => [{ id: `log_dc_${Date.now()}`, type: 'system', content: 'Connection lost. Trying to reconnect…', timestamp: new Date().toISOString() }, ...prev].slice(0, 50));
+          setHasNewLogs(true);
         }
       }
     };
@@ -1344,9 +1344,9 @@ const ChatRoom = () => {
 
     const handleError = ({ code, message }) => {
       if (code === 'INVALID_KEY_BUNDLE') return;
-      setError(message);
-      setTimeout(() => setError(null), 5000);
-      if (message.includes('Invalid') || message.includes('expired')) setShowJoinModal(true);
+      setActivityLogs(prev => [{ id: `log_err_${Date.now()}`, type: 'system', content: message, timestamp: new Date().toISOString() }, ...prev].slice(0, 50));
+      setHasNewLogs(true);
+      if (message.includes('Invalid') || message.includes('expired')) { setError(message); setShowJoinModal(true); }
     };
 
     const handleKnockApproved = ({ isHost }) => {
@@ -1412,7 +1412,7 @@ const ChatRoom = () => {
     };
 
     const handleKicked = ({ reason, kickedBy }) => {
-      setError(`You were kicked by ${kickedBy}: ${reason}`);
+      setActivityLogs(prev => [{ id: `log_kick_${Date.now()}`, type: 'system', content: `You were kicked by ${kickedBy}: ${reason}`, timestamp: new Date().toISOString() }, ...prev].slice(0, 50));
       setIsJoined(false);
       setRoom(null);
       navigate('/');
@@ -1568,33 +1568,15 @@ const ChatRoom = () => {
     });
     socketManager.on('whisper-incoming', ({ fromNickname }) => {
       if (!stateRef.current.isJoined) return;
-      toast(
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setShowWhisperModal(true)}>
-          <span className="text-lg">🔐</span>
-          <div>
-            <p className="text-sm font-bold">Whisper from {fromNickname || 'Someone'}</p>
-            <p className="text-xs text-gray-500">Tap to read</p>
-          </div>
-        </div>,
-        { autoClose: 8000 }
-      );
+      setActivityLogs(prev => [{ id: `log_wh_${Date.now()}`, type: 'system', content: `🔐 Whisper received from ${fromNickname || 'Someone'} — open Whisper to read`, timestamp: new Date().toISOString() }, ...prev].slice(0, 50));
+      setHasNewLogs(true);
     });
     socketManager.on('hotSeat-started', ({ targetNickname }) => setHotSeatTarget(targetNickname));
     socketManager.on('hotSeat-ended', () => setHotSeatTarget(null));
     socketManager.on('room-fork-invite', ({ newRoomCode, fromNickname, isHost: forkIsHost }) => {
-      toast(
-        <div className="flex flex-col gap-1">
-          <span className="font-bold text-sm">{forkIsHost ? 'Forked room created!' : `${fromNickname} forked the room`}</span>
-          <span className="text-xs text-gray-500">{forkIsHost ? `Room ${newRoomCode} is ready.` : 'You\'ve been invited to a forked room.'}</span>
-          <button
-            onClick={() => { navigate(`/room/${newRoomCode}`); }}
-            className="mt-1 px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 w-fit"
-          >
-            Join {newRoomCode}
-          </button>
-        </div>,
-        { autoClose: 15000 }
-      );
+      const msg = forkIsHost ? `Forked room ${newRoomCode} is ready.` : `${fromNickname} forked the room — join code: ${newRoomCode}`;
+      setActivityLogs(prev => [{ id: `log_fork_${Date.now()}`, type: 'system', content: msg, timestamp: new Date().toISOString() }, ...prev].slice(0, 50));
+      setHasNewLogs(true);
     });
     socketManager.on('file-transfer-invite', handleFileTransferInvite);
 
@@ -3013,18 +2995,6 @@ const ChatRoom = () => {
       </div>
 
 
-      {error && (
-        <div className="mx-4 mt-2 bg-red-100 dark:bg-red-900/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-2 rounded-lg text-sm flex items-center justify-between md:w-fit md:mx-auto shadow-sm animate-in fade-in slide-in-from-top-2 z-[60] relative">
-          <span>{error}</span>
-          <button
-            onClick={() => setError(null)}
-            className="ml-3 p-1 hover:bg-red-200 dark:hover:bg-red-800/50 rounded-md transition-colors flex-shrink-0"
-            title="Dismiss"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
 
       <div className={`flex-1 flex overflow-hidden min-h-0 ${sidebarPosition === 'left' ? 'flex-row-reverse' : ''}`}>
         <div className="flex-1 flex flex-col min-w-0 min-h-0 relative">
@@ -3775,6 +3745,11 @@ const ChatRoom = () => {
                 setHasNewLogs={setHasNewLogs}
                 verbalCode={verbalCode}
                 isHost={isHost}
+                soundEnabled={soundEnabled}
+                toggleSound={toggleSound}
+                showSearch={showSearch}
+                setShowSearch={setShowSearch}
+                clearSearch={clearSearch}
                 onClose={null}
               />
             )}
@@ -3851,6 +3826,11 @@ const ChatRoom = () => {
                     setHasNewLogs={setHasNewLogs}
                     verbalCode={verbalCode}
                     isHost={isHost}
+                    soundEnabled={soundEnabled}
+                    toggleSound={toggleSound}
+                    showSearch={showSearch}
+                    setShowSearch={setShowSearch}
+                    clearSearch={clearSearch}
                     onClose={() => setShowMobileMenu(false)}
                   />
                 )}

@@ -514,7 +514,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 <Users className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                 <label className="font-medium text-gray-900 dark:text-white text-sm">Max Users</label>
               </div>
-              <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center justify-center gap-3 mb-3">
                 <button
                   type="button"
                   onClick={() => setSettings(prev => ({ ...prev, maxUsers: Math.max(1, prev.maxUsers - 1) }))}

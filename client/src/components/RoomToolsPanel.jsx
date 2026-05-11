@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Music, ImageIcon, Lock, Code2, Activity, ListMusic, Eye, PanelLeft, PanelRight, FileText, RefreshCw, Zap } from 'lucide-react';
+import { Music, ImageIcon, Lock, Code2, Activity, ListMusic, Eye, PanelLeft, PanelRight, FileText, RefreshCw, Zap, Volume2, VolumeX, Search } from 'lucide-react';
 import { hapticSuccess } from '../utils/platform';
 
 const FEATURES = [
@@ -20,6 +20,11 @@ export default function RoomToolsPanel({
   setShowActivityLogs, setHasNewLogs,
   verbalCode = null,
   isHost = false,
+  soundEnabled = true,
+  toggleSound,
+  showSearch = false,
+  setShowSearch,
+  clearSearch,
   onClose,
 }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -49,6 +54,12 @@ export default function RoomToolsPanel({
     setTimeout(() => setCodeCopied(false), 2000);
   };
 
+  const handleToggleSearch = () => {
+    if (showSearch) { clearSearch?.(); setShowSearch?.(false); }
+    else setShowSearch?.(true);
+    onClose?.();
+  };
+
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-4">
       {/* Feature grid */}
@@ -72,6 +83,37 @@ export default function RoomToolsPanel({
       <div>
         <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1 mb-1">Preferences</p>
         <div className="space-y-0.5">
+
+          {/* Sound FX toggle */}
+          {toggleSound && (
+            <button
+              onClick={() => { toggleSound(); }}
+              className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
+            >
+              <div className="flex items-center gap-2.5">
+                {soundEnabled
+                  ? <Volume2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  : <VolumeX className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
+                <span className="text-xs text-gray-700 dark:text-gray-300">Sound Effects</span>
+              </div>
+              <div className={`relative w-8 h-4.5 rounded-full transition-colors flex items-center ${soundEnabled ? 'bg-teal-500' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                <div className={`absolute w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-transform ${soundEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+              </div>
+            </button>
+          )}
+
+          {/* Search messages */}
+          {setShowSearch && (
+            <button
+              onClick={handleToggleSearch}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-colors ${showSearch ? 'bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30' : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'}`}
+            >
+              <Search className={`w-4 h-4 ${showSearch ? 'text-indigo-500 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400'}`} />
+              <span className={`text-xs ${showSearch ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                {showSearch ? 'Close Search' : 'Search Messages'}
+              </span>
+            </button>
+          )}
 
           {/* Typing preview toggle */}
           <button

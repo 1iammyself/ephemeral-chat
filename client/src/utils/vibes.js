@@ -10,7 +10,7 @@ export const VIBES = {
         id: 'default',
         name: 'Default',
         emoji: '💬',
-        bgClass: 'bg-slate-100/80 dark:bg-black',
+        bgClass: 'bg-slate-200 dark:bg-black',
         messageClass: 'bg-primary-600 dark:bg-primary-700 text-white rounded-tr-none',
         sidebarClass: 'bg-transparent dark:bg-gray-950/40',
         panelClass: 'bg-transparent dark:bg-gray-950/40 dark:border-b dark:border-white/5',

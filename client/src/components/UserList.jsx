@@ -490,18 +490,6 @@ const UserList = ({
         )}
       </div>
 
-      {/* Watch Party Button */}
-      {onWatchParty && (
-        <div className="p-3 shrink-0">
-          <button
-            onClick={onWatchParty}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-${vibeAccent}-100 dark:from-${vibeAccent}-950/30 to-transparent border border-${vibeAccent}-300/50 dark:border-${vibeAccent}-700/30 rounded-xl hover:shadow-md hover:border-${vibeAccent}-400 dark:hover:border-${vibeAccent}-600 transition-all active:scale-[0.98] group`}
-          >
-            <Radio className={`w-4 h-4 text-${vibeAccent}-500 group-hover:animate-pulse`} />
-            <span className={`text-sm font-bold text-${vibeAccent}-700 dark:text-${vibeAccent}-300 tracking-tight`}>Watch Party</span>
-          </button>
-        </div>
-      )}
     </div>
   );
 };
