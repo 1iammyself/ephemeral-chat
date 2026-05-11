@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { hapticSuccess } from '../utils/platform';
-import { X, Check, Copy, Users, Lock, Unlock, Timer, Zap, PartyPopper, Sun, Sunset, Settings, Clock, Shield, Share2, Hash, ToggleLeft, ToggleRight, Upload, Plus, Trash2, ClipboardList, MapPin, Locate } from 'lucide-react';
+import { X, Check, Copy, Users, Lock, Unlock, Timer, Zap, PartyPopper, Sun, Sunset, Settings, Clock, Shield, Share2, Hash, ToggleLeft, ToggleRight, Upload, Plus, Trash2, ClipboardList, MapPin, Locate, ChevronDown } from 'lucide-react';
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
 import ShareSheet from './ShareSheet';
@@ -12,7 +12,6 @@ import { secureFetch } from '../utils/secure-fetch.js';
 import { API_BASE } from '../utils/resolve-url.js';
 import { IntegrityPlugin } from '../capacitor/security-plugins';
 import { useGeofence } from '../hooks/useGeofence';
-// Removed @cap.js/widget - using honeypot instead
 
 const CreateRoomModal = ({ onClose, onRoomCreated }) => {
 
@@ -21,9 +20,8 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
     messageTTL: '30sec',
     password: '',
     maxUsers: 1,
-    persistenceMode: 'ephemeral' // NEW: Default to ephemeral mode
+    persistenceMode: 'ephemeral'
   });
-  // Honeypot fields - bots will fill these, humans won't see them
   const [honeypot, setHoneypot] = useState({
     hp_email: '',
     hp_website: '',
@@ -48,28 +46,28 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const [customCodeError, setCustomCodeError] = useState('');
   const [autoApproveEnabled, setAutoApproveEnabled] = useState(false);
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
-  const [scheduledFor, setScheduledFor] = useState(''); // ISO datetime-local string
+  const [scheduledFor, setScheduledFor] = useState('');
   const [preApprovedText, setPreApprovedText] = useState('');
   const [preApprovedEntries, setPreApprovedEntries] = useState([]);
   const preApprovedFileRef = useRef(null);
   const [geofenceEnabled, setGeofenceEnabled] = useState(false);
-  const [geofenceCenter, setGeofenceCenter] = useState(null); // { lat, lng }
-  const [geofenceRadius, setGeofenceRadius] = useState(500); // metres
+  const [geofenceCenter, setGeofenceCenter] = useState(null);
+  const [geofenceRadius, setGeofenceRadius] = useState(500);
   const { fetchPosition, loading: geoLoading, error: geoError } = useGeofence();
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const navigate = useNavigate();
 
-  // Set timestamp when component mounts (for timing-based bot detection)
   useEffect(() => {
     setHoneypot(prev => ({ ...prev, hp_timestamp: Date.now().toString() }));
   }, []);
 
   const ttlOptions = [
-    { value: 'none', label: 'Never', description: 'Messages stay until room expires' },
-    { value: '30sec', label: '30 Seconds (Default)', description: 'Messages disappear after 30 seconds' },
-    { value: '1min', label: '1 Minute', description: 'Messages disappear after 1 minute' },
-    { value: '5min', label: '5 Minutes', description: 'Messages disappear after 5 minutes' },
-    { value: '30min', label: '30 Minutes', description: 'Messages disappear after 30 minutes' },
-    { value: '1hour', label: '1 Hour', description: 'Messages disappear after 1 hour' }
+    { value: 'none',   label: 'Never',             short: 'Never', description: 'Messages stay until room expires' },
+    { value: '30sec',  label: '30 Seconds (Default)', short: '30s', description: 'Messages disappear after 30 seconds' },
+    { value: '1min',   label: '1 Minute',           short: '1m',   description: 'Messages disappear after 1 minute' },
+    { value: '5min',   label: '5 Minutes',          short: '5m',   description: 'Messages disappear after 5 minutes' },
+    { value: '30min',  label: '30 Minutes',         short: '30m',  description: 'Messages disappear after 30 minutes' },
+    { value: '1hour',  label: '1 Hour',             short: '1h',   description: 'Messages disappear after 1 hour' }
   ];
 
   const generateInviteLink = async (roomCode, password) => {
@@ -91,9 +89,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
 
       if (response.ok && data.inviteLink) {
         setInviteLink(data.inviteLink);
-        if (data.verbalCode) {
-          setVerbalCode(data.verbalCode);
-        }
+        if (data.verbalCode) setVerbalCode(data.verbalCode);
         return data.inviteLink;
       } else {
         throw new Error(data.error || 'Failed to generate invite link');
@@ -110,33 +106,25 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const handleCreate = async (e) => {
     e.preventDefault();
 
-    // Validate custom code if enabled
     if (useCustomCode) {
       const normalized = customCode.trim().toLowerCase().replace(/\s+/g, '-');
       if (!normalized || normalized.length < 3 || normalized.length > 30 || !/^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$/.test(normalized)) {
         setCustomCodeError('Please enter a valid custom phrase (3-30 chars, letters, numbers, hyphens)');
+        setShowAdvanced(true);
         return;
       }
     }
 
-    // Validate geofence: location must be set before creating
-    if (geofenceEnabled && !geofenceCenter) {
-      return; // warning already shown in UI
-    }
+    if (geofenceEnabled && !geofenceCenter) return;
 
     setIsCreating(true);
 
     try {
-      // Generate E2EE Key
       const key = generateRoomKey();
       setRoomKey(key);
 
-      // Get or generate creator ID
       const creatorId = getCreatorId();
 
-      // Android: attach Play Integrity token when available.
-      // Gracefully skipped for sideloaded APKs or when server attestation is unconfigured —
-      // the server passes through requests without headers when enforcement is off.
       const integrityHeaders = {};
       if (Capacitor.getPlatform() === 'android') {
         try {
@@ -148,29 +136,22 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
             integrityHeaders['x-attestation-nonce'] = nonce;
           }
         } catch {
-          // Play Integrity unavailable (sideloaded APK, emulator, unconfigured keys) — proceed without
+          // Play Integrity unavailable — proceed without
         }
       }
 
-      // Retry only on network errors (fetch throws). HTTP error responses mean the
-      // server received the request and marked the attestation nonce as used — retrying
-      // with the same nonce would hit replay protection and fail with 403.
       let response;
       let lastError;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           response = await secureFetch(`${API_BASE}/api/rooms`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...integrityHeaders,
-            },
+            headers: { 'Content-Type': 'application/json', ...integrityHeaders },
             body: JSON.stringify({
               messageTTL: roomSettings.messageTTL !== 'none' ? roomSettings.messageTTL : undefined,
               password: roomSettings.password.trim() || undefined,
               maxUsers: roomSettings.maxUsers,
               customCode: useCustomCode && customCode.trim() ? customCode.trim() : undefined,
-              // Honeypot fields for bot detection (invisible to users)
               hp_email: honeypot.hp_email,
               hp_website: honeypot.hp_website,
               hp_timestamp: honeypot.hp_timestamp,
@@ -184,13 +165,10 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 : undefined,
             }),
           });
-          break; // Got an HTTP response (ok or error) — don't retry
+          break;
         } catch (fetchError) {
-          // Network-level failure (no response from server) — safe to retry with same nonce
           lastError = fetchError.message;
-          if (attempt < 2) {
-            await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
-          }
+          if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
         }
       }
 
@@ -216,16 +194,9 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
       }
 
       if (data.roomCode) {
-        setCreatedRoom({
-          roomCode: data.roomCode,
-          password: roomSettings.password.trim() || ''
-        });
-
-        // Generate invite link automatically
+        setCreatedRoom({ roomCode: data.roomCode, password: roomSettings.password.trim() || '' });
         const link = await generateInviteLink(data.roomCode, roomSettings.password.trim() || undefined);
-        if (link) {
-          setInviteLink(`${link}#${key}`);
-        }
+        if (link) setInviteLink(`${link}#${key}`);
       } else {
         throw new Error(data.error || 'Failed to create room');
       }
@@ -240,31 +211,18 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
     navigator.clipboard.writeText(text);
     hapticSuccess();
     setIsCopied(prev => ({ ...prev, [type]: true }));
-    setTimeout(() => {
-      setIsCopied(prev => ({ ...prev, [type]: false }));
-    }, 2000);
+    setTimeout(() => setIsCopied(prev => ({ ...prev, [type]: false })), 2000);
   };
 
   const handleShare = async () => {
     if (!inviteLink) return;
 
-    // Use a more explicit check for mobile platforms vs others
     const platform = Capacitor.getPlatform();
     const isMobile = platform === 'ios' || platform === 'android';
 
     if (isMobile) {
-      // Native (Android/iOS) - Use standard Share Sheet
-      const shareText = `Join my private, secure chat room!
-
-Verbal Code: ${verbalCode || 'N/A'}`;
-
-      const shareData = {
-        title: 'Ephemeral Chat',
-        text: shareText,
-        url: inviteLink,
-        dialogTitle: 'Share Invite'
-      };
-
+      const shareText = `Join my private, secure chat room!\n\nVerbal Code: ${verbalCode || 'N/A'}`;
+      const shareData = { title: 'Ephemeral Chat', text: shareText, url: inviteLink, dialogTitle: 'Share Invite' };
       try {
         const canShareResult = await Share.canShare();
         if (canShareResult.value) {
@@ -274,12 +232,10 @@ Verbal Code: ${verbalCode || 'N/A'}`;
         }
       } catch (error) {
         if (error.message !== 'Share canceled' && error.name !== 'AbortError') {
-          const fullText = `${shareText}\n\nLink: ${inviteLink}`;
-          copyToClipboard(fullText, 'inviteLink');
+          copyToClipboard(`${shareText}\n\nLink: ${inviteLink}`, 'inviteLink');
         }
       }
     } else {
-      // Web/Electron - Show custom Share Sheet
       setShowShareSheet(true);
     }
   };
@@ -296,25 +252,15 @@ Verbal Code: ${verbalCode || 'N/A'}`;
     setIsCreating(false);
     setInviteLink('');
     setVerbalCode('');
-    setIsCopied({
-      roomCode: false,
-      password: false,
-      inviteLink: false,
-      verbalCode: false
-    });
-    setSettings({
-      messageTTL: '30sec',
-      password: '',
-      maxUsers: 1
-    });
+    setIsCopied({ roomCode: false, password: false, inviteLink: false, verbalCode: false });
+    setSettings({ messageTTL: '30sec', password: '', maxUsers: 1, persistenceMode: 'ephemeral' });
     setUseCustomCode(false);
     setCustomCode('');
     setCustomCodeError('');
-    // setCapToken(null); // This variable is not defined in the provided code
-    // setIsCapVerified(false); // This variable is not defined in the provided code
+    setShowAdvanced(false);
   };
 
-  // If room was created, show success message with invite options
+  // Success view (after room created)
   if (createdRoom) {
     return (
       <>
@@ -326,14 +272,12 @@ Verbal Code: ${verbalCode || 'N/A'}`;
               </h2>
 
               <div className="space-y-4 mb-6">
-                {/* Room Code display removed to enforce link-only joining */}
-
                 {createdRoom.password && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Access Key</label>
                     <div className="flex items-center">
                       <input
-                        type="text" /* keep password managers from treating this as a password */
+                        type="text"
                         readOnly
                         inputMode="none"
                         autoComplete="off"
@@ -387,7 +331,6 @@ Verbal Code: ${verbalCode || 'N/A'}`;
                   <p className="mt-1 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">Share this link with others to join easily</p>
                 </div>
 
-                {/* Verbal Join Code */}
                 {verbalCode && (
                   <div className="pt-3">
                     <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-100 dark:border-blue-800">
@@ -444,7 +387,7 @@ Verbal Code: ${verbalCode || 'N/A'}`;
     );
   }
 
-  // Show the room creation form
+  // Creation form
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
       <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl w-full max-w-md relative shadow-2xl overflow-hidden border border-gray-300 dark:border-gray-700">
@@ -456,167 +399,86 @@ Verbal Code: ${verbalCode || 'N/A'}`;
         </button>
 
         <div className="p-4 sm:p-6 max-h-[90vh] overflow-y-auto no-scrollbar">
-          <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 flex items-center dark:text-white">
-            <Settings className="w-5 h-5 mr-2" />
+          <h2 className="text-xl font-bold mb-5 flex items-center gap-2 dark:text-white">
+            <Settings className="w-5 h-5" />
             Create a New Room
           </h2>
 
-          <form onSubmit={handleCreate} autoComplete="off" className="space-y-4 sm:space-y-6">
-            {/* Custom Phrase Room Code */}
-            <div>
-              <div className="flex items-center justify-between mb-2 sm:mb-3">
-                <div className="flex items-center space-x-2">
-                  <Hash className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
-                  <label className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">
-                    Custom Room Code
-                  </label>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUseCustomCode(!useCustomCode);
-                    setCustomCode('');
-                    setCustomCodeError('');
-                  }}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${useCustomCode ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${useCustomCode ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                  />
-                </button>
-              </div>
-              {useCustomCode && (
-                <>
-                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
-                    Use a memorable phrase instead of a random code (e.g. "friday-hangout")
-                  </p>
-                  <input
-                    type="text"
-                    autoComplete="off"
-                    placeholder="e.g. movie-night, study-group"
-                    value={customCode}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setCustomCode(val);
-                      // Live validation
-                      const normalized = val.trim().toLowerCase().replace(/\s+/g, '-');
-                      if (normalized.length > 0 && normalized.length < 3) {
-                        setCustomCodeError('Must be at least 3 characters');
-                      } else if (normalized.length > 30) {
-                        setCustomCodeError('Must be 30 characters or less');
-                      } else if (normalized.length > 0 && !/^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$/.test(normalized)) {
-                        setCustomCodeError('Only letters, numbers, and hyphens allowed');
-                      } else {
-                        setCustomCodeError('');
-                      }
-                    }}
-                    className={`w-full input-field text-sm sm:text-base py-2 sm:py-3 px-3 sm:px-4 dark:bg-gray-700 dark:border-gray-600 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 ${customCodeError ? 'focus:ring-red-500 border-red-300 dark:border-red-500' : 'focus:ring-blue-500'
-                      }`}
-                    maxLength={30}
-                  />
-                  {customCode.trim() && !customCodeError && (
-                    <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                      Room code: <span className="font-mono font-semibold">{customCode.trim().toLowerCase().replace(/\s+/g, '-')}</span>
-                    </p>
-                  )}
-                  {customCodeError && (
-                    <p className="text-xs text-red-500 dark:text-red-400 mt-1">{customCodeError}</p>
-                  )}
-                </>
-              )}
-            </div>
+          <form onSubmit={handleCreate} autoComplete="off" className="space-y-5">
 
-            {/* Persistence Mode Selection */}
+            {/* Room Duration */}
             <div>
-              <div className="flex items-center space-x-2 mb-2 sm:mb-3">
-                <Timer className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
-                <label className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">
-                  Room Duration
-                </label>
+              <div className="flex items-center gap-2 mb-2">
+                <Timer className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                <label className="font-medium text-gray-900 dark:text-white text-sm">Room Duration</label>
+                <span className="ml-auto text-[11px] text-gray-400 dark:text-gray-500">Max 5 active rooms</span>
               </div>
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-3">
-                You can have up to 5 rooms at a time
-              </p>
-              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              <div className="grid grid-cols-2 gap-2">
                 {[
-                  { id: 'ephemeral', title: 'Quick Chat', duration: '10 min', icon: Zap, desc: 'Disappears when empty' },
-                  { id: 'gathering', title: 'Gathering', duration: '3 hours', icon: PartyPopper, desc: 'Stays alive when empty' },
-                  { id: 'social', title: 'Social', duration: '6 hours', icon: Sun, desc: 'Perfect for hangouts' },
-                  { id: 'extended', title: 'Extended', duration: '24 hours', icon: Sunset, desc: 'All-day event' }
+                  { id: 'ephemeral', title: 'Quick Chat',  duration: '10 min',   icon: Zap,         desc: 'Vanishes when empty' },
+                  { id: 'gathering', title: 'Gathering',   duration: '3 hours',  icon: PartyPopper, desc: 'Stays when empty' },
+                  { id: 'social',    title: 'Social',      duration: '6 hours',  icon: Sun,         desc: 'Perfect for hangouts' },
+                  { id: 'extended',  title: 'Extended',    duration: '24 hours', icon: Sunset,      desc: 'All-day event' }
                 ].map(mode => {
-                  const IconComponent = mode.icon;
+                  const Icon = mode.icon;
                   return (
                     <button
                       key={mode.id}
                       type="button"
                       onClick={() => setSettings(prev => ({ ...prev, persistenceMode: mode.id }))}
-                      className={`p-3 sm:p-4 border-2 rounded-lg transition-all text-left ${roomSettings.persistenceMode === mode.id
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                        }`}
+                      className={`p-3 border-2 rounded-lg transition-all text-left ${
+                        roomSettings.persistenceMode === mode.id
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      }`}
                     >
-                      <div className="flex items-center mb-1">
-                        <IconComponent className="w-5 h-5 mr-2 text-blue-600 dark:text-blue-400" />
-                        <div className="font-medium text-sm dark:text-white">{mode.title}</div>
+                      <div className="flex items-center mb-0.5">
+                        <Icon className="w-4 h-4 mr-1.5 text-blue-500 dark:text-blue-400" />
+                        <span className="font-semibold text-sm dark:text-white">{mode.title}</span>
                       </div>
-                      <div className="text-xs text-gray-600 dark:text-gray-400">{mode.duration}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">{mode.desc}</div>
+                      <div className="text-xs font-medium text-blue-600 dark:text-blue-400">{mode.duration}</div>
+                      <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{mode.desc}</div>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Message TTL Setting */}
+            {/* Message Auto-Delete — compact chip selector */}
             <div>
-              <div className="flex items-center space-x-2 mb-2 sm:mb-3">
-                <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
-                <label className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">
-                  Message Auto-Delete
-                </label>
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                <label className="font-medium text-gray-900 dark:text-white text-sm">Message Auto-Delete</label>
               </div>
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-3 sm:mb-4">
-                Choose when messages should automatically disappear for privacy
-              </p>
-              <div className="space-y-2">
-                {ttlOptions.map((option) => (
-                  <label
-                    key={option.value}
-                    className={`flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 rounded-lg border cursor-pointer transition-colors ${roomSettings.messageTTL === option.value
-                      ? 'border-primary-500 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
-                      }`}
+              <div className="flex flex-wrap gap-1.5">
+                {ttlOptions.map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setSettings(prev => ({ ...prev, messageTTL: opt.value }))}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+                      roomSettings.messageTTL === opt.value
+                        ? 'bg-blue-500 text-white border-blue-500'
+                        : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-600'
+                    }`}
                   >
-                    <input
-                      type="radio"
-                      name="messageTTL"
-                      value={option.value}
-                      checked={roomSettings.messageTTL === option.value}
-                      onChange={(e) => setSettings(prev => ({ ...prev, messageTTL: e.target.value }))}
-                      className="mt-1"
-                    />
-                    <div className="min-w-0">
-                      <div className="font-medium text-xs sm:text-sm dark:text-white">{option.label}</div>
-                      <div className="text-xs text-gray-600 dark:text-gray-400">{option.description}</div>
-                    </div>
-                  </label>
+                    {opt.short}
+                  </button>
                 ))}
               </div>
+              <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                {ttlOptions.find(o => o.value === roomSettings.messageTTL)?.description}
+              </p>
             </div>
 
-            {/* Password Setting */}
+            {/* Access Key */}
             <div>
-              <div className="flex items-center space-x-2 mb-2 sm:mb-3">
-                <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
-                <label className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">
-                  Room Access Key (Optional)
+              <div className="flex items-center gap-2 mb-2">
+                <Lock className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                <label className="font-medium text-gray-900 dark:text-white text-sm">
+                  Access Key <span className="font-normal text-gray-400 dark:text-gray-500 text-xs">(optional)</span>
                 </label>
               </div>
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 sm:mb-3">
-                Set a private access key to restrict your room (not saved by the browser)
-              </p>
               <input
                 type="password"
                 autoComplete="off"
@@ -629,167 +491,304 @@ Verbal Code: ${verbalCode || 'N/A'}`;
                 data-form-type="other"
                 name={`new_room_key_${Math.random().toString(36).substring(7)}`}
                 id="create-room-key-field"
-                placeholder="Enter access key (optional)"
+                placeholder="Set a private access key"
                 value={roomSettings.password}
                 onChange={(e) => setSettings(prev => ({ ...prev, password: e.target.value }))}
                 onCopy={(e) => e.preventDefault()}
                 onCut={(e) => e.preventDefault()}
                 onPaste={(e) => e.preventDefault()}
-                className="input-field text-sm sm:text-base py-2 sm:py-3 px-3 sm:px-4 dark:bg-gray-700 dark:border-gray-600 text-transparent dark:text-transparent placeholder:text-gray-500 dark:placeholder:text-gray-400 caret-blue-500 selection:bg-transparent selection:text-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input-field text-sm py-2 px-3 dark:bg-gray-700 dark:border-gray-600 text-transparent dark:text-transparent placeholder:text-gray-500 dark:placeholder:text-gray-400 caret-blue-500 selection:bg-transparent selection:text-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                 maxLength={50}
               />
             </div>
-            <div>
-              <div className="flex items-center space-x-2 mb-2 sm:mb-3">
-                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
-                <label className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">
-                  Maximum Users
-                </label>
-              </div>
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 sm:mb-3">
-                Set the maximum number of people who can join this room (1-10)
-              </p>
-              <div className="px-2 sm:px-3">
-                {/* +/- buttons with current value */}
-                <div className="flex items-center justify-center space-x-3 mb-3">
-                  <button
-                    type="button"
-                    onClick={() => setSettings(prev => ({ ...prev, maxUsers: Math.max(1, prev.maxUsers - 1) }))}
-                    disabled={roomSettings.maxUsers <= 1}
-                    className="w-10 h-10 flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 rounded-full text-xl font-bold transition-colors dark:text-white border border-gray-300 dark:border-gray-600"
-                  >
-                    −
-                  </button>
-                  <span className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400 w-16 text-center">
-                    {roomSettings.maxUsers}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setSettings(prev => ({ ...prev, maxUsers: Math.min(10, prev.maxUsers + 1) }))}
-                    disabled={roomSettings.maxUsers >= 10}
-                    className="w-10 h-10 flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 rounded-full text-xl font-bold transition-colors dark:text-white border border-gray-300 dark:border-gray-600"
-                  >
-                    +
-                  </button>
-                </div>
-                {/* Slider */}
-                <div className="mt-4 sm:mt-6">
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    step="1"
-                    value={roomSettings.maxUsers}
-                    onChange={(e) => setSettings(prev => ({ ...prev, maxUsers: parseInt(e.target.value) }))}
-                    className="w-full h-2 bg-transparent rounded-lg appearance-none cursor-pointer accent-blue-600"
-                  />
-                  <div className="flex justify-between mt-2 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium pb-2">
-                    <span>1</span>
-                    <span>10</span>
-                  </div>
-                </div>
-              </div>
-            </div>
 
-            {/* Auto-Approve & Pre-Approved List */}
+            {/* Max Users */}
             <div>
-              <div className="flex items-center space-x-2 mb-2 sm:mb-3">
-                <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
-                <label className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">
-                  Access Control
-                </label>
+              <div className="flex items-center gap-2 mb-2">
+                <Users className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                <label className="font-medium text-gray-900 dark:text-white text-sm">Max Users</label>
               </div>
-
-              {/* Auto-Approve Toggle */}
-              <div className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 mb-3">
-                <div>
-                  <div className="font-medium text-sm dark:text-white">Auto-Approve Users</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Skip the waiting room for all joiners</div>
-                </div>
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setAutoApproveEnabled(!autoApproveEnabled)}
-                  className={`flex-shrink-0 transition-all active:scale-95 ${autoApproveEnabled ? 'text-green-500' : 'text-gray-400 dark:text-gray-500'}`}
+                  onClick={() => setSettings(prev => ({ ...prev, maxUsers: Math.max(1, prev.maxUsers - 1) }))}
+                  disabled={roomSettings.maxUsers <= 1}
+                  className="w-9 h-9 flex items-center justify-center bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-40 rounded-full text-xl font-bold dark:text-white border border-gray-200 dark:border-gray-600 transition-colors"
                 >
-                  {autoApproveEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
+                  −
                 </button>
-              </div>
-
-              {/* Pre-Approved List */}
-              <div className="p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-2 mb-2">
-                  <ClipboardList className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                  <span className="font-medium text-sm dark:text-white">Pre-Approved List</span>
-                </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                  Users on this list bypass the waiting room. Assign optional roles.
-                </p>
-                <textarea
-                  value={preApprovedText}
-                  onChange={(e) => {
-                    setPreApprovedText(e.target.value);
-                    // Parse as they type
-                    const entries = e.target.value.split(',')
-                      .map(s => s.trim())
-                      .filter(s => s.length > 0)
-                      .map(s => {
-                        const match = s.match(/^([^(]+?)(?:\(([^)]+)\))?$/);
-                        if (!match) return null;
-                        return { name: match[1].trim(), role: (match[2] || 'none').trim().toLowerCase() };
-                      })
-                      .filter(Boolean);
-                    setPreApprovedEntries(entries);
-                  }}
-                  placeholder="user1(admin), user2, user3(mod)"
-                  className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  rows={2}
-                />
-                <div className="flex items-center justify-between mt-2">
-                  <button
-                    type="button"
-                    onClick={() => preApprovedFileRef.current?.click()}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-gray-100 dark:bg-gray-700 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-500 transition-all active:scale-[0.98]"
-                  >
-                    <Upload className="w-3 h-3" />
-                    Import .txt
-                  </button>
-                  <input
-                    ref={preApprovedFileRef}
-                    type="file"
-                    accept=".txt"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = (ev) => {
-                        const text = ev.target.result;
-                        setPreApprovedText(text);
-                        const entries = text.split(',')
-                          .map(s => s.trim())
-                          .filter(s => s.length > 0)
-                          .map(s => {
-                            const match = s.match(/^([^(]+?)(?:\(([^)]+)\))?$/);
-                            if (!match) return null;
-                            return { name: match[1].trim(), role: (match[2] || 'none').trim().toLowerCase() };
-                          })
-                          .filter(Boolean);
-                        setPreApprovedEntries(entries);
-                      };
-                      reader.readAsText(file);
-                      e.target.value = '';
-                    }}
-                    className="hidden"
-                  />
-                  {preApprovedEntries.length > 0 && (
-                    <span className="text-[10px] text-green-600 dark:text-green-400 font-semibold">
-                      {preApprovedEntries.length} user{preApprovedEntries.length !== 1 ? 's' : ''} added
-                    </span>
-                  )}
-                </div>
+                <span className="text-xl font-bold text-blue-600 dark:text-blue-400 w-8 text-center">
+                  {roomSettings.maxUsers}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSettings(prev => ({ ...prev, maxUsers: Math.min(10, prev.maxUsers + 1) }))}
+                  disabled={roomSettings.maxUsers >= 10}
+                  className="w-9 h-9 flex items-center justify-center bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-40 rounded-full text-xl font-bold dark:text-white border border-gray-200 dark:border-gray-600 transition-colors"
+                >
+                  +
+                </button>
+                <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">people (max 10)</span>
               </div>
             </div>
 
-            {/* Honeypot fields - invisible to humans, bots will fill them */}
+            {/* Advanced Options accordion */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(s => !s)}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-gray-400" />
+                  Advanced Options
+                </span>
+                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${showAdvanced ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showAdvanced && (
+                <div className="mt-3 space-y-4 animate-in fade-in slide-in-from-top-1 duration-150">
+
+                  {/* Custom Room Code */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Hash className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                        <label className="font-medium text-gray-900 dark:text-white text-sm">Custom Room Code</label>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setUseCustomCode(!useCustomCode); setCustomCode(''); setCustomCodeError(''); }}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${useCustomCode ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${useCustomCode ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </button>
+                    </div>
+                    {useCustomCode && (
+                      <>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                          Use a memorable phrase instead of a random code (e.g. "friday-hangout")
+                        </p>
+                        <input
+                          type="text"
+                          autoComplete="off"
+                          placeholder="e.g. movie-night, study-group"
+                          value={customCode}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCustomCode(val);
+                            const normalized = val.trim().toLowerCase().replace(/\s+/g, '-');
+                            if (normalized.length > 0 && normalized.length < 3) {
+                              setCustomCodeError('Must be at least 3 characters');
+                            } else if (normalized.length > 30) {
+                              setCustomCodeError('Must be 30 characters or less');
+                            } else if (normalized.length > 0 && !/^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$/.test(normalized)) {
+                              setCustomCodeError('Only letters, numbers, and hyphens allowed');
+                            } else {
+                              setCustomCodeError('');
+                            }
+                          }}
+                          className={`w-full input-field text-sm py-2 px-3 dark:bg-gray-700 dark:border-gray-600 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 ${customCodeError ? 'focus:ring-red-500 border-red-300 dark:border-red-500' : 'focus:ring-blue-500'}`}
+                          maxLength={30}
+                        />
+                        {customCode.trim() && !customCodeError && (
+                          <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                            Code: <span className="font-mono font-semibold">{customCode.trim().toLowerCase().replace(/\s+/g, '-')}</span>
+                          </p>
+                        )}
+                        {customCodeError && <p className="text-xs text-red-500 dark:text-red-400 mt-1">{customCodeError}</p>}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Access Control */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Shield className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                      <label className="font-medium text-gray-900 dark:text-white text-sm">Access Control</label>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 mb-3">
+                      <div>
+                        <div className="font-medium text-sm dark:text-white">Auto-Approve Users</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Skip the waiting room for all joiners</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setAutoApproveEnabled(!autoApproveEnabled)}
+                        className={`flex-shrink-0 transition-all active:scale-95 ${autoApproveEnabled ? 'text-green-500' : 'text-gray-400 dark:text-gray-500'}`}
+                      >
+                        {autoApproveEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
+                      </button>
+                    </div>
+
+                    <div className="p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center gap-2 mb-2">
+                        <ClipboardList className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                        <span className="font-medium text-sm dark:text-white">Pre-Approved List</span>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                        Users on this list bypass the waiting room. Assign optional roles.
+                      </p>
+                      <textarea
+                        value={preApprovedText}
+                        onChange={(e) => {
+                          setPreApprovedText(e.target.value);
+                          const entries = e.target.value.split(',')
+                            .map(s => s.trim()).filter(s => s.length > 0)
+                            .map(s => {
+                              const match = s.match(/^([^(]+?)(?:\(([^)]+)\))?$/);
+                              if (!match) return null;
+                              return { name: match[1].trim(), role: (match[2] || 'none').trim().toLowerCase() };
+                            }).filter(Boolean);
+                          setPreApprovedEntries(entries);
+                        }}
+                        placeholder="user1(admin), user2, user3(mod)"
+                        className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                        rows={2}
+                      />
+                      <div className="flex items-center justify-between mt-2">
+                        <button
+                          type="button"
+                          onClick={() => preApprovedFileRef.current?.click()}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-gray-100 dark:bg-gray-700 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-500 transition-all active:scale-[0.98]"
+                        >
+                          <Upload className="w-3 h-3" />
+                          Import .txt
+                        </button>
+                        <input
+                          ref={preApprovedFileRef}
+                          type="file"
+                          accept=".txt"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                              const text = ev.target.result;
+                              setPreApprovedText(text);
+                              const entries = text.split(',')
+                                .map(s => s.trim()).filter(s => s.length > 0)
+                                .map(s => {
+                                  const match = s.match(/^([^(]+?)(?:\(([^)]+)\))?$/);
+                                  if (!match) return null;
+                                  return { name: match[1].trim(), role: (match[2] || 'none').trim().toLowerCase() };
+                                }).filter(Boolean);
+                              setPreApprovedEntries(entries);
+                            };
+                            reader.readAsText(file);
+                            e.target.value = '';
+                          }}
+                          className="hidden"
+                        />
+                        {preApprovedEntries.length > 0 && (
+                          <span className="text-[10px] text-green-600 dark:text-green-400 font-semibold">
+                            {preApprovedEntries.length} user{preApprovedEntries.length !== 1 ? 's' : ''} added
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Schedule for Later */}
+                  <div className="flex flex-col gap-2 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium text-sm dark:text-white flex items-center gap-1.5">
+                          <Clock className="w-4 h-4 text-gray-400" />
+                          Schedule for Later
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Room opens at a future time; link is shareable now</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setScheduleEnabled(s => !s)}
+                        className={`flex-shrink-0 transition-all active:scale-95 ${scheduleEnabled ? 'text-indigo-500' : 'text-gray-400 dark:text-gray-500'}`}
+                      >
+                        {scheduleEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
+                      </button>
+                    </div>
+                    {scheduleEnabled && (
+                      <input
+                        type="datetime-local"
+                        value={scheduledFor}
+                        min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+                        onChange={(e) => setScheduledFor(e.target.value)}
+                        className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                        required={scheduleEnabled}
+                      />
+                    )}
+                  </div>
+
+                  {/* Geofenced Room */}
+                  <div className="flex flex-col gap-2 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium text-sm dark:text-white flex items-center gap-1.5">
+                          <MapPin className="w-4 h-4 text-gray-400" />
+                          Geofenced Room
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Only users within the set radius can join</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setGeofenceEnabled(s => !s)}
+                        className={`flex-shrink-0 transition-all active:scale-95 ${geofenceEnabled ? 'text-green-500' : 'text-gray-400 dark:text-gray-500'}`}
+                      >
+                        {geofenceEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
+                      </button>
+                    </div>
+                    {geofenceEnabled && (
+                      <div className="flex flex-col gap-3">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const pos = await fetchPosition();
+                            if (pos) setGeofenceCenter(pos);
+                          }}
+                          disabled={geoLoading}
+                          className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                        >
+                          <Locate className={`w-4 h-4 ${geoLoading ? 'animate-spin text-blue-500' : 'text-gray-500'}`} />
+                          {geoLoading ? 'Getting location…' : geofenceCenter ? 'Location set — tap to update' : 'Use my current location'}
+                        </button>
+                        {geoError && <p className="text-xs text-red-500">{geoError}</p>}
+                        {geofenceCenter && (
+                          <p className="text-xs text-green-600 dark:text-green-400">
+                            Centre locked ({geofenceCenter.lat.toFixed(4)}, {geofenceCenter.lng.toFixed(4)})
+                          </p>
+                        )}
+                        <div className="flex flex-col gap-1">
+                          <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                            <span>Radius</span>
+                            <span className="font-medium">{geofenceRadius >= 1000 ? `${(geofenceRadius / 1000).toFixed(1)} km` : `${geofenceRadius} m`}</span>
+                          </div>
+                          <input
+                            type="range"
+                            min={50}
+                            max={5000}
+                            step={50}
+                            value={geofenceRadius}
+                            onChange={(e) => setGeofenceRadius(Number(e.target.value))}
+                            className="w-full accent-green-500"
+                          />
+                          <div className="flex justify-between text-xs text-gray-400">
+                            <span>50 m</span>
+                            <span>5 km</span>
+                          </div>
+                        </div>
+                        {geofenceEnabled && !geofenceCenter && (
+                          <p className="text-xs text-amber-500">Set a location before creating the room</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              )}
+            </div>
+
+            {/* Honeypot fields — invisible to users, bots fill these */}
             <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', opacity: 0, height: 0, overflow: 'hidden' }}>
               <label htmlFor="hp_email">Email (leave empty)</label>
               <input
@@ -813,108 +812,12 @@ Verbal Code: ${verbalCode || 'N/A'}`;
               />
             </div>
 
-            {/* Schedule for Later */}
-            <div className="flex flex-col gap-2 p-3 rounded-lg border border-gray-200 dark:border-gray-700 mt-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium text-sm dark:text-white flex items-center gap-1.5">
-                    <Clock className="w-4 h-4 text-gray-400" />
-                    Schedule for Later
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Room opens at a future time; link is shareable now</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setScheduleEnabled(s => !s)}
-                  className={`flex-shrink-0 transition-all active:scale-95 ${scheduleEnabled ? 'text-indigo-500' : 'text-gray-400 dark:text-gray-500'}`}
-                >
-                  {scheduleEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
-                </button>
-              </div>
-              {scheduleEnabled && (
-                <input
-                  type="datetime-local"
-                  value={scheduledFor}
-                  min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
-                  onChange={(e) => setScheduledFor(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-                  required={scheduleEnabled}
-                />
-              )}
-            </div>
-
-            {/* Geofenced Room */}
-            <div className="flex flex-col gap-2 p-3 rounded-lg border border-gray-200 dark:border-gray-700 mt-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium text-sm dark:text-white flex items-center gap-1.5">
-                    <MapPin className="w-4 h-4 text-gray-400" />
-                    Geofenced Room
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Only users within the set radius can join</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setGeofenceEnabled(s => !s)}
-                  className={`flex-shrink-0 transition-all active:scale-95 ${geofenceEnabled ? 'text-green-500' : 'text-gray-400 dark:text-gray-500'}`}
-                >
-                  {geofenceEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
-                </button>
-              </div>
-              {geofenceEnabled && (
-                <div className="flex flex-col gap-3">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const pos = await fetchPosition();
-                      if (pos) setGeofenceCenter(pos);
-                    }}
-                    disabled={geoLoading}
-                    className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-                  >
-                    <Locate className={`w-4 h-4 ${geoLoading ? 'animate-spin text-blue-500' : 'text-gray-500'}`} />
-                    {geoLoading ? 'Getting location…' : geofenceCenter ? 'Location set — tap to update' : 'Use my current location'}
-                  </button>
-                  {geoError && (
-                    <p className="text-xs text-red-500">{geoError}</p>
-                  )}
-                  {geofenceCenter && (
-                    <p className="text-xs text-green-600 dark:text-green-400">
-                      Centre locked ({geofenceCenter.lat.toFixed(4)}, {geofenceCenter.lng.toFixed(4)})
-                    </p>
-                  )}
-                  <div className="flex flex-col gap-1">
-                    <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-                      <span>Radius</span>
-                      <span className="font-medium">{geofenceRadius >= 1000 ? `${(geofenceRadius / 1000).toFixed(1)} km` : `${geofenceRadius} m`}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={50}
-                      max={5000}
-                      step={50}
-                      value={geofenceRadius}
-                      onChange={(e) => setGeofenceRadius(Number(e.target.value))}
-                      className="w-full accent-green-500"
-                    />
-                    <div className="flex justify-between text-xs text-gray-400">
-                      <span>50 m</span>
-                      <span>5 km</span>
-                    </div>
-                  </div>
-                  {geofenceEnabled && !geofenceCenter && (
-                    <p className="text-xs text-amber-500">Set a location before creating the room</p>
-                  )}
-                </div>
-              )}
-            </div>
-
             {/* Actions */}
-            <div className="mt-4 sm:mt-6 flex justify-end space-x-2 sm:space-x-3">
+            <div className="flex justify-end gap-2 pt-1">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3 sm:px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors text-sm sm:text-base min-h-[44px]"
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-sm min-h-[44px]"
                 disabled={isCreating}
               >
                 Cancel
@@ -922,22 +825,22 @@ Verbal Code: ${verbalCode || 'N/A'}`;
               <button
                 type="submit"
                 disabled={isCreating}
-                className="px-3 sm:px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 disabled:bg-blue-300 dark:disabled:bg-blue-800 disabled:cursor-not-allowed transition-colors flex items-center text-sm sm:text-base min-h-[44px]"
+                className="px-4 py-2 bg-blue-500 dark:bg-blue-600 text-white rounded-lg hover:bg-blue-600 dark:hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-2 text-sm min-h-[44px] font-medium"
               >
                 {isCreating ? (
                   <>
-                    <svg className="animate-spin -ml-1 mr-2 h-3 w-3 sm:h-4 sm:w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <svg className="animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    <span>{createdRoom ? 'Finalizing...' : 'Waking up secure server...'}</span>
+                    Waking up secure server...
                   </>
                 ) : 'Create Room'}
               </button>
             </div>
           </form>
         </div>
-      </div >
+      </div>
 
       {inviteLink && (
         <ShareSheet
@@ -950,7 +853,7 @@ Verbal Code: ${verbalCode || 'N/A'}`;
           }}
         />
       )}
-    </div >
+    </div>
   );
 };
 
