@@ -3092,7 +3092,6 @@ const ChatRoom = () => {
               onStegoExtract={handleStegoExtract}
               onChessJoin={handleChessJoin}
               onChessLaunch={handleLaunchChess}
-              onDelete={handleDeleteMessage}
               linkPreviews={linkPreviews}
               onOpenEmojiPicker={(messageId) => {
                 setReactionTargetId(messageId);

@@ -310,6 +310,29 @@ const ChessGame = ({ gameData, currentUserId, currentNickname, onMove, vibeId })
         position: 'relative',
       }}>
         {squares}
+
+        {/* Waiting for opponent overlay */}
+        {!gameData?.players?.black?.id && !gameData?.winner && (
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 30,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)',
+            borderRadius: 10,
+          }}>
+            <div style={{
+              background: `${primary}22`, border: `1.5px solid ${primary}66`,
+              borderRadius: 14, padding: '18px 28px', textAlign: 'center', maxWidth: 200,
+            }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>⏳</div>
+              <p style={{ color: '#f9fafb', fontWeight: 700, fontSize: '0.85rem', margin: 0 }}>
+                Waiting for opponent
+              </p>
+              <p style={{ color: '#9ca3af', fontSize: '0.72rem', marginTop: 4 }}>
+                Share the room so someone can join as Black
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* White's captured pieces (bottom) */}
@@ -335,7 +358,9 @@ const ChessGame = ({ gameData, currentUserId, currentNickname, onMove, vibeId })
           <span style={{ color: isMyTurn ? primary : '#9ca3af' }}>
             {game.isGameOver()
               ? (game.isCheckmate() ? 'Checkmate!' : 'Draw!')
-              : isMyTurn ? 'Your turn' : `${game.turn() === 'w' ? 'White' : 'Black'}'s turn`}
+              : !gameData?.players?.black?.id
+                ? 'Waiting for opponent…'
+                : isMyTurn ? 'Your turn' : `${game.turn() === 'w' ? 'White' : 'Black'}'s turn`}
           </span>
         </div>
         {inCheck && !game.isGameOver() && (

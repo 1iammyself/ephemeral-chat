@@ -2545,6 +2545,8 @@ io.on('connection', (socket) => {
             winner: null,
             lastActivity: Date.now()
           };
+          // Chess games must never expire while active; overrideTtl=0 signals "never expire"
+          overrideTtl = 0;
         } else {
           socket.emit('error', { message: 'Unknown game type' });
           return;
@@ -2599,7 +2601,7 @@ io.on('connection', (socket) => {
         reactions: {}, // Initialize reactions
         hasBeenViewed: false,
         isAnonymous: !!isAnonymous, // Anonymous confession flag
-        overrideTtl: overrideTtl || null,
+        overrideTtl: overrideTtl != null ? overrideTtl : null,
         sender: isAnonymous ? {
           socketId: `anon_${Date.now()}`,
           nickname: 'Anonymous \uD83D\uDC7B',

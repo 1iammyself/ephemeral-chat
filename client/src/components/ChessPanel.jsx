@@ -107,11 +107,12 @@ const ChessPanel = ({ message, currentUserId, currentNickname, users, onMove, ro
 
               <div className="space-y-2">
                 {/* White player */}
-                <div className={`flex items-center justify-between p-2.5 rounded-lg border-2 transition-all ${
-                  gameData.turn === 'w' && !gameData.winner
-                    ? `border-${accentColor}-500 bg-${accentColor}-50 dark:bg-${accentColor}-900/10`
-                    : 'border-transparent opacity-70'
-                }`}>
+                <div
+                  className={`flex items-center justify-between p-2.5 rounded-lg border-2 transition-all ${
+                    gameData.turn === 'w' && !gameData.winner ? '' : 'border-transparent opacity-70'
+                  }`}
+                  style={gameData.turn === 'w' && !gameData.winner ? { borderColor: primary, backgroundColor: primary + '20' } : {}}
+                >
                   <div className="flex items-center gap-2.5">
                     <div className="w-9 h-9 rounded-full bg-white border-2 border-gray-200 dark:border-gray-600 flex items-center justify-center text-lg shadow-sm select-none">♔</div>
                     <div className="min-w-0">
@@ -126,7 +127,7 @@ const ChessPanel = ({ message, currentUserId, currentNickname, users, onMove, ro
                       </div>
                     </div>
                   </div>
-                  {isWhite && <Shield className={`w-3.5 h-3.5 text-${accentColor}-500 shrink-0`} />}
+                  {isWhite && <Shield className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />}
                 </div>
 
                 <div className="flex justify-center opacity-25">
@@ -134,11 +135,12 @@ const ChessPanel = ({ message, currentUserId, currentNickname, users, onMove, ro
                 </div>
 
                 {/* Black player */}
-                <div className={`flex items-center justify-between p-2.5 rounded-lg border-2 transition-all ${
-                  gameData.turn === 'b' && !gameData.winner
-                    ? `border-${accentColor}-500 bg-${accentColor}-50 dark:bg-${accentColor}-900/10`
-                    : 'border-transparent opacity-70'
-                }`}>
+                <div
+                  className={`flex items-center justify-between p-2.5 rounded-lg border-2 transition-all ${
+                    gameData.turn === 'b' && !gameData.winner ? '' : 'border-transparent opacity-70'
+                  }`}
+                  style={gameData.turn === 'b' && !gameData.winner ? { borderColor: primary, backgroundColor: primary + '20' } : {}}
+                >
                   <div className="flex items-center gap-2.5">
                     <div className="w-9 h-9 rounded-full bg-gray-900 border-2 border-gray-600 flex items-center justify-center text-lg text-white shadow-sm select-none">♚</div>
                     <div className="min-w-0">
@@ -153,7 +155,7 @@ const ChessPanel = ({ message, currentUserId, currentNickname, users, onMove, ro
                       </div>
                     </div>
                   </div>
-                  {isBlack && <Shield className={`w-3.5 h-3.5 text-${accentColor}-500 shrink-0`} />}
+                  {isBlack && <Shield className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />}
                 </div>
               </div>
             </div>
@@ -197,8 +199,8 @@ const ChessPanel = ({ message, currentUserId, currentNickname, users, onMove, ro
               </div>
             </div>
 
-            {/* Host management */}
-            {isHost && !gameData.winner && (
+            {/* Host management — only show when both players are in */}
+            {isHost && !gameData.winner && gameData.players.white?.id && gameData.players.black?.id && (
               <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-3 border border-gray-200 dark:border-gray-800">
                 <div className="flex items-center gap-1.5 mb-2.5 text-gray-400">
                   <Shield className="w-3.5 h-3.5" />
