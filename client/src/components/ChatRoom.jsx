@@ -3356,6 +3356,11 @@ const ChatRoom = () => {
                                 <Activity className="w-4 h-4 text-purple-400" />
                               </div>
                             </button>
+                            <button type="button" onClick={() => { setShowEmojiPicker(p => !p); setShowFeatureMenu(false); }} disabled={!isConnected} className="flex sm:hidden items-center justify-center p-1.5 rounded-lg bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group" title="Emoji">
+                              <div className="flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <Smile className="w-4 h-4 text-yellow-400" />
+                              </div>
+                            </button>
                           </div>
 
                           {/* Admin Section — mobile: compact row, desktop: full with labels */}
