@@ -34,6 +34,7 @@ import {
   Volume2,
   VolumeX,
   Search,
+  Eye,
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -863,6 +864,7 @@ const ChatRoom = () => {
         setActiveTimer(response.room.timer);
         setAutoApprove(response.room.autoApprove || false);
         setPreApprovedList(response.room.preApprovedList || []);
+        if (response.room.hotSeatTarget) setHotSeatTarget(response.room.hotSeatTarget);
         socketManager.setRoomType(response.room.settings?.persistenceMode || 'ephemeral');
 
         setCurrentUser({ id: persistentUserId, socketId: socketManager.socket?.id, nickname: response.nickname, isAdmin: myRole === 'host' || myRole === 'tier1' });
@@ -1509,7 +1511,13 @@ const ChatRoom = () => {
     socketManager.on('confetti-bomb', handleConfettiBomb);
     socketManager.on('message-pinned', handleMessagePinned);
     socketManager.on('message-unpinned', handleMessageUnpinned);
-    socketManager.on('room-opening', () => setRoomOpensAt(null));
+    socketManager.on('room-opening', () => {
+      setRoomOpensAt(null);
+      // Auto-rejoin the now-open room using stored credentials
+      if (!stateRef.current.isJoined && joinParamsRef.current) {
+        performJoin(joinParamsRef.current);
+      }
+    });
     socketManager.on('hotSeat-started', ({ targetNickname }) => setHotSeatTarget(targetNickname));
     socketManager.on('hotSeat-ended', () => setHotSeatTarget(null));
     socketManager.on('room-fork-invite', ({ newRoomCode, fromNickname, isHost: forkIsHost }) => {
@@ -2875,10 +2883,10 @@ const ChatRoom = () => {
             </button>
             <button
               onClick={() => { const next = !previewEnabled; setPreviewEnabled(next); localStorage.setItem('typingPreview_enabled', String(next)); }}
-              className={`p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-xs font-black ${previewEnabled ? 'text-teal-600 dark:text-teal-400' : 'text-gray-400 dark:text-gray-500'}`}
+              className={`p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors ${previewEnabled ? 'text-teal-600 dark:text-teal-400' : 'text-gray-400 dark:text-gray-500'}`}
               title={previewEnabled ? 'Live preview on — others see your typing' : 'Live preview off'}
             >
-              👁
+              <Eye className="w-4 h-4" />
             </button>
             <button
               onClick={toggleSound}
@@ -2913,8 +2921,8 @@ const ChatRoom = () => {
       )}
 
       <div className={`flex-1 flex overflow-hidden min-h-0 ${sidebarPosition === 'left' ? 'flex-row-reverse' : ''}`}>
-        <div className="flex-1 flex flex-col min-w-0 min-h-0">
-          {/* ── Scheduled room countdown ── */}
+        <div className="flex-1 flex flex-col min-w-0 min-h-0 relative">
+          {/* ── Scheduled room countdown — overlays entire chat area ── */}
           {roomOpensAt && (
             <RoomCountdown
               opensAt={roomOpensAt}
@@ -2964,7 +2972,7 @@ const ChatRoom = () => {
           )}
           <PinnedMessageBanner
             pinnedMessage={pinnedMessage}
-            isHost={isHost}
+            isHost={canManageRoom(currentUserRole)}
             onUnpin={handleUnpinMessage}
             onClick={() => {
               if (pinnedMessage?.messageId) {

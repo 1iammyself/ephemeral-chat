@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 
 export function useMessageSearch(messages) {
   const [query, setQuery] = useState('');
@@ -21,6 +21,15 @@ export function useMessageSearch(messages) {
     results.forEach(r => { map[r.messageId] = r; });
     return map;
   }, [results]);
+
+  // Clamp focusedIndex whenever results shrink (e.g. message deleted during search)
+  useEffect(() => {
+    if (results.length === 0) {
+      setFocusedIndex(0);
+    } else if (focusedIndex >= results.length) {
+      setFocusedIndex(results.length - 1);
+    }
+  }, [results.length, focusedIndex]);
 
   const focusedMessageId = results[focusedIndex]?.messageId ?? null;
 

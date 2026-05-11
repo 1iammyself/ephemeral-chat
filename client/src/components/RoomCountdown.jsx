@@ -24,7 +24,7 @@ export default function RoomCountdown({ opensAt, roomCode, onOpen }) {
   }, [opensAt, onOpen]);
 
   return (
-    <div className="flex flex-col items-center justify-center flex-1 gap-6 bg-gray-50 dark:bg-gray-950 select-none">
+    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-6 bg-gray-50 dark:bg-gray-950 select-none">
       <div className="flex flex-col items-center gap-3">
         <div className="w-16 h-16 rounded-full bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
           <Clock className="w-8 h-8 text-indigo-500 dark:text-indigo-400" />

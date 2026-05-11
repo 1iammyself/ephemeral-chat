@@ -2159,6 +2159,7 @@ io.on('connection', (socket) => {
           playlist: roomData[roomCode].playlist || [],
           playlistIndex: roomData[roomCode].playlistIndex ?? -1,
           playlistStartedAt: roomData[roomCode].playlistStartedAt || null,
+          hotSeatTarget: roomData[roomCode].hotSeatTarget || null,
         };
 
         const enrichedUsers = getEnrichedUsers(roomCode);
@@ -2180,6 +2181,24 @@ io.on('connection', (socket) => {
           sessionToken,
           activeMedia: []
         });
+
+        // Sync active hot seat to late joiners
+        const rd = roomData[roomCode];
+        if (rd?.hotSeatTarget) {
+          socket.emit('hotSeat-started', { targetNickname: rd.hotSeatTarget });
+        }
+        // Sync active playlist to late joiners (queue + current track with seek offset)
+        if (rd && Array.isArray(rd.playlist) && rd.playlist.length > 0) {
+          socket.emit('playlist-sync', { queue: rd.playlist, currentIndex: rd.playlistIndex ?? -1 });
+          const currentTrack = rd.playlist[rd.playlistIndex ?? -1];
+          if (currentTrack && rd.playlistStartedAt) {
+            socket.emit('playlist-playing', {
+              url: currentTrack.url,
+              title: currentTrack.title,
+              startedAt: rd.playlistStartedAt,
+            });
+          }
+        }
 
         // Notify others
         socket.to(roomCode).emit('user-joined', {
@@ -3112,11 +3131,13 @@ io.on('connection', (socket) => {
     });
   });
 
-  // ─── Message Pinning (host only) ───
+  // ─── Message Pinning (host + managers) ───
   socket.on('pin-message', ({ messageId, text, senderNickname }) => {
     if (!socket.roomCode || !messageId) return;
     const rd = roomData[socket.roomCode];
-    if (!rd || rd.hostId !== socket.id) return; // host only
+    if (!rd) return;
+    const canManage = rd.hostId === socket.id || ['tier1', 'admin', 'mod'].includes(rd.userRoles?.[socket.id]);
+    if (!canManage) return;
     const safeText = typeof text === 'string' ? text.slice(0, 500) : '';
     const safeNickname = typeof senderNickname === 'string' ? senderNickname.slice(0, 60) : 'Unknown';
     rd.pinnedMessage = { messageId, text: safeText, senderNickname: safeNickname };
@@ -3126,7 +3147,9 @@ io.on('connection', (socket) => {
   socket.on('unpin-message', () => {
     if (!socket.roomCode) return;
     const rd = roomData[socket.roomCode];
-    if (!rd || rd.hostId !== socket.id) return; // host only
+    if (!rd) return;
+    const canManage = rd.hostId === socket.id || ['tier1', 'admin', 'mod'].includes(rd.userRoles?.[socket.id]);
+    if (!canManage) return;
     rd.pinnedMessage = null;
     io.to(socket.roomCode).emit('message-unpinned');
   });
@@ -3188,6 +3211,7 @@ io.on('connection', (socket) => {
     if (!rc) return;
     const rd = roomData[rc];
     if (!rd?.playlist?.length) return;
+    if (rd.hostId !== socket.id) return; // host-only
     rd.playlistIndex = (rd.playlistIndex ?? -1) + 1;
     const track = rd.playlist[rd.playlistIndex];
     if (!track) return;
@@ -3212,6 +3236,8 @@ io.on('connection', (socket) => {
     if (!rc || !text || typeof text !== 'string') return;
     const rd = roomData[rc];
     if (!rd?.hotSeatTarget) return;
+    // Block the hot-seat subject from submitting questions about themselves
+    if (socket.nickname === rd.hotSeatTarget) return;
     const safe = text.trim().slice(0, 200);
     if (!safe) return;
     rd.hotSeatQueue = rd.hotSeatQueue || [];
@@ -3225,6 +3251,8 @@ io.on('connection', (socket) => {
     if (!rc) return;
     const rd = roomData[rc];
     if (!rd?.hotSeatTarget || !Array.isArray(rd.hotSeatQueue)) return;
+    // Only the hot-seat subject or the host may advance to the next question
+    if (socket.nickname !== rd.hotSeatTarget && rd.hostId !== socket.id) return;
     const q = rd.hotSeatQueue.shift() || null;
     io.to(rc).emit('hotSeat-next-question', { question: q });
   });

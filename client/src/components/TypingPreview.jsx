@@ -11,7 +11,11 @@ export default function TypingPreview() {
       if (!nickname) return;
       setPreviews(prev => {
         const next = new Map(prev);
-        next.set(nickname, { text: partial, expiresAt: Date.now() + EXPIRE_MS });
+        if (partial === '' || partial == null) {
+          next.delete(nickname);
+        } else {
+          next.set(nickname, { text: partial, expiresAt: Date.now() + EXPIRE_MS });
+        }
         return next;
       });
     };
