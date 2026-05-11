@@ -444,31 +444,37 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
               </div>
             </div>
 
-            {/* Message Auto-Delete — compact chip selector */}
+            {/* Message Auto-Delete */}
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Clock className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                 <label className="font-medium text-gray-900 dark:text-white text-sm">Message Auto-Delete</label>
               </div>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="space-y-1">
                 {ttlOptions.map(opt => (
-                  <button
+                  <label
                     key={opt.value}
-                    type="button"
-                    onClick={() => setSettings(prev => ({ ...prev, messageTTL: opt.value }))}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+                    className={`flex items-start gap-3 cursor-pointer p-2 rounded-lg transition-colors ${
                       roomSettings.messageTTL === opt.value
-                        ? 'bg-blue-500 text-white border-blue-500'
-                        : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-600'
+                        ? 'bg-blue-50 dark:bg-blue-900/20'
+                        : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'
                     }`}
                   >
-                    {opt.short}
-                  </button>
+                    <input
+                      type="radio"
+                      name="messageTTL"
+                      value={opt.value}
+                      checked={roomSettings.messageTTL === opt.value}
+                      onChange={() => setSettings(prev => ({ ...prev, messageTTL: opt.value }))}
+                      className="mt-0.5 accent-blue-500"
+                    />
+                    <div>
+                      <div className="text-sm font-medium dark:text-white">{opt.label}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">{opt.description}</div>
+                    </div>
+                  </label>
                 ))}
               </div>
-              <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                {ttlOptions.find(o => o.value === roomSettings.messageTTL)?.description}
-              </p>
             </div>
 
             {/* Access Key */}
@@ -508,7 +514,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 <Users className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                 <label className="font-medium text-gray-900 dark:text-white text-sm">Max Users</label>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 mb-3">
                 <button
                   type="button"
                   onClick={() => setSettings(prev => ({ ...prev, maxUsers: Math.max(1, prev.maxUsers - 1) }))}
@@ -529,6 +535,19 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                   +
                 </button>
                 <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">people (max 10)</span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={10}
+                step={1}
+                value={roomSettings.maxUsers}
+                onChange={(e) => setSettings(prev => ({ ...prev, maxUsers: Number(e.target.value) }))}
+                className="w-full accent-blue-500"
+              />
+              <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-1">
+                <span>1</span>
+                <span>10</span>
               </div>
             </div>
 

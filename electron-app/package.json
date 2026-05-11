@@ -1,6 +1,6 @@
 {
   "name": "ephemeral-chat",
-  "version": "1.1.4",
+  "version": "1.2.0",
   "description": "Private, temporary chat rooms with self-destructing messages",
   "main": "main.js",
   "author": {

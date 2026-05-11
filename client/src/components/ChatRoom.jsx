@@ -2934,7 +2934,7 @@ const ChatRoom = () => {
           <div className="flex items-center space-x-2 sm:space-x-4">
             <button onClick={() => navigate('/')} className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
             <div className="min-w-0">
-              <h1 className="text-base sm:text-lg font-bold truncate text-gray-900 dark:text-white leading-tight">{/^[A-Z0-9]{10}$/.test(roomCode) ? 'Secure Chat' : roomCode}</h1>
+              <h1 className="text-base sm:text-lg font-bold truncate text-gray-900 dark:text-white leading-tight">{/^[A-Z0-9]{10}$/.test(roomCode) ? 'Chatroom' : roomCode}</h1>
               <div className="flex items-center space-x-3 sm:space-x-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
                 {latency !== null && (
                   <div className="flex items-end space-x-0.5 h-4 pb-1" title={`Latency: ${latency}ms`}>
@@ -2971,19 +2971,6 @@ const ChatRoom = () => {
                     <Clock className="w-4 h-4" />
                     <span><span className="hidden sm:inline">TTL: </span>{getTTLDisplay()}</span>
                   </div>
-                )}
-                {isHost && verbalCode && (
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(verbalCode);
-                      hapticSuccess();
-                    }}
-                    className="hidden sm:flex items-center space-x-1 px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors border border-indigo-100 dark:border-indigo-800"
-                    title="Click to copy join code"
-                  >
-                    <Zap className="w-3 h-3" />
-                    <span className="font-bold text-[10px] uppercase tracking-wider">Code</span>
-                  </button>
                 )}
               </div>
             </div>
@@ -3453,7 +3440,7 @@ const ChatRoom = () => {
                     </div>
 
                     <div
-                      className="relative flex-shrink-0"
+                      className="relative flex-shrink-0 hidden sm:block"
                       ref={emojiPickerRef}
                       onMouseEnter={() => {
                         if (window.electronAPI) {
@@ -3781,6 +3768,8 @@ const ChatRoom = () => {
                 setShowPlaylist={setShowPlaylist}
                 setShowActivityLogs={setShowActivityLogs}
                 setHasNewLogs={setHasNewLogs}
+                verbalCode={verbalCode}
+                isHost={isHost}
                 onClose={null}
               />
             )}
@@ -3855,6 +3844,8 @@ const ChatRoom = () => {
                     setShowPlaylist={setShowPlaylist}
                     setShowActivityLogs={setShowActivityLogs}
                     setHasNewLogs={setHasNewLogs}
+                    verbalCode={verbalCode}
+                    isHost={isHost}
                     onClose={() => setShowMobileMenu(false)}
                   />
                 )}

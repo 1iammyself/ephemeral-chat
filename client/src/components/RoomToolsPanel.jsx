@@ -1,5 +1,6 @@
-import { Music, ImageIcon, Lock, Code2, Activity, ListMusic, Eye, PanelLeft, PanelRight, FileText } from 'lucide-react';
-import { AppRefreshButton } from './AppRefreshButton';
+import { useState } from 'react';
+import { Music, ImageIcon, Lock, Code2, Activity, ListMusic, Eye, PanelLeft, PanelRight, FileText, RefreshCw, Zap } from 'lucide-react';
+import { hapticSuccess } from '../utils/platform';
 
 const FEATURES = [
   { icon: Music,     label: 'Music',    color: 'purple',  key: 'music' },
@@ -17,8 +18,13 @@ export default function RoomToolsPanel({
   setShowMusicRoom, setShowStegoModal, setShowWhisperModal,
   setShowCodeShare, setShowWatchPartyModal, setShowPlaylist,
   setShowActivityLogs, setHasNewLogs,
-  onClose, // null on desktop, setShowMobileMenu(false) on mobile
+  verbalCode = null,
+  isHost = false,
+  onClose,
 }) {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
+
   const open = (fn) => { fn(true); onClose?.(); };
 
   const featureActions = {
@@ -28,6 +34,19 @@ export default function RoomToolsPanel({
     code:     () => open(setShowCodeShare),
     watch:    () => open(setShowWatchPartyModal),
     playlist: () => open(setShowPlaylist),
+  };
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    setTimeout(() => window.location.reload(), 400);
+  };
+
+  const handleCopyCode = () => {
+    if (!verbalCode) return;
+    navigator.clipboard.writeText(verbalCode);
+    hapticSuccess();
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 2000);
   };
 
   return (
@@ -94,10 +113,31 @@ export default function RoomToolsPanel({
             {hasNewLogs && <span className="ml-auto text-[10px] font-bold text-red-500">New</span>}
           </button>
 
-          {/* App refresh */}
-          <div className="px-3 py-2">
-            <AppRefreshButton />
-          </div>
+          {/* Copy join code — host only */}
+          {isHost && verbalCode && (
+            <button
+              onClick={handleCopyCode}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
+            >
+              <Zap className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+              <span className="text-xs text-gray-700 dark:text-gray-300">
+                {codeCopied ? 'Copied!' : 'Copy Join Code'}
+              </span>
+              {!codeCopied && (
+                <span className="ml-auto text-[10px] text-gray-400 dark:text-gray-500 font-mono truncate max-w-[90px]">{verbalCode}</span>
+              )}
+            </button>
+          )}
+
+          {/* Refresh / Reload */}
+          <button
+            onClick={handleRefresh}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-all duration-500 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+            <span className="text-xs text-gray-700 dark:text-gray-300">Refresh / Reload</span>
+          </button>
+
         </div>
       </div>
     </div>

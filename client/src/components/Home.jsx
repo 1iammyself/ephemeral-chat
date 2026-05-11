@@ -10,7 +10,6 @@ import TraceHashModal from './TraceHashModal';
 import ThemeToggle from './ThemeToggle';
 import { joinWithVerbalCode, checkRoom } from '../utils/api';
 import { hapticError } from '../utils/platform';
-import { AppRefreshButton } from './AppRefreshButton';
 
 const Home = ({ children }) => {
   const [roomCode, setRoomCode] = useState('');
@@ -25,7 +24,6 @@ const Home = ({ children }) => {
   const [isJoiningVerbal, setIsJoiningVerbal] = useState(false);
   const [urlParamsProcessed, setUrlParamsProcessed] = useState(false);
   const [verbalError, setVerbalError] = useState('');
-  const [showDropsPanel, setShowDropsPanel] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -56,7 +54,10 @@ const Home = ({ children }) => {
           .then(result => {
             if (result.success && result.roomCode) {
               navigate(`/room/${result.roomCode}`, {
-                state: { inviteToken: result.token, requiresPassword: !!result.requiresPassword }
+                state: {
+                  inviteToken: result.token,
+                  requiresPassword: !!result.requiresPassword
+                }
               });
             } else {
               setVerbalError('Invalid or expired verbal code.');
@@ -68,7 +69,9 @@ const Home = ({ children }) => {
             setVerbalError(msg);
             hapticError();
           })
-          .finally(() => setIsJoiningVerbal(false));
+          .finally(() => {
+            setIsJoiningVerbal(false);
+          });
       } else {
         setVerbalError('Invalid verbal code format. Please enter 4 words.');
         hapticError();
@@ -82,6 +85,7 @@ const Home = ({ children }) => {
       alert('Please enter a valid 10-character room code');
       return;
     }
+
     setIsJoining(true);
     try {
       const data = await checkRoom(roomCode.toUpperCase());
@@ -116,12 +120,16 @@ const Home = ({ children }) => {
     }
 
     setVerbalError('');
+
     setIsJoiningVerbal(true);
     try {
       const result = await joinWithVerbalCode(trimmedCode);
       if (result.success && result.roomCode) {
         navigate(`/room/${result.roomCode}`, {
-          state: { inviteToken: result.token, requiresPassword: result.requiresPassword }
+          state: {
+            inviteToken: result.token,
+            requiresPassword: result.requiresPassword
+          }
         });
       }
     } catch (error) {
@@ -138,197 +146,240 @@ const Home = ({ children }) => {
   };
 
   const features = [
-    { icon: Zap,   title: 'Real-Time'  },
-    { icon: UserX, title: 'No Account' },
-    { icon: Clock, title: 'Ephemeral'  },
-    { icon: Lock,  title: 'Encrypted'  },
-    { icon: Wifi,  title: 'WebSocket'  },
-    { icon: Edit,  title: 'Nickname'   },
+    { icon: Zap,   title: 'Real-Time Chat',  description: 'Instant messaging' },
+    { icon: Wifi,  title: 'WebSocket Powered', description: 'Low-latency connections' },
+    { icon: UserX, title: 'No user account', description: 'No registration needed' },
+    { icon: Edit,  title: 'Pick Nickname',   description: 'Choose a name' },
+    { icon: Clock, title: 'Ephemeral',       description: 'Auto-delete messages' },
+    { icon: Lock,  title: 'Private',         description: 'Optional passwords' },
   ];
 
   return (
-    <div style={{ height: '100vh', overflowY: 'auto' }} className="bg-slate-50 dark:bg-gray-900 transition-colors duration-200 no-scrollbar flex flex-col">
+    <div style={{ height: '100vh', overflowY: 'auto' }} className="bg-slate-50 dark:bg-gray-900 transition-colors duration-200 no-scrollbar">
       {/* Header */}
-      <header className="sticky top-0 z-50 flex-none bg-white/80 dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 backdrop-blur-xl transition-colors duration-200">
-        <div className="max-w-lg mx-auto px-4 pt-[clamp(8px,env(safe-area-inset-top),32px)] pb-3 flex justify-between items-center">
-          <h1 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <img src="/logo.svg" alt="Logo" className="h-7 w-7" />
+      <header className="sticky top-0 z-50 bg-white/80 dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 transition-colors duration-200 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-4 pt-[clamp(8px,env(safe-area-inset-top),32px)] pb-4 sm:py-6 sm:px-6 lg:px-8 flex justify-between items-center">
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 flex items-center">
+            <img src="/logo.svg" alt="Logo" className="h-8 w-8 sm:h-10 sm:w-10 mr-2 sm:mr-3" />
             Ephemeral Chat
           </h1>
-          <div className="flex items-center gap-2">
-            <AppRefreshButton />
+          <div className="flex items-center space-x-2">
             <ThemeToggle />
           </div>
         </div>
       </header>
 
-      {/* Main */}
-      <main className="flex-1 flex flex-col">
+      {/* Main Content */}
+      <main className="flex-grow">
         {children || (
-          <div className="flex-1 flex items-center justify-center px-4 py-6">
-            <div className="w-full max-w-sm space-y-3">
+          <div className="max-w-7xl mx-auto px-4 py-8 sm:py-12 sm:px-6 lg:px-8">
+            {/* Hero Section */}
+            <div className="text-center mb-8 sm:mb-16">
+              <h2 className="text-2xl sm:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight lg:text-6xl">
+                Secure, Temporary Chat Rooms
+              </h2>
+              <p className="mt-3 sm:mt-4 max-w-2xl mx-auto text-sm sm:text-xl text-gray-600 dark:text-gray-400">
+                Create or join a room to start chatting.
+              </p>
+            </div>
 
-              {/* Primary card */}
-              <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-lg border border-gray-200 dark:border-gray-700">
-
-                {/* Create Room */}
+            {/* Hero Action Card */}
+            <div className="mt-8 sm:mt-10 max-w-lg mx-auto space-y-4">
+              <div className="bg-white/90 dark:bg-[#1e293b] rounded-2xl p-5 sm:p-8 shadow-xl border border-gray-200 dark:border-gray-700 transition-colors duration-200">
                 <button
                   onClick={() => setShowCreateModal(true)}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl transition-all active:scale-[0.98] shadow-md shadow-green-500/20 text-sm"
+                  className="w-full flex justify-center items-center px-4 py-2.5 sm:py-4 text-sm sm:text-lg font-bold rounded-xl text-white bg-[#22c55e] hover:bg-[#16a34a] transition-all transform active:scale-[0.98] shadow-lg shadow-green-500/20"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="-ml-1 mr-2 h-5 w-5" />
                   Create New Room
                 </button>
 
-                {/* Verbal join form */}
-                <form onSubmit={handleVerbalJoin} className="mt-3 flex gap-2">
-                  <div className="relative flex-1">
-                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-                    <input
-                      type="text"
-                      value={verbalCode}
-                      onChange={(e) => { setVerbalCode(e.target.value); setVerbalError(''); }}
-                      placeholder="4-word join code"
-                      data-allow-copy="true"
-                      className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                      disabled={isJoiningVerbal}
-                    />
+                <button
+                  onClick={() => navigate('/my-rooms')}
+                  className="w-full flex justify-center items-center px-4 py-2.5 sm:py-3.5 text-sm sm:text-lg font-semibold rounded-xl text-gray-700 dark:text-gray-300 bg-slate-100 dark:bg-gray-800/50 hover:bg-slate-200 dark:hover:bg-gray-800/80 transition-all transform active:scale-[0.98] border border-slate-200 dark:border-gray-700 mt-3"
+                >
+                  <Timer className="-ml-1 mr-2 h-5 w-5" />
+                  My Rooms
+                </button>
+
+                {/* Ephemeral Drops Section */}
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <p className="text-center text-xs font-medium text-purple-700 dark:text-purple-400 mb-3 flex items-center justify-center gap-1">
+                    <Package className="w-3.5 h-3.5" />
+                    Ephemeral Drops — Encrypted Dead Drops
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setShowCreateDropModal(true)}
+                      className="flex justify-center items-center px-3 py-2.5 text-sm font-bold rounded-xl text-white bg-purple-500 hover:bg-purple-600 transition-all transform active:scale-[0.98] shadow-lg shadow-purple-500/20"
+                    >
+                      <Package className="-ml-1 mr-1.5 h-4 w-4" />
+                      Create Drop
+                    </button>
+                    <button
+                      onClick={() => setShowClaimDropModal(true)}
+                      className="flex justify-center items-center px-3 py-2.5 text-sm font-bold rounded-xl text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-all transform active:scale-[0.98] border border-purple-200 dark:border-purple-800/50"
+                    >
+                      <Download className="-ml-1 mr-1.5 h-4 w-4" />
+                      Claim Drop
+                    </button>
                   </div>
                   <button
-                    type="submit"
-                    disabled={isJoiningVerbal || !verbalCode.trim()}
-                    className="px-3.5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition-colors disabled:opacity-50 flex items-center"
+                    onClick={() => navigate('/my-drops')}
+                    className="w-full flex justify-center items-center px-4 py-2 text-xs font-medium rounded-lg text-purple-500 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all mt-2"
                   >
-                    {isJoiningVerbal ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Join'}
-                  </button>
-                </form>
-                {verbalError && (
-                  <p className="mt-1.5 text-xs text-red-500 dark:text-red-400 animate-in fade-in">{verbalError}</p>
-                )}
-
-                {/* Secondary tiles: My Rooms | Drops | Nearby */}
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => navigate('/my-rooms')}
-                    className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 transition-colors active:scale-95"
-                  >
-                    <Timer className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                    <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">My Rooms</span>
-                  </button>
-
-                  <button
-                    onClick={() => setShowDropsPanel(p => !p)}
-                    className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border transition-colors active:scale-95 ${
-                      showDropsPanel
-                        ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-700'
-                        : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    <Package className={`w-4 h-4 ${showDropsPanel ? 'text-purple-500 dark:text-purple-400' : 'text-gray-600 dark:text-gray-400'}`} />
-                    <span className={`text-[10px] font-semibold ${showDropsPanel ? 'text-purple-600 dark:text-purple-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                      Drops
-                    </span>
-                  </button>
-
-                  <button
-                    onClick={() => navigate('/nearby')}
-                    className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 transition-colors active:scale-95"
-                  >
-                    <Radio className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                    <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">Nearby</span>
+                    My Drops →
                   </button>
                 </div>
 
-                {/* Drops sub-panel (Create / Claim / My Drops) */}
-                {showDropsPanel && (
-                  <div className="mt-2 grid grid-cols-3 gap-2 animate-in fade-in slide-in-from-top-1 duration-150">
-                    <button
-                      onClick={() => { setShowCreateDropModal(true); setShowDropsPanel(false); }}
-                      className="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl bg-purple-500 hover:bg-purple-600 transition-colors active:scale-95"
-                    >
-                      <Package className="w-4 h-4 text-white" />
-                      <span className="text-[10px] font-bold text-white">Create</span>
-                    </button>
-                    <button
-                      onClick={() => { setShowClaimDropModal(true); setShowDropsPanel(false); }}
-                      className="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 border border-purple-200 dark:border-purple-700 transition-colors active:scale-95"
-                    >
-                      <Download className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                      <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400">Claim</span>
-                    </button>
-                    <button
-                      onClick={() => navigate('/my-drops')}
-                      className="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 transition-colors active:scale-95"
-                    >
-                      <Timer className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                      <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300">My Drops</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Footer row: invite note + trace hash */}
-                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                  <p className="text-[10px] text-gray-400 dark:text-gray-500">
-                    Or open an invite link from the host
+                {/* Nearby Transfer Section */}
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <p className="text-center text-xs font-medium text-emerald-700 dark:text-emerald-400 mb-3 flex items-center justify-center gap-1">
+                    <Radio className="w-3.5 h-3.5" />
+                    Nearby Transfer — P2P File Sharing
                   </p>
                   <button
-                    onClick={() => setShowTraceModal(true)}
-                    className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
+                    onClick={() => navigate('/nearby')}
+                    className="w-full flex justify-center items-center px-4 py-2.5 text-sm font-bold rounded-xl text-white bg-emerald-500 hover:bg-emerald-600 transition-all transform active:scale-[0.98] shadow-lg shadow-emerald-500/20"
                   >
-                    <Shield className="w-3 h-3" />
-                    Trace Hash
+                    <Radio className="-ml-1 mr-2 h-4 w-4" />
+                    Nearby Transfer
                   </button>
+                  <p className="text-center text-[10px] text-gray-700 dark:text-gray-500 mt-1.5">
+                    Send files &amp; messages to devices on the same network
+                  </p>
                 </div>
+
+                {/* Verbal Join Section */}
+                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <p className="text-center text-sm font-semibold text-gray-900 dark:text-gray-300 mb-3">
+                    Have a join code?
+                  </p>
+                  <form onSubmit={handleVerbalJoin} className="flex gap-2">
+                    <div className="relative flex-1">
+                      <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={verbalCode}
+                        onChange={(e) => setVerbalCode(e.target.value)}
+                        placeholder="clarity compass journey peace"
+                        data-allow-copy="true"
+                        className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        disabled={isJoiningVerbal}
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={isJoiningVerbal || !verbalCode.trim()}
+                      className="px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                    >
+                      {isJoiningVerbal ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        'Join'
+                      )}
+                    </button>
+                  </form>
+                  {verbalError && (
+                    <p className="mt-2 text-xs text-red-500 dark:text-red-400 animate-in fade-in slide-in-from-top-1">
+                      {verbalError}
+                    </p>
+                  )}
+                </div>
+
+                <p className="mt-4 text-center text-xs text-gray-700 dark:text-gray-500">
+                  Or use an invite link shared by the host
+                </p>
               </div>
 
-              {/* Feature chips */}
-              <div className="flex flex-wrap justify-center gap-1.5">
-                {features.map((f, i) => (
-                  <span key={i} className="flex items-center gap-1 px-2.5 py-1 bg-white/60 dark:bg-gray-800/60 rounded-full text-[10px] text-gray-500 dark:text-gray-400 border border-gray-200/60 dark:border-gray-700/60">
-                    <f.icon className="w-2.5 h-2.5" />
-                    {f.title}
-                  </span>
+              <button
+                onClick={() => setShowTraceModal(true)}
+                className="w-full flex justify-center items-center px-4 py-3 text-sm font-semibold rounded-xl text-gray-800 dark:text-gray-400 bg-white/80 dark:bg-gray-800/50 hover:bg-white dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 transition-all transform active:scale-[0.98]"
+              >
+                <Shield className="mr-2 h-4 w-4" />
+                Trace Forensic Hash
+              </button>
+            </div>
+
+            {/* Features Info Section */}
+            <div className="mt-12">
+              <p className="text-center text-xs text-gray-700 dark:text-gray-400 mb-4 font-medium">
+                Why use Ephemeral Chat?
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5 sm:gap-2 max-w-lg mx-auto">
+                {features.map((feature, index) => (
+                  <div key={index} className="flex items-center space-x-1.5 p-1.5 sm:p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs transition-colors duration-200 border border-gray-200 dark:border-gray-700">
+                    <feature.icon className="w-3 h-3 text-gray-600 dark:text-gray-500 flex-shrink-0" />
+                    <span className="text-gray-800 dark:text-gray-300 truncate font-medium">{feature.title}</span>
+                  </div>
                 ))}
               </div>
-
-              {/* Privacy */}
-              <p className="text-center">
-                <button
-                  onClick={() => navigate('/privacy')}
-                  className="text-[10px] text-gray-400 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 hover:underline transition-colors"
-                >
-                  Privacy Policy
-                </button>
-              </p>
             </div>
           </div>
         )}
 
         {showCreateModal && (
-          <CreateRoomModal onClose={() => setShowCreateModal(false)} onRoomCreated={handleRoomCreated} />
+          <CreateRoomModal
+            onClose={() => setShowCreateModal(false)}
+            onRoomCreated={handleRoomCreated}
+          />
         )}
+
         {showTraceModal && (
-          <TraceHashModal onClose={() => setShowTraceModal(false)} />
+          <TraceHashModal
+            onClose={() => setShowTraceModal(false)}
+          />
         )}
+
         {showCreateDropModal && (
           <CreateDropModal
             onClose={() => setShowCreateDropModal(false)}
-            onDropCreated={(data) => { setShowCreateDropModal(false); setDropCreatedData(data); }}
+            onDropCreated={(data) => {
+              setShowCreateDropModal(false);
+              setDropCreatedData(data);
+            }}
           />
         )}
+
         {dropCreatedData && (
-          <DropCreatedModal onClose={() => setDropCreatedData(null)} dropData={dropCreatedData} />
+          <DropCreatedModal
+            onClose={() => setDropCreatedData(null)}
+            dropData={dropCreatedData}
+          />
         )}
+
         {showClaimDropModal && (
           <ClaimDropModal
             onClose={() => setShowClaimDropModal(false)}
-            onDropClaimed={(data) => { setShowClaimDropModal(false); setDropClaimData(data); }}
+            onDropClaimed={(data) => {
+              setShowClaimDropModal(false);
+              setDropClaimData(data);
+            }}
           />
         )}
+
         {dropClaimData && (
-          <DropViewer onClose={() => setDropClaimData(null)} claimData={dropClaimData} />
+          <DropViewer
+            onClose={() => setDropClaimData(null)}
+            claimData={dropClaimData}
+          />
         )}
       </main>
+
+      {/* Footer */}
+      <footer className="bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 py-6 transition-colors duration-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col items-center space-y-2 text-sm text-gray-700 dark:text-gray-400">
+            <p>Ephemeral Chat offers a fast, secure, and private experience</p>
+            <button
+              onClick={() => navigate('/privacy')}
+              className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors font-medium underline underline-offset-4"
+            >
+              Privacy Policy
+            </button>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

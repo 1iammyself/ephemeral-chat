@@ -335,19 +335,6 @@ const UserList = ({
           </h3>
         </div>
         <div className="flex items-center space-x-2">
-          {isHost && verbalCode && (
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(verbalCode);
-                hapticSuccess();
-              }}
-              className="lg:hidden flex items-center space-x-1 px-2 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all border border-indigo-100 dark:border-indigo-800 active:scale-95 shadow-sm"
-              title="Click to copy join code"
-            >
-              <Zap className="w-3 h-3" />
-              <span className="font-black text-[9px] uppercase tracking-widest">Code</span>
-            </button>
-          )}
           {isHost && onForkRoom && users.length > 1 && (
             <button
               onClick={() => { setForkMode(f => !f); setForkTargets(new Set()); }}
