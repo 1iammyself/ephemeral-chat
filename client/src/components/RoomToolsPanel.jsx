@@ -1,14 +1,12 @@
 import { useState } from 'react';
-import { Music, ImageIcon, Lock, Code2, Activity, ListMusic, Eye, PanelLeft, PanelRight, FileText, RefreshCw, Zap, Volume2, VolumeX, Search } from 'lucide-react';
+import { Music, Lock, Code2, Activity, Eye, PanelLeft, PanelRight, FileText, RefreshCw, Zap, Volume2, VolumeX, Search } from 'lucide-react';
 import { hapticSuccess } from '../utils/platform';
 
 const FEATURES = [
-  { icon: Music,     label: 'Music',    color: 'purple',  key: 'music' },
-  { icon: ImageIcon, label: 'Stego',    color: 'emerald', key: 'stego' },
-  { icon: Lock,      label: 'Whisper',  color: 'violet',  key: 'whisper' },
-  { icon: Code2,     label: 'Code',     color: 'blue',    key: 'code' },
-  { icon: Activity,  label: 'Watch',    color: 'red',     key: 'watch' },
-  { icon: ListMusic, label: 'Playlist', color: 'indigo',  key: 'playlist' },
+  { icon: Music, label: 'Music',   color: 'purple',  key: 'music' },
+  { icon: Lock,  label: 'Secrets', color: 'violet',  key: 'secrets' },
+  { icon: Code2, label: 'Code',    color: 'blue',    key: 'code' },
+  { icon: Activity, label: 'Watch', color: 'red',    key: 'watch' },
 ];
 
 export default function RoomToolsPanel({
@@ -30,12 +28,10 @@ export default function RoomToolsPanel({
   const [codeCopied, setCodeCopied] = useState(false);
 
   const featureActions = {
-    music:    () => { onOpenPanel?.('music');    onClose?.(); },
-    stego:    () => { onOpenPanel?.('stego');    onClose?.(); },
-    whisper:  () => { onOpenPanel?.('whisper');  onClose?.(); },
-    code:     () => { onOpenPanel?.('code');     onClose?.(); },
-    watch:    () => { onOpenPanel?.('watch');    onClose?.(); },
-    playlist: () => { onOpenPanel?.('playlist'); onClose?.(); },
+    music:   () => { onOpenPanel?.('music');   onClose?.(); },
+    secrets: () => { onOpenPanel?.('secrets'); onClose?.(); },
+    code:    () => { onOpenPanel?.('code');    onClose?.(); },
+    watch:   () => { onOpenPanel?.('watch');   onClose?.(); },
   };
 
   const handleRefresh = () => {
@@ -59,10 +55,10 @@ export default function RoomToolsPanel({
 
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-4">
-      {/* Feature grid */}
+      {/* Feature grid — 4 items */}
       <div>
         <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1 mb-2">Features</p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           {FEATURES.map(({ icon: Icon, label, color, key }) => (
             <button
               key={key}

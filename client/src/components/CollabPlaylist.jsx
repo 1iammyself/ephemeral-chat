@@ -15,7 +15,7 @@ function TrackRow({ track, isCurrent, index }) {
   );
 }
 
-export default function CollabPlaylist({ isOpen, onClose, isHost, currentUser, roomCode, embedded = false }) {
+export default function CollabPlaylist({ isOpen, onClose, isHost, currentUser, roomCode, embedded = false, noAudio = false }) {
   // Combined state prevents stale-closure bugs in socket handlers
   const [playlistState, setPlaylistState] = useState({ queue: [], currentIndex: -1 });
   const { queue, currentIndex } = playlistState;
@@ -89,13 +89,14 @@ export default function CollabPlaylist({ isOpen, onClose, isHost, currentUser, r
   const isYouTube = currentDetected?.type === 'youtube';
 
   // Audio element always in DOM so playback continues even when drawer is closed
-  const audioEl = <audio ref={audioRef} className="hidden" />;
+  // noAudio=true when rendered inside MusicRoom (the ChatRoom-level instance handles audio)
+  const audioEl = noAudio ? null : <audio ref={audioRef} className="hidden" />;
 
   if (!isOpen && !embedded) return audioEl;
 
   return (
     <>
-      {audioEl}
+      {!noAudio && audioEl}
       <div
         className={embedded ? "w-full h-full overflow-auto" : "fixed inset-x-0 bottom-0 z-[75] sm:inset-0 sm:flex sm:items-center sm:justify-center sm:bg-black/40 sm:backdrop-blur-sm"}
         onClick={embedded ? undefined : (e) => e.target === e.currentTarget && onClose()}

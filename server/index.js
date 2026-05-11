@@ -6,6 +6,8 @@
 require('dotenv').config();
 const nodeCrypto = require('crypto');
 const express = require('express');
+const fs = require('fs');
+const os = require('os');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
@@ -287,8 +289,64 @@ const PORT = process.env.PORT || 3001
 // Elevated limit for encrypted file drop endpoints FIRST (base64-encoded payloads can be large)
 // Must come before the global 1 MB middleware so large drop bodies aren't rejected early.
 app.use('/api/drops', express.json({ limit: '50mb' }));
+// Audio upload — 8 MB cap (base64 adds ~33% overhead so body limit is 12 MB)
+app.use('/upload-audio', express.json({ limit: '12mb' }));
 // Global JSON limit — 1 MB for all other routes
 app.use(express.json({ limit: '1mb' }));
+
+// ─── Ephemeral Audio Upload ──────────────────────────────────────────────────
+const AUDIO_DIR = path.join(os.tmpdir(), 'ephemeral-audio');
+if (!fs.existsSync(AUDIO_DIR)) fs.mkdirSync(AUDIO_DIR, { recursive: true });
+// roomAudioFiles[roomCode] = [filename, ...]
+const roomAudioFiles = {};
+
+app.post('/upload-audio/:roomCode', (req, res) => {
+  const { roomCode } = req.params;
+  if (!roomCode) return res.status(400).json({ error: 'Missing roomCode' });
+  const { data, filename } = req.body || {};
+  if (!data || !filename) return res.status(400).json({ error: 'Missing data or filename' });
+
+  // Validate MIME — must be audio/*
+  const mimeMatch = data.match(/^data:(audio\/[a-zA-Z0-9+.-]+);base64,/);
+  if (!mimeMatch) return res.status(400).json({ error: 'Only audio files are allowed' });
+  const mime = mimeMatch[1];
+
+  // Strip data URL header and decode
+  const base64 = data.replace(/^data:[^,]+,/, '');
+  const buf = Buffer.from(base64, 'base64');
+
+  // Enforce 8 MB file size
+  if (buf.length > 8 * 1024 * 1024) return res.status(413).json({ error: 'File exceeds 8 MB limit' });
+
+  // Safe extension from MIME
+  const ext = mime.split('/')[1].replace(/[^a-z0-9]/g, '').substring(0, 8) || 'bin';
+  const fileId = nodeCrypto.randomBytes(12).toString('hex');
+  const storedName = `${fileId}.${ext}`;
+  const filePath = path.join(AUDIO_DIR, storedName);
+  fs.writeFileSync(filePath, buf);
+
+  if (!roomAudioFiles[roomCode]) roomAudioFiles[roomCode] = [];
+  roomAudioFiles[roomCode].push(storedName);
+
+  res.json({ audioUrl: `/audio/${storedName}`, title: filename });
+});
+
+app.get('/audio/:filename', (req, res) => {
+  const name = path.basename(req.params.filename);
+  const filePath = path.join(AUDIO_DIR, name);
+  if (!fs.existsSync(filePath)) return res.status(404).end();
+  res.setHeader('Cache-Control', 'no-store');
+  res.sendFile(filePath);
+});
+
+function cleanupRoomAudio(roomCode) {
+  const files = roomAudioFiles[roomCode];
+  if (!files) return;
+  for (const name of files) {
+    try { fs.unlinkSync(path.join(AUDIO_DIR, name)); } catch { /* already gone */ }
+  }
+  delete roomAudioFiles[roomCode];
+}
 
 // ─── Traffic Padding Middleware (RFC-compliant traffic analysis resistance) ──
 // Pads all JSON API responses to fixed bucket sizes so network observers
@@ -1169,6 +1227,7 @@ function ensureRoomChaff(roomCode) {
  */
 function cleanupRoomChaff(roomCode) {
   stopServerChaff(roomCode);
+  cleanupRoomAudio(roomCode);
 }
 
 io.on('connection', (socket) => {

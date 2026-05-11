@@ -38,7 +38,6 @@ import {
   MessageCircle,
   Code2,
   Lock,
-  ListMusic,
   LayoutGrid,
   Music,
 } from 'lucide-react';
@@ -389,6 +388,33 @@ const VibeEffects = ({ effectType }) => {
   return null;
 };
 
+function SecretsPanel({ secretsTab, setSecretsTab, users, currentUser, roomCode, isAnonymousMode, whisperMaxHops, setWhisperMaxHops, handleSendStego, onClose }) {
+  return (
+    <div className="w-full h-full flex flex-col overflow-hidden">
+      {/* Tab bar */}
+      <div className="flex gap-px bg-white/[0.04] flex-shrink-0">
+        {[{ id: 'whisper', label: '🔐 Whisper' }, { id: 'stego', label: '🖼 Stego' }].map(t => (
+          <button
+            key={t.id}
+            onClick={() => setSecretsTab(t.id)}
+            className={`flex-1 py-2.5 text-xs font-bold tracking-wide transition-colors ${
+              secretsTab === t.id ? 'text-violet-300 border-b-2 border-violet-500' : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {secretsTab === 'whisper'
+          ? <WhisperModal embedded onClose={onClose} users={users} currentUser={currentUser} roomCode={roomCode}
+              isAnonymous={isAnonymousMode} whisperMaxHops={whisperMaxHops} onWhisperMaxHopsChange={setWhisperMaxHops} />
+          : <StegoModal embedded onClose={onClose} onSendStego={handleSendStego} />}
+      </div>
+    </div>
+  );
+}
+
 const ChatRoom = () => {
   const { roomCode } = useParams();
   const navigate = useNavigate();
@@ -615,8 +641,6 @@ const ChatRoom = () => {
   const [previewEnabled, setPreviewEnabled] = useState(() => localStorage.getItem('typingPreview_enabled') !== 'false');
   const previewDebounceRef = useRef(null);
 
-  // Collaborative Playlist (M7)
-  const [showPlaylist, setShowPlaylist] = useState(false); // kept for /playlist slash command
 
   // Message Threads (M4)
   const [threadParent, setThreadParent] = useState(null);
@@ -656,9 +680,9 @@ const ChatRoom = () => {
   const [showCameraModal, setShowCameraModal] = useState(false);
   // Feature floating panels
   const { openPanel, closePanel, focusPanel, isOpen: isPanelOpen, getZ } = usePanelManager();
-  const setShowStegoModal   = (v) => v ? openPanel('stego')   : closePanel('stego');
+  const setShowStegoModal   = (v) => { if (v) { setSecretsTab('stego');   openPanel('secrets'); } else closePanel('secrets'); };
   const setShowMusicRoom    = (v) => v ? openPanel('music')   : closePanel('music');
-  const setShowWhisperModal = (v) => v ? openPanel('whisper') : closePanel('whisper');
+  const setShowWhisperModal = (v) => { if (v) { setSecretsTab('whisper'); openPanel('secrets'); } else closePanel('secrets'); };
   const setShowCodeShare    = (v) => v ? openPanel('code')    : closePanel('code');
   const [activeTimer, setActiveTimer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
@@ -735,6 +759,7 @@ const ChatRoom = () => {
   const [whisperTarget, setWhisperTarget] = useState(null);
   const [whisperMaxHops, setWhisperMaxHops] = useState(3);
   const [peerKeys, setPeerKeys] = useState({});
+  const [secretsTab, setSecretsTab] = useState('whisper');
 
   // ─── Sync MLS ref with state ───────────────────────────
   useEffect(() => { mlsReadyRef.current = mlsReady; }, [mlsReady]);
@@ -2220,7 +2245,7 @@ const ChatRoom = () => {
           }
           break;
         case '/playlist':
-          setShowPlaylist(true);
+          openPanel('music');
           break;
         case '/hotseat':
         case '/hotSeat':
@@ -3994,13 +4019,8 @@ const ChatRoom = () => {
         onSend={handleThreadReply}
         roomVibe={roomVibe}
       />
-      <CollabPlaylist
-        isOpen={showPlaylist}
-        onClose={() => setShowPlaylist(false)}
-        isHost={isHost}
-        currentUser={currentUser}
-        roomCode={roomCode}
-      />
+      {/* Background audio element for CollabPlaylist — always mounted */}
+      <CollabPlaylist isOpen={false} onClose={() => {}} isHost={isHost} currentUser={currentUser} roomCode={roomCode} />
       <WatchPartyModal
         isOpen={showWatchPartyModal}
         onClose={() => setShowWatchPartyModal(false)}
@@ -4036,27 +4056,24 @@ const ChatRoom = () => {
         onCapture={handleCameraCapture}
       />
       {/* ── Floating feature panels ─────────────────────────────────── */}
-      {isPanelOpen('stego') && (
-        <FloatingPanel title="Stego" icon={ImageIcon} iconColor="text-emerald-400"
-          onClose={() => closePanel('stego')} onFocus={() => focusPanel('stego')} zIndex={getZ('stego')}
-          defaultWidth={600} defaultHeight={480} defaultX={120} defaultY={100}>
-          <StegoModal embedded onClose={() => closePanel('stego')} onSendStego={handleSendStego} />
-        </FloatingPanel>
-      )}
       {isPanelOpen('music') && (
         <FloatingPanel title="Music" icon={Music} iconColor="text-purple-400"
           onClose={() => closePanel('music')} onFocus={() => focusPanel('music')} zIndex={getZ('music')}
-          defaultWidth={700} defaultHeight={500} defaultX={100} defaultY={80}>
-          <MusicRoom embedded onClose={() => closePanel('music')} isHost={isHost} />
+          defaultWidth={700} defaultHeight={540} defaultX={100} defaultY={80}>
+          <MusicRoom embedded onClose={() => closePanel('music')} isHost={isHost} roomCode={roomCode} currentUser={currentUser} />
         </FloatingPanel>
       )}
-      {isPanelOpen('whisper') && (
-        <FloatingPanel title="Whisper" icon={Lock} iconColor="text-violet-400"
-          onClose={() => closePanel('whisper')} onFocus={() => focusPanel('whisper')} zIndex={getZ('whisper')}
-          defaultWidth={500} defaultHeight={560} defaultX={160} defaultY={90}>
-          <WhisperModal embedded onClose={() => closePanel('whisper')}
-            users={users} currentUser={currentUser} roomCode={roomCode} isAnonymous={isAnonymousMode}
-            whisperMaxHops={whisperMaxHops} onWhisperMaxHopsChange={setWhisperMaxHops} />
+      {isPanelOpen('secrets') && (
+        <FloatingPanel title="Secrets" icon={Lock} iconColor="text-violet-400"
+          onClose={() => closePanel('secrets')} onFocus={() => focusPanel('secrets')} zIndex={getZ('secrets')}
+          defaultWidth={560} defaultHeight={520} defaultX={160} defaultY={90}>
+          <SecretsPanel
+            secretsTab={secretsTab} setSecretsTab={setSecretsTab}
+            users={users} currentUser={currentUser} roomCode={roomCode}
+            isAnonymousMode={isAnonymousMode} whisperMaxHops={whisperMaxHops}
+            setWhisperMaxHops={setWhisperMaxHops} handleSendStego={handleSendStego}
+            onClose={() => closePanel('secrets')}
+          />
         </FloatingPanel>
       )}
       {isPanelOpen('code') && (
@@ -4079,13 +4096,6 @@ const ChatRoom = () => {
                 setShowMediaPlayer(true);
               }
             }} />
-        </FloatingPanel>
-      )}
-      {isPanelOpen('playlist') && (
-        <FloatingPanel title="Playlist" icon={ListMusic} iconColor="text-indigo-400"
-          onClose={() => closePanel('playlist')} onFocus={() => focusPanel('playlist')} zIndex={getZ('playlist')}
-          defaultWidth={420} defaultHeight={520} defaultX={180} defaultY={95}>
-          <CollabPlaylist embedded onClose={() => closePanel('playlist')} isHost={isHost} currentUser={currentUser} roomCode={roomCode} />
         </FloatingPanel>
       )}
       <EditMessageModal
