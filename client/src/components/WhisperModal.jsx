@@ -26,7 +26,7 @@ function formatWhisperTime(ts) {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function WhisperModal({ isOpen, onClose, users, currentUser, roomCode, isAnonymous = false }) {
+export default function WhisperModal({ isOpen, onClose, users, currentUser, roomCode, isAnonymous = false, embedded = false }) {
   const [tab, setTab] = useState('send');
 
   // Send tab state
@@ -157,14 +157,14 @@ export default function WhisperModal({ isOpen, onClose, users, currentUser, room
   const otherUsers = users.filter(u => u.nickname !== currentUser?.nickname);
   const unread = inbox.filter(w => !w.read).length;
 
-  if (!isOpen) return null;
+  if (!isOpen && !embedded) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      className={embedded ? "w-full h-full overflow-auto" : "fixed inset-0 z-[120] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"}
+      onClick={embedded ? undefined : e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full sm:w-[440px] bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200">
+      <div className={embedded ? "w-full h-full bg-white dark:bg-gray-900 overflow-hidden" : "w-full sm:w-[440px] bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"}>
         {/* Header */}
         <div className="flex items-center gap-3 px-5 pt-5 pb-0">
           <div className="p-2 rounded-xl bg-violet-100 dark:bg-violet-900/40">

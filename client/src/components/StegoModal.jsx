@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { X, Lock, Eye, EyeOff, Download, Send, Image as ImageIcon, AlertCircle, CheckCircle } from 'lucide-react';
 import { embed, extract } from '../crypto/steganography';
 
-export default function StegoModal({ isOpen, onClose, onSendStego }) {
+export default function StegoModal({ isOpen, onClose, onSendStego, embedded = false }) {
   const [tab, setTab] = useState('hide');
 
   const [carrierFile, setCarrierFile] = useState(null);
@@ -102,14 +102,14 @@ export default function StegoModal({ isOpen, onClose, onSendStego }) {
     handleClose();
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !embedded) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
-      onClick={e => { if (e.target === e.currentTarget) handleClose(); }}
+      className={embedded ? "w-full h-full overflow-auto" : "fixed inset-0 z-[120] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"}
+      onClick={embedded ? undefined : e => { if (e.target === e.currentTarget) handleClose(); }}
     >
-      <div className="w-full sm:w-[480px] bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200">
+      <div className={embedded ? "w-full h-full bg-white dark:bg-gray-900 overflow-hidden" : "w-full sm:w-[480px] bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"}>
         {/* Header */}
         <div className="flex items-center gap-3 px-5 pt-5 pb-0">
           <div className="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-900/40">

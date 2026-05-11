@@ -9,7 +9,7 @@ function formatTime(secs) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export default function MusicRoom({ isOpen, onClose, isHost }) {
+export default function MusicRoom({ isOpen, onClose, isHost, embedded = false }) {
   const { audioRef, serverState, displayPosition, duration, handleDurationChange, play, pause, seek, stop } = useSyncPlayback(isHost);
 
   const [urlInput, setUrlInput] = useState('');
@@ -78,16 +78,16 @@ export default function MusicRoom({ isOpen, onClose, isHost }) {
     />
   );
 
-  if (!isOpen) return audioElement;
+  if (!isOpen && !embedded) return audioElement;
 
   return (
     <>
       {audioElement}
       <div
-        className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
-        onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+        className={embedded ? "w-full h-full overflow-auto" : "fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"}
+        onClick={embedded ? undefined : e => { if (e.target === e.currentTarget) onClose(); }}
       >
-        <div className="w-full sm:w-[420px] bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200">
+        <div className={embedded ? "w-full h-full bg-white dark:bg-gray-900 overflow-hidden" : "w-full sm:w-[420px] bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"}>
           {/* Header */}
           <div className="flex items-center gap-3 px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800">
             <div className={`p-2 rounded-xl ${playing ? 'bg-purple-100 dark:bg-purple-900/40' : 'bg-gray-100 dark:bg-gray-800'}`}>

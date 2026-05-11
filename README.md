@@ -52,8 +52,7 @@ Privacy doesn’t have to mean compromising on usability:
 ## 🚀 The Multi-Platform Ecosystem
 
 One codebase, everywhere:
-*   **🌐 Web & PWA**: Accessible instantly from any browser with full offline caching.
-*   **📱 Android Native**: Packaged via Capacitor for direct hardware integration (Bluetooth proximity, OS-level secure screen guards).
+*   **📱 Capacitor** for direct hardware integration (Bluetooth proximity, OS-level secure screen guards).
 *   **💻 Desktop (Win/Mac/Linux)**: Electron-hardened shell blocking injection and sniffing at the OS memory level.
 
 ---

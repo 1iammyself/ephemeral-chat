@@ -26,7 +26,7 @@ const LANGUAGES = [
   { id: 'plain', label: 'Plain Text', ext: null },
 ];
 
-export default function CodeShareModal({ isOpen, onClose, roomCode, onSendCode }) {
+export default function CodeShareModal({ isOpen, onClose, roomCode, onSendCode, embedded = false }) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
@@ -87,11 +87,14 @@ export default function CodeShareModal({ isOpen, onClose, roomCode, onSendCode }
     onClose();
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !embedded) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm">
-      <div className="relative w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
+    <div
+      className={embedded ? "w-full h-full overflow-auto" : "fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm"}
+      onClick={embedded ? undefined : undefined}
+    >
+      <div className={embedded ? "w-full h-full flex flex-col bg-white dark:bg-gray-900 overflow-hidden" : "relative w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden"}>
 
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">

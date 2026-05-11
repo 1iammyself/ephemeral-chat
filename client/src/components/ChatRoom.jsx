@@ -101,6 +101,8 @@ import { getRandomIcebreaker } from '../utils/icebreakers';
 import { AppRefreshButton } from './AppRefreshButton';
 import CodeShareModal from './CodeShareModal';
 import RoomToolsPanel from './RoomToolsPanel';
+import FloatingPanel from './FloatingPanel';
+import { usePanelManager } from '../hooks/usePanelManager';
 import { getCreatorId } from '../utils/creator';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess } from '../utils/platform';
 import { useSoundFX } from '../hooks/useSoundFX';
@@ -582,7 +584,7 @@ const ChatRoom = () => {
   // Watch Party / Now Playing state
   const [nowPlayingMap, setNowPlayingMap] = useState({}); // { [userId]: { title, artist, source } }
   const [showMediaPlayer, setShowMediaPlayer] = useState(true);
-  const [showWatchPartyModal, setShowWatchPartyModal] = useState(false);
+  const [showWatchPartyModal, setShowWatchPartyModal] = useState(false); // kept for inline + menu triggers
   const [initialMedia, setInitialMedia] = useState(null); // Persisted media state from server on rejoin
 
   // Stealth Actions State
@@ -611,7 +613,7 @@ const ChatRoom = () => {
   const previewDebounceRef = useRef(null);
 
   // Collaborative Playlist (M7)
-  const [showPlaylist, setShowPlaylist] = useState(false);
+  const [showPlaylist, setShowPlaylist] = useState(false); // kept for /playlist slash command
 
   // Message Threads (M4)
   const [threadParent, setThreadParent] = useState(null);
@@ -649,10 +651,12 @@ const ChatRoom = () => {
   const [showTopicEditor, setShowTopicEditor] = useState(false);
   const [showTimerModal, setShowTimerModal] = useState(false);
   const [showCameraModal, setShowCameraModal] = useState(false);
-  const [showStegoModal, setShowStegoModal] = useState(false);
-  const [showMusicRoom, setShowMusicRoom] = useState(false);
-  const [showWhisperModal, setShowWhisperModal] = useState(false);
-  const [showCodeShare, setShowCodeShare] = useState(false);
+  // Feature floating panels
+  const { openPanel, closePanel, focusPanel, isOpen: isPanelOpen, getZ } = usePanelManager();
+  const setShowStegoModal   = (v) => v ? openPanel('stego')   : closePanel('stego');
+  const setShowMusicRoom    = (v) => v ? openPanel('music')   : closePanel('music');
+  const setShowWhisperModal = (v) => v ? openPanel('whisper') : closePanel('whisper');
+  const setShowCodeShare    = (v) => v ? openPanel('code')    : closePanel('code');
   const [activeTimer, setActiveTimer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
@@ -3735,12 +3739,7 @@ const ChatRoom = () => {
                 sidebarPosition={sidebarPosition}
                 setSidebarPosition={setSidebarPosition}
                 hasNewLogs={hasNewLogs}
-                setShowMusicRoom={setShowMusicRoom}
-                setShowStegoModal={setShowStegoModal}
-                setShowWhisperModal={setShowWhisperModal}
-                setShowCodeShare={setShowCodeShare}
-                setShowWatchPartyModal={setShowWatchPartyModal}
-                setShowPlaylist={setShowPlaylist}
+                onOpenPanel={openPanel}
                 setShowActivityLogs={setShowActivityLogs}
                 setHasNewLogs={setHasNewLogs}
                 verbalCode={verbalCode}
@@ -3816,12 +3815,7 @@ const ChatRoom = () => {
                     sidebarPosition={sidebarPosition}
                     setSidebarPosition={setSidebarPosition}
                     hasNewLogs={hasNewLogs}
-                    setShowMusicRoom={setShowMusicRoom}
-                    setShowStegoModal={setShowStegoModal}
-                    setShowWhisperModal={setShowWhisperModal}
-                    setShowCodeShare={setShowCodeShare}
-                    setShowWatchPartyModal={setShowWatchPartyModal}
-                    setShowPlaylist={setShowPlaylist}
+                    onOpenPanel={openPanel}
                     setShowActivityLogs={setShowActivityLogs}
                     setHasNewLogs={setHasNewLogs}
                     verbalCode={verbalCode}
@@ -3899,33 +3893,58 @@ const ChatRoom = () => {
         onClose={() => setShowCameraModal(false)}
         onCapture={handleCameraCapture}
       />
-      <StegoModal
-        isOpen={showStegoModal}
-        onClose={() => setShowStegoModal(false)}
-        onSendStego={handleSendStego}
-      />
-      <MusicRoom
-        isOpen={showMusicRoom}
-        onClose={() => setShowMusicRoom(false)}
-        isHost={isHost}
-      />
-      <WhisperModal
-        isOpen={showWhisperModal}
-        onClose={() => setShowWhisperModal(false)}
-        users={users}
-        currentUser={currentUser}
-        roomCode={roomCode}
-        isAnonymous={isAnonymousMode}
-      />
-      <CodeShareModal
-        isOpen={showCodeShare}
-        onClose={() => setShowCodeShare(false)}
-        roomCode={roomCode}
-        onSendCode={(code, lang) => {
-          const fence = `\`\`\`${lang}\n${code}\n\`\`\``;
-          sendTextMessage(fence);
-        }}
-      />
+      {/* ── Floating feature panels ─────────────────────────────────── */}
+      {isPanelOpen('stego') && (
+        <FloatingPanel title="Stego" icon={ImageIcon} iconColor="text-emerald-400"
+          onClose={() => closePanel('stego')} onFocus={() => focusPanel('stego')} zIndex={getZ('stego')}
+          defaultWidth={600} defaultHeight={480} defaultX={120} defaultY={100}>
+          <StegoModal embedded onClose={() => closePanel('stego')} onSendStego={handleSendStego} />
+        </FloatingPanel>
+      )}
+      {isPanelOpen('music') && (
+        <FloatingPanel title="Music" icon={Music} iconColor="text-purple-400"
+          onClose={() => closePanel('music')} onFocus={() => focusPanel('music')} zIndex={getZ('music')}
+          defaultWidth={700} defaultHeight={500} defaultX={100} defaultY={80}>
+          <MusicRoom embedded onClose={() => closePanel('music')} isHost={isHost} />
+        </FloatingPanel>
+      )}
+      {isPanelOpen('whisper') && (
+        <FloatingPanel title="Whisper" icon={Lock} iconColor="text-violet-400"
+          onClose={() => closePanel('whisper')} onFocus={() => focusPanel('whisper')} zIndex={getZ('whisper')}
+          defaultWidth={500} defaultHeight={560} defaultX={160} defaultY={90}>
+          <WhisperModal embedded onClose={() => closePanel('whisper')}
+            users={users} currentUser={currentUser} roomCode={roomCode} isAnonymous={isAnonymousMode} />
+        </FloatingPanel>
+      )}
+      {isPanelOpen('code') && (
+        <FloatingPanel title="Code Studio" icon={Code2} iconColor="text-blue-400"
+          onClose={() => closePanel('code')} onFocus={() => focusPanel('code')} zIndex={getZ('code')}
+          defaultWidth={820} defaultHeight={580} defaultX={80} defaultY={70}>
+          <CodeShareModal embedded onClose={() => closePanel('code')} roomCode={roomCode}
+            onSendCode={(code, lang) => { sendTextMessage(`\`\`\`${lang}\n${code}\n\`\`\``); }} />
+        </FloatingPanel>
+      )}
+      {isPanelOpen('watch') && (
+        <FloatingPanel title="Watch Party" icon={Activity} iconColor="text-red-400"
+          onClose={() => closePanel('watch')} onFocus={() => focusPanel('watch')} zIndex={getZ('watch')}
+          defaultWidth={700} defaultHeight={520} defaultX={140} defaultY={85}>
+          <WatchPartyModal embedded onClose={() => closePanel('watch')} roomVibe={roomVibe}
+            onShare={(url) => {
+              const detected = detectMediaUrl(url);
+              if (detected) {
+                socketManager.emit('media-share', { roomCode, type: detected.type, id: detected.id || null, url: detected.url, sharedBy: currentUser?.nickname || 'Someone' });
+                setShowMediaPlayer(true);
+              }
+            }} />
+        </FloatingPanel>
+      )}
+      {isPanelOpen('playlist') && (
+        <FloatingPanel title="Playlist" icon={ListMusic} iconColor="text-indigo-400"
+          onClose={() => closePanel('playlist')} onFocus={() => focusPanel('playlist')} zIndex={getZ('playlist')}
+          defaultWidth={420} defaultHeight={520} defaultX={180} defaultY={95}>
+          <CollabPlaylist embedded onClose={() => closePanel('playlist')} isHost={isHost} currentUser={currentUser} roomCode={roomCode} />
+        </FloatingPanel>
+      )}
       <EditMessageModal
         isOpen={!!editingMessage}
         onClose={() => setEditingMessage(null)}

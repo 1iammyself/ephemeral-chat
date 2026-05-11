@@ -15,8 +15,7 @@ export default function RoomToolsPanel({
   previewEnabled, setPreviewEnabled,
   sidebarPosition, setSidebarPosition,
   hasNewLogs,
-  setShowMusicRoom, setShowStegoModal, setShowWhisperModal,
-  setShowCodeShare, setShowWatchPartyModal, setShowPlaylist,
+  onOpenPanel,
   setShowActivityLogs, setHasNewLogs,
   verbalCode = null,
   isHost = false,
@@ -30,15 +29,13 @@ export default function RoomToolsPanel({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
 
-  const open = (fn) => { fn(true); onClose?.(); };
-
   const featureActions = {
-    music:    () => open(setShowMusicRoom),
-    stego:    () => open(setShowStegoModal),
-    whisper:  () => open(setShowWhisperModal),
-    code:     () => open(setShowCodeShare),
-    watch:    () => open(setShowWatchPartyModal),
-    playlist: () => open(setShowPlaylist),
+    music:    () => { onOpenPanel?.('music');    onClose?.(); },
+    stego:    () => { onOpenPanel?.('stego');    onClose?.(); },
+    whisper:  () => { onOpenPanel?.('whisper');  onClose?.(); },
+    code:     () => { onOpenPanel?.('code');     onClose?.(); },
+    watch:    () => { onOpenPanel?.('watch');    onClose?.(); },
+    playlist: () => { onOpenPanel?.('playlist'); onClose?.(); },
   };
 
   const handleRefresh = () => {

@@ -7,7 +7,7 @@ import { getVibeById } from '../utils/vibes';
  * WatchPartyModal — Centered popup for pasting a YouTube/SoundCloud URL
  * to start a watch party. Shows validation feedback inline.
  */
-const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => {
+const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default', embedded = false }) => {
   const [urlInput, setUrlInput] = useState('');
   const inputRef = useRef(null);
 
@@ -43,15 +43,10 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
     onClose();
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !embedded) return null;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-
-      {/* Modal */}
-      <div className="relative w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-black/10 dark:border-white/10 overflow-hidden animate-in zoom-in-95 duration-200">
+  const modalContent = (
+    <div className={embedded ? "w-full h-full bg-white dark:bg-gray-900 overflow-hidden" : "relative w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-black/10 dark:border-white/10 overflow-hidden animate-in zoom-in-95 duration-200"}>
         {/* Header */}
         <div className={`flex items-center justify-between px-5 py-4 border-b border-black/10 dark:border-white/10 bg-gradient-to-r from-${vibeAccent}-50/50 dark:from-${vibeAccent}-950/30 to-transparent`}>
           <div className="flex items-center gap-3">
@@ -165,6 +160,14 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default' }) => 
           </button>
         </div>
       </div>
+  );
+
+  if (embedded) return <div className="w-full h-full overflow-auto">{modalContent}</div>;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      {modalContent}
     </div>
   );
 };

@@ -15,7 +15,7 @@ function TrackRow({ track, isCurrent, index }) {
   );
 }
 
-export default function CollabPlaylist({ isOpen, onClose, isHost, currentUser, roomCode }) {
+export default function CollabPlaylist({ isOpen, onClose, isHost, currentUser, roomCode, embedded = false }) {
   // Combined state prevents stale-closure bugs in socket handlers
   const [playlistState, setPlaylistState] = useState({ queue: [], currentIndex: -1 });
   const { queue, currentIndex } = playlistState;
@@ -91,13 +91,16 @@ export default function CollabPlaylist({ isOpen, onClose, isHost, currentUser, r
   // Audio element always in DOM so playback continues even when drawer is closed
   const audioEl = <audio ref={audioRef} className="hidden" />;
 
-  if (!isOpen) return audioEl;
+  if (!isOpen && !embedded) return audioEl;
 
   return (
     <>
       {audioEl}
-      <div className="fixed inset-x-0 bottom-0 z-[75] sm:inset-0 sm:flex sm:items-center sm:justify-center sm:bg-black/40 sm:backdrop-blur-sm" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="w-full sm:w-80 bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 flex flex-col max-h-[60vh]">
+      <div
+        className={embedded ? "w-full h-full overflow-auto" : "fixed inset-x-0 bottom-0 z-[75] sm:inset-0 sm:flex sm:items-center sm:justify-center sm:bg-black/40 sm:backdrop-blur-sm"}
+        onClick={embedded ? undefined : (e) => e.target === e.currentTarget && onClose()}
+      >
+      <div className={embedded ? "w-full h-full bg-white dark:bg-gray-900 overflow-hidden flex flex-col" : "w-full sm:w-80 bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 flex flex-col max-h-[60vh]"}>
         {/* Header */}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800 shrink-0">
           <Music className="w-4 h-4 text-indigo-500" />
