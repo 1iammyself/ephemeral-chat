@@ -2225,7 +2225,6 @@ io.on('connection', (socket) => {
         });
 
         // Sync active hot seat to late joiners
-        const rd = roomData[roomCode];
         if (rd?.hotSeatTarget) {
           socket.emit('hotSeat-started', { targetNickname: rd.hotSeatTarget });
         }
