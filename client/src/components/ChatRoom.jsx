@@ -71,6 +71,7 @@ import PrivacyOverlay from './PrivacyOverlay';
 import GhostWatermark from './GhostWatermark';
 import TopicEditor from './TopicEditor';
 import TimerModal from './TimerModal';
+import PinnedMessageBanner from './PinnedMessageBanner';
 import EditMessageModal from './EditMessageModal';
 import DragDropOverlay from './DragDropOverlay';
 import ActivityLog from './ActivityLog';
@@ -559,7 +560,11 @@ const ChatRoom = () => {
 
   // Stealth Actions State
   const [isStealthMode, setIsStealthMode] = useState(false);
-  const [overrideTtl, setOverrideTtl] = useState(false);
+  const [overrideTtl, setOverrideTtl] = useState(null); // null = off, number = seconds per-message TTL
+  const [showTtlPicker, setShowTtlPicker] = useState(false);
+
+  // Pinned message
+  const [pinnedMessage, setPinnedMessage] = useState(null);
 
   // Floating Reactions State
   const reactionLayerRef = useRef(null);
@@ -1027,6 +1032,14 @@ const ChatRoom = () => {
     hapticLight();
   }, [triggerConfettiBomb]);
 
+  const handleMessagePinned = useCallback((pinData) => {
+    setPinnedMessage(pinData);
+  }, []);
+
+  const handleMessageUnpinned = useCallback(() => {
+    setPinnedMessage(null);
+  }, []);
+
   const handleFileTransferInvite = useCallback(({ from, fromId, roomCode: targetRoomCode, recipients: targetedTo }) => {
     // Determine if we should show this
     const myId = socketManager.socket?.id;
@@ -1146,6 +1159,7 @@ const ChatRoom = () => {
       setRoomVibe(data.room.vibe || 'default');
       setRoomTopic(data.room.topic || '');
       setActiveTimer(data.room.timer);
+      setPinnedMessage(data.room.pinnedMessage || null);
       socketManager.setRoomType(data.room.settings?.persistenceMode || 'ephemeral');
 
       setCurrentUser({ id: persistentUserId, socketId: socketManager.socket?.id, nickname: data.nickname, isAdmin: (myRole === 'host' || myRole === 'tier1') });
@@ -1458,6 +1472,8 @@ const ChatRoom = () => {
     socketManager.on('user-stop-typing', handleUserStopTyping);
     socketManager.on('room-reaction', handleRoomReaction);
     socketManager.on('confetti-bomb', handleConfettiBomb);
+    socketManager.on('message-pinned', handleMessagePinned);
+    socketManager.on('message-unpinned', handleMessageUnpinned);
     socketManager.on('file-transfer-invite', handleFileTransferInvite);
 
     // Screenshot detection handler
@@ -1649,6 +1665,8 @@ const ChatRoom = () => {
       socketManager.off('user-stop-typing', handleUserStopTyping);
       socketManager.off('room-reaction', handleRoomReaction);
       socketManager.off('confetti-bomb', handleConfettiBomb);
+      socketManager.off('message-pinned', handleMessagePinned);
+      socketManager.off('message-unpinned', handleMessageUnpinned);
       socketManager.off('file-transfer-invite', handleFileTransferInvite);
       socketManager.off('screenshot-detected', handleScreenshotDetected);
       socketManager.off('auto-approve-updated', handleAutoApproveUpdated);
@@ -1706,7 +1724,7 @@ const ChatRoom = () => {
     if (window.electronAPI?.onToggleOverrideTtl) {
       window.electronAPI.onToggleOverrideTtl(() => {
         setOverrideTtl(prev => {
-          const next = !prev;
+          const next = prev ? null : 10; // Toggle between off and 10s default
           if (next) hapticLight();
           return next;
         });
@@ -1772,6 +1790,9 @@ const ChatRoom = () => {
       }
       if (suggestionRef.current && !suggestionRef.current.contains(event.target)) {
         setSuggestions(prev => ({ ...prev, show: false }));
+      }
+      if (!event.target.closest('[data-ttl-picker]')) {
+        setShowTtlPicker(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -2096,11 +2117,11 @@ const ChatRoom = () => {
           replyTo: replyData,
           isAnonymous: isAnonymousMode,
           isEncrypted: true,
-          overrideTtl: overrideTtl ? 10 : null
+          overrideTtl: overrideTtl || null
         });
       });
 
-      if (overrideTtl) setOverrideTtl(false);
+      if (overrideTtl) setOverrideTtl(null);
       if (!isStealthMode) socketManager.emit('user-activity');
       hapticLight();
 
@@ -2200,6 +2221,18 @@ const ChatRoom = () => {
   const handleCancelReply = () => {
     setReplyingTo(null);
   };
+
+  const handlePinMessage = useCallback(({ messageId, text, senderNickname }) => {
+    if (pinnedMessage?.messageId === messageId) {
+      socketManager.emit('unpin-message');
+    } else {
+      socketManager.emit('pin-message', { messageId, text, senderNickname });
+    }
+  }, [pinnedMessage]);
+
+  const handleUnpinMessage = useCallback(() => {
+    socketManager.emit('unpin-message');
+  }, []);
 
   const handleReaction = (messageId, emoji) => {
     spawnMessageReaction(messageId, emoji);
@@ -2823,6 +2856,17 @@ const ChatRoom = () => {
               )}
             </div>
           )}
+          <PinnedMessageBanner
+            pinnedMessage={pinnedMessage}
+            isHost={isHost}
+            onUnpin={handleUnpinMessage}
+            onClick={() => {
+              if (pinnedMessage?.messageId) {
+                const el = document.getElementById(pinnedMessage.messageId);
+                el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }}
+          />
           <div
             ref={messagesContainerRef}
             onScroll={handleScroll}
@@ -2866,6 +2910,9 @@ const ChatRoom = () => {
               onReact={handleReaction}
               onEdit={handleEditMessage}
               onDelete={handleDeleteMessage}
+              onPin={handlePinMessage}
+              isHost={isHost}
+              pinnedMessageId={pinnedMessage?.messageId}
               roomVibe={roomVibe}
               onShareResult={handleShareResult}
               linkPreviews={linkPreviews}
@@ -2878,7 +2925,7 @@ const ChatRoom = () => {
           </div>
           <div className={`${getVibeById(roomVibe).panelClass} sticky bottom-0 z-50 shrink-0 chat-input-area`}>
             {/* Active Security Indicators */}
-            {(isStealthMode || overrideTtl || isAnonymousMode) && (
+            {(isStealthMode || overrideTtl !== null || isAnonymousMode) && (
               <div className="px-4 py-1.5 flex items-center gap-3 bg-transparent dark:bg-black/20 overflow-x-auto scrollbar-none">
                 {isStealthMode && (
                   <div className="flex items-center gap-1.5 text-[10px] font-black tracking-tighter text-gray-600 dark:text-gray-400 bg-gray-100/80 dark:bg-gray-800/80 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-gray-200/50 dark:border-white/10 shadow-sm shrink-0">
@@ -2886,11 +2933,15 @@ const ChatRoom = () => {
                     GHOST MODE
                   </div>
                 )}
-                {overrideTtl && (
-                  <div className="flex items-center gap-1.5 text-[10px] font-black tracking-tighter text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-950/40 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-red-100/50 dark:border-red-500/20 shadow-sm animate-pulse shrink-0">
+                {overrideTtl !== null && (
+                  <button
+                    onClick={() => setShowTtlPicker(p => !p)}
+                    className="flex items-center gap-1.5 text-[10px] font-black tracking-tighter text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-950/40 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-red-100/50 dark:border-red-500/20 shadow-sm animate-pulse shrink-0 hover:animate-none transition-all"
+                    title="Change self-destruct timer"
+                  >
                     <Clock className="w-3 h-3" />
-                    VANISH-10S
-                  </div>
+                    VANISH-{overrideTtl < 60 ? `${overrideTtl}S` : `${overrideTtl / 60}M`}
+                  </button>
                 )}
                 {isAnonymousMode && (
                   <div className="flex items-center gap-1.5 text-[10px] font-black tracking-tighter text-purple-600 dark:text-purple-400 bg-purple-50/80 dark:bg-purple-950/40 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-purple-100/50 dark:border-purple-500/20 shadow-sm shrink-0">
@@ -3266,6 +3317,45 @@ const ChatRoom = () => {
                         </button>
                       )}
                     </div>
+                    {/* Per-message TTL picker */}
+                    <div className="relative flex-shrink-0" data-ttl-picker>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => setShowTtlPicker(p => !p)}
+                        className={`p-2.5 sm:p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-all text-base sm:text-lg flex-shrink-0 touch-manipulation ${overrideTtl !== null ? 'text-red-500 bg-red-50/80 dark:bg-red-950/40 ring-2 ring-red-500/30' : 'text-gray-400 hover:text-red-500 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                        style={{ WebkitTapHighlightColor: 'transparent' }}
+                        title={overrideTtl !== null ? `Self-destruct: ${overrideTtl}s` : 'Set self-destruct timer'}
+                      >
+                        ⏱
+                      </button>
+                      {showTtlPicker && (
+                        <div className="absolute bottom-full mb-2 right-0 z-[70] bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 p-2 flex flex-col gap-1 min-w-[130px] animate-in slide-in-from-bottom-2 duration-200">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 px-1 pb-0.5">Self-destruct</p>
+                          {[5, 30, 60, 300].map(secs => (
+                            <button
+                              key={secs}
+                              type="button"
+                              onClick={() => { setOverrideTtl(overrideTtl === secs ? null : secs); setShowTtlPicker(false); }}
+                              className={`flex items-center justify-between px-3 py-1.5 rounded-xl text-sm font-bold transition-all ${overrideTtl === secs ? 'bg-red-500 text-white shadow-sm' : 'hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-700 dark:text-gray-200'}`}
+                            >
+                              <span>{secs < 60 ? `${secs}s` : `${secs / 60}m`}</span>
+                              {overrideTtl === secs && <span className="text-xs ml-2">✓</span>}
+                            </button>
+                          ))}
+                          {overrideTtl !== null && (
+                            <button
+                              type="button"
+                              onClick={() => { setOverrideTtl(null); setShowTtlPicker(false); }}
+                              className="mt-1 px-3 py-1.5 rounded-xl text-xs font-bold text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 text-center transition-all"
+                            >
+                              Turn off
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
                     <button
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}

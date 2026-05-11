@@ -2109,7 +2109,8 @@ io.on('connection', (socket) => {
           topic: roomData[roomCode].topic || '',
           timer: roomData[roomCode].timer || null,
           autoApprove: roomData[roomCode].autoApprove || false,
-          preApprovedList: roomData[roomCode].preApprovedList || []
+          preApprovedList: roomData[roomCode].preApprovedList || [],
+          pinnedMessage: roomData[roomCode].pinnedMessage || null,
         };
 
         const enrichedUsers = getEnrichedUsers(roomCode);
@@ -2588,12 +2589,19 @@ io.on('connection', (socket) => {
       if (!updatedMessage) return;
 
       io.to(socket.roomCode).emit('message-updated', updatedMessage);
-      io.to(socket.roomCode).emit('message-reaction', {
-        messageId,
-        emoji,
-        fromSocketId: socket.id,
-        fromNickname: socket.nickname || 'Someone',
-      });
+
+      // Only fire the physics event when the emoji was actually added, not toggled off
+      const reactorId = socket.persistentUserId || socket.id;
+      const wasAdded = Array.isArray(updatedMessage.reactions?.[emoji]) &&
+        updatedMessage.reactions[emoji].includes(reactorId);
+      if (wasAdded) {
+        io.to(socket.roomCode).emit('message-reaction', {
+          messageId,
+          emoji,
+          fromSocketId: socket.id,
+          fromNickname: socket.nickname || 'Someone',
+        });
+      }
     } catch (error) {
       logger.error('Error adding reaction:', error);
     }
@@ -3044,6 +3052,25 @@ io.on('connection', (socket) => {
     socket.to(socket.roomCode).emit('pulse-received', {
       from: socket.nickname || 'Someone',
     });
+  });
+
+  // ─── Message Pinning (host only) ───
+  socket.on('pin-message', ({ messageId, text, senderNickname }) => {
+    if (!socket.roomCode || !messageId) return;
+    const rd = roomData[socket.roomCode];
+    if (!rd || rd.hostId !== socket.id) return; // host only
+    const safeText = typeof text === 'string' ? text.slice(0, 500) : '';
+    const safeNickname = typeof senderNickname === 'string' ? senderNickname.slice(0, 60) : 'Unknown';
+    rd.pinnedMessage = { messageId, text: safeText, senderNickname: safeNickname };
+    io.to(socket.roomCode).emit('message-pinned', rd.pinnedMessage);
+  });
+
+  socket.on('unpin-message', () => {
+    if (!socket.roomCode) return;
+    const rd = roomData[socket.roomCode];
+    if (!rd || rd.hostId !== socket.id) return; // host only
+    rd.pinnedMessage = null;
+    io.to(socket.roomCode).emit('message-unpinned');
   });
 
   // ─── Confetti Bomb (rate-limited: 1 per 10 s per socket) ───

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, FileText, Download, Check, CheckCheck, Pencil, X } from 'lucide-react';
+import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, FileText, Download, Check, CheckCheck, Pencil, X, Pin } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
 import ImageViewer from './ImageViewer';
@@ -17,9 +17,10 @@ import { FileOpener } from '@capacitor-community/file-opener';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀', '🍕', '🍔', '🍦', '🍩', '🍺', '🎸', '🎮', '🚀', '🌈', '🍄'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, roomVibe, linkPreviews = {}, onOpenEmojiPicker }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onPin, isHost, pinnedMessageId, roomVibe, linkPreviews = {}, onOpenEmojiPicker }) => {
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
+  const [contextMenu, setContextMenu] = useState(null); // { messageId, x, y }
   const { theme } = useTheme();
   const currentVibe = getVibeById(roomVibe);
   const [messageTimers, setMessageTimers] = useState(new Map());
@@ -40,12 +41,15 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
     isSwipe: false
   });
 
-  // Click away listener for reaction bar
+  // Click away listener for reaction bar and context menu
   useEffect(() => {
     const handleClickAway = (e) => {
       if (activeReactionId && !e.target.closest('.reaction-container')) {
         setActiveReactionId(null);
         setShowFullPicker(false);
+      }
+      if (contextMenu && !e.target.closest('.msg-context-menu')) {
+        setContextMenu(null);
       }
     };
     document.addEventListener('mousedown', handleClickAway);
@@ -54,7 +58,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
       document.removeEventListener('mousedown', handleClickAway);
       document.removeEventListener('touchstart', handleClickAway);
     };
-  }, [activeReactionId]);
+  }, [activeReactionId, contextMenu]);
 
   // Listen for message-viewed events from server
   useEffect(() => {
@@ -330,6 +334,10 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
             onTouchStart={(e) => handleTouchStart(e, message)}
             onTouchMove={(e) => handleTouchMove(e, message)}
             onTouchEnd={(e) => handleTouchEnd(e, message)}
+            onContextMenu={isHost && message.type !== 'system' ? (e) => {
+              e.preventDefault();
+              setContextMenu({ messageId: message.id, messageText: message.content || '', senderNickname: message.sender.nickname, x: e.clientX, y: e.clientY });
+            } : undefined}
           >
             <div className={`flex items-center space-x-2 mb-1 px-1 text-[10px] font-bold uppercase tracking-tighter text-gray-400 dark:text-gray-500`}>
               {!isOwnMessage && (
@@ -599,6 +607,25 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
           </div>
         );
       })}
+
+      {/* Context menu for host pin action */}
+      {contextMenu && isHost && (
+        <div
+          className="msg-context-menu fixed z-[200] bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 py-1 min-w-[140px] animate-in fade-in zoom-in-95 duration-150"
+          style={{ top: contextMenu.y, left: Math.min(contextMenu.x, window.innerWidth - 160) }}
+        >
+          <button
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-amber-50 dark:hover:bg-amber-900/20 text-gray-700 dark:text-gray-200 transition-colors"
+            onClick={() => {
+              onPin?.({ messageId: contextMenu.messageId, text: contextMenu.messageText, senderNickname: contextMenu.senderNickname });
+              setContextMenu(null);
+            }}
+          >
+            <Pin className="w-3.5 h-3.5 text-amber-500" />
+            {pinnedMessageId === contextMenu.messageId ? 'Unpin' : 'Pin message'}
+          </button>
+        </div>
+      )}
 
       <ImageViewer
         isOpen={!!viewingImage}

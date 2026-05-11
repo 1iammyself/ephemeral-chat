@@ -8,22 +8,31 @@ import Home from './Home';
  * Mounted at the root "/" route.
  *
  * Behaviour:
- *  • Capacitor (Android) or Electron  → render <Home /> normally.
- *  • Plain web browser                → hard-redirect to the landing page
+ *  • Capacitor (Android / iOS)          → render <Home /> normally.
+ *  • Electron                           → render <Home /> normally.
+ *  • PWA installed to homescreen        → render <Home /> normally.
+ *  • Plain web browser (production)     → hard-redirect to the landing page
  *    so that chat.kyere.me/ always shows the marketing site instead of
  *    dumping visitors straight into the chat UI.
+ *  • Dev mode (import.meta.env.DEV)     → render <Home /> so local testing works.
  *
  * The landing URL is read from VITE_LANDING_URL so it can be overridden
  * per-environment without touching source code.
  */
-const LANDING_URL =
-  import.meta.env.VITE_LANDING_URL || 'https://ephchat.kyere.me';
+const LANDING_URL = import.meta.env.VITE_LANDING_URL;
 
 function LandingRedirect() {
   const isNative = Capacitor.getPlatform() !== 'web';
   const isElectron =
     typeof window !== 'undefined' && !!window.electronAPI?.isElectron;
-  const shouldRedirect = !isNative && !isElectron;
+  const isPwa =
+    typeof window !== 'undefined' &&
+    (window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true);
+  const isDev = import.meta.env.DEV;
+
+  const shouldRedirect =
+    !isNative && !isElectron && !isPwa && !isDev && !!LANDING_URL;
 
   useEffect(() => {
     if (shouldRedirect) {
@@ -31,12 +40,10 @@ function LandingRedirect() {
     }
   }, [shouldRedirect]);
 
-  // Native / Electron: show the home screen as usual.
   if (!shouldRedirect) {
     return <Home />;
   }
 
-  // Web browser: blank holding screen while the redirect fires.
   return (
     <div
       style={{
@@ -51,7 +58,6 @@ function LandingRedirect() {
         gap: '0.6rem',
       }}
     >
-      {/* Tiny spinner */}
       <span
         style={{
           width: 16,
