@@ -41,12 +41,14 @@ function avatarColor(name) {
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
 
-export default function WhisperModal({ isOpen, onClose, users, currentUser, roomCode, isAnonymous = false, embedded = false }) {
-  const [tab, setTab] = useState('send');
+export default function WhisperModal({ isOpen, onClose, users, currentUser, roomCode, isAnonymous = false, embedded = false, whisperMaxHops, onWhisperMaxHopsChange }) {
+  const [tab, setTab] = useState('inbox');
 
   const [recipient,       setRecipient]       = useState('');
   const [message,         setMessage]         = useState('');
-  const [maxHops,         setMaxHops]         = useState(3);
+  const [maxHopsInternal, setMaxHopsInternal] = useState(3);
+  const maxHops = whisperMaxHops !== undefined ? whisperMaxHops : maxHopsInternal;
+  const setMaxHops = (v) => { setMaxHopsInternal(v); onWhisperMaxHopsChange?.(v); };
   const [isSending,       setIsSending]       = useState(false);
   const [sendError,       setSendError]       = useState('');
   const [sendOk,          setSendOk]          = useState(false);
@@ -59,10 +61,10 @@ export default function WhisperModal({ isOpen, onClose, users, currentUser, room
   const [peerKeys,        setPeerKeys]        = useState({});
 
   useEffect(() => {
-    if (!isOpen || !roomCode) return;
+    if ((!isOpen && !embedded) || !roomCode) return;
     const handleRoster = ({ bundles }) => {
       const map = {};
-      for (const { socketId, bundle, nickname } of bundles) {
+      for (const { socketId, bundle, nickname } of (bundles || [])) {
         if (nickname && bundle?.ik) map[nickname] = { ik: bundle.ik, isNative: bundle.isNative ?? true, socketId };
       }
       setPeerKeys(map);
@@ -70,7 +72,7 @@ export default function WhisperModal({ isOpen, onClose, users, currentUser, room
     socketManager.on('key-bundle-roster', handleRoster);
     socketManager.emit('request-key-bundles', { roomCode });
     return () => socketManager.off('key-bundle-roster', handleRoster);
-  }, [isOpen, roomCode]);
+  }, [isOpen, embedded, roomCode]);
 
   useEffect(() => {
     const handleWhisper = async ({ from, ephPubKey, ciphertext, iv, isNative, fromNickname }) => {
@@ -125,122 +127,40 @@ export default function WhisperModal({ isOpen, onClose, users, currentUser, room
 
   if (!isOpen && !embedded) return null;
 
-  /* ─── embedded: full dark messenger layout ───────────────────────────── */
+  /* ─── embedded: inbox-only dark layout ──────────────────────────────── */
   if (embedded) return (
     <div className="w-full h-full flex flex-col overflow-hidden">
 
-      {/* Tabs */}
-      <div className="flex gap-px bg-white/[0.04] flex-shrink-0">
-        {[
-          { id: 'send',  label: 'Send Whisper' },
-          { id: 'inbox', label: 'Inbox', badge: unread },
-        ].map(t => (
-          <button
-            key={t.id}
-            onClick={() => { setTab(t.id); if (t.id === 'inbox') setInbox(p => p.map(w => ({ ...w, read: true }))); }}
-            className={`relative flex-1 py-3 text-xs font-bold tracking-wide transition-colors ${
-              tab === t.id ? 'text-violet-300 border-b-2 border-violet-500' : 'text-gray-500 hover:text-gray-300'
-            }`}
-          >
-            {t.label}
-            {t.badge > 0 && (
-              <span className="absolute top-2 right-4 w-4 h-4 rounded-full bg-violet-500 text-white text-[9px] font-bold flex items-center justify-center">{t.badge}</span>
-            )}
-          </button>
-        ))}
+      {/* Hop setting — persistent at top */}
+      <div className="px-4 py-3 border-b border-white/[0.06] flex-shrink-0 bg-white/[0.02]">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center gap-1.5">
+            <Shield className="w-3 h-3 text-violet-400" />
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              Whisper hops: <span className="text-violet-400 normal-case font-bold">{maxHops}</span>
+            </p>
+          </div>
+          <span className="text-[10px] text-gray-600">
+            {otherUsers.length <= 1
+              ? 'Direct only — no one to forward to'
+              : `forwardable ${maxHops - 1} time${maxHops - 1 !== 1 ? 's' : ''}`}
+          </span>
+        </div>
+        <input
+          type="range" min={1} max={5} step={1} value={maxHops}
+          onChange={e => setMaxHops(Number(e.target.value))}
+          className="w-full accent-violet-500 h-1"
+        />
+        <p className="mt-1.5 text-[10px] text-gray-600 leading-snug">
+          {otherUsers.length <= 1
+            ? 'Only 2 people in this room — whispers go directly, hops have no effect.'
+            : 'Controls how many times your whisper can be forwarded by the recipient.'}
+        </p>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-
-        {tab === 'send' ? (
-          <div className="flex-1 flex flex-col overflow-hidden">
-
-            {/* Recipient picker */}
-            <div className="px-4 pt-4 flex-shrink-0">
-              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">To</p>
-              {otherUsers.length === 0 ? (
-                <p className="text-xs text-gray-600 py-2">No other users in the room</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {otherUsers.map(u => (
-                    <button
-                      key={u.nickname}
-                      onClick={() => { setRecipient(u.nickname); setSendError(''); setSendOk(false); }}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                        recipient === u.nickname
-                          ? 'bg-violet-600 text-white ring-2 ring-violet-400/40'
-                          : 'bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10'
-                      }`}
-                    >
-                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white ${avatarColor(u.nickname)}`}>
-                        {initials(u.nickname)}
-                      </span>
-                      {u.nickname}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Message + controls */}
-            <div className="flex-1 flex flex-col px-4 py-3 gap-3 overflow-y-auto min-h-0">
-              <div className="flex-1 flex flex-col min-h-0">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <Lock className="w-3 h-3 text-violet-400" />
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Message</p>
-                </div>
-                <textarea
-                  value={message}
-                  onChange={e => setMessage(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSend(); }}
-                  placeholder="Your secret message… (Ctrl+Enter to send)"
-                  className="flex-1 min-h-[80px] max-h-[160px] w-full rounded-xl border border-white/10 bg-white/5 text-sm text-gray-200 placeholder-gray-600 px-3 py-2.5 outline-none focus:ring-1 focus:ring-violet-500/50 resize-none"
-                />
-              </div>
-
-              {/* Hops */}
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                    Forward hops: <span className="text-violet-400 normal-case">{maxHops}</span>
-                  </p>
-                  <span className="text-[10px] text-gray-600">can be forwarded {maxHops - 1} more time{maxHops - 1 !== 1 ? 's' : ''}</span>
-                </div>
-                <input type="range" min={1} max={5} step={1} value={maxHops} onChange={e => setMaxHops(Number(e.target.value))} className="w-full accent-violet-500 h-1" />
-              </div>
-
-              {sendError && (
-                <div className="flex items-center gap-2 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg flex-shrink-0">
-                  <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
-                  <p className="text-xs text-red-400">{sendError}</p>
-                </div>
-              )}
-
-              {sendOk && (
-                <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs text-emerald-400 font-medium text-center flex-shrink-0">
-                  Whisper sent
-                </div>
-              )}
-            </div>
-
-            {/* Send bar */}
-            <div className="border-t border-white/[0.07] px-4 py-3 flex-shrink-0">
-              <button
-                onClick={handleSend}
-                disabled={isSending || !recipient || !message.trim()}
-                className="w-full py-2.5 rounded-xl bg-violet-600 text-white text-sm font-bold disabled:opacity-30 hover:bg-violet-500 transition-colors active:scale-95 flex items-center justify-center gap-2"
-              >
-                <Shield className="w-3.5 h-3.5" />
-                {isSending ? 'Encrypting…' : 'Send Whisper'}
-              </button>
-            </div>
-          </div>
-
-        ) : (
-          /* Inbox */
-          <div className="flex-1 overflow-y-auto min-h-0">
-            {selected ? (
+      {/* Inbox */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {selected ? (
               /* Message detail */
               <div className="flex flex-col h-full">
                 <div className="px-4 pt-3 pb-2 border-b border-white/[0.07] flex-shrink-0">
@@ -337,8 +257,6 @@ export default function WhisperModal({ isOpen, onClose, users, currentUser, room
                 ))}
               </div>
             )}
-          </div>
-        )}
       </div>
     </div>
   );

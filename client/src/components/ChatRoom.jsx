@@ -70,6 +70,8 @@ import {
   handleIncomingKeyBundle,
 } from '../utils/security';
 import { initTrafficPadding, stopTrafficPadding, withJitter } from '../crypto/traffic-padding';
+import { encryptWhisper, newChainId } from '../crypto/whisper-chain';
+import { getKeyBundle } from '../crypto/key-store';
 import { initOHTTP } from '../crypto/ohttp';
 import { initPrivacyPass, getAuthToken, refreshTokensIfNeeded, isPrivacyPassReady } from '../crypto/privacy-pass';
 import { TransportManager, TRANSPORT } from '../transport/transport-manager';
@@ -721,13 +723,37 @@ const ChatRoom = () => {
   });
   const dragCounter = useRef(0);
   const typingTimeoutRef = useRef(null);
+  const anonClickCountRef = useRef(0);
+  const anonClickTimerRef = useRef(null);
+  const anonHoldTimerRef = useRef(null);
+  const isWhisperModeRef = useRef(false);
   const { theme } = useTheme();
 
   const [audioViewOnce, setAudioViewOnce] = useState(true);
   const [isAnonymousMode, setIsAnonymousMode] = useState(false);
+  const [isWhisperMode, setIsWhisperMode] = useState(false);
+  const [whisperTarget, setWhisperTarget] = useState(null);
+  const [whisperMaxHops, setWhisperMaxHops] = useState(3);
+  const [peerKeys, setPeerKeys] = useState({});
 
   // ─── Sync MLS ref with state ───────────────────────────
   useEffect(() => { mlsReadyRef.current = mlsReady; }, [mlsReady]);
+  useEffect(() => { isWhisperModeRef.current = isWhisperMode; }, [isWhisperMode]);
+
+  // ─── Keep peerKeys fresh for inline whisper sends ───────
+  useEffect(() => {
+    if (!roomCode) return;
+    const handleRoster = ({ bundles }) => {
+      const map = {};
+      for (const { socketId, bundle, nickname } of (bundles || [])) {
+        if (nickname && bundle?.ik) map[nickname] = { ik: bundle.ik, isNative: bundle.isNative ?? true, socketId };
+      }
+      setPeerKeys(map);
+    };
+    socketManager.on('key-bundle-roster', handleRoster);
+    socketManager.emit('request-key-bundles', { roomCode });
+    return () => socketManager.off('key-bundle-roster', handleRoster);
+  }, [roomCode]);
 
   // ─── Initialize AES room-key on mount (no WASM needed) ───
   useEffect(() => {
@@ -2094,10 +2120,65 @@ const ChatRoom = () => {
     e.target.value = '';
   };
 
+  // ── Inline whisper sender — used when isWhisperMode is active ──
+  const doSendWhisper = async (content, targetNick) => {
+    const peer = peerKeys[targetNick];
+    if (!peer) { setError('Recipient E2EE key not ready — try again shortly'); return false; }
+    const myBundle = getKeyBundle(roomCode);
+    if (!myBundle) { setError('Your encryption keys are not ready yet'); return false; }
+    try {
+      const chainId = newChainId();
+      const { ephPubKey, ciphertext, iv, isNative } = await encryptWhisper(
+        content, peer.ik, peer.isNative, chainId, 1, whisperMaxHops
+      );
+      socketManager.emit('whisper-send', {
+        to: peer.socketId, ephPubKey, ciphertext, iv, isNative,
+        ...(isAnonymousMode ? {} : { fromNickname: currentUser?.nickname }),
+      });
+      return true;
+    } catch {
+      setError('Whisper encryption failed');
+      return false;
+    }
+  };
+
   // Core send logic — called directly (no event needed)
   // This avoids the form submission pipeline that causes Android keyboard blur flash
   const doSendMessage = async () => {
     if (!newMessage.trim() || isSending || !isConnected) return;
+
+    // ── Whisper mode: route through E2EE whisper instead of normal send ──
+    if (isWhisperMode) {
+      let targetNick = whisperTarget?.nickname;
+      let content = newMessage.trim();
+      // Allow @name to select recipient on-the-fly
+      const atMatch = content.match(/^@(\w+)\s*/);
+      if (atMatch) {
+        const nick = atMatch[1].toLowerCase();
+        const matched = users.find(u => u.nickname.toLowerCase() === nick && u.nickname !== currentUser?.nickname);
+        if (matched) { targetNick = matched.nickname; setWhisperTarget(matched); }
+        const stripped = content.substring(atMatch[0].length).trim();
+        if (stripped) content = stripped;
+      }
+      if (!targetNick) { setError('Select a recipient to whisper to'); return; }
+      if (!content) return;
+      setIsSending(true);
+      try {
+        const ok = await doSendWhisper(content, targetNick);
+        if (ok) {
+          setNewMessage('');
+          setReplyingTo(null);
+          hapticLight();
+          if (messageInputRef.current) {
+            messageInputRef.current.focus();
+            setTimeout(() => messageInputRef.current?.focus(), 10);
+          }
+        }
+      } finally {
+        setIsSending(false);
+      }
+      return;
+    }
 
     // 1. Handle Slash Commands
     if (newMessage.trim().startsWith('/')) {
@@ -2963,22 +3044,6 @@ const ChatRoom = () => {
             </div>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2">
-            <button
-              onClick={() => { setShowSearch(s => !s); if (showSearch) clearSearch(); }}
-              className={`p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors ${showSearch ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300'}`}
-              title="Search messages"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-            <button
-              onClick={toggleSound}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              title={soundEnabled ? 'Sound on' : 'Sound off'}
-            >
-              {soundEnabled
-                ? <Volume2 className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-                : <VolumeX className="w-5 h-5 text-gray-400 dark:text-gray-500" />}
-            </button>
             <ThemeToggle />
             {/* Unified panel toggle — People & Tools */}
             <button
@@ -3197,6 +3262,39 @@ const ChatRoom = () => {
                 <button onClick={() => setSelectedRecipients([])} className={`text-xs text-${vibeAccent}-500 hover:text-${vibeAccent}-700 dark:hover:text-${vibeAccent}-200 underline`}>Clear selection</button>
               </div>
             )}
+            {isWhisperMode && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-violet-500/10 border-b border-violet-500/20 flex-shrink-0 animate-in slide-in-from-top-1 duration-200">
+                <Lock className="w-3 h-3 text-violet-400 flex-shrink-0" />
+                <span className="text-[10px] font-bold text-violet-400 uppercase tracking-widest flex-shrink-0">Whisper to</span>
+                <div className="flex items-center gap-1.5 flex-1 overflow-x-auto no-scrollbar">
+                  {users.filter(u => u.nickname !== currentUser?.nickname).length === 0 ? (
+                    <span className="text-[10px] text-gray-500">No one else in this room</span>
+                  ) : (
+                    users.filter(u => u.nickname !== currentUser?.nickname).map(u => (
+                      <button
+                        key={u.nickname}
+                        type="button"
+                        onClick={() => setWhisperTarget(whisperTarget?.nickname === u.nickname ? null : u)}
+                        className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
+                          whisperTarget?.nickname === u.nickname
+                            ? 'bg-violet-600 text-white ring-1 ring-violet-400/40'
+                            : 'bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 border border-violet-500/20'
+                        }`}
+                      >
+                        {u.nickname}
+                      </button>
+                    ))
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setIsWhisperMode(false); setWhisperTarget(null); }}
+                  className="flex-shrink-0 p-1 rounded-full hover:bg-violet-500/20 text-violet-400 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
             <div className="px-0 pt-2 sm:px-4 sm:pt-4 pb-0 sm:pb-4 w-full relative z-10 bg-transparent">
               <form onSubmit={handleSendMessage} className="flex items-center w-full">
                 {isRecording ? (
@@ -3221,7 +3319,7 @@ const ChatRoom = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className={`relative flex items-center w-full ${getVibeById(roomVibe).inputClass} rounded-none sm:rounded-xl px-1 py-0.5 sm:py-1 transition-all ${isAnonymousMode ? 'border-purple-400 dark:border-purple-600 ring-4 ring-purple-500/20' : ''}`}>
+                  <div className={`relative flex items-center w-full ${getVibeById(roomVibe).inputClass} rounded-none sm:rounded-xl px-1 py-0.5 sm:py-1 transition-all ${isWhisperMode ? 'border-violet-500 ring-4 ring-violet-500/20' : isAnonymousMode ? 'border-purple-400 dark:border-purple-600 ring-4 ring-purple-500/20' : ''}`}>
                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" id="image-upload" />
 
                     <div
@@ -3523,7 +3621,7 @@ const ChatRoom = () => {
                         onCopy={(e) => e.preventDefault()}
                         onCut={(e) => e.preventDefault()}
                         onPaste={(e) => e.preventDefault()}
-                        placeholder={isAnonymousMode ? "Confess anonymously..." : "Type message..."}
+                        placeholder={isWhisperMode ? (whisperTarget ? `Whisper to ${whisperTarget.nickname}…` : 'Select a recipient above…') : isAnonymousMode ? "Confess anonymously..." : "Type message..."}
                         className={`w-full bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white text-[15px] sm:text-base py-2.5 min-w-0 placeholder:text-gray-500 dark:placeholder:text-gray-400 ${newMessage.startsWith('🧊 ') ? 'pl-2 pr-10' : 'px-2'}`}
                         disabled={!isConnected}
                         maxLength={500}
@@ -3582,13 +3680,56 @@ const ChatRoom = () => {
                     <button
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}
-                      onTouchStart={(e) => { e.preventDefault(); setIsAnonymousMode(prev => !prev); }}
-                      onClick={() => setIsAnonymousMode(prev => !prev)}
-                      className={`p-2.5 sm:p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-all text-base sm:text-lg flex-shrink-0 touch-manipulation ${isAnonymousMode ? `${getVibeById(roomVibe).accentClass} ring-2 ring-white/20` : 'text-gray-400 hover:text-primary-500 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                      onTouchStart={(e) => {
+                        e.preventDefault();
+                        anonHoldTimerRef.current = setTimeout(() => {
+                          anonHoldTimerRef.current = null;
+                          const canWhisper = users.filter(u => u.nickname !== currentUser?.nickname).length > 0;
+                          if (!canWhisper) return;
+                          const next = !isWhisperModeRef.current;
+                          setIsWhisperMode(next);
+                          if (!next) setWhisperTarget(null);
+                          setIsAnonymousMode(false);
+                          hapticMedium();
+                        }, 500);
+                      }}
+                      onTouchEnd={() => {
+                        if (anonHoldTimerRef.current !== null) {
+                          clearTimeout(anonHoldTimerRef.current);
+                          anonHoldTimerRef.current = null;
+                          if (!isWhisperModeRef.current) setIsAnonymousMode(prev => !prev);
+                        }
+                      }}
+                      onClick={() => {
+                        anonClickCountRef.current += 1;
+                        if (anonClickCountRef.current === 1) {
+                          anonClickTimerRef.current = setTimeout(() => {
+                            anonClickCountRef.current = 0;
+                            setIsAnonymousMode(prev => !prev);
+                            if (isWhisperModeRef.current) { setIsWhisperMode(false); setWhisperTarget(null); }
+                          }, 280);
+                        } else {
+                          clearTimeout(anonClickTimerRef.current);
+                          anonClickCountRef.current = 0;
+                          const canWhisper = users.filter(u => u.nickname !== currentUser?.nickname).length > 0;
+                          if (!canWhisper) return;
+                          const next = !isWhisperModeRef.current;
+                          setIsWhisperMode(next);
+                          if (!next) setWhisperTarget(null);
+                          setIsAnonymousMode(false);
+                        }
+                      }}
+                      className={`p-2.5 sm:p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-all text-base sm:text-lg flex-shrink-0 touch-manipulation ${
+                        isWhisperMode
+                          ? 'bg-violet-600/20 text-violet-400 ring-2 ring-violet-500/40'
+                          : isAnonymousMode
+                            ? `${getVibeById(roomVibe).accentClass} ring-2 ring-white/20`
+                            : 'text-gray-400 hover:text-primary-500 hover:bg-black/5 dark:hover:bg-white/5'
+                      }`}
                       style={{ WebkitTapHighlightColor: 'transparent' }}
-                      title={isAnonymousMode ? 'Anonymous mode ON' : 'Send anonymously'}
+                      title={isWhisperMode ? 'Whisper mode ON — double-click or hold to disable' : isAnonymousMode ? 'Anonymous mode ON' : 'Tap: anonymous · Double-tap or hold: whisper'}
                     >
-                      👻
+                      {isWhisperMode ? <Lock className="w-4 h-4" /> : '👻'}
                     </button>
                     {newMessage.trim() ? (
                       <button
@@ -3599,10 +3740,10 @@ const ChatRoom = () => {
                           doSendMessage();
                         }}
                         onClick={doSendMessage}
-                        disabled={!isConnected}
-                        className={`flex-shrink-0 ml-1 sm:ml-2 ${getVibeById(roomVibe).accentClass} h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
+                        disabled={!isConnected || (isWhisperMode && !whisperTarget)}
+                        className={`flex-shrink-0 ml-1 sm:ml-2 ${isWhisperMode ? 'bg-violet-600 hover:bg-violet-500' : getVibeById(roomVibe).accentClass} h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
-                        <Send className="w-4 h-4 sm:w-5 sm:h-5 -ml-0.5" />
+                        {isWhisperMode ? <Lock className="w-4 h-4 sm:w-5 sm:h-5" /> : <Send className="w-4 h-4 sm:w-5 sm:h-5 -ml-0.5" />}
                       </button>
                     ) : (
                       <button
@@ -3914,7 +4055,8 @@ const ChatRoom = () => {
           onClose={() => closePanel('whisper')} onFocus={() => focusPanel('whisper')} zIndex={getZ('whisper')}
           defaultWidth={500} defaultHeight={560} defaultX={160} defaultY={90}>
           <WhisperModal embedded onClose={() => closePanel('whisper')}
-            users={users} currentUser={currentUser} roomCode={roomCode} isAnonymous={isAnonymousMode} />
+            users={users} currentUser={currentUser} roomCode={roomCode} isAnonymous={isAnonymousMode}
+            whisperMaxHops={whisperMaxHops} onWhisperMaxHopsChange={setWhisperMaxHops} />
         </FloatingPanel>
       )}
       {isPanelOpen('code') && (
