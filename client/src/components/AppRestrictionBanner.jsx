@@ -44,13 +44,13 @@ const AppRestrictionBanner = () => {
             // 3. iOS detection
             const isIOS = /iphone|ipad|ipod/i.test(userAgent);
 
-            // CHANGED: We now block iOS PWA as well, so we only allow Electron or Android Native
+            // Only allow Electron or Android native app
             if (isElectron || isAndroidApp) {
                 setIsVisible(false);
                 return true;
             }
 
-            // If we are here, we are in a browser or iOS PWA
+            // Plain browser or unrecognised environment
             if (isAndroidDevice) {
                 setPlatform('android');
                 setIsVisible(true);

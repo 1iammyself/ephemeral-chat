@@ -708,7 +708,7 @@ app.post('/api/verbal-join', async (req, res) => {
 
 app.post('/api/rooms', requireDeviceAttestation, async (req, res) => {
   try {
-    const { messageTTL, password, maxUsers, capToken, creatorId, persistenceMode, customCode, hp_email, hp_website, hp_timestamp, autoApprove, preApprovedList, scheduledFor } = req.body;
+    const { messageTTL, password, maxUsers, capToken, creatorId, persistenceMode, customCode, hp_email, hp_website, hp_timestamp, autoApprove, preApprovedList, scheduledFor, geofence } = req.body;
 
     // Verify Play Integrity token for Android clients (middleware sets req.deviceAttestation)
     if (req.deviceAttestation?.platform === 'android') {
@@ -780,6 +780,18 @@ app.post('/api/rooms', requireDeviceAttestation, async (req, res) => {
       roomData[roomCode] = { hostId: null, lobbyLimit: 100, lobbyCount: 0, userRoles: {} };
     }
     roomData[roomCode].autoApprove = !!autoApprove;
+
+    // Geofence — validate and store centre + radius
+    if (geofence && typeof geofence === 'object') {
+      const { lat, lng, radiusMeters } = geofence;
+      if (
+        typeof lat === 'number' && lat >= -90 && lat <= 90 &&
+        typeof lng === 'number' && lng >= -180 && lng <= 180 &&
+        typeof radiusMeters === 'number' && radiusMeters >= 50 && radiusMeters <= 50000
+      ) {
+        roomData[roomCode].geofence = { lat, lng, radiusMeters };
+      }
+    }
 
     // Scheduled room support
     if (scheduledFor) {
@@ -1126,6 +1138,17 @@ app.delete('/api/rooms/:roomCode/delete', async (req, res) => {
     res.status(403).json({ error: error.message });
   }
 });
+
+// ─── Haversine Distance (metres) ───────────────────────────
+function haversineMeters(lat1, lng1, lat2, lng2) {
+  const R = 6_371_000;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 // ─── Socket.IO Traffic Padding Middleware ──────────────────
 // Intercepts padded-message events: drops chaff, strips padding from real
@@ -1761,7 +1784,7 @@ io.on('connection', (socket) => {
 
   socket.on('join-room', async (data, callback) => {
     try {
-      const { roomCode, nickname, password, inviteToken, capToken, sessionToken, userId, hp_email, hp_website, hp_timestamp, totpCode } = data;
+      const { roomCode, nickname, password, inviteToken, capToken, sessionToken, userId, hp_email, hp_website, hp_timestamp, totpCode, lat, lng } = data;
 
       // Brute-force lockout check
       const joinLockStatus = securityManager.isLocked(socket.id);
@@ -2102,8 +2125,24 @@ io.on('connection', (socket) => {
         // Successful join - clear any failed attempts
         securityManager.clearFailedAttempts(socket.id);
 
-        // Scheduled room — block entry until open time (host may still join)
+        // Geofence — validate joiner's location before allowing entry
         const rd = roomData[roomCode];
+        if (rd?.geofence && socket.id !== rd.hostId) {
+          if (typeof lat !== 'number' || typeof lng !== 'number') {
+            return callback({ success: false, error: 'geofence-location-required' });
+          }
+          const dist = haversineMeters(rd.geofence.lat, rd.geofence.lng, lat, lng);
+          if (dist > rd.geofence.radiusMeters) {
+            return callback({
+              success: false,
+              error: 'geofence-out-of-range',
+              distanceMeters: Math.round(dist),
+              radiusMeters: rd.geofence.radiusMeters,
+            });
+          }
+        }
+
+        // Scheduled room — block entry until open time (host may still join)
         if (rd?.scheduledFor && socket.id !== rd.hostId) {
           // Put waiter in a waiting room so they receive room-opening
           socket.join(`waiting:${roomCode}`);
@@ -2160,6 +2199,9 @@ io.on('connection', (socket) => {
           playlistIndex: roomData[roomCode].playlistIndex ?? -1,
           playlistStartedAt: roomData[roomCode].playlistStartedAt || null,
           hotSeatTarget: roomData[roomCode].hotSeatTarget || null,
+          geofence: roomData[roomCode].geofence
+            ? { radiusMeters: roomData[roomCode].geofence.radiusMeters }
+            : null,
         };
 
         const enrichedUsers = getEnrichedUsers(roomCode);
@@ -2198,6 +2240,11 @@ io.on('connection', (socket) => {
               startedAt: rd.playlistStartedAt,
             });
           }
+        }
+
+        // Sync active music room to late joiners
+        if (rd?.musicState) {
+          socket.emit('music-state', rd.musicState);
         }
 
         // Notify others
@@ -3268,6 +3315,78 @@ io.on('connection', (socket) => {
     io.to(rc).emit('hotSeat-ended');
   });
 
+  // ─── Whisper Chain ──────────────────────────────────────────
+  socket.on('whisper-send', ({ to, ephPubKey, ciphertext, iv, isNative, fromNickname } = {}) => {
+    if (!to || !ephPubKey || !ciphertext || !iv) return;
+    // Validate target is in the same room
+    const targetSocket = io.sockets.sockets.get(to);
+    if (!targetSocket || targetSocket.roomCode !== socket.roomCode) return;
+    targetSocket.emit('whisper-incoming', {
+      from: socket.id,
+      fromNickname: fromNickname || socket.nickname || 'Unknown',
+      ephPubKey,
+      ciphertext,
+      iv,
+      isNative: isNative ?? true,
+    });
+  });
+
+  // ─── Code Share — Yjs CRDT relay ────────────────────────────
+  socket.on('yjs-update', ({ roomCode: rc, update } = {}) => {
+    if (!rc || !Array.isArray(update)) return;
+    // Validate socket is in this room
+    if (socket.roomCode !== rc) return;
+    // Store for late joiners
+    if (!roomData[rc]) return;
+    if (!roomData[rc].yjsUpdates) roomData[rc].yjsUpdates = [];
+    roomData[rc].yjsUpdates.push(update);
+    // Relay to all others in room
+    socket.to(rc).emit('yjs-update', { update });
+  });
+
+  socket.on('yjs-request-state', ({ roomCode: rc } = {}, callback) => {
+    if (typeof callback !== 'function') return;
+    if (!rc || socket.roomCode !== rc || !roomData[rc]) return callback([]);
+    callback(roomData[rc].yjsUpdates || []);
+  });
+
+  // ─── Music Room (synchronized playback) ─────────────────────
+  socket.on('music-play', ({ url, title = '', position = 0 } = {}) => {
+    const rc = socket.roomCode;
+    if (!rc) return;
+    const rd = roomData[rc];
+    if (!rd || rd.hostId !== socket.id || !url) return;
+    rd.musicState = { url, title, playing: true, startedAt: Date.now() - position * 1000, pausePosition: 0 };
+    io.to(rc).emit('music-state', rd.musicState);
+  });
+
+  socket.on('music-pause', ({ position = 0 } = {}) => {
+    const rc = socket.roomCode;
+    if (!rc) return;
+    const rd = roomData[rc];
+    if (!rd || rd.hostId !== socket.id || !rd.musicState) return;
+    rd.musicState = { ...rd.musicState, playing: false, pausePosition: position };
+    io.to(rc).emit('music-state', rd.musicState);
+  });
+
+  socket.on('music-seek', ({ position = 0 } = {}) => {
+    const rc = socket.roomCode;
+    if (!rc) return;
+    const rd = roomData[rc];
+    if (!rd || rd.hostId !== socket.id || !rd.musicState) return;
+    rd.musicState = { ...rd.musicState, playing: true, startedAt: Date.now() - position * 1000 };
+    io.to(rc).emit('music-state', rd.musicState);
+  });
+
+  socket.on('music-stop', () => {
+    const rc = socket.roomCode;
+    if (!rc) return;
+    const rd = roomData[rc];
+    if (!rd || rd.hostId !== socket.id) return;
+    rd.musicState = null;
+    io.to(rc).emit('music-state', { url: null, title: '', playing: false, startedAt: null, pausePosition: 0 });
+  });
+
   // ─── Confetti Bomb (rate-limited: 1 per 10 s per socket) ───
   socket.on('send-confetti-bomb', () => {
     if (!socket.roomCode) return;
@@ -3303,7 +3422,12 @@ io.on('connection', (socket) => {
   // Client requests bundles for all existing room members
   socket.on('request-key-bundles', ({ roomCode }) => {
     if (!roomCode) return;
-    const bundles = keyRegistry.getBundlesForRoom(roomCode, socket.id);
+    const rawBundles = keyRegistry.getBundlesForRoom(roomCode, socket.id);
+    // Annotate each entry with the socket's nickname for whisper routing
+    const bundles = rawBundles.map(entry => ({
+      ...entry,
+      nickname: io.sockets.sockets.get(entry.socketId)?.nickname || null,
+    }));
     socket.emit('key-bundle-roster', signSocketPayload({ bundles, roomCode }));
   });
 

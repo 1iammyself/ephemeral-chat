@@ -35,6 +35,8 @@ import {
   VolumeX,
   Search,
   Eye,
+  MessageCircle,
+  Code2,
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -83,6 +85,9 @@ import EditMessageModal from './EditMessageModal';
 import DragDropOverlay from './DragDropOverlay';
 import ActivityLog from './ActivityLog';
 import CameraModal from './CameraModal';
+import StegoModal from './StegoModal';
+import MusicRoom from './MusicRoom';
+import WhisperModal from './WhisperModal';
 import { getVibeById, getAllVibes } from '../utils/vibes';
 import AmbientPlayer from './AmbientPlayer';
 import SharedMediaPlayer, { detectMediaUrl } from './SharedMediaPlayer';
@@ -90,7 +95,8 @@ import WatchPartyModal from './WatchPartyModal';
 import NowPlayingBadge from './NowPlayingBadge';
 import { canManageRoom } from '../utils/roles';
 import { getRandomIcebreaker } from '../utils/icebreakers';
-import { RefreshButton } from './PWAHandler';
+import { AppRefreshButton } from './AppRefreshButton';
+import CodeShareModal from './CodeShareModal';
 import { getCreatorId } from '../utils/creator';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess } from '../utils/platform';
 import { useSoundFX } from '../hooks/useSoundFX';
@@ -100,6 +106,7 @@ import FileTransferModal from './FileTransferModal';
 import { toast } from 'react-toastify';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
+import { useGeofence } from '../hooks/useGeofence';
 
 const SLASH_COMMANDS = [
   { icon: Camera, label: 'Camera', value: '/camera', desc: 'Take a photo' },
@@ -116,6 +123,10 @@ const SLASH_COMMANDS = [
   { icon: Sparkles, label: 'Hot Seat', value: '/hotSeat', desc: 'Put someone in the hot seat', adminOnly: true },
   { icon: Activity, label: 'Watch Party', value: '/media', desc: 'Share YouTube/SoundCloud' },
   { icon: Activity, label: 'Playlist', value: '/playlist', desc: 'Open collab playlist' },
+  { icon: FileText, label: 'Stego', value: '/stego', desc: 'Hide a secret in a photo' },
+  { icon: Volume2, label: 'Music', value: '/music', desc: 'Synchronized music room' },
+  { icon: MessageCircle, label: 'Whisper', value: '/whisper', desc: 'Send an encrypted whisper' },
+  { icon: Code2, label: 'Code Share', value: '/code', desc: 'Collaborative code editor' },
 ];
 
 const CONFETTI_COLORS = [
@@ -587,6 +598,7 @@ const ChatRoom = () => {
   // Sound FX
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('soundFX_enabled') !== 'false');
   const { playMessageSound } = useSoundFX();
+  const { fetchPosition: fetchGeoPosition } = useGeofence();
 
   // Message Search (M1)
   const [showSearch, setShowSearch] = useState(false);
@@ -634,6 +646,10 @@ const ChatRoom = () => {
   const [showTopicEditor, setShowTopicEditor] = useState(false);
   const [showTimerModal, setShowTimerModal] = useState(false);
   const [showCameraModal, setShowCameraModal] = useState(false);
+  const [showStegoModal, setShowStegoModal] = useState(false);
+  const [showMusicRoom, setShowMusicRoom] = useState(false);
+  const [showWhisperModal, setShowWhisperModal] = useState(false);
+  const [showCodeShare, setShowCodeShare] = useState(false);
   const [activeTimer, setActiveTimer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
@@ -814,11 +830,13 @@ const ChatRoom = () => {
   }, []);
 
   const performJoin = useCallback((params) => {
-    const { nickname, password, capToken, inviteToken, sessionToken: resumeToken } = params;
+    const { nickname, password, capToken, inviteToken, sessionToken: resumeToken, lat, lng } = params;
     const userId = getCreatorId(); // Use persistent device ID for participation tracking
     const joinData = { roomCode, nickname, password, capToken, userId };
     if (inviteToken) joinData.inviteToken = inviteToken;
     if (resumeToken) joinData.sessionToken = resumeToken;
+    if (lat != null) joinData.lat = lat;
+    if (lng != null) joinData.lng = lng;
 
     socketManager.emit('join-room', joinData, async (response) => {
       if (!response) {
@@ -836,6 +854,27 @@ const ChatRoom = () => {
         setRoomOpensAt(response.scheduledFor);
         setShowJoinModal(false);
         setIsProcessingInvite(false);
+        return;
+      }
+      if (!response.success && response.error === 'geofence-location-required') {
+        // Room requires GPS — fetch location and retry once
+        toast.info('This room requires your location. Requesting GPS…', { autoClose: 3000 });
+        const pos = await fetchGeoPosition();
+        if (pos) {
+          performJoin({ ...params, lat: pos.lat, lng: pos.lng });
+        } else {
+          setError('Location required to join this room. Please enable location access.');
+          setIsProcessingInvite(false);
+          setShowJoinModal(true);
+        }
+        return;
+      }
+      if (!response.success && response.error === 'geofence-out-of-range') {
+        const dist = response.distanceMeters != null ? `${Math.round(response.distanceMeters)} m` : 'unknown distance';
+        const radius = response.radiusMeters != null ? `${response.radiusMeters} m` : 'the allowed radius';
+        setError(`You are too far from this room. You are ${dist} away but the room only allows within ${radius}.`);
+        setIsProcessingInvite(false);
+        setShowJoinModal(true);
         return;
       }
       if (response.success) {
@@ -983,7 +1022,7 @@ const ChatRoom = () => {
         setIsJoined(false); // Kick user out if room is gone
       }
     });
-  }, [roomCode, navigate, roomKey]);
+  }, [roomCode, navigate, roomKey, fetchGeoPosition]);
 
   const spawnReaction = useCallback((emoji) => {
     if (!reactionLayerRef.current) return;
@@ -1522,6 +1561,19 @@ const ChatRoom = () => {
         performJoin(joinParamsRef.current);
       }
     });
+    socketManager.on('whisper-incoming', ({ fromNickname }) => {
+      if (!stateRef.current.isJoined) return;
+      toast(
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setShowWhisperModal(true)}>
+          <span className="text-lg">🔐</span>
+          <div>
+            <p className="text-sm font-bold">Whisper from {fromNickname || 'Someone'}</p>
+            <p className="text-xs text-gray-500">Tap to read</p>
+          </div>
+        </div>,
+        { autoClose: 8000 }
+      );
+    });
     socketManager.on('hotSeat-started', ({ targetNickname }) => setHotSeatTarget(targetNickname));
     socketManager.on('hotSeat-ended', () => setHotSeatTarget(null));
     socketManager.on('room-fork-invite', ({ newRoomCode, fromNickname, isHost: forkIsHost }) => {
@@ -1734,6 +1786,7 @@ const ChatRoom = () => {
       socketManager.off('message-unpinned', handleMessageUnpinned);
       socketManager.off('room-opening');
       socketManager.off('room-fork-invite');
+      socketManager.off('whisper-incoming');
       socketManager.off('hotSeat-started');
       socketManager.off('hotSeat-ended');
       socketManager.off('file-transfer-invite', handleFileTransferInvite);
@@ -2118,6 +2171,18 @@ const ChatRoom = () => {
             setShowWatchPartyModal(true);
           }
           break;
+        case '/stego':
+          setShowStegoModal(true);
+          break;
+        case '/music':
+          setShowMusicRoom(true);
+          break;
+        case '/whisper':
+          setShowWhisperModal(true);
+          break;
+        case '/code':
+          setShowCodeShare(true);
+          break;
         default: break;
       }
       if (cmd.startsWith('/')) {
@@ -2236,6 +2301,34 @@ const ChatRoom = () => {
     e.preventDefault();
     doSendMessage();
   };
+
+  // Programmatic send (used by CodeShareModal / other modals)
+  const sendTextMessage = useCallback(async (content) => {
+    if (!content.trim() || !isConnected) return;
+    setIsSending(true);
+    try {
+      let v2Payload;
+      try {
+        v2Payload = await encryptMLSMessage(content, roomCode);
+      } catch (e) {
+        setError('Encryption failed.');
+        return;
+      }
+      await withJitter(() => {
+        socketManager.emit('send-message', {
+          ...v2Payload,
+          messageType: 'text',
+          recipients: [],
+          replyTo: null,
+          isAnonymous: false,
+          isEncrypted: true,
+          overrideTtl: null,
+        });
+      });
+    } finally {
+      setIsSending(false);
+    }
+  }, [isConnected, roomCode]);
 
   const handleSendPoll = (pollData) => {
     // Polls are NOT encrypted — the server needs pollData to manage votes.
@@ -2586,6 +2679,11 @@ const ChatRoom = () => {
       });
   };
 
+  const handleSendStego = (stegoBlob) => {
+    const file = new File([stegoBlob], `stego_${Date.now()}.png`, { type: 'image/png' });
+    uploadFile(file, { isViewOnce: false });
+  };
+
   const handleEditMessage = (message) => {
     setEditingMessage(message);
   };
@@ -2893,7 +2991,7 @@ const ChatRoom = () => {
             >
               {sidebarPosition === 'right' ? <PanelLeft className="w-5 h-5" /> : <PanelRight className="w-5 h-5" />}
             </button>
-            <RefreshButton />
+            <AppRefreshButton />
             <button
               onClick={() => { setShowSearch(s => !s); if (showSearch) clearSearch(); }}
               className={`p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors ${showSearch ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-300'}`}
@@ -3750,6 +3848,33 @@ const ChatRoom = () => {
         isOpen={showCameraModal}
         onClose={() => setShowCameraModal(false)}
         onCapture={handleCameraCapture}
+      />
+      <StegoModal
+        isOpen={showStegoModal}
+        onClose={() => setShowStegoModal(false)}
+        onSendStego={handleSendStego}
+      />
+      <MusicRoom
+        isOpen={showMusicRoom}
+        onClose={() => setShowMusicRoom(false)}
+        isHost={isHost}
+      />
+      <WhisperModal
+        isOpen={showWhisperModal}
+        onClose={() => setShowWhisperModal(false)}
+        users={users}
+        currentUser={currentUser}
+        roomCode={roomCode}
+        isAnonymous={isAnonymousMode}
+      />
+      <CodeShareModal
+        isOpen={showCodeShare}
+        onClose={() => setShowCodeShare(false)}
+        roomCode={roomCode}
+        onSendCode={(code, lang) => {
+          const fence = `\`\`\`${lang}\n${code}\n\`\`\``;
+          sendTextMessage(fence);
+        }}
       />
       <EditMessageModal
         isOpen={!!editingMessage}

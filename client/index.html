@@ -15,12 +15,8 @@
   <meta name="description"
     content="Create Private, temporary chat rooms with real-time messaging. No registration required." />
 
-  <!-- PWA Manifest -->
-  <link rel="manifest" href="/manifest.json" />
-
-  <!-- Apple Touch Icons -->
-  <link rel="apple-touch-icon" href="/pwa-192x192.png" />
-  <link rel="apple-touch-startup-image" href="/pwa-512x512.png" />
+  <!-- App Icons -->
+  <link rel="apple-touch-icon" href="/icons/app-192.png" />
 
   <style>
     /* Premium Splash Screen Styles */
@@ -139,25 +135,7 @@
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
   <script>
-    // Register service worker
-    if ('serviceWorker' in navigator && window.location.hostname !== 'localhost') {
-      const isElectron = !!(window.electronAPI || (window.process && window.process.versions && window.process.versions.electron));
-      const isCapacitor = !!window.Capacitor && !!window.Capacitor.isNative;
-
-      if (!isElectron && !isCapacitor) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then(registration => {
-              console.log('ServiceWorker registration successful');
-            })
-            .catch(error => {
-              console.log('ServiceWorker registration failed');
-            });
-        });
-      }
-    }
-
-    // Signal app is ready (this will be called from main.jsx)
+    // Signal app is ready (called from main.jsx)
     window.addEventListener('app-ready', () => {
       document.body.classList.add('app-loaded');
     });

@@ -83,21 +83,6 @@ One codebase, everywhere:
 git clone https://github.com/cLLeB/ephemeral-chat.git
 cd ephemeral-chat
 
-# Install root & submodule dependencies
-npm install
-cd client && npm install
-cd ../electron-app && npm install
-```
-
-### 3. Running the App
-```bash
-# Start both Server and Client concurrently from the root directory
-npm run dev
-```
-
-- **Chat Interface**: `http://localhost:5173`
-- **Signal Server**: `http://localhost:3001`
-- **Desktop (Electron)**: Open a new terminal and run `cd electron-app && npm run dev`
 
 ---
 <div align="center">

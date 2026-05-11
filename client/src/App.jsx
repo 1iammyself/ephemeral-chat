@@ -7,7 +7,7 @@ import Home from './components/Home';
 import LandingRedirect from './components/LandingRedirect';
 import ChatRoom from './components/ChatRoom';
 import InviteHandler from './components/InviteHandler.jsx';
-import PWAHandler from './components/PWAHandler';
+import { useAppResume } from './hooks/useAppResume';
 import MyRooms from './components/MyRooms'; // Import MyRooms component
 import MyDrops from './components/MyDrops';
 import DropPage from './components/DropPage';
@@ -51,6 +51,8 @@ async function runBiometricGate(setIsLocked) {
 function App() {
   const isAndroid = Capacitor.getPlatform() === 'android';
   const [isLocked, setIsLocked] = useState(isAndroid);
+
+  useAppResume();
 
   // Run biometric gate on mount
   useEffect(() => {
@@ -108,7 +110,6 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 transition-colors duration-200 no-scrollbar">
-        <PWAHandler />
         <DesktopSecurityGuard />
         <DeepLinkHandler />
         <AppRestrictionBanner />

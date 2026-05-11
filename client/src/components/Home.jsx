@@ -11,7 +11,7 @@ import ThemeToggle from './ThemeToggle';
 import { joinWithVerbalCode, checkRoom } from '../utils/api';
 import { hapticError } from '../utils/platform';
 
-import { RefreshButton } from './PWAHandler';
+import { AppRefreshButton } from './AppRefreshButton';
 
 const Home = ({ children }) => {
   const [roomCode, setRoomCode] = useState('');
@@ -195,7 +195,7 @@ const Home = ({ children }) => {
             Ephemeral Chat
           </h1>
           <div className="flex items-center space-x-2">
-            <RefreshButton />
+            <AppRefreshButton />
             <ThemeToggle />
           </div>
         </div>

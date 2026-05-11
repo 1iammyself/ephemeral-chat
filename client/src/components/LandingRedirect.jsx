@@ -8,13 +8,12 @@ import Home from './Home';
  * Mounted at the root "/" route.
  *
  * Behaviour:
- *  • Capacitor (Android / iOS)          → render <Home /> normally.
- *  • Electron                           → render <Home /> normally.
- *  • PWA installed to homescreen        → render <Home /> normally.
- *  • Plain web browser (production)     → hard-redirect to the landing page
+ *  • Capacitor (Android / iOS)      → render <Home /> normally.
+ *  • Electron                       → render <Home /> normally.
+ *  • Plain web browser (production) → hard-redirect to the landing page
  *    so that chat.kyere.me/ always shows the marketing site instead of
  *    dumping visitors straight into the chat UI.
- *  • Dev mode (import.meta.env.DEV)     → render <Home /> so local testing works.
+ *  • Dev mode (import.meta.env.DEV) → render <Home /> so local testing works.
  *
  * The landing URL is read from VITE_LANDING_URL so it can be overridden
  * per-environment without touching source code.
@@ -25,14 +24,10 @@ function LandingRedirect() {
   const isNative = Capacitor.getPlatform() !== 'web';
   const isElectron =
     typeof window !== 'undefined' && !!window.electronAPI?.isElectron;
-  const isPwa =
-    typeof window !== 'undefined' &&
-    (window.matchMedia('(display-mode: standalone)').matches ||
-      window.navigator.standalone === true);
   const isDev = import.meta.env.DEV;
 
   const shouldRedirect =
-    !isNative && !isElectron && !isPwa && !isDev && !!LANDING_URL;
+    !isNative && !isElectron && !isDev && !!LANDING_URL;
 
   useEffect(() => {
     if (shouldRedirect) {

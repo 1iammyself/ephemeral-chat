@@ -23,6 +23,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   const { theme } = useTheme();
   const currentVibe = getVibeById(roomVibe);
   const [messageTimers, setMessageTimers] = useState(new Map());
+  const ttlTimerIdsRef = React.useRef({});
   const [viewingImage, setViewingImage] = useState(null);
   const [currentImageUrl, setCurrentImageUrl] = useState(null);
   const [viewedMessages, setViewedMessages] = useState(new Set());
@@ -69,34 +70,42 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
     return () => socketManager.off('message-viewed', handleMessageViewed);
   }, [currentUser]);
 
-  // Set up timers for messages with TTL
+  // Set up TTL timers for new messages.
+  // No cleanup here — cancelling timers on every messages update would prevent expiry.
+  // Unmount cleanup is handled by the separate effect below.
   useEffect(() => {
     messages.forEach(message => {
       const ttl = message.overrideTtl || messageTTL;
+      if (!ttl || ttl <= 0 || message.type === 'system') return;
+      if (messageTimers.has(message.id)) return;
+      if (ttlTimerIdsRef.current[message.id]) return;
 
-      if (ttl && ttl > 0 && message.type !== 'system' && !messageTimers.has(message.id)) {
-        const messageTime = new Date(message.timestamp).getTime();
-        const expiryTime = messageTime + (ttl * 1000);
-        const timeLeft = expiryTime - Date.now();
+      const messageTime = new Date(message.timestamp).getTime();
+      const expiryTime = messageTime + (ttl * 1000);
+      const timeLeft = expiryTime - Date.now();
 
-        if (timeLeft > 0) {
-          const timer = setTimeout(() => {
-            setMessageTimers(prev => new Map(prev).set(message.id, 'vanishing'));
-            setTimeout(() => {
-              setMessageTimers(prev => new Map(prev).set(message.id, 'expired'));
-            }, 500);
-          }, timeLeft);
-          setMessageTimers(prev => new Map(prev).set(message.id, timer));
-        } else {
-          setMessageTimers(prev => new Map(prev).set(message.id, 'expired'));
-        }
+      if (timeLeft > 0) {
+        const timerId = setTimeout(() => {
+          setMessageTimers(prev => new Map(prev).set(message.id, 'vanishing'));
+          setTimeout(() => {
+            setMessageTimers(prev => new Map(prev).set(message.id, 'expired'));
+            delete ttlTimerIdsRef.current[message.id];
+          }, 500);
+        }, timeLeft);
+        ttlTimerIdsRef.current[message.id] = timerId;
+        setMessageTimers(prev => new Map(prev).set(message.id, timerId));
+      } else {
+        setMessageTimers(prev => new Map(prev).set(message.id, 'expired'));
       }
     });
-
-    return () => {
-      messageTimers.forEach(timer => { if (typeof timer === 'object') clearTimeout(timer); });
-    };
   }, [messages, messageTTL]);
+
+  // Cancel all pending TTL timers on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(ttlTimerIdsRef.current).forEach(id => clearTimeout(id));
+    };
+  }, []);
 
   // Read Receipt Observer
   useEffect(() => {

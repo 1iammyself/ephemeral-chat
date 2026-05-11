@@ -61,6 +61,16 @@ export default function CollabPlaylist({ isOpen, onClose, isHost, currentUser, r
   const addUrl = useCallback(() => {
     const url = urlInput.trim();
     if (!url) return;
+    try {
+      const parsed = new URL(url);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        setError('Only HTTP/HTTPS URLs are supported');
+        return;
+      }
+    } catch {
+      setError('Please enter a valid URL');
+      return;
+    }
     const detected = detectMediaUrl(url);
     const title = detected
       ? (detected.type === 'youtube' ? `YouTube: ${detected.id}` : url)
@@ -121,7 +131,7 @@ export default function CollabPlaylist({ isOpen, onClose, isHost, currentUser, r
         <div className="flex-1 overflow-y-auto py-1 px-2">
           {queue.length === 0
             ? <p className="text-center text-xs text-gray-400 py-6">Queue is empty — add a URL below</p>
-            : queue.map((t, i) => <TrackRow key={i} track={t} isCurrent={i === currentIndex} index={i} />)
+            : queue.map((t, i) => <TrackRow key={`${t.url}-${i}`} track={t} isCurrent={i === currentIndex} index={i} />)
           }
         </div>
 
@@ -146,7 +156,7 @@ export default function CollabPlaylist({ isOpen, onClose, isHost, currentUser, r
           <div className="flex gap-2">
             <input
               value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
+              onChange={(e) => { setUrlInput(e.target.value); setError(''); }}
               onKeyDown={(e) => e.key === 'Enter' && addUrl()}
               placeholder="Paste audio URL…"
               className="flex-1 px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400/40"

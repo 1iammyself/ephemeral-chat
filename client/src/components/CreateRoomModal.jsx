@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { hapticSuccess } from '../utils/platform';
-import { X, Check, Copy, Users, Lock, Unlock, Timer, Zap, PartyPopper, Sun, Sunset, Settings, Clock, Shield, Share2, Hash, ToggleLeft, ToggleRight, Upload, Plus, Trash2, ClipboardList } from 'lucide-react';
+import { X, Check, Copy, Users, Lock, Unlock, Timer, Zap, PartyPopper, Sun, Sunset, Settings, Clock, Shield, Share2, Hash, ToggleLeft, ToggleRight, Upload, Plus, Trash2, ClipboardList, MapPin, Locate } from 'lucide-react';
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
 import ShareSheet from './ShareSheet';
@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { secureFetch } from '../utils/secure-fetch.js';
 import { API_BASE } from '../utils/resolve-url.js';
 import { IntegrityPlugin } from '../capacitor/security-plugins';
+import { useGeofence } from '../hooks/useGeofence';
 // Removed @cap.js/widget - using honeypot instead
 
 const CreateRoomModal = ({ onClose, onRoomCreated }) => {
@@ -51,6 +52,10 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   const [preApprovedText, setPreApprovedText] = useState('');
   const [preApprovedEntries, setPreApprovedEntries] = useState([]);
   const preApprovedFileRef = useRef(null);
+  const [geofenceEnabled, setGeofenceEnabled] = useState(false);
+  const [geofenceCenter, setGeofenceCenter] = useState(null); // { lat, lng }
+  const [geofenceRadius, setGeofenceRadius] = useState(500); // metres
+  const { fetchPosition, loading: geoLoading, error: geoError } = useGeofence();
   const navigate = useNavigate();
 
   // Set timestamp when component mounts (for timing-based bot detection)
@@ -114,6 +119,11 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
       }
     }
 
+    // Validate geofence: location must be set before creating
+    if (geofenceEnabled && !geofenceCenter) {
+      return; // warning already shown in UI
+    }
+
     setIsCreating(true);
 
     try {
@@ -169,6 +179,9 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
               autoApprove: autoApproveEnabled,
               preApprovedList: preApprovedEntries.length > 0 ? preApprovedEntries : undefined,
               scheduledFor: scheduleEnabled && scheduledFor ? new Date(scheduledFor).toISOString() : undefined,
+              geofence: geofenceEnabled && geofenceCenter
+                ? { lat: geofenceCenter.lat, lng: geofenceCenter.lng, radiusMeters: geofenceRadius }
+                : undefined,
             }),
           });
           break; // Got an HTTP response (ok or error) — don't retry
@@ -827,6 +840,72 @@ Verbal Code: ${verbalCode || 'N/A'}`;
                   className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                   required={scheduleEnabled}
                 />
+              )}
+            </div>
+
+            {/* Geofenced Room */}
+            <div className="flex flex-col gap-2 p-3 rounded-lg border border-gray-200 dark:border-gray-700 mt-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-medium text-sm dark:text-white flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-gray-400" />
+                    Geofenced Room
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Only users within the set radius can join</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setGeofenceEnabled(s => !s)}
+                  className={`flex-shrink-0 transition-all active:scale-95 ${geofenceEnabled ? 'text-green-500' : 'text-gray-400 dark:text-gray-500'}`}
+                >
+                  {geofenceEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
+                </button>
+              </div>
+              {geofenceEnabled && (
+                <div className="flex flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const pos = await fetchPosition();
+                      if (pos) setGeofenceCenter(pos);
+                    }}
+                    disabled={geoLoading}
+                    className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                  >
+                    <Locate className={`w-4 h-4 ${geoLoading ? 'animate-spin text-blue-500' : 'text-gray-500'}`} />
+                    {geoLoading ? 'Getting location…' : geofenceCenter ? 'Location set — tap to update' : 'Use my current location'}
+                  </button>
+                  {geoError && (
+                    <p className="text-xs text-red-500">{geoError}</p>
+                  )}
+                  {geofenceCenter && (
+                    <p className="text-xs text-green-600 dark:text-green-400">
+                      Centre locked ({geofenceCenter.lat.toFixed(4)}, {geofenceCenter.lng.toFixed(4)})
+                    </p>
+                  )}
+                  <div className="flex flex-col gap-1">
+                    <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                      <span>Radius</span>
+                      <span className="font-medium">{geofenceRadius >= 1000 ? `${(geofenceRadius / 1000).toFixed(1)} km` : `${geofenceRadius} m`}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={50}
+                      max={5000}
+                      step={50}
+                      value={geofenceRadius}
+                      onChange={(e) => setGeofenceRadius(Number(e.target.value))}
+                      className="w-full accent-green-500"
+                    />
+                    <div className="flex justify-between text-xs text-gray-400">
+                      <span>50 m</span>
+                      <span>5 km</span>
+                    </div>
+                  </div>
+                  {geofenceEnabled && !geofenceCenter && (
+                    <p className="text-xs text-amber-500">Set a location before creating the room</p>
+                  )}
+                </div>
               )}
             </div>
 

@@ -113,7 +113,6 @@ export function getSecurityCapabilities() {
     webCrypto: hasWebCrypto,
     webTransport: hasWebTransport,
     electronSecurity: hasElectronSecurity,
-    serviceWorker: 'serviceWorker' in navigator,
     // SharedArrayBuffer is needed by some WASM crypto modules
     sharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
     // WebAssembly is needed for native crypto implementations
