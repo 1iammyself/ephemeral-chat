@@ -31,7 +31,9 @@
     font-family: 'Inter', system-ui, "Apple Color Emoji", "Noto Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Android Emoji", sans-serif;
     /* font-variant-emoji: emoji; -- Removed as it causes digit separation on some mobile devices */
     letter-spacing: normal;
-    @apply bg-slate-50 dark:bg-black text-gray-900 dark:text-gray-100;
+    /* Light mode: cool blue-gray base — noticeably off-white for contrast */
+    background-color: #e8edf2;
+    @apply dark:bg-black text-gray-900 dark:text-gray-100;
     /* Smooth out any background-color changes (e.g. keyboard dismiss resize flash) */
     transition: background-color 0.25s ease, color 0.2s ease;
   }
@@ -820,8 +822,8 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ─── Global Light Theme Accessibility Fixes ─── */
-/* Adds subtle borders to standard cards and menus in light mode 
-   to prevent them blending into pure white backgrounds. 
+/* Adds subtle borders to standard cards and menus in light mode
+   to prevent them blending into pure white backgrounds.
    (Exempts glassmorphic panels like Feature Menu/Emoji Picker) */
 
 /* Specific fix for grey borders that are too light in light mode */
@@ -837,6 +839,20 @@ input[type="range"]::-moz-range-thumb {
   border-left-color: rgba(0, 0, 0, 0.08) !important;
   border-right-color: rgba(0, 0, 0, 0.08) !important;
   border-bottom-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* ─── Light Mode: Soften All Pure-White Surfaces ─── */
+/* Replaces #ffffff with a soft cool-white so cards/panels/menus
+   contrast visibly against the #e8edf2 page base. */
+:root:not(.dark) .bg-white {
+  background-color: #f2f6fb !important;
+}
+
+/* Slightly deepen bg-slate-50 / bg-gray-50 surfaces in light mode
+   so they sit between the page base and elevated cards. */
+:root:not(.dark) .bg-slate-50,
+:root:not(.dark) .bg-gray-50 {
+  background-color: #eaf0f6 !important;
 }
 
 /* Hide emoji category names/headings in the picker without breaking virtualization */

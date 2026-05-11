@@ -26,7 +26,7 @@ export const ThemeProvider = ({ children }) => {
       if (metaThemeColor) metaThemeColor.setAttribute('content', '#030712');
     } else {
       root.classList.remove('dark');
-      if (metaThemeColor) metaThemeColor.setAttribute('content', '#f8fafc');
+      if (metaThemeColor) metaThemeColor.setAttribute('content', '#e8edf2');
     }
     localStorage.setItem('theme', theme);
   }, [theme]);
