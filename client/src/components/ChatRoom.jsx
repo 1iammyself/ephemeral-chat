@@ -37,6 +37,7 @@ import {
   Code2,
   Lock,
   LayoutGrid,
+  Trophy,
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -86,6 +87,8 @@ import DragDropOverlay from './DragDropOverlay';
 import ActivityLog from './ActivityLog';
 import CameraModal from './CameraModal';
 import StegoModal from './StegoModal';
+import ChessMessage from './ChessMessage';
+import ChessPanel from './ChessPanel';
 import { getVibeById, getAllVibes } from '../utils/vibes';
 import SharedMediaPlayer, { detectMediaUrl } from './SharedMediaPlayer';
 import WatchPartyModal from './WatchPartyModal';
@@ -122,6 +125,7 @@ const SLASH_COMMANDS = [
   { icon: Activity, label: 'Watch Party', value: '/media', desc: 'Share YouTube/SoundCloud' },
   { icon: FileText, label: 'Stego', value: '/stego', desc: 'Hide a secret in a photo' },
   { icon: Code2, label: 'Code Share', value: '/code', desc: 'Collaborative code editor' },
+  { icon: Trophy, label: 'Chess', value: '/chess', desc: 'Start a chess match' },
 ];
 
 const CONFETTI_COLORS = [
@@ -651,8 +655,12 @@ const ChatRoom = () => {
   // Feature floating panels
   const { openPanel, closePanel, focusPanel, isOpen: isPanelOpen, getZ } = usePanelManager();
   const [stegoExtractImage, setStegoExtractImage] = useState(null);
+  const [activeChessMessage, setActiveChessMessage] = useState(null);
+  const [chessApprovalRequest, setChessApprovalRequest] = useState(null);
   const setShowStegoModal = (v) => { if (!v) setStegoExtractImage(null); v ? openPanel('secrets') : closePanel('secrets'); };
   const setShowCodeShare    = (v) => v ? openPanel('code')    : closePanel('code');
+  const openChessPanel = (message) => { setActiveChessMessage(message); openPanel('chess'); };
+  const closeChessPanel = () => { closePanel('chess'); };
   const [activeTimer, setActiveTimer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
@@ -1397,6 +1405,8 @@ const ChatRoom = () => {
         }
       }
       setMessages(prev => prev.map(m => m.id === finalMessage.id ? finalMessage : m));
+      // Keep open chess panel in sync
+      setActiveChessMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
     };
 
     // Role and moderation event handlers
@@ -1643,6 +1653,28 @@ const ChatRoom = () => {
     };
     socketManager.on('link-preview-update', handleLinkPreviewUpdate);
 
+    // ─── Chess approval handlers ─────────────────────────────
+    const handleChessSwapApproval = ({ messageId, requestedBy }) =>
+      setChessApprovalRequest({ type: 'swap', messageId, requestedBy });
+    const handleChessReplaceApproval = ({ messageId, role, newPlayerName, requestedBy }) =>
+      setChessApprovalRequest({ type: 'replace', messageId, role, newPlayerName, requestedBy });
+    const handleChessSwapDeclined = ({ declinedBy }) => {
+      setActivityLogs(prev => [{
+        id: `log_chess_${Date.now()}`, type: 'system',
+        content: `${declinedBy} declined the swap request`, timestamp: new Date().toISOString()
+      }, ...prev].slice(0, 50));
+    };
+    const handleChessReplaceDeclined = ({ declinedBy }) => {
+      setActivityLogs(prev => [{
+        id: `log_chess_${Date.now()}`, type: 'system',
+        content: `${declinedBy} declined the replacement request`, timestamp: new Date().toISOString()
+      }, ...prev].slice(0, 50));
+    };
+    socketManager.on('chess-swap-approval-needed', handleChessSwapApproval);
+    socketManager.on('chess-replace-approval-needed', handleChessReplaceApproval);
+    socketManager.on('chess-swap-declined', handleChessSwapDeclined);
+    socketManager.on('chess-replace-declined', handleChessReplaceDeclined);
+
     return () => {
       socketManager.off('connect', handleConnect);
       socketManager.off('disconnect', handleDisconnect);
@@ -1690,6 +1722,10 @@ const ChatRoom = () => {
       socketManager.off('pre-approved-list-updated', handlePreApprovedListUpdated);
       socketManager.off('messages-cleared');
       socketManager.off('link-preview-update', handleLinkPreviewUpdate);
+      socketManager.off('chess-swap-approval-needed', handleChessSwapApproval);
+      socketManager.off('chess-replace-approval-needed', handleChessReplaceApproval);
+      socketManager.off('chess-swap-declined', handleChessSwapDeclined);
+      socketManager.off('chess-replace-declined', handleChessReplaceDeclined);
 
       // ─── MLS Security: Clean up session + padding ───
       destroyMLSSession(roomCode);
@@ -1719,6 +1755,13 @@ const ChatRoom = () => {
     }, 5000);
     return () => clearInterval(interval);
   }, [isConnected]);
+
+  // Auto-decline chess approval after 30s of inactivity
+  useEffect(() => {
+    if (!chessApprovalRequest) return;
+    const t = setTimeout(() => handleChessApproval(false), 30_000);
+    return () => clearTimeout(t);
+  }, [chessApprovalRequest]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // High-Assurance Quick Actions (Electron only, Option C)
   useEffect(() => {
@@ -2062,6 +2105,9 @@ const ChatRoom = () => {
           break;
         case '/code':
           setShowCodeShare(true);
+          break;
+        case '/chess':
+          handleSendChess();
           break;
         default: break;
       }
@@ -2573,6 +2619,52 @@ const ChatRoom = () => {
     openPanel('secrets');
   };
 
+  // ─── Chess handlers ──────────────────────────────────────────
+  const handleSendChess = () => {
+    if (!isConnected) return;
+    if (selectedRecipients.length > 1) {
+      setError('Chess can only be sent to one person at a time.');
+      return;
+    }
+    socketManager.emit('send-message', {
+      messageType: 'game',
+      gameData: { gameType: 'chess' },
+      recipients: selectedRecipients,
+      userId: persistentUserId,
+      isAnonymous: false,
+    });
+  };
+
+  const handleChessAction = (messageId, action, payload) => {
+    if (!isConnected) return;
+    if (action === 'chess-move') {
+      socketManager.emit('chess-move', { messageId, move: payload, userId: persistentUserId });
+    } else if (action === 'chess-join') {
+      socketManager.emit('chess-join', { messageId, userId: persistentUserId });
+    } else if (action === 'chess-swap') {
+      socketManager.emit('chess-swap-request', { messageId });
+    } else if (action === 'chess-replace') {
+      const { targetUserId, role } = payload;
+      socketManager.emit('chess-replace-request', { messageId, role, targetUserId });
+    }
+  };
+
+  const handleLaunchChess = (message) => {
+    openChessPanel(message);
+    hapticLight();
+  };
+
+  const handleChessJoin = (messageId) => {
+    socketManager.emit('chess-join', { messageId, userId: persistentUserId });
+  };
+
+  const handleChessApproval = (approved) => {
+    if (!chessApprovalRequest) return;
+    const event = chessApprovalRequest.type === 'swap' ? 'chess-swap-response' : 'chess-replace-response';
+    socketManager.emit(event, { messageId: chessApprovalRequest.messageId, approved });
+    setChessApprovalRequest(null);
+  };
+
   const handleEditMessage = (message) => {
     setEditingMessage(message);
   };
@@ -2998,6 +3090,9 @@ const ChatRoom = () => {
               roomVibe={roomVibe}
               onShareResult={handleShareResult}
               onStegoExtract={handleStegoExtract}
+              onChessJoin={handleChessJoin}
+              onChessLaunch={handleLaunchChess}
+              onDelete={handleDeleteMessage}
               linkPreviews={linkPreviews}
               onOpenEmojiPicker={(messageId) => {
                 setReactionTargetId(messageId);
@@ -3815,6 +3910,66 @@ const ChatRoom = () => {
             }} />
         </FloatingPanel>
       )}
+      {/* ── Chess FloatingPanel ──────────────────────────────────────── */}
+      {isPanelOpen('chess') && (
+        <FloatingPanel
+          title="Chess Match"
+          icon={Trophy}
+          iconColor="text-amber-400"
+          onClose={closeChessPanel}
+          onFocus={() => focusPanel('chess')}
+          zIndex={getZ('chess')}
+          defaultWidth={720}
+          defaultHeight={560}
+          defaultX={80}
+          defaultY={60}
+        >
+          <ChessPanel
+            message={activeChessMessage}
+            currentUserId={currentUser?.id || currentUser?.socketId}
+            currentNickname={currentUser?.nickname}
+            users={users}
+            onMove={handleChessAction}
+            roomVibe={roomVibe}
+          />
+        </FloatingPanel>
+      )}
+
+      {/* ── Chess swap/replace approval dialog ───────────────────────── */}
+      {chessApprovalRequest && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => handleChessApproval(false)}
+          />
+          <div className={`relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-sm w-full border-2 border-${getVibeById(roomVibe).accent || 'indigo'}-500/40 animate-in zoom-in-95 fade-in duration-200`}>
+            <h3 className="text-base font-black text-gray-900 dark:text-white mb-2">
+              {chessApprovalRequest.type === 'swap' ? '♟ Swap Request' : '♟ Replace Request'}
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-5">
+              {chessApprovalRequest.type === 'swap'
+                ? `${chessApprovalRequest.requestedBy} wants to swap White and Black sides. Do you approve?`
+                : `${chessApprovalRequest.requestedBy} wants to replace you with ${chessApprovalRequest.newPlayerName}. Do you approve?`}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleChessApproval(true)}
+                className={`flex-1 py-2.5 ${getVibeById(roomVibe).accentClass} rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02] active:scale-95`}
+              >
+                Approve
+              </button>
+              <button
+                onClick={() => handleChessApproval(false)}
+                className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-red-500 hover:text-white text-gray-600 dark:text-gray-400 rounded-xl text-sm font-bold transition-all"
+              >
+                Decline
+              </button>
+            </div>
+            <p className="text-center text-[9px] text-gray-400 mt-3 font-bold uppercase tracking-widest">Auto-declines in 30s</p>
+          </div>
+        </div>
+      )}
+
       <EditMessageModal
         isOpen={!!editingMessage}
         onClose={() => setEditingMessage(null)}

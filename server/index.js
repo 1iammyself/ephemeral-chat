@@ -28,6 +28,7 @@ const {
   logger
 } = require('./utils');
 const { convertAudioToAAC } = require('./utils/audio-converter');
+const { Chess } = require('./utils/chess');
 
 const helmet = require('helmet');
 const { RtcTokenBuilder, RtcRole } = require('agora-token');
@@ -2159,6 +2160,51 @@ io.on('connection', (socket) => {
         socket.nickname = userNickname;
         socket.persistentUserId = userId || socket.id; // Store persistent ID on socket
 
+        // Re-sync chess (and other game) player socketIds for this returning user
+        try {
+          const freshRoom = await roomManager.getRoom(roomCode);
+          if (freshRoom && freshRoom.messages) {
+            let gamesUpdated = false;
+            for (const msg of freshRoom.messages) {
+              if (msg.messageType !== 'game' || !msg.gameData) continue;
+              const gd = msg.gameData;
+
+              if (gd.gameType === 'chess' && !gd.winner) {
+                if (gd.players.white && (gd.players.white.id === userId || gd.players.white.name === userNickname)) {
+                  gd.players.white.socketId = socket.id;
+                  gd.players.white.name = userNickname;
+                  if (gd.players.white.id !== userId && userId) gd.players.white.id = userId;
+                  gamesUpdated = true;
+                  logger.info(`♟️ Re-synced chess white player socketId for ${userNickname} to ${socket.id}`);
+                }
+                if (gd.players.black && (gd.players.black.id === userId || gd.players.black.name === userNickname)) {
+                  gd.players.black.socketId = socket.id;
+                  gd.players.black.name = userNickname;
+                  if (gd.players.black.id !== userId && userId) gd.players.black.id = userId;
+                  gamesUpdated = true;
+                  logger.info(`♟️ Re-synced chess black player socketId for ${userNickname} to ${socket.id}`);
+                }
+              }
+
+              if (msg.sender && msg.sender.nickname === userNickname && msg.sender.id !== userId && userId) {
+                msg.sender.id = userId;
+                msg.sender.socketId = socket.id;
+                gamesUpdated = true;
+              }
+            }
+            if (gamesUpdated) {
+              await roomManager.saveRoom(roomCode, freshRoom);
+              for (const msg of freshRoom.messages) {
+                if (msg.messageType === 'game' && msg.gameData && !msg.gameData.winner) {
+                  io.to(roomCode).emit('message-updated', msg);
+                }
+              }
+            }
+          }
+        } catch (syncErr) {
+          logger.error('Error re-syncing chess games on join:', syncErr);
+        }
+
         // Register user activity and start inactivity timer
         const timeoutMs = await roomManager.getRoomTimeout(roomCode);
 
@@ -2300,7 +2346,7 @@ io.on('connection', (socket) => {
       // ─── v3 MLS fields (RFC 9420 MLS group encryption) ───
       // ─── v4 AES-GCM fields (room-key symmetric encryption) ───
       // ─── v5 PQXDH + Double Ratchet / Megolm-style group encryption ───
-      let { content, messageType = 'text', isViewOnce = false, imageData, pollData, recipients = [], replyTo, parentId, isEncrypted, iv, fileName, mimeType, fileSize, isAnonymous, overrideTtl,
+      let { content, messageType = 'text', isViewOnce = false, imageData, pollData, gameData, recipients = [], replyTo, parentId, isEncrypted, iv, fileName, mimeType, fileSize, isAnonymous, overrideTtl,
         v: payloadVersion, header: ratchetHeader, ciphertext: ratchetCiphertext, ratchet: isRatchet, mls: mlsCiphertext,
         ct: aesCiphertext, dr: drPayload, sk: skPayload } = data;
 
@@ -2465,6 +2511,45 @@ io.on('connection', (socket) => {
           allowMultiple: !!pollData.allowMultiple,
           allowCustomAnswers: !!pollData.allowCustomAnswers
         };
+      } else if (messageType === 'game') {
+        if (!gameData || !gameData.gameType) {
+          socket.emit('error', { message: 'Invalid game data' });
+          return;
+        }
+        // Chess only allows at most 1 targeted recipient
+        if (recipients && recipients.length > 1 && gameData.gameType === 'chess') {
+          socket.emit('error', { message: 'Chess can only target one player' });
+          return;
+        }
+        if (gameData.gameType === 'chess') {
+          const senderId = socket.persistentUserId || data.userId || socket.id;
+          const isTargeted = recipients && recipients.length === 1;
+          let invitedNickname = null;
+          if (isTargeted) {
+            const chessRoom = await roomManager.getRoom(socket.roomCode);
+            if (chessRoom && chessRoom.users) {
+              const targetUser = chessRoom.users.find(u => u.socketId === recipients[0] || u.id === recipients[0]);
+              invitedNickname = targetUser ? targetUser.nickname : null;
+            }
+          }
+          data.gameData = {
+            gameType: 'chess',
+            fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+            players: {
+              white: { id: senderId, socketId: socket.id, name: socket.nickname },
+              black: null
+            },
+            invitedNickname,
+            turn: 'w',
+            history: [],
+            winner: null,
+            lastActivity: Date.now()
+          };
+        } else {
+          socket.emit('error', { message: 'Unknown game type' });
+          return;
+        }
+        messageContent = 'Chess';
       } else if (!['text', 'image', 'audio', 'poll', 'file'].includes(messageType)) {
         socket.emit('error', { message: 'Unsupported message type' });
         return;
@@ -2478,6 +2563,7 @@ io.on('connection', (socket) => {
         messageType,
         isViewOnce,
         pollData: messageType === 'poll' ? data.pollData : undefined,
+        gameData: messageType === 'game' ? data.gameData : undefined,
         fileName: messageType === 'file' ? fileName : undefined,
         mimeType: messageType === 'file' ? mimeType : undefined,
         fileSize: messageType === 'file' ? fileSize : undefined,
@@ -2544,14 +2630,19 @@ io.on('connection', (socket) => {
 
       // Broadcast logic
       if (recipients && recipients.length > 0) {
-        // 1. Send to sender (so they see their own message)
-        socket.emit('new-message', message);
+        // Chess games always broadcast to the whole room (anyone can spectate)
+        const isChessGame = message.messageType === 'game' && message.gameData?.gameType === 'chess';
+        if (isChessGame) {
+          io.to(socket.roomCode).emit('new-message', message);
+        } else {
+          // 1. Send to sender (so they see their own message)
+          socket.emit('new-message', message);
 
-        // 2. Send to each recipient
-        recipients.forEach(recipientId => {
-          io.to(recipientId).emit('new-message', message);
-        });
-
+          // 2. Send to each recipient
+          recipients.forEach(recipientId => {
+            io.to(recipientId).emit('new-message', message);
+          });
+        }
       } else {
         // Broadcast to all users in room (default)
         io.to(socket.roomCode).emit('new-message', message);
@@ -2584,6 +2675,277 @@ io.on('connection', (socket) => {
       logger.error('Error sending message:', error);
       socket.emit('error', { message: 'Failed to send message' });
     }
+  });
+
+  // ─── Chess Handlers ────────────────────────────────────────────────────────
+
+  socket.on('chess-join', async (data) => {
+    try {
+      const { messageId, userId } = data;
+      if (!socket.roomCode || !messageId) return;
+
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
+
+      const { gameData } = message;
+      if (gameData.winner) return;
+
+      const joinerId = userId || socket.persistentUserId || socket.id;
+
+      if (!gameData.players.white?.id) {
+        gameData.players.white = { id: joinerId, socketId: socket.id, name: socket.nickname };
+      } else if (!gameData.players.black?.id) {
+        if (gameData.players.white?.id === joinerId || gameData.players.white?.name === socket.nickname) return;
+
+        const isTargeted = message.recipients && message.recipients.length > 0;
+        if (isTargeted) {
+          const isIntendedRecipient = message.recipients.includes(joinerId) ||
+            message.recipients.includes(socket.id) ||
+            (gameData.invitedNickname && gameData.invitedNickname === socket.nickname);
+          if (!isIntendedRecipient) return;
+        }
+
+        gameData.players.black = { id: joinerId, socketId: socket.id, name: socket.nickname };
+      } else {
+        // Re-sync socketId if existing player rejoins
+        if (gameData.players.white.id === joinerId || gameData.players.white.name === socket.nickname) {
+          gameData.players.white.id = joinerId;
+          gameData.players.white.socketId = socket.id;
+          gameData.players.white.name = socket.nickname;
+        } else if (gameData.players.black.id === joinerId || gameData.players.black.name === socket.nickname) {
+          gameData.players.black.id = joinerId;
+          gameData.players.black.socketId = socket.id;
+          gameData.players.black.name = socket.nickname;
+        } else {
+          return; // Game full
+        }
+      }
+
+      gameData.lastActivity = Date.now();
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (error) {
+      logger.error('Error handling chess join:', error);
+    }
+  });
+
+  socket.on('chess-move', async (data) => {
+    try {
+      const { messageId, move, userId } = data;
+      if (!socket.roomCode || !messageId || !move) return;
+
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
+
+      const { gameData } = message;
+      if (gameData.winner) return;
+
+      const playerId = socket.persistentUserId || userId || socket.id;
+      const isWhite = gameData.players.white?.id === playerId || gameData.players.white?.name === socket.nickname;
+      const isBlack = gameData.players.black?.id === playerId || gameData.players.black?.name === socket.nickname;
+
+      if ((gameData.turn === 'w' && !isWhite) || (gameData.turn === 'b' && !isBlack)) return;
+
+      const chess = new Chess(gameData.fen);
+      const moveResult = chess.move(move);
+
+      if (moveResult) {
+        gameData.fen = chess.fen();
+        gameData.turn = chess.turn();
+
+        if (chess.isCheckmate() || chess.isDraw()) {
+          const winner = chess.isDraw() ? 'draw' : (chess.turn() === 'w' ? 'black' : 'white');
+          gameData.winner = winner;
+          if (winner !== 'draw') {
+            gameData.winnerId = winner === 'white' ? gameData.players.white.id : gameData.players.black.id;
+          }
+          gameData.endedAt = Date.now();
+          // Completed games get a 2-min grace period before expiry
+          message.overrideTtl = 120;
+          message.expiresAt = new Date(Date.now() + 120 * 1000).toISOString();
+        }
+
+        gameData.history = gameData.history || [];
+        gameData.history.push(moveResult.san);
+        gameData.lastActivity = Date.now();
+
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+      }
+    } catch (error) {
+      logger.error('Error handling chess move:', error);
+    }
+  });
+
+  socket.on('chess-swap-request', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
+
+      const requesterId = socket.persistentUserId || socket.id;
+      const isHost = message.sender.id === requesterId || message.sender.socketId === socket.id || message.sender.nickname === socket.nickname;
+      if (!isHost) return;
+
+      const { gameData } = message;
+
+      if (!gameData.players.white || !gameData.players.black) {
+        const temp = gameData.players.white;
+        gameData.players.white = gameData.players.black;
+        gameData.players.black = temp;
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        return;
+      }
+
+      const whiteOnline = io.sockets.sockets.has(gameData.players.white.socketId);
+      const blackOnline = io.sockets.sockets.has(gameData.players.black.socketId);
+
+      if (!whiteOnline && !blackOnline) {
+        const temp = gameData.players.white;
+        gameData.players.white = gameData.players.black;
+        gameData.players.black = temp;
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        return;
+      }
+
+      const onlinePlayers = [];
+      if (whiteOnline && gameData.players.white.id !== requesterId) onlinePlayers.push(gameData.players.white);
+      if (blackOnline && gameData.players.black.id !== requesterId) onlinePlayers.push(gameData.players.black);
+
+      if (onlinePlayers.length === 0) {
+        const temp = gameData.players.white;
+        gameData.players.white = gameData.players.black;
+        gameData.players.black = temp;
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        return;
+      }
+
+      gameData._pendingSwap = {
+        requestedBy: requesterId,
+        requesterName: socket.nickname,
+        responses: {},
+        needed: onlinePlayers.length
+      };
+      await roomManager.saveRoom(socket.roomCode, room);
+
+      onlinePlayers.forEach(player => {
+        io.to(player.socketId).emit('chess-swap-approval-needed', { messageId, requestedBy: socket.nickname });
+      });
+      socket.emit('chess-swap-pending', { messageId, waitingFor: onlinePlayers.map(p => p.name) });
+    } catch (err) { logger.error('chess-swap-request err:', err); }
+  });
+
+  socket.on('chess-swap-response', async ({ messageId, approved }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
+
+      const { gameData } = message;
+      if (!gameData._pendingSwap) return;
+
+      const responderId = socket.persistentUserId || socket.id;
+      gameData._pendingSwap.responses[responderId] = approved;
+
+      if (!approved) {
+        io.to(message.sender.socketId).emit('chess-swap-declined', { messageId, declinedBy: socket.nickname });
+        delete gameData._pendingSwap;
+        await roomManager.saveRoom(socket.roomCode, room);
+        return;
+      }
+
+      const approvalCount = Object.values(gameData._pendingSwap.responses).filter(v => v === true).length;
+      if (approvalCount >= gameData._pendingSwap.needed) {
+        const temp = gameData.players.white;
+        gameData.players.white = gameData.players.black;
+        gameData.players.black = temp;
+        delete gameData._pendingSwap;
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+      } else {
+        await roomManager.saveRoom(socket.roomCode, room);
+      }
+    } catch (err) { logger.error('chess-swap-response err:', err); }
+  });
+
+  socket.on('chess-replace-request', async ({ messageId, role, targetUserId }) => {
+    try {
+      if (!socket.roomCode || !messageId || !role || !targetUserId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
+
+      const requesterId = socket.persistentUserId || socket.id;
+      const isHost = message.sender.id === requesterId || message.sender.socketId === socket.id || message.sender.nickname === socket.nickname;
+      if (!isHost) return;
+
+      const targetUser = (room.users || []).find(u => u.socketId === targetUserId);
+      const targetId = targetUser?.id || targetUser?.userId || targetUserId;
+      const targetNick = targetUser?.nickname || 'New Player';
+
+      const { gameData } = message;
+      const currentPlayer = gameData.players[role];
+      const isCurrentPlayerOnline = currentPlayer && currentPlayer.socketId && io.sockets.sockets.has(currentPlayer.socketId);
+
+      if (!isCurrentPlayerOnline || !currentPlayer?.id) {
+        gameData.players[role] = { id: targetId, socketId: targetUserId, name: targetNick };
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        return;
+      }
+
+      gameData._pendingReplace = {
+        role,
+        newPlayer: { id: targetId, socketId: targetUserId, name: targetNick },
+        requestedBy: requesterId,
+        requesterName: socket.nickname
+      };
+      await roomManager.saveRoom(socket.roomCode, room);
+
+      io.to(currentPlayer.socketId).emit('chess-replace-approval-needed', {
+        messageId, role, newPlayerName: targetNick, requestedBy: socket.nickname
+      });
+      socket.emit('chess-replace-pending', { messageId, role, waitingFor: currentPlayer.name });
+    } catch (err) { logger.error('chess-replace-request err:', err); }
+  });
+
+  socket.on('chess-replace-response', async ({ messageId, approved }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
+
+      const { gameData } = message;
+      if (!gameData._pendingReplace) return;
+
+      if (approved) {
+        const { role, newPlayer } = gameData._pendingReplace;
+        gameData.players[role] = newPlayer;
+        delete gameData._pendingReplace;
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+      } else {
+        io.to(message.sender.socketId).emit('chess-replace-declined', { messageId, declinedBy: socket.nickname });
+        delete gameData._pendingReplace;
+        await roomManager.saveRoom(socket.roomCode, room);
+      }
+    } catch (err) { logger.error('chess-replace-response err:', err); }
   });
 
   // Handle ephemeral view token requests
