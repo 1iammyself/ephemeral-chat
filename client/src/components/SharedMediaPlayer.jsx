@@ -21,14 +21,14 @@ import { withJitter } from '../crypto/traffic-padding';
 
 // ─── URL Detection Helpers ────────────────────────────────────────────
 const YT_REGEX = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-const SC_REGEX = /(?:www\.|on\.)?soundcloud\.com\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)?/;
+const SC_REGEX = /(?:www\.|on\.)?soundcloud\.com\/[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+(?:\/[a-zA-Z0-9._-]+)?/;
 const FIGMA_REGEX = /figma\.com\/(file|proto|design)\/([a-zA-Z0-9_-]+)/;
 const GDRIVE_REGEX = /drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)([^\s]*)/;
 const DOCS_REGEX = /docs\.google\.com\/(document|spreadsheets|spreadsheet|presentation|forms)\/d\/([a-zA-Z0-9_-]+)(?:\/(?:edit|view))?([^\s]*)/;
 
 // Security: URL origin whitelist (must match server-side validation)
 const SAFE_YT_ORIGIN = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)\//;
-const SAFE_SC_ORIGIN = /^https?:\/\/(www\.)?soundcloud\.com\//;
+const SAFE_SC_ORIGIN = /^https?:\/\/(www\.|on\.)?soundcloud\.com\//;
 const SAFE_FIGMA_ORIGIN = /^https?:\/\/(www\.)?figma\.com\//;
 const SAFE_GDRIVE_ORIGIN = /^https?:\/\/(www\.|docs\.|drive\.)?google\.com\//;
 
@@ -665,11 +665,12 @@ const SingleMediaPlayer = ({
                 key={mediaInfo.url}
                 id={embedId}
                 className="w-full h-full"
-                src={`https://w.soundcloud.com/player/?url=${encodeURIComponent(mediaInfo.url)}&auto_play=false&show_artwork=true&visual=true&color=6366f1`}
+                src={`https://w.soundcloud.com/player/?url=${encodeURIComponent(mediaInfo.url)}&auto_play=false&show_artwork=true&visual=false&color=6366f1&buying=false&sharing=false&download=false&show_comments=false&show_user=true&show_reposts=false&show_teaser=false`}
                 scrolling="no"
                 frameBorder="no"
-                allow="autoplay; fullscreen"
+                allow="autoplay; fullscreen; encrypted-media; clipboard-write"
                 referrerPolicy="strict-origin-when-cross-origin"
+                loading="eager"
               />
             ) : (
               <iframe

@@ -221,8 +221,10 @@ app.use(helmet({
         "'unsafe-inline'",
         "'unsafe-eval'", 
         "https://*.youtube.com", 
+        "https://youtube.com",
         "https://*.ytimg.com", 
         "https://*.soundcloud.com",
+        "https://soundcloud.com",
         "https://*.sndcdn.com"
       ],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
@@ -231,6 +233,13 @@ app.use(helmet({
         "'self'",
         'wss:',
         'https:',
+        "https://*.youtube.com",
+        "https://youtube.com",
+        "https://*.soundcloud.com",
+        "https://soundcloud.com",
+        "https://*.sndcdn.com",
+        "https://api-v2.soundcloud.com",
+        "https://api-widget.soundcloud.com",
         // Allow socket.io and OHTTP relay connections
         ...(process.env.PUBLIC_URL ? [process.env.PUBLIC_URL.replace(/^http/, 'ws')] : []),
       ].filter(Boolean),
@@ -240,8 +249,11 @@ app.use(helmet({
       frameSrc: [
         "'self'", 
         "https://*.youtube.com", 
+        "https://youtube.com",
         "https://*.youtube-nocookie.com", 
-        "https://*.soundcloud.com", 
+        "https://*.soundcloud.com",
+        "https://soundcloud.com",
+        "https://*.sndcdn.com",
         "https://*.figma.com", 
         "https://docs.google.com", 
         "https://drive.google.com"
@@ -258,6 +270,8 @@ app.use(helmet({
     ...(process.env.CSP_REPORT_URI ? { reportUri: process.env.CSP_REPORT_URI } : {}),
   },
   crossOriginEmbedderPolicy: false, // Allow SharedArrayBuffer for WebRTC
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow third-party media assets
+  crossOriginOpenerPolicy: false,    // Allow popups for OAuth/SoundCloud
   // Additional security headers
   hsts: {
     maxAge: 31536000, // 1 year
