@@ -24,11 +24,13 @@ const YT_REGEX = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([
 const FIGMA_REGEX = /figma\.com\/(file|proto|design)\/([a-zA-Z0-9_-]+)/;
 const GDRIVE_REGEX = /drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)([^\s]*)/;
 const DOCS_REGEX = /docs\.google\.com\/(document|spreadsheets|spreadsheet|presentation|forms)\/d\/([a-zA-Z0-9_-]+)(?:\/(?:edit|view))?([^\s]*)/;
+const SOUNDCLOUD_REGEX = /soundcloud\.com\/([a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+)/;
 
 // Security: URL origin whitelist (must match server-side validation)
 const SAFE_YT_ORIGIN = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)\//;
 const SAFE_FIGMA_ORIGIN = /^https?:\/\/(www\.)?figma\.com\//;
 const SAFE_GDRIVE_ORIGIN = /^https?:\/\/(www\.|docs\.|drive\.)?google\.com\//;
+const SAFE_SOUNDCLOUD_ORIGIN = /^https?:\/\/(www\.|w\.|api\.)?soundcloud\.com\//;
 
 /**
  * Validate that a URL is a safe, whitelisted media URL.
@@ -42,6 +44,7 @@ function isSafeMediaUrl(url, type) {
   if (type === 'youtube') return SAFE_YT_ORIGIN.test(url);
   if (type === 'figma') return SAFE_FIGMA_ORIGIN.test(url);
   if (type === 'gdrive' || type === 'docs') return SAFE_GDRIVE_ORIGIN.test(url);
+  if (type === 'soundcloud') return SAFE_SOUNDCLOUD_ORIGIN.test(url);
   return false;
 }
 
@@ -79,6 +82,13 @@ export function detectMediaUrl(text) {
     return { type: 'docs', service: docsMatch[1], id: docsMatch[2], query, url };
   }
 
+  const scMatch = text.match(SOUNDCLOUD_REGEX);
+  if (scMatch) {
+    const url = text.match(/https?:\/\/[^\s]+/)?.[0] || text;
+    if (!isSafeMediaUrl(url, 'soundcloud')) return null;
+    return { type: 'soundcloud', id: scMatch[1], url };
+  }
+
   return null;
 }
 
@@ -100,6 +110,28 @@ function loadYouTubeApi() {
       ytApiLoaded = true;
       ytApiCallbacks.forEach(cb => cb());
       ytApiCallbacks = [];
+    };
+  });
+}
+
+// ─── SoundCloud Widget API loader ─────────────────────────────────────
+let scApiLoaded = false;
+let scApiCallbacks = [];
+
+function loadSoundCloudApi() {
+  return new Promise((resolve) => {
+    if (scApiLoaded && window.SC?.Widget) { resolve(); return; }
+    scApiCallbacks.push(resolve);
+    if (document.querySelector('script[src*="soundcloud.com/player/api.js"]')) return;
+
+    const tag = document.createElement('script');
+    tag.src = 'https://w.soundcloud.com/player/api.js';
+    document.head.appendChild(tag);
+
+    tag.onload = () => {
+      scApiLoaded = true;
+      scApiCallbacks.forEach(cb => cb());
+      scApiCallbacks = [];
     };
   });
 }
@@ -191,6 +223,7 @@ const SingleMediaPlayer = ({
   }, []);
 
   const ytPlayerRef = useRef(null);
+  const scPlayerRef = useRef(null);
   const playerContainerRef = useRef(null);
   const timeUpdateRef = useRef(null);
   const ignoreNextSyncRef = useRef(0);
@@ -210,16 +243,19 @@ const SingleMediaPlayer = ({
   // ─── Playback controls ──────────────────────────────────────────
   const playMedia = useCallback(() => {
     if (ytPlayerRef.current?.playVideo) ytPlayerRef.current.playVideo();
+    if (scPlayerRef.current?.play) scPlayerRef.current.play();
     setIsPlaying(true);
   }, []);
 
   const pauseMedia = useCallback(() => {
     if (ytPlayerRef.current?.pauseVideo) ytPlayerRef.current.pauseVideo();
+    if (scPlayerRef.current?.pause) scPlayerRef.current.pause();
     setIsPlaying(false);
   }, []);
 
   const seekTo = useCallback((time) => {
     if (ytPlayerRef.current?.seekTo) ytPlayerRef.current.seekTo(time, true);
+    if (scPlayerRef.current?.seekTo) scPlayerRef.current.seekTo(time * 1000); // SoundCloud uses ms
     setCurrentTime(time);
   }, []);
 
@@ -230,7 +266,12 @@ const SingleMediaPlayer = ({
       try { ytPlayerRef.current.destroy(); } catch (_) { }
       ytPlayerRef.current = null;
     }
+    if (scPlayerRef.current) {
+      // SC Widget doesn't have a formal destroy, but we can clear the ref
+      scPlayerRef.current = null;
+    }
     ytPlayerRef.current = null;
+    scPlayerRef.current = null;
   }, []);
 
   // ─── Encrypted emit helper (scoped: includes mediaId) ───────────
@@ -297,7 +338,8 @@ const SingleMediaPlayer = ({
       const trySync = () => {
         attempts++;
         const yt = ytPlayerRef.current;
-        if (yt?.seekTo) {
+        const sc = scPlayerRef.current;
+        if (yt?.seekTo || sc?.seekTo) {
           seekTo(data.currentTime);
           if (data.isPlaying) playMedia();
         } else if (attempts < 20) {
@@ -370,6 +412,38 @@ const SingleMediaPlayer = ({
           }
         });
       });
+    } else if (mediaInfo.type === 'soundcloud') {
+      loadSoundCloudApi().then(() => {
+        const iframe = document.getElementById(embedId);
+        if (!iframe) return;
+        
+        // Construct the SoundCloud embed URL if it's just a regular link
+        let embedUrl = mediaInfo.url;
+        if (!embedUrl.includes('w.soundcloud.com/player')) {
+          embedUrl = `https://w.soundcloud.com/player/?url=${encodeURIComponent(mediaInfo.url)}&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false`;
+        }
+        iframe.src = embedUrl;
+
+        const widget = window.SC.Widget(iframe);
+        scPlayerRef.current = widget;
+
+        widget.bind(window.SC.Widget.Events.READY, () => {
+          widget.getDuration((ms) => setDuration(ms / 1000));
+          widget.setVolume(volume);
+          
+          clearInterval(timeUpdateRef.current);
+          timeUpdateRef.current = setInterval(() => {
+            widget.getPosition((ms) => setCurrentTime(ms / 1000));
+          }, 500);
+        });
+
+        widget.bind(window.SC.Widget.Events.PLAY, () => setIsPlaying(true));
+        widget.bind(window.SC.Widget.Events.PAUSE, () => setIsPlaying(false));
+        widget.bind(window.SC.Widget.Events.FINISH, () => {
+          setIsPlaying(false);
+          setCurrentTime(0);
+        });
+      });
     } else if (mediaInfo.type === 'figma') {
       const iframe = document.getElementById(embedId);
       if (iframe) {
@@ -411,7 +485,7 @@ const SingleMediaPlayer = ({
   useEffect(() => {
     const v = isMuted ? 0 : volume;
     if (ytPlayerRef.current?.setVolume) ytPlayerRef.current.setVolume(v);
-    if (ytPlayerRef.current?.setVolume) ytPlayerRef.current.setVolume(v);
+    if (scPlayerRef.current?.setVolume) scPlayerRef.current.setVolume(v);
   }, [volume, isMuted]);
 
   // ─── Now Playing ────────────────────────────────────────────────
@@ -430,7 +504,10 @@ const SingleMediaPlayer = ({
     };
 
     if (mediaInfo && isPlaying) {
-      const title = mediaInfo.type === 'youtube' ? 'YouTube video' : 'Media content';
+      let title = 'Media content';
+      if (mediaInfo.type === 'youtube') title = 'YouTube video';
+      else if (mediaInfo.type === 'soundcloud') title = 'SoundCloud track';
+      
       const nowPlaying = {
         title: mediaInfo.sharedBy ? `${title} (via ${mediaInfo.sharedBy})` : title,
         artist: 'Watch Party',
@@ -560,6 +637,7 @@ const SingleMediaPlayer = ({
             <div className="flex-1 min-w-0">
               <p className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate">
                 {mediaInfo.type === 'youtube' ? '▶ YouTube Video' :
+                    mediaInfo.type === 'soundcloud' ? '🎵 SoundCloud' :
                     mediaInfo.type === 'figma' ? '🎨 Figma' : '📄 Doc Viewer'}
               </p>
               <div className="flex items-center gap-2 mt-0.5">
@@ -596,7 +674,7 @@ const SingleMediaPlayer = ({
             }}
           >
             {/* Unique embed ID per card */}
-            {mediaInfo.type === 'youtube' ? (
+            {mediaInfo.type === 'youtube' || mediaInfo.type === 'soundcloud' ? (
               <div id={embedId} className="w-full h-full" />
             ) : (
               <iframe
@@ -610,8 +688,8 @@ const SingleMediaPlayer = ({
               />
             )}
 
-            {/* Click overlay — play/pause on click (ONLY FOR VIDEO TYPES) */}
-            {mediaInfo.type === 'youtube' && (
+            {/* Click overlay — play/pause on click (ONLY FOR VIDEO/AUDIO TYPES) */}
+            {(mediaInfo.type === 'youtube' || mediaInfo.type === 'soundcloud') && (
               <div
                 className="absolute inset-0 z-10 cursor-pointer"
                 onClick={(e) => { e.stopPropagation(); handlePlayPause(); }}
@@ -624,8 +702,8 @@ const SingleMediaPlayer = ({
               </div>
             )}
 
-            {/* Bottom controls bar (ONLY FOR VIDEO TYPES) */}
-            {mediaInfo.type === 'youtube' && (
+            {/* Bottom controls bar (ONLY FOR VIDEO/AUDIO TYPES) */}
+            {(mediaInfo.type === 'youtube' || mediaInfo.type === 'soundcloud') && (
               <div
                 className={`absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 pt-6 pb-2 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                 onClick={(e) => e.stopPropagation()}
@@ -745,7 +823,7 @@ const SharedMediaPlayer = ({
         }
 
         const type = typeof parsed.type === 'string' ? parsed.type : '';
-        if (['youtube', 'figma', 'gdrive', 'docs'].indexOf(type) === -1) continue;
+        if (['youtube', 'figma', 'gdrive', 'docs', 'soundcloud'].indexOf(type) === -1) continue;
         if (!isSafeMediaUrl(parsed.url, type)) continue;
         if (type === 'youtube' && (!parsed.id || !/^[a-zA-Z0-9_-]{11}$/.test(parsed.id))) continue;
 
@@ -788,7 +866,7 @@ const SharedMediaPlayer = ({
       }
 
       const type = typeof parsed.type === 'string' ? parsed.type : '';
-      if (['youtube', 'figma', 'gdrive', 'docs'].indexOf(type) === -1) return;
+      if (['youtube', 'figma', 'gdrive', 'docs', 'soundcloud'].indexOf(type) === -1) return;
       if (!isSafeMediaUrl(parsed.url, type)) return;
       if (type === 'youtube' && (!parsed.id || !/^[a-zA-Z0-9_-]{11}$/.test(parsed.id))) return;
 

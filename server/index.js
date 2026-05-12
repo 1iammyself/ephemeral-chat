@@ -222,7 +222,9 @@ app.use(helmet({
         "'unsafe-eval'", 
         "https://*.youtube.com", 
         "https://youtube.com",
-        "https://*.ytimg.com"
+        "https://*.ytimg.com",
+        "https://*.soundcloud.com",
+        "https://w.soundcloud.com"
       ],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
@@ -233,6 +235,8 @@ app.use(helmet({
         "https://*.youtube.com",
         "https://youtube.com",
         "https://*.ytimg.com",
+        "https://*.soundcloud.com",
+        "https://*.sndcdn.com",
         // Allow socket.io and OHTTP relay connections
         ...(process.env.PUBLIC_URL ? [process.env.PUBLIC_URL.replace(/^http/, 'ws')] : []),
       ].filter(Boolean),
@@ -246,7 +250,8 @@ app.use(helmet({
         "https://*.youtube-nocookie.com",
         "https://*.figma.com", 
         "https://docs.google.com", 
-        "https://drive.google.com"
+        "https://drive.google.com",
+        "https://w.soundcloud.com"
       ],
       frameAncestors: ["'none'"],       // Stronger clickjacking protection than X-Frame-Options
       objectSrc: ["'none'"],
@@ -3678,12 +3683,13 @@ io.on('connection', (socket) => {
   });
 
   // ─── Watch Party (synchronized media sharing) ────────────────────────────
-  const SAFE_MEDIA_TYPES_WP = new Set(['youtube', 'figma', 'gdrive', 'docs']);
+  const SAFE_MEDIA_TYPES_WP = new Set(['youtube', 'figma', 'gdrive', 'docs', 'soundcloud']);
   const SAFE_MEDIA_ORIGINS_WP = {
     youtube: /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)\//,
     figma: /^https?:\/\/(www\.)?figma\.com\//,
     gdrive: /^https?:\/\/(www\.|docs\.|drive\.)?google\.com\//,
     docs: /^https?:\/\/(www\.|docs\.|drive\.)?google\.com\//,
+    soundcloud: /^https?:\/\/(www\.|w\.|api\.)?soundcloud\.com\//,
   };
 
   socket.on('media-share', (data) => {

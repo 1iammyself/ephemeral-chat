@@ -13,6 +13,8 @@ const config: CapacitorConfig = {
     allowNavigation: [
       'https://*.youtube.com',
       'https://*.youtube-nocookie.com',
+      'https://*.soundcloud.com',
+      'https://*.sndcdn.com',
     ]
   },
   android: {
