@@ -3,7 +3,7 @@ import { Trophy, Swords } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getVibeById } from '../utils/vibes';
 
-const ChessMessage = ({ message, currentUser, onJoin, onLaunch, onDelete, roomVibe }) => {
+const ChessMessage = ({ message, currentUser, onJoin, onLaunch, onDelete, roomVibe, isHost }) => {
   const { gameData } = message;
   const currentUserId = currentUser?.id || currentUser?.socketId;
   const currentNickname = currentUser?.nickname;
@@ -157,8 +157,8 @@ const ChessMessage = ({ message, currentUser, onJoin, onLaunch, onDelete, roomVi
           </button>
         )}
 
-        {/* Delete (sender only) */}
-        {isSender && !gameData.winner && (
+        {/* Delete (sender or host) */}
+        {(isSender || isHost) && !gameData.winner && (
           <button
             onClick={() => onDelete(message.id)}
             className="text-[10px] font-bold text-rose-400 hover:text-rose-500 transition-colors uppercase tracking-widest mt-1"

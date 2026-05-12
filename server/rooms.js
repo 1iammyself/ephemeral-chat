@@ -529,16 +529,28 @@ class RoomManager {
    */
   async removeMessage(roomCode, messageId) {
     const room = await this.getRoom(roomCode);
-    if (!room || !room.messages) return false;
+    if (!room) return false;
 
-    const originalLen = room.messages.length;
-    room.messages = room.messages.filter(m => m.id !== messageId);
+    let removed = false;
 
-    if (room.messages.length !== originalLen) {
-      await this.saveRoom(roomCode, room);
-      return true;
+    // 1. Try to remove from Redis if enabled
+    if (this.redis) {
+      const messageKey = `message:${roomCode}:${messageId}`;
+      const delCount = await this.redis.del(messageKey);
+      if (delCount > 0) removed = true;
     }
-    return false;
+
+    // 2. Always check/remove from the room's message array (fallback or non-TTL messages)
+    if (room.messages && Array.isArray(room.messages)) {
+      const originalLen = room.messages.length;
+      room.messages = room.messages.filter(m => m.id !== messageId);
+      if (room.messages.length !== originalLen) {
+        await this.saveRoom(roomCode, room);
+        removed = true;
+      }
+    }
+
+    return removed;
   }
 
   /**

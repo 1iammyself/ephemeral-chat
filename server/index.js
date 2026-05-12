@@ -220,10 +220,10 @@ app.use(helmet({
         "'self'", 
         "'unsafe-inline'",
         "'unsafe-eval'", 
-        "https://www.youtube.com", 
-        "https://s.ytimg.com", 
-        "https://w.soundcloud.com",
-        "https://www.soundcloud.com"
+        "https://*.youtube.com", 
+        "https://*.ytimg.com", 
+        "https://*.soundcloud.com",
+        "https://*.sndcdn.com"
       ],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
@@ -2991,11 +2991,14 @@ io.on('connection', (socket) => {
       // Permission check: sender, host, or view-once auto-deletion can delete
       const requesterId = socket.persistentUserId || socket.id;
       const isSender = message.sender.id === requesterId || message.sender.socketId === socket.id || (socket.nickname && message.sender.nickname === socket.nickname);
-      const isRoomHost = (roomData[socket.roomCode] && roomData[socket.roomCode].hostId === socket.id);
+      
+      const room = roomData[socket.roomCode];
+      const userRole = room ? (room.userRoles?.[socket.id] || (room.hostId === socket.id ? 'host' : 'user')) : 'user';
+      const isAuthorizedModerator = (userRole === 'host' || userRole === 'tier1');
 
       let shouldDelete = false;
 
-      if (isSender || isRoomHost) {
+      if (isSender || isAuthorizedModerator) {
         shouldDelete = true;
       } else if (message.isViewOnce) {
         // Ensure the requesting user is marked as having viewed the message
