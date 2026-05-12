@@ -31,7 +31,7 @@ public class MainActivity extends BridgeActivity {
         if (webView != null) {
             WebSettings settings = webView.getSettings();
             settings.setMediaPlaybackRequiresUserGesture(false);
-            // Allow third-party cookies for YouTube/SoundCloud embeds
+            // Allow third-party cookies for YouTube embeds
             android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
         }
     }

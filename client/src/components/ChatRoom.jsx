@@ -122,7 +122,7 @@ const SLASH_COMMANDS = [
   { icon: Clock, label: 'Timer', value: '/timer', desc: 'Start a countdown', adminOnly: true },
   { icon: Activity, label: 'Vibe', value: '/vibe', desc: 'Change room vibe', adminOnly: true },
   { icon: Sparkles, label: 'Hot Seat', value: '/hotSeat', desc: 'Put someone in the hot seat', adminOnly: true },
-  { icon: Activity, label: 'Watch Party', value: '/media', desc: 'Share YouTube/SoundCloud' },
+  { icon: Activity, label: 'Watch Party', value: '/media', desc: 'Share YouTube' },
   { icon: FileText, label: 'Stego', value: '/stego', desc: 'Hide a secret in a photo' },
   { icon: Code2, label: 'Code Share', value: '/code', desc: 'Collaborative code editor' },
   { icon: Trophy, label: 'Chess', value: '/chess', desc: 'Start a chess match' },
@@ -2094,7 +2094,7 @@ const ChatRoom = () => {
             if (detected) {
               socketManager.emit('media-share', { roomCode, type: detected.type, id: detected.id || null, url: detected.url, sharedBy: currentUser?.nickname || 'Someone' });
               setShowMediaPlayer(true);
-            } else setError('Paste a YouTube or SoundCloud URL after /media');
+            } else setError('Paste a YouTube URL after /media');
           } else {
             // No URL provided — open the watch party modal
             setShowWatchPartyModal(true);
@@ -2117,7 +2117,7 @@ const ChatRoom = () => {
       }
     }
 
-    // Auto-detect YouTube/SoundCloud URLs and trigger Watch Party
+    // Auto-detect YouTube URLs and trigger Watch Party
     {
       const detected = detectMediaUrl(newMessage.trim());
       if (detected) {

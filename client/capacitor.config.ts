@@ -9,12 +9,10 @@ const config: CapacitorConfig = {
     // Use the production URL — also enables Android App Links verification
     url: 'https://chat.kyere.me',
     cleartext: false,
-    // Allow YouTube and SoundCloud embeds for Watch Party feature
+    // Allow YouTube embeds for Watch Party feature
     allowNavigation: [
       'https://*.youtube.com',
       'https://*.youtube-nocookie.com',
-      'https://*.soundcloud.com',
-      'https://w.soundcloud.com',
     ]
   },
   android: {

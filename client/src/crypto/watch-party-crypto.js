@@ -22,8 +22,6 @@ const ALLOWED_URL_PREFIXES = [
   'https://www.youtube.com/',
   'https://youtu.be/',
   'https://youtube.com/',
-  'https://soundcloud.com/',
-  'https://www.soundcloud.com/',
 ];
 
 /**
@@ -116,7 +114,7 @@ export function validateMediaUrl(url) {
   );
   if (!allowed) {
     throw new Error(
-      `Media URL not from an allowed provider. Allowed: YouTube, SoundCloud. Got: ${url.slice(0, 50)}`,
+      `Media URL not from an allowed provider. Allowed: YouTube. Got: ${url.slice(0, 50)}`,
     );
   }
 }

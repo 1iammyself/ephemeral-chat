@@ -4,7 +4,7 @@ import { detectMediaUrl } from './SharedMediaPlayer';
 import { getVibeById } from '../utils/vibes';
 
 /**
- * WatchPartyModal — Centered popup for pasting a YouTube/SoundCloud URL
+ * WatchPartyModal — Centered popup for pasting a YouTube URL
  * to start a watch party. Shows validation feedback inline.
  */
 const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default', embedded = false }) => {
@@ -78,7 +78,7 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default', embed
               onChange={(e) => setUrlInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleShare()}
               data-allow-copy="true"
-              placeholder="Paste YouTube or SoundCloud URL..."
+              placeholder="Paste YouTube URL..."
               className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 outline-none min-w-0"
             />
             {urlInput && (
@@ -95,18 +95,15 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default', embed
               style={{ backgroundColor: `${vibeColor}18`, borderColor: `${vibeColor}40` }}
             >
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${detected.type === 'youtube' ? 'bg-red-500/10' :
-                  detected.type === 'soundcloud' ? 'bg-orange-500/10' :
                     detected.type === 'figma' ? 'bg-pink-500/10' : 'bg-blue-500/10'
                 } `}>
                 {detected.type === 'youtube' && <Youtube className="w-4 h-4 text-red-500" />}
-                {detected.type === 'soundcloud' && <Music className="w-4 h-4 text-orange-500" />}
                 {detected.type === 'figma' && <Figma className="w-4 h-4 text-pink-500" />}
                 {(detected.type === 'gdrive' || detected.type === 'docs') && <FileText className="w-4 h-4 text-blue-500" />}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-gray-700 dark:text-gray-200">
                   {detected.type === 'youtube' ? 'YouTube Video' :
-                    detected.type === 'soundcloud' ? 'SoundCloud Track' :
                       detected.type === 'figma' ? 'Figma Project' : 'Document'} detected
                 </p>
                 <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">{urlInput.trim()}</p>
@@ -120,10 +117,6 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default', embed
               <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 hover:text-red-500 transition-colors cursor-default">
                 <Youtube className="w-4 h-4" />
                 <span className="text-[11px] font-medium">YouTube</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 hover:text-orange-500 transition-colors cursor-default">
-                <Music className="w-4 h-4" />
-                <span className="text-[11px] font-medium">SoundCloud</span>
               </div>
               <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 hover:text-pink-500 transition-colors cursor-default">
                 <Figma className="w-4 h-4" />

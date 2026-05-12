@@ -79,7 +79,6 @@ public class NowPlayingPlugin extends Plugin {
                 if (pkg != null) {
                     if (pkg.contains("spotify")) source = "spotify";
                     else if (pkg.contains("youtube")) source = "youtube";
-                    else if (pkg.contains("soundcloud")) source = "soundcloud";
                     else if (pkg.contains("apple.music")) source = "apple-music";
                 }
 
