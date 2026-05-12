@@ -3691,7 +3691,7 @@ io.on('connection', (socket) => {
   const SAFE_MEDIA_TYPES_WP = new Set(['youtube', 'soundcloud', 'figma', 'gdrive', 'docs']);
   const SAFE_MEDIA_ORIGINS_WP = {
     youtube: /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)\//,
-    soundcloud: /^https?:\/\/(www\.|on\.)?soundcloud\.com\//,
+    soundcloud: /^https?:\/\/(www\.)?soundcloud\.com\//,
     figma: /^https?:\/\/(www\.)?figma\.com\//,
     gdrive: /^https?:\/\/(www\.|docs\.|drive\.)?google\.com\//,
     docs: /^https?:\/\/(www\.|docs\.|drive\.)?google\.com\//,

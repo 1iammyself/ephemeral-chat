@@ -21,14 +21,14 @@ import { withJitter } from '../crypto/traffic-padding';
 
 // ─── URL Detection Helpers ────────────────────────────────────────────
 const YT_REGEX = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-const SC_REGEX = /(?:www\.|on\.)?soundcloud\.com\/[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+(?:\/[a-zA-Z0-9._-]+)?/;
+const SC_REGEX = /soundcloud\.com\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+/;
 const FIGMA_REGEX = /figma\.com\/(file|proto|design)\/([a-zA-Z0-9_-]+)/;
 const GDRIVE_REGEX = /drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)([^\s]*)/;
 const DOCS_REGEX = /docs\.google\.com\/(document|spreadsheets|spreadsheet|presentation|forms)\/d\/([a-zA-Z0-9_-]+)(?:\/(?:edit|view))?([^\s]*)/;
 
 // Security: URL origin whitelist (must match server-side validation)
 const SAFE_YT_ORIGIN = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)\//;
-const SAFE_SC_ORIGIN = /^https?:\/\/(www\.|on\.)?soundcloud\.com\//;
+const SAFE_SC_ORIGIN = /^https?:\/\/(www\.)?soundcloud\.com\//;
 const SAFE_FIGMA_ORIGIN = /^https?:\/\/(www\.)?figma\.com\//;
 const SAFE_GDRIVE_ORIGIN = /^https?:\/\/(www\.|docs\.|drive\.)?google\.com\//;
 
@@ -110,31 +110,6 @@ function loadYouTubeApi() {
       ytApiCallbacks.forEach(cb => cb());
       ytApiCallbacks = [];
     };
-  });
-}
-
-// ─── SoundCloud Widget API loader ──────────────────────────────────────
-let scApiLoaded = false;
-let scApiCallbacks = [];
-
-function loadSoundCloudApi() {
-  return new Promise((resolve) => {
-    if (window.SC?.Widget) { scApiLoaded = true; resolve(); return; }
-    scApiCallbacks.push(resolve);
-    if (document.querySelector('script[src*="w.soundcloud.com/player/api.js"]')) return;
-
-    const tag = document.createElement('script');
-    tag.src = 'https://w.soundcloud.com/player/api.js';
-    tag.onload = () => {
-      scApiLoaded = true;
-      const cbs = scApiCallbacks.splice(0);
-      cbs.forEach(cb => cb());
-    };
-    tag.onerror = () => {
-      const cbs = scApiCallbacks.splice(0);
-      cbs.forEach(cb => cb()); // resolve anyway — Widget check handles failure
-    };
-    document.head.appendChild(tag);
   });
 }
 
@@ -409,12 +384,10 @@ const SingleMediaPlayer = ({
         });
       });
     } else if (mediaInfo.type === 'soundcloud') {
-      // Iframe src is already set in JSX — just load the Widget API and bind events.
-      // SC.Widget() buffers commands until the READY event fires internally,
-      // so we don't need to wait for iframe.onload.
-      loadSoundCloudApi().then(() => {
-        const iframe = document.getElementById(embedId);
-        if (!iframe || !window.SC?.Widget) return;
+      const iframe = document.getElementById(embedId);
+      if (!iframe) return;
+      iframe.src = `https://w.soundcloud.com/player/?url=${encodeURIComponent(mediaInfo.url)}&auto_play=false&show_artwork=true&visual=true&color=%236366f1`;
+      iframe.onload = () => {
         const widget = window.SC.Widget(iframe);
         scWidgetRef.current = widget;
         widget.bind(window.SC.Widget.Events.READY, () => {
@@ -429,7 +402,7 @@ const SingleMediaPlayer = ({
           setIsPlaying(false);
           setCurrentTime(0);
         });
-      });
+      };
     } else if (mediaInfo.type === 'figma') {
       const iframe = document.getElementById(embedId);
       if (iframe) {
@@ -660,18 +633,6 @@ const SingleMediaPlayer = ({
             {/* Unique embed ID per card */}
             {mediaInfo.type === 'youtube' ? (
               <div id={embedId} className="w-full h-full" />
-            ) : mediaInfo.type === 'soundcloud' ? (
-              <iframe
-                key={mediaInfo.url}
-                id={embedId}
-                className="w-full h-full"
-                src={`https://w.soundcloud.com/player/?url=${encodeURIComponent(mediaInfo.url)}&auto_play=false&show_artwork=true&visual=false&color=6366f1&buying=false&sharing=false&download=false&show_comments=false&show_user=true&show_reposts=false&show_teaser=false`}
-                scrolling="no"
-                frameBorder="no"
-                allow="autoplay; fullscreen; encrypted-media; clipboard-write"
-                referrerPolicy="strict-origin-when-cross-origin"
-                loading="eager"
-              />
             ) : (
               <iframe
                 id={embedId}
