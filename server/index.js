@@ -216,9 +216,17 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'data:', 'blob:'],
+      scriptSrc: [
+        "'self'", 
+        "'unsafe-inline'",
+        "'unsafe-eval'", 
+        "https://www.youtube.com", 
+        "https://s.ytimg.com", 
+        "https://w.soundcloud.com",
+        "https://www.soundcloud.com"
+      ],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
       connectSrc: [
         "'self'",
         'wss:',
@@ -226,9 +234,18 @@ app.use(helmet({
         // Allow socket.io and OHTTP relay connections
         ...(process.env.PUBLIC_URL ? [process.env.PUBLIC_URL.replace(/^http/, 'ws')] : []),
       ].filter(Boolean),
-      mediaSrc: ["'self'", 'blob:'],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      mediaSrc: ["'self'", 'blob:', 'https:'],
       workerSrc: ["'self'", 'blob:'],
-      frameSrc: ["'none'"],
+      frameSrc: [
+        "'self'", 
+        "https://*.youtube.com", 
+        "https://*.youtube-nocookie.com", 
+        "https://*.soundcloud.com", 
+        "https://*.figma.com", 
+        "https://docs.google.com", 
+        "https://drive.google.com"
+      ],
       frameAncestors: ["'none'"],       // Stronger clickjacking protection than X-Frame-Options
       objectSrc: ["'none'"],
       baseUri: ["'none'"],              // Prevent base tag injection
@@ -247,7 +264,7 @@ app.use(helmet({
     includeSubDomains: true,
     preload: true,
   },
-  referrerPolicy: { policy: 'no-referrer' },
+  referrerPolicy: { policy: 'no-referrer-when-downgrade' },
   permittedCrossDomainPolicies: { permittedPolicies: 'none' },
 }));
 
@@ -3657,7 +3674,7 @@ io.on('connection', (socket) => {
   const SAFE_MEDIA_TYPES_WP = new Set(['youtube', 'soundcloud', 'figma', 'gdrive', 'docs']);
   const SAFE_MEDIA_ORIGINS_WP = {
     youtube: /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)\//,
-    soundcloud: /^https?:\/\/(www\.)?soundcloud\.com\//,
+    soundcloud: /^https?:\/\/(www\.|on\.)?soundcloud\.com\//,
     figma: /^https?:\/\/(www\.)?figma\.com\//,
     gdrive: /^https?:\/\/(www\.|docs\.|drive\.)?google\.com\//,
     docs: /^https?:\/\/(www\.|docs\.|drive\.)?google\.com\//,

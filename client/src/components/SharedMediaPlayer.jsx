@@ -21,7 +21,7 @@ import { withJitter } from '../crypto/traffic-padding';
 
 // ─── URL Detection Helpers ────────────────────────────────────────────
 const YT_REGEX = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-const SC_REGEX = /soundcloud\.com\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+/;
+const SC_REGEX = /(?:www\.|on\.)?soundcloud\.com\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)?/;
 const FIGMA_REGEX = /figma\.com\/(file|proto|design)\/([a-zA-Z0-9_-]+)/;
 const GDRIVE_REGEX = /drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)([^\s]*)/;
 const DOCS_REGEX = /docs\.google\.com\/(document|spreadsheets|spreadsheet|presentation|forms)\/d\/([a-zA-Z0-9_-]+)(?:\/(?:edit|view))?([^\s]*)/;
@@ -662,6 +662,7 @@ const SingleMediaPlayer = ({
               <div id={embedId} className="w-full h-full" />
             ) : mediaInfo.type === 'soundcloud' ? (
               <iframe
+                key={mediaInfo.url}
                 id={embedId}
                 className="w-full h-full"
                 src={`https://w.soundcloud.com/player/?url=${encodeURIComponent(mediaInfo.url)}&auto_play=false&show_artwork=true&visual=true&color=6366f1`}
