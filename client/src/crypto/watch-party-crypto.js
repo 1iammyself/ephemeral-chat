@@ -22,6 +22,8 @@ const ALLOWED_URL_PREFIXES = [
   'https://www.youtube.com/',
   'https://youtu.be/',
   'https://youtube.com/',
+  'https://soundcloud.com/',
+  'https://w.soundcloud.com/',
 ];
 
 /**
