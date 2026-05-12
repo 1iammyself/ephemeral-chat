@@ -674,16 +674,16 @@ const SingleMediaPlayer = ({
             }}
           >
             {/* Unique embed ID per card */}
-            {mediaInfo.type === 'youtube' || mediaInfo.type === 'soundcloud' ? (
+            {mediaInfo.type === 'youtube' ? (
               <div id={embedId} className="w-full h-full" />
             ) : (
               <iframe
                 id={embedId}
                 className="w-full h-full"
-                scrolling={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs' || mediaInfo.type === 'figma') ? 'yes' : 'no'}
+                scrolling={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs' || mediaInfo.type === 'figma' || mediaInfo.type === 'soundcloud') ? 'yes' : 'no'}
                 frameBorder="no"
                 allow="autoplay; fullscreen"
-                sandbox={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs' || mediaInfo.type === 'figma') ? undefined : "allow-scripts allow-same-origin allow-popups allow-forms"}
+                sandbox={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs' || mediaInfo.type === 'figma' || mediaInfo.type === 'soundcloud') ? undefined : "allow-scripts allow-same-origin allow-popups allow-forms"}
                 referrerPolicy="strict-origin-when-cross-origin"
               />
             )}
