@@ -409,26 +409,38 @@ const SingleMediaPlayer = ({
         });
       });
     } else if (mediaInfo.type === 'soundcloud') {
+      const embedUrl = `https://w.soundcloud.com/player/?url=${encodeURIComponent(mediaInfo.url)}&auto_play=false&visual=true&color=%236366f1`;
       loadSoundCloudApi().then(() => {
-        const iframe = document.getElementById(embedId);
-        if (!iframe || !window.SC?.Widget) return;
-        iframe.src = `https://w.soundcloud.com/player/?url=${encodeURIComponent(mediaInfo.url)}&auto_play=false&show_artwork=true&visual=true&color=%236366f1`;
-        iframe.onload = () => {
-          const widget = window.SC.Widget(iframe);
-          scWidgetRef.current = widget;
-          widget.bind(window.SC.Widget.Events.READY, () => {
-            widget.getDuration((d) => setDuration(d / 1000));
-          });
-          widget.bind(window.SC.Widget.Events.PLAY, () => setIsPlaying(true));
-          widget.bind(window.SC.Widget.Events.PAUSE, () => setIsPlaying(false));
-          widget.bind(window.SC.Widget.Events.PLAY_PROGRESS, (e) => {
-            setCurrentTime(e.currentPosition / 1000);
-          });
-          widget.bind(window.SC.Widget.Events.FINISH, () => {
-            setIsPlaying(false);
-            setCurrentTime(0);
-          });
-        };
+        requestAnimationFrame(() => {
+          const iframe = document.getElementById(embedId);
+          if (!iframe) return;
+          if (iframe.src !== embedUrl) iframe.src = embedUrl;
+
+          const tryBind = (retries = 20) => {
+            try {
+              const widget = window.SC.Widget(iframe);
+              scWidgetRef.current = widget;
+              widget.bind(window.SC.Widget.Events.READY, () => {
+                widget.getDuration((d) => setDuration(d / 1000));
+              });
+              widget.bind(window.SC.Widget.Events.PLAY, () => setIsPlaying(true));
+              widget.bind(window.SC.Widget.Events.PAUSE, () => setIsPlaying(false));
+              widget.bind(window.SC.Widget.Events.PLAY_PROGRESS, (e) => {
+                setCurrentTime(e.currentPosition / 1000);
+              });
+              widget.bind(window.SC.Widget.Events.FINISH, () => {
+                setIsPlaying(false);
+                setCurrentTime(0);
+              });
+            } catch (err) {
+              if (retries > 0) {
+                setTimeout(() => tryBind(retries - 1), 250);
+              }
+            }
+          };
+
+          tryBind();
+        });
       });
     } else if (mediaInfo.type === 'figma') {
       const iframe = document.getElementById(embedId);
@@ -660,6 +672,16 @@ const SingleMediaPlayer = ({
             {/* Unique embed ID per card */}
             {mediaInfo.type === 'youtube' ? (
               <div id={embedId} className="w-full h-full" />
+            ) : mediaInfo.type === 'soundcloud' ? (
+              <iframe
+                id={embedId}
+                className="w-full h-full"
+                scrolling="no"
+                frameBorder="no"
+                allow="autoplay; fullscreen; encrypted-media; clipboard-write"
+                referrerPolicy="strict-origin-when-cross-origin"
+                loading="eager"
+              />
             ) : (
               <iframe
                 id={embedId}
