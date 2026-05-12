@@ -415,15 +415,8 @@ const SingleMediaPlayer = ({
     } else if (mediaInfo.type === 'soundcloud') {
       loadSoundCloudApi().then(() => {
         const iframe = document.getElementById(embedId);
-        if (!iframe) return;
+        if (!iframe || scPlayerRef.current) return;
         
-        // Construct the SoundCloud embed URL if it's just a regular link
-        let embedUrl = mediaInfo.url;
-        if (!embedUrl.includes('w.soundcloud.com/player')) {
-          embedUrl = `https://w.soundcloud.com/player/?url=${encodeURIComponent(mediaInfo.url)}&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false`;
-        }
-        iframe.src = embedUrl;
-
         const widget = window.SC.Widget(iframe);
         scPlayerRef.current = widget;
 
@@ -680,10 +673,13 @@ const SingleMediaPlayer = ({
               <iframe
                 id={embedId}
                 className="w-full h-full"
-                scrolling={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs' || mediaInfo.type === 'figma' || mediaInfo.type === 'soundcloud') ? 'yes' : 'no'}
+                src={mediaInfo.type === 'soundcloud' && !mediaInfo.url.includes('w.soundcloud.com/player')
+                  ? `https://w.soundcloud.com/player/?url=${encodeURIComponent(mediaInfo.url)}&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false`
+                  : mediaInfo.url}
+                scrolling={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs' || mediaInfo.type === 'figma') ? 'yes' : 'no'}
                 frameBorder="no"
                 allow="autoplay; fullscreen"
-                sandbox={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs' || mediaInfo.type === 'figma' || mediaInfo.type === 'soundcloud') ? undefined : "allow-scripts allow-same-origin allow-popups allow-forms"}
+                sandbox={(mediaInfo.type === 'gdrive' || mediaInfo.type === 'docs' || mediaInfo.type === 'figma') ? undefined : "allow-scripts allow-same-origin allow-popups allow-forms"}
                 referrerPolicy="strict-origin-when-cross-origin"
               />
             )}
