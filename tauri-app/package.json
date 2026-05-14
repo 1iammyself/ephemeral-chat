@@ -1,0 +1,14 @@
+{
+  "name": "ephemeral-chat-tauri",
+  "version": "1.2.0",
+  "description": "Ephemeral Chat - Tauri Desktop",
+  "scripts": {
+    "dev": "cargo tauri dev",
+    "build": "cargo tauri build",
+    "build:debug": "cargo tauri build --debug",
+    "tauri": "cargo tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.tauri.app/config/2.json",
+  "productName": "Ephemeral Chat",
+  "version": "1.2.0",
+  "identifier": "me.kyere.chat",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "https://chat.kyere.me"
+  },
+  "app": {
+    "security": {
+      "csp": null
+    },
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true,
+      "menuOnLeftClick": false
+    },
+    "withGlobalTauri": true
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.ico",
+      "icons/icon.png",
+      "icons/icon.icns"
+    ],
+    "publisher": "Caleb Kwabena Kyere Boateng",
+    "category": "SocialNetworking",
+    "shortDescription": "Private, temporary chat rooms",
+    "longDescription": "Secure, temporary chat rooms that vanish when you are done. No accounts. No history. Just conversation.",
+    "fileAssociations": [
+      {
+        "ext": ["eph"],
+        "name": "Ephemeral Drop",
+        "description": "Ephemeral Drop Auth Packet",
+        "mimeType": "application/x-ephemeral-drop",
+        "role": "Viewer"
+      }
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
+}

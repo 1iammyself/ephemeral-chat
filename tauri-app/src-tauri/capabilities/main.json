@@ -1,0 +1,38 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-capability",
+  "description": "Ephemeral Chat main window capabilities",
+  "windows": ["main"],
+  "remote": {
+    "urls": ["https://chat.kyere.me/**", "https://chat.kyere.me"]
+  },
+  "permissions": [
+    "core:default",
+    "core:window:default",
+    "core:app:default",
+    "shell:allow-open",
+    "opener:default",
+    "opener:allow-open-url",
+    "opener:allow-open-path",
+    "notification:default",
+    "notification:allow-notify",
+    "store:allow-get",
+    "store:allow-set",
+    "store:allow-save",
+    "store:allow-load",
+    "dialog:allow-message",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "fs:default",
+    "fs:allow-app-read-recursive",
+    "fs:allow-app-write-recursive",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+    "global-shortcut:allow-is-registered",
+    "window-state:allow-restore-state",
+    "window-state:allow-save-window-state",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled"
+  ]
+}
