@@ -87,7 +87,7 @@ function ThemeSelector() {
   );
 }
 
-function GeneralSettings({ settings, updateSetting, version }) {
+function GeneralSettings({ settings, updateSetting, version, onCheckForUpdates, updateStatus }) {
   const [autostartEnabled, setAutostartEnabled] = useState(false);
 
   useEffect(() => {
@@ -267,14 +267,30 @@ function GeneralSettings({ settings, updateSetting, version }) {
           <>
             <SettingRow
               icon={ExternalLink}
-              label="View on GitHub"
-              onClick={() => API?.openUrlExternal?.('https://github.com/cLLeB/ephemeral-chat')}
+              label="Visit Website"
+              description="ephchat.kyere.me"
+              onClick={() => API?.openUrlExternal?.('https://ephchat.kyere.me')}
+            />
+            <SettingRow
+              icon={Info}
+              label="Third Party Licenses"
+              onClick={() => API?.openUrlExternal?.('https://ephchat.kyere.me')}
             />
             <SettingRow
               icon={RefreshCw}
               label="Check for Updates"
-              onClick={() => API?.checkForUpdates?.()}
-            />
+              onClick={onCheckForUpdates}
+            >
+              {updateStatus === 'checking' && (
+                <span className="text-xs text-gray-400 animate-pulse">Checking…</span>
+              )}
+              {updateStatus === 'up-to-date' && (
+                <span className="text-xs text-teal-500 font-medium">Up to date ✓</span>
+              )}
+              {updateStatus === 'available' && (
+                <span className="text-xs text-amber-500 font-medium">Update available</span>
+              )}
+            </SettingRow>
           </>
         )}
       </Section>
@@ -344,6 +360,7 @@ export default function SettingsModal({ isOpen, onClose, initialTab = 'general' 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [settings, setSettings] = useState(null);
   const [version, setVersion] = useState('');
+  const [updateStatus, setUpdateStatus] = useState(null); // null | 'checking' | 'up-to-date' | 'available'
 
   useEffect(() => {
     if (isOpen) setActiveTab(initialTab);
@@ -357,6 +374,7 @@ export default function SettingsModal({ isOpen, onClose, initialTab = 'general' 
     API.getVersion?.()
       .then(v => setVersion(v))
       .catch(() => {});
+    setUpdateStatus(null);
   }, [isOpen]);
 
   // Open settings when triggered from tray
@@ -368,10 +386,31 @@ export default function SettingsModal({ isOpen, onClose, initialTab = 'general' 
     });
   }, [onClose]);
 
+  // Sync settings state when tray (or another source) changes a setting
+  useEffect(() => {
+    if (!isDesktop() || !API.onSettingsChanged) return;
+    API.onSettingsChanged((payload) => {
+      if (!payload) return;
+      const { key, value } = payload;
+      setSettings(prev => prev ? { ...prev, [key]: value } : prev);
+    });
+  }, []);
+
   const updateSetting = useCallback((key, value) => {
     setSettings(prev => ({ ...(prev ?? {}), [key]: value }));
     if (isDesktop()) {
       API.setSetting?.(key, value).catch?.(() => {});
+    }
+  }, []);
+
+  const handleCheckForUpdates = useCallback(async () => {
+    setUpdateStatus('checking');
+    try {
+      await API?.checkForUpdates?.();
+      // Backend emits update-available or update-not-available; default to up-to-date
+      setTimeout(() => setUpdateStatus(s => s === 'checking' ? 'up-to-date' : s), 3000);
+    } catch {
+      setUpdateStatus('up-to-date');
     }
   }, []);
 
@@ -435,6 +474,8 @@ export default function SettingsModal({ isOpen, onClose, initialTab = 'general' 
               settings={settings}
               updateSetting={updateSetting}
               version={version}
+              onCheckForUpdates={handleCheckForUpdates}
+              updateStatus={updateStatus}
             />
           ) : (
             <ChatSettings />

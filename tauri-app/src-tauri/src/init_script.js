@@ -66,6 +66,9 @@
     listenEvent('lock-app', function () {
       if (_handlers['lock-app']) _handlers['lock-app']();
     });
+    listenEvent('settings-changed', function (e) {
+      if (_handlers['settings-changed']) _handlers['settings-changed'](e.payload);
+    });
     listenEvent('update-available', function (e) {
       if (_handlers['update-available']) _handlers['update-available'](e.payload);
     });
@@ -133,6 +136,7 @@
     onOpenSettings: function (cb) { _handlers['open-settings'] = cb; },
     onCheckForUpdatesMenu: function (cb) { _handlers['check-for-updates-menu'] = cb; },
     onLockApp: function (cb) { _handlers['lock-app'] = cb; },
+    onSettingsChanged: function (cb) { _handlers['settings-changed'] = cb; },
 
     // ── Window management ─────────────────────────────────────────────────
     reload: function () { return invoke('window_reload'); },

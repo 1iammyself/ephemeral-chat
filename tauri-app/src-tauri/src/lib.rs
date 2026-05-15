@@ -8,7 +8,7 @@ use mdns::MdnsManager;
 use tauri::{
     menu::{CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, SubmenuBuilder},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Emitter, Manager, WebviewUrl, WebviewWindowBuilder,
+    Emitter, Listener, Manager, WebviewUrl, WebviewWindowBuilder,
 };
 
 const CHAT_URL: &str = "https://chat.kyere.me";
@@ -118,17 +118,38 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         let _ = win.set_always_on_top(true);
     }
 
-    // Intercept close → hide to tray
+    // Intercept close → hide to tray; minimize → hide to tray
     win.on_window_event({
         let handle = app.handle().clone();
         move |event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                use tauri_plugin_window_state::AppHandleExt;
-                let _ = handle.save_window_state(tauri_plugin_window_state::StateFlags::all());
-                api.prevent_close();
-                if let Some(win) = handle.get_webview_window("main") {
-                    let _ = win.hide();
+            match event {
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    use tauri_plugin_window_state::AppHandleExt;
+                    let _ = handle.save_window_state(tauri_plugin_window_state::StateFlags::all());
+                    api.prevent_close();
+                    if let Some(w) = handle.get_webview_window("main") {
+                        let _ = w.hide();
+                    }
                 }
+                tauri::WindowEvent::Focused(false) => {
+                    let h = handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        tokio::time::sleep(tokio::time::Duration::from_millis(80)).await;
+                        if let Some(w) = h.get_webview_window("main") {
+                            if w.is_minimized().unwrap_or(false) {
+                                if store_get_bool(&h, "minimizeToTray", true) {
+                                    let _ = w.hide();
+                                }
+                                if store_get_bool(&h, "biometricLockEnabled", false)
+                                    && store_get_i64(&h, "lockDelay", 5) == 0
+                                {
+                                    let _ = h.emit("lock-app", ());
+                                }
+                            }
+                        }
+                    });
+                }
+                _ => {}
             }
         }
     });
@@ -214,27 +235,27 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let h = app.handle().clone();
 
     // Initial setting values
-    let aot_val       = store_get_bool(&h, "alwaysOnTop", false);
-    let start_min_val = store_get_bool(&h, "startMinimized", false);
-    let start_boot_val= store_get_bool(&h, "startOnBoot", false);
-    let notifs_val    = store_get_bool(&h, "notificationsEnabled", true);
-    let sound_val     = store_get_bool(&h, "soundEnabled", true);
-    let biometric_val = store_get_bool(&h, "biometricLockEnabled", false);
-    let sec_mode      = store_get_str(&h, "securityMode", "high");
-    let lock_delay    = store_get_i64(&h, "lockDelay", 5);
+    let aot_val        = store_get_bool(&h, "alwaysOnTop", false);
+    let start_min_val  = store_get_bool(&h, "startMinimized", false);
+    let start_boot_val = store_get_bool(&h, "startOnBoot", false);
+    let notifs_val     = store_get_bool(&h, "notificationsEnabled", true);
+    let sound_val      = store_get_bool(&h, "soundEnabled", true);
+    let biometric_val  = store_get_bool(&h, "biometricLockEnabled", false);
+    let sec_mode       = store_get_str(&h, "securityMode", "high");
+    let lock_delay     = store_get_i64(&h, "lockDelay", 5);
 
     // ── Basic items ──
-    let show      = MenuItemBuilder::with_id("tray_show",     "Open Ephemeral Chat").build(app)?;
-    let lock_now  = MenuItemBuilder::with_id("tray_lock_now", "Lock App Now").build(app)?;
-    let new_room  = MenuItemBuilder::with_id("tray_new_room", "Create New Room").build(app)?;
+    let show     = MenuItemBuilder::with_id("tray_show",     "Open Ephemeral Chat").build(app)?;
+    let lock_now = MenuItemBuilder::with_id("tray_lock_now", "Lock App Now").build(app)?;
+    let new_room = MenuItemBuilder::with_id("tray_new_room", "Create New Room").build(app)?;
 
     // ── Checkbox items ──
-    let aot       = CheckMenuItemBuilder::with_id("tray_aot",        "Always on Top").checked(aot_val).build(app)?;
-    let start_min = CheckMenuItemBuilder::with_id("tray_start_min",  "Start Minimized").checked(start_min_val).build(app)?;
-    let start_boot= CheckMenuItemBuilder::with_id("tray_start_boot", "Start with Windows").checked(start_boot_val).build(app)?;
-    let notifs    = CheckMenuItemBuilder::with_id("tray_notifs",     "Notifications").checked(notifs_val).build(app)?;
-    let sound     = CheckMenuItemBuilder::with_id("tray_sound",      "Sound").checked(sound_val).build(app)?;
-    let biometric = CheckMenuItemBuilder::with_id("tray_biometric",  "Biometric Lock").checked(biometric_val).build(app)?;
+    let aot        = CheckMenuItemBuilder::with_id("tray_aot",        "Always on Top").checked(aot_val).build(app)?;
+    let start_min  = CheckMenuItemBuilder::with_id("tray_start_min",  "Start Minimized").checked(start_min_val).build(app)?;
+    let start_boot = CheckMenuItemBuilder::with_id("tray_start_boot", "Start with Windows").checked(start_boot_val).build(app)?;
+    let notifs     = CheckMenuItemBuilder::with_id("tray_notifs",     "Notifications").checked(notifs_val).build(app)?;
+    let sound      = CheckMenuItemBuilder::with_id("tray_sound",      "Sound").checked(sound_val).build(app)?;
+    let biometric  = CheckMenuItemBuilder::with_id("tray_biometric",  "Biometric Lock").checked(biometric_val).build(app)?;
 
     // ── Security Mode submenu (simulated radio) ──
     let sec_high   = CheckMenuItemBuilder::with_id("tray_sec_high",   "High (Recommended)").checked(sec_mode == "high").build(app)?;
@@ -256,12 +277,21 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let check_upd    = MenuItemBuilder::with_id("tray_check_updates", "Check for Updates").build(app)?;
     let quit         = MenuItemBuilder::with_id("tray_quit",          "Quit").build(app)?;
 
-    // ── Clones captured by event closure ──
+    // ── Clones for on_menu_event closure ──
     let (aot_c, start_min_c, start_boot_c, notifs_c, sound_c, biometric_c) = (
         aot.clone(), start_min.clone(), start_boot.clone(), notifs.clone(), sound.clone(), biometric.clone(),
     );
     let (sec_high_c, sec_medium_c, sec_low_c) = (sec_high.clone(), sec_medium.clone(), sec_low.clone());
     let (delay_imm_c, delay_1m_c, delay_5m_c, delay_10m_c, delay_30m_c) = (
+        delay_imm.clone(), delay_1m.clone(), delay_5m.clone(), delay_10m.clone(), delay_30m.clone(),
+    );
+
+    // ── Clones for settings-changed → tray sync listener ──
+    let (aot_l, start_min_l, start_boot_l, notifs_l, sound_l, biometric_l) = (
+        aot.clone(), start_min.clone(), start_boot.clone(), notifs.clone(), sound.clone(), biometric.clone(),
+    );
+    let (sec_high_l, sec_medium_l, sec_low_l) = (sec_high.clone(), sec_medium.clone(), sec_low.clone());
+    let (delay_imm_l, delay_1m_l, delay_5m_l, delay_10m_l, delay_30m_l) = (
         delay_imm.clone(), delay_1m.clone(), delay_5m.clone(), delay_10m.clone(), delay_30m.clone(),
     );
 
@@ -313,11 +343,13 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     if let Some(win) = app.get_webview_window("main") {
                         let _ = win.set_always_on_top(v);
                     }
+                    let _ = app.emit("settings-changed", serde_json::json!({"key":"alwaysOnTop","value":v}));
                 }
                 "tray_start_min" => {
                     let v = !store_get_bool(app, "startMinimized", false);
                     let _ = start_min_c.set_checked(v);
                     store_set_bool(app, "startMinimized", v);
+                    let _ = app.emit("settings-changed", serde_json::json!({"key":"startMinimized","value":v}));
                 }
                 "tray_start_boot" => {
                     let v = !store_get_bool(app, "startOnBoot", false);
@@ -326,16 +358,19 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     use tauri_plugin_autostart::ManagerExt;
                     if v { let _ = app.autolaunch().enable(); }
                     else { let _ = app.autolaunch().disable(); }
+                    let _ = app.emit("settings-changed", serde_json::json!({"key":"startOnBoot","value":v}));
                 }
                 "tray_notifs" => {
                     let v = !store_get_bool(app, "notificationsEnabled", true);
                     let _ = notifs_c.set_checked(v);
                     store_set_bool(app, "notificationsEnabled", v);
+                    let _ = app.emit("settings-changed", serde_json::json!({"key":"notificationsEnabled","value":v}));
                 }
                 "tray_sound" => {
                     let v = !store_get_bool(app, "soundEnabled", true);
                     let _ = sound_c.set_checked(v);
                     store_set_bool(app, "soundEnabled", v);
+                    let _ = app.emit("settings-changed", serde_json::json!({"key":"soundEnabled","value":v}));
                 }
 
                 // ── Security Mode (radio simulation) ──
@@ -344,27 +379,24 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     let _ = sec_medium_c.set_checked(false);
                     let _ = sec_low_c.set_checked(false);
                     store_set_str(app, "securityMode", "high");
-                    if let Some(win) = app.get_webview_window("main") {
-                        let _ = win.set_content_protected(true);
-                    }
+                    if let Some(win) = app.get_webview_window("main") { let _ = win.set_content_protected(true); }
+                    let _ = app.emit("settings-changed", serde_json::json!({"key":"securityMode","value":"high"}));
                 }
                 "tray_sec_medium" => {
                     let _ = sec_high_c.set_checked(false);
                     let _ = sec_medium_c.set_checked(true);
                     let _ = sec_low_c.set_checked(false);
                     store_set_str(app, "securityMode", "medium");
-                    if let Some(win) = app.get_webview_window("main") {
-                        let _ = win.set_content_protected(true);
-                    }
+                    if let Some(win) = app.get_webview_window("main") { let _ = win.set_content_protected(true); }
+                    let _ = app.emit("settings-changed", serde_json::json!({"key":"securityMode","value":"medium"}));
                 }
                 "tray_sec_low" => {
                     let _ = sec_high_c.set_checked(false);
                     let _ = sec_medium_c.set_checked(false);
                     let _ = sec_low_c.set_checked(true);
                     store_set_str(app, "securityMode", "low");
-                    if let Some(win) = app.get_webview_window("main") {
-                        let _ = win.set_content_protected(false);
-                    }
+                    if let Some(win) = app.get_webview_window("main") { let _ = win.set_content_protected(false); }
+                    let _ = app.emit("settings-changed", serde_json::json!({"key":"securityMode","value":"low"}));
                 }
 
                 // ── Biometric Lock ──
@@ -372,6 +404,7 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     let v = !store_get_bool(app, "biometricLockEnabled", false);
                     let _ = biometric_c.set_checked(v);
                     store_set_bool(app, "biometricLockEnabled", v);
+                    let _ = app.emit("settings-changed", serde_json::json!({"key":"biometricLockEnabled","value":v}));
                 }
 
                 // ── Lock Delay (radio simulation) ──
@@ -382,6 +415,7 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     let _ = delay_10m_c.set_checked(false);
                     let _ = delay_30m_c.set_checked(false);
                     store_set_i64(app, "lockDelay", 0);
+                    let _ = app.emit("settings-changed", serde_json::json!({"key":"lockDelay","value":0}));
                 }
                 "tray_delay_1" => {
                     let _ = delay_imm_c.set_checked(false);
@@ -390,6 +424,7 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     let _ = delay_10m_c.set_checked(false);
                     let _ = delay_30m_c.set_checked(false);
                     store_set_i64(app, "lockDelay", 1);
+                    let _ = app.emit("settings-changed", serde_json::json!({"key":"lockDelay","value":1}));
                 }
                 "tray_delay_5" => {
                     let _ = delay_imm_c.set_checked(false);
@@ -398,6 +433,7 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     let _ = delay_10m_c.set_checked(false);
                     let _ = delay_30m_c.set_checked(false);
                     store_set_i64(app, "lockDelay", 5);
+                    let _ = app.emit("settings-changed", serde_json::json!({"key":"lockDelay","value":5}));
                 }
                 "tray_delay_10" => {
                     let _ = delay_imm_c.set_checked(false);
@@ -406,6 +442,7 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     let _ = delay_10m_c.set_checked(true);
                     let _ = delay_30m_c.set_checked(false);
                     store_set_i64(app, "lockDelay", 10);
+                    let _ = app.emit("settings-changed", serde_json::json!({"key":"lockDelay","value":10}));
                 }
                 "tray_delay_30" => {
                     let _ = delay_imm_c.set_checked(false);
@@ -414,6 +451,7 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     let _ = delay_10m_c.set_checked(false);
                     let _ = delay_30m_c.set_checked(true);
                     store_set_i64(app, "lockDelay", 30);
+                    let _ = app.emit("settings-changed", serde_json::json!({"key":"lockDelay","value":30}));
                 }
 
                 // ── Misc ──
@@ -422,6 +460,7 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     let _ = app.emit("open-settings", ());
                 }
                 "tray_check_updates" => {
+                    show_main(app);
                     let _ = app.emit("check-for-updates-menu", ());
                 }
                 "tray_quit" => app.exit(0),
@@ -439,6 +478,35 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             }
         })
         .build(app)?;
+
+    // Sync tray checkmarks when settings change via the modal
+    app.listen("settings-changed", move |e: tauri::Event| {
+        let Ok(p) = serde_json::from_str::<serde_json::Value>(e.payload()) else { return };
+        let key = p["key"].as_str().unwrap_or("");
+        match key {
+            "alwaysOnTop"          => { let _ = aot_l.set_checked(p["value"].as_bool().unwrap_or(false)); }
+            "startMinimized"       => { let _ = start_min_l.set_checked(p["value"].as_bool().unwrap_or(false)); }
+            "startOnBoot"          => { let _ = start_boot_l.set_checked(p["value"].as_bool().unwrap_or(false)); }
+            "notificationsEnabled" => { let _ = notifs_l.set_checked(p["value"].as_bool().unwrap_or(true)); }
+            "soundEnabled"         => { let _ = sound_l.set_checked(p["value"].as_bool().unwrap_or(true)); }
+            "biometricLockEnabled" => { let _ = biometric_l.set_checked(p["value"].as_bool().unwrap_or(false)); }
+            "securityMode" => {
+                let v = p["value"].as_str().unwrap_or("high");
+                let _ = sec_high_l.set_checked(v == "high");
+                let _ = sec_medium_l.set_checked(v == "medium");
+                let _ = sec_low_l.set_checked(v == "low");
+            }
+            "lockDelay" => {
+                let v = p["value"].as_i64().unwrap_or(5);
+                let _ = delay_imm_l.set_checked(v == 0);
+                let _ = delay_1m_l.set_checked(v == 1);
+                let _ = delay_5m_l.set_checked(v == 5);
+                let _ = delay_10m_l.set_checked(v == 10);
+                let _ = delay_30m_l.set_checked(v == 30);
+            }
+            _ => {}
+        }
+    });
 
     Ok(())
 }

@@ -56,8 +56,29 @@ pub fn set_setting(app: AppHandle, key: String, value: serde_json::Value) -> boo
     let Ok(store) = app.store("settings.json") else {
         return false;
     };
-    store.set(key, value);
-    store.save().is_ok()
+    store.set(key.clone(), value.clone());
+    let saved = store.save().is_ok();
+
+    // Apply immediate side effects
+    match key.as_str() {
+        "securityMode" => {
+            let protect = value.as_str() != Some("low");
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.set_content_protected(protect);
+            }
+        }
+        "alwaysOnTop" => {
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.set_always_on_top(value.as_bool().unwrap_or(false));
+            }
+        }
+        _ => {}
+    }
+
+    // Notify tray and any open settings panel to sync
+    let _ = app.emit("settings-changed", serde_json::json!({ "key": key, "value": value }));
+
+    saved
 }
 
 // ─── App info ─────────────────────────────────────────────────────────────────
