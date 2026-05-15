@@ -57,9 +57,10 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
   const [myLevel, setMyLevel] = useState(1);
   const [p1State, setP1State] = useState(null);
   const [p2State, setP2State] = useState(null);
-  const [gameOver, setGameOver] = useState(null); // 'won' | 'lost'
+  const [gameOver, setGameOver] = useState(null); // 'won' | 'lost' | 'ended'
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
   const [garbageTotal, setGarbageTotal] = useState(0);
+  const [gameKey, setGameKey] = useState(0); // increment to remount TetrisGame
   const relayThrottleRef = useRef(0);
 
   const vibe = getVibeById(roomVibe);
@@ -111,12 +112,20 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
   }, [isSpectator, messageId]);
 
   const handleGameRestart = useCallback(() => {
-    // Only allow restart for solo games (server game stays finished for 1v1)
     if (!gameData?.player2) {
       setGameOver(null);
       setGarbageTotal(0);
+      if (messageId) socketManager.emit('tetris-solo-reset', { messageId });
     }
-  }, [gameData?.player2]);
+  }, [gameData?.player2, messageId]);
+
+  const handleNewGame = useCallback(() => {
+    if (gameData?.player2) return; // solo only
+    setGameOver(null);
+    setGarbageTotal(0);
+    setGameKey(k => k + 1); // remount TetrisGame (fresh state)
+    if (messageId) socketManager.emit('tetris-solo-reset', { messageId });
+  }, [gameData?.player2, messageId]);
 
   // ── Socket events ────────────────────────────────────────────────
   useEffect(() => {
@@ -155,11 +164,16 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
     };
   }, [messageId, isSpectator]);
 
-  // Derive won state from server message
+  // Derive game-over state from server message
   useEffect(() => {
-    if (!gameData || gameData.status !== 'finished' || !gameData.winner || isSpectator || gameOver === 'won') return;
-    const winnerName = gameData.winner === 'player1' ? gameData.player1?.name : gameData.player2?.name;
-    if (winnerName === currentNickname) setGameOver('won');
+    if (!gameData || gameData.status !== 'finished' || isSpectator || gameOver) return;
+    if (gameData.winner) {
+      const winnerName = gameData.winner === 'player1' ? gameData.player1?.name : gameData.player2?.name;
+      setGameOver(winnerName === currentNickname ? 'won' : 'lost');
+    } else if (!gameData.player2) {
+      // Solo forfeit / End Game
+      setGameOver('ended');
+    }
   }, [gameData?.status, gameData?.winner, isSpectator, currentNickname, gameOver]);
 
   if (!gameData) return null;
@@ -202,6 +216,7 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
       {/* Game area — dominant, fills available space */}
       <div className="relative flex-1 min-w-0 min-h-0">
         <TetrisGame
+          key={gameKey}
           onStateUpdate={handleStateUpdate}
           onLinesCleared={handleLinesCleared}
           onGameOver={handleGameOver}
@@ -209,7 +224,7 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
           garbageTotal={garbageTotal}
         />
 
-        {gameOver && (
+        {gameOver && gameOver !== 'ended' && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm z-30 pointer-events-none">
             <div className="text-center space-y-2 px-4">
               {gameOver === 'won' ? (
@@ -225,7 +240,7 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
               )}
               <p className="text-gray-300 text-sm">Score: {myScore.toLocaleString()}</p>
               {!gameData.player2 && (
-                <p className="text-gray-500 text-xs">Press R or tap Restart to play again</p>
+                <p className="text-gray-500 text-xs">Press R or use New Game below</p>
               )}
             </div>
           </div>
@@ -295,20 +310,40 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
             </div>
           )}
 
-          {/* Forfeit button */}
-          {!gameOver && (
+          {/* Action buttons */}
+          {gameOver === 'ended' ? (
             <button
-              onClick={() => socketManager.emit('tetris-forfeit', { messageId })}
-              className="w-full py-1.5 text-[9px] font-black rounded-lg bg-red-900/30 text-red-400 border border-red-800/40 hover:bg-red-900/60 transition-colors"
-            >
-              {gameData.player2 ? 'Forfeit' : 'End Game'}
-            </button>
+              onClick={handleNewGame}
+              className="w-full py-1.5 text-[9px] font-black rounded-lg bg-cyan-800/50 text-cyan-300 border border-cyan-700/40 hover:bg-cyan-800/80 transition-colors"
+            >↺ New Game</button>
+          ) : !gameOver ? (
+            <>
+              {!gameData.player2 && (
+                <button
+                  onClick={handleNewGame}
+                  className="w-full py-1.5 text-[9px] font-black rounded-lg bg-cyan-800/30 text-cyan-400 border border-cyan-700/30 hover:bg-cyan-800/60 transition-colors"
+                >↺ Reset</button>
+              )}
+              <button
+                onClick={() => socketManager.emit('tetris-forfeit', { messageId })}
+                className="w-full py-1.5 text-[9px] font-black rounded-lg bg-red-900/30 text-red-400 border border-red-800/40 hover:bg-red-900/60 transition-colors"
+              >
+                {gameData.player2 ? 'Forfeit' : 'End Game'}
+              </button>
+            </>
+          ) : (
+            !gameData.player2 && (
+              <button
+                onClick={handleNewGame}
+                className="w-full py-1.5 text-[9px] font-black rounded-lg bg-cyan-800/50 text-cyan-300 border border-cyan-700/40 hover:bg-cyan-800/80 transition-colors"
+              >↺ New Game</button>
+            )
           )}
 
           {/* Controls hint */}
           <div className="mt-auto pt-2 border-t border-gray-800 text-[9px] text-gray-600 leading-relaxed">
             <p>← → Move &nbsp; ↑ Rotate &nbsp; ↓ Soft drop</p>
-            <p>Space Hard drop &nbsp; P Pause &nbsp; M Music</p>
+            <p>Space Hard drop &nbsp; P Pause &nbsp; S Sound</p>
           </div>
         </div>
       </div>

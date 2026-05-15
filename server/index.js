@@ -3158,6 +3158,23 @@ io.on('connection', (socket) => {
     } catch (err) { logger.error('tetris-forfeit err:', err); }
   });
 
+  socket.on('tetris-solo-reset', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.gameData?.gameType !== 'tetris') return;
+      const { gameData } = message;
+      if (gameData.player2) return; // solo only
+      gameData.status = 'playing';
+      gameData.winner = null;
+      gameData.endedAt = null;
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('tetris-solo-reset err:', err); }
+  });
+
   // Handle ephemeral view token requests
   socket.on('request-view-token', async ({ messageId }, callback) => {
     try {
