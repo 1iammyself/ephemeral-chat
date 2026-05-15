@@ -50,6 +50,11 @@ export default defineConfig(({ mode }) => {
           target: 'http://127.0.0.1:3001',
           changeOrigin: true,
           secure: false
+        },
+        '/games': {
+          target: 'http://127.0.0.1:3001',
+          changeOrigin: true,
+          secure: false
         }
       },
       host: '0.0.0.0',

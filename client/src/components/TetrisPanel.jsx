@@ -225,6 +225,7 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
           title="Tetris"
           style={{ width: 320, height: '100%', minHeight: 480, display: 'block' }}
           allow="autoplay"
+          onLoad={() => setIframeReady(true)}
         />
         {!iframeReady && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-950">
