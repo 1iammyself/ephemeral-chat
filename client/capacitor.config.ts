@@ -38,9 +38,8 @@ const config: CapacitorConfig = {
       resizeOnFullScreen: true
     },
     SplashScreen: {
-      launchShowDuration: 2000,
+      launchShowDuration: 0,
       launchAutoHide: true,
-      backgroundColor: '#4F46E5',
       showSpinner: false
     },
     // Deep-link handling via @capacitor/app
