@@ -2,11 +2,12 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Gamepad2, Trophy, Zap, WifiOff } from 'lucide-react';
 import socketManager from '../socket';
 import { getVibeById } from '../utils/vibes';
+import TetrisGame from './games/TetrisGame';
 
 // lines cleared → garbage rows sent (standard battle rules)
 const GARBAGE_MAP = [0, 0, 1, 2, 4];
 
-// Compact board renderer (opponent / spectator view)
+// Compact board renderer for opponent / spectator view
 const MiniBoard = ({ matrix, label, score, lines }) => {
   const cellSize = 7;
   const cols = 10;
@@ -32,12 +33,7 @@ const MiniBoard = ({ matrix, label, score, lines }) => {
               row.map((cell, ci) => (
                 <div
                   key={`${ri}-${ci}`}
-                  style={{
-                    width: cellSize,
-                    height: cellSize,
-                    background: cell ? '#22d3ee' : '#1f2937',
-                    borderRadius: 1,
-                  }}
+                  style={{ width: cellSize, height: cellSize, background: cell ? '#22d3ee' : '#1f2937', borderRadius: 1 }}
                 />
               ))
             )
@@ -56,8 +52,6 @@ const MiniBoard = ({ matrix, label, score, lines }) => {
 };
 
 const TetrisPanel = ({ message, currentUser, roomVibe }) => {
-  const iframeRef = useRef(null);
-  const [iframeReady, setIframeReady] = useState(false);
   const [myScore, setMyScore] = useState(0);
   const [myLines, setMyLines] = useState(0);
   const [myLevel, setMyLevel] = useState(1);
@@ -65,8 +59,8 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
   const [p2State, setP2State] = useState(null);
   const [gameOver, setGameOver] = useState(null); // 'won' | 'lost'
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
+  const [garbageTotal, setGarbageTotal] = useState(0);
   const relayThrottleRef = useRef(0);
-  const lastOpponentUpdateRef = useRef(0);
 
   const vibe = getVibeById(roomVibe);
   const gameData = message?.gameData;
@@ -88,52 +82,46 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
     ? gameData?.player2?.name
     : gameData?.player1?.name;
 
-  // Messages from the game iframe
-  const handleIframeMessage = useCallback((event) => {
-    if (!event.data?.type) return;
-    // Accept same-origin and null (file://) origins only
-    if (event.origin !== window.location.origin && event.origin !== 'null') return;
-
-    const { type } = event.data;
-
-    if (type === 'TETRIS_READY') {
-      setIframeReady(true);
-    } else if (type === 'TETRIS_STATE') {
-      const { score, lines, level, matrix } = event.data;
-      setMyScore(score ?? 0);
-      setMyLines(lines ?? 0);
-      setMyLevel(level ?? 1);
-
-      if (!isSpectator && messageId) {
-        const now = Date.now();
-        if (now - relayThrottleRef.current >= 400) {
-          relayThrottleRef.current = now;
-          socketManager.emit('tetris-state-update', { messageId, score, lines, level, matrix });
-        }
-      }
-    } else if (type === 'TETRIS_LINES_CLEARED') {
-      const garbage = GARBAGE_MAP[Math.min(event.data.count, 4)] ?? 0;
-      if (garbage > 0 && !isSpectator && messageId) {
-        socketManager.emit('tetris-garbage', { messageId, count: garbage });
-      }
-    } else if (type === 'TETRIS_GAME_OVER') {
-      setGameOver('lost');
-      if (!isSpectator && messageId) {
-        socketManager.emit('tetris-game-over', { messageId });
+  // ── Multiplayer callbacks passed to TetrisGame ───────────────────
+  const handleStateUpdate = useCallback(({ score, lines, level, matrix }) => {
+    setMyScore(score);
+    setMyLines(lines);
+    setMyLevel(level);
+    if (!isSpectator && messageId) {
+      const now = Date.now();
+      if (now - relayThrottleRef.current >= 400) {
+        relayThrottleRef.current = now;
+        socketManager.emit('tetris-state-update', { messageId, score, lines, level, matrix });
       }
     }
-  }, [messageId, isSpectator]);
+  }, [isSpectator, messageId]);
 
-  useEffect(() => {
-    window.addEventListener('message', handleIframeMessage);
-    return () => window.removeEventListener('message', handleIframeMessage);
-  }, [handleIframeMessage]);
+  const handleLinesCleared = useCallback((count) => {
+    const garbage = GARBAGE_MAP[Math.min(count, 4)] ?? 0;
+    if (garbage > 0 && !isSpectator && messageId) {
+      socketManager.emit('tetris-garbage', { messageId, count: garbage });
+    }
+  }, [isSpectator, messageId]);
 
-  // Socket events from the server
+  const handleGameOver = useCallback(() => {
+    setGameOver('lost');
+    if (!isSpectator && messageId) {
+      socketManager.emit('tetris-game-over', { messageId });
+    }
+  }, [isSpectator, messageId]);
+
+  const handleGameRestart = useCallback(() => {
+    // Only allow restart for solo games (server game stays finished for 1v1)
+    if (!gameData?.player2) {
+      setGameOver(null);
+      setGarbageTotal(0);
+    }
+  }, [gameData?.player2]);
+
+  // ── Socket events ────────────────────────────────────────────────
   useEffect(() => {
     const handleOpponentState = ({ messageId: mid, role, score, lines, level, matrix }) => {
       if (mid !== messageId) return;
-      lastOpponentUpdateRef.current = Date.now();
       setOpponentDisconnected(false);
       const setter = role === 'player1' ? setP1State : setP2State;
       setter({ score, lines, level, matrix });
@@ -141,12 +129,7 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
 
     const handleAddGarbage = ({ messageId: mid, count }) => {
       if (mid !== messageId) return;
-      if (iframeRef.current && !isSpectator) {
-        iframeRef.current.contentWindow?.postMessage(
-          { type: 'TETRIS_ADD_GARBAGE', count },
-          window.location.origin
-        );
-      }
+      if (!isSpectator) setGarbageTotal(prev => prev + count);
     };
 
     const handleOpponentDisconnected = ({ messageId: mid }) => {
@@ -172,16 +155,16 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
     };
   }, [messageId, isSpectator]);
 
-  // Derive game-over state from the message prop (ChatRoom keeps it in sync via message-updated)
+  // Derive won state from server message
   useEffect(() => {
-    if (!gameData || gameData.status !== 'finished' || !gameData.winner || isSpectator || gameOver) return;
+    if (!gameData || gameData.status !== 'finished' || !gameData.winner || isSpectator || gameOver === 'won') return;
     const winnerName = gameData.winner === 'player1' ? gameData.player1?.name : gameData.player2?.name;
-    setGameOver(winnerName === currentNickname ? 'won' : 'lost');
+    if (winnerName === currentNickname) setGameOver('won');
   }, [gameData?.status, gameData?.winner, isSpectator, currentNickname, gameOver]);
 
   if (!gameData) return null;
 
-  // ── Spectator view: two mini-boards side by side ──────────────────────────
+  // ── Spectator view ───────────────────────────────────────────────
   if (isSpectator) {
     return (
       <div className="flex h-full flex-col bg-gray-950 p-4 gap-4 overflow-y-auto">
@@ -213,27 +196,23 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
     );
   }
 
-  // ── Player view: game iframe + opponent side panel ────────────────────────
+  // ── Player view ──────────────────────────────────────────────────
   return (
     <div className="flex h-full overflow-hidden bg-gray-950" style={{ minHeight: 480 }}>
-      {/* Game iframe */}
-      <div className="relative flex-shrink-0" style={{ width: 320 }}>
-        <iframe
-          ref={iframeRef}
-          src="/games/tetris"
-          className="border-0"
-          title="Tetris"
-          style={{ width: 320, height: '100%', minHeight: 480, display: 'block' }}
-          allow="autoplay"
-          onLoad={() => setIframeReady(true)}
-        />
-        {!iframeReady && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-950">
-            <div className="animate-pulse text-cyan-400 text-sm font-bold">Loading game…</div>
-          </div>
-        )}
+      {/* Game area */}
+      <div className="relative flex-shrink-0" style={{ width: 320, height: '100%' }}>
+        <div className="h-full overflow-y-auto">
+          <TetrisGame
+            onStateUpdate={handleStateUpdate}
+            onLinesCleared={handleLinesCleared}
+            onGameOver={handleGameOver}
+            onGameRestart={handleGameRestart}
+            garbageTotal={garbageTotal}
+          />
+        </div>
+
         {gameOver && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/75 backdrop-blur-sm z-10">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm z-10 pointer-events-none">
             <div className="text-center space-y-2 px-4">
               {gameOver === 'won' ? (
                 <>
@@ -247,7 +226,9 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
                 </>
               )}
               <p className="text-gray-300 text-sm">Score: {myScore.toLocaleString()}</p>
-              <p className="text-gray-500 text-xs">Press R in the game to play again</p>
+              {!gameData.player2 && (
+                <p className="text-gray-500 text-xs">Press R or tap Restart to play again</p>
+              )}
             </div>
           </div>
         )}
