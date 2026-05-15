@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { UserX, Clock, Shield, Plus, Zap, Wifi, Edit, Lock, KeyRound, Loader2, Timer, Package, Download, Radio, Settings } from 'lucide-react';
 import CreateRoomModal from './CreateRoomModal';
 import CreateDropModal from './CreateDropModal';
@@ -12,6 +13,7 @@ import { joinWithVerbalCode, checkRoom } from '../utils/api';
 import { hapticError } from '../utils/platform';
 
 const Home = ({ children }) => {
+  const { t } = useTranslation();
   const [roomCode, setRoomCode] = useState('');
   const [verbalCode, setVerbalCode] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -61,12 +63,12 @@ const Home = ({ children }) => {
                 }
               });
             } else {
-              setVerbalError('Invalid or expired verbal code.');
+              setVerbalError(t('home.joinCode.error.invalid'));
               hapticError();
             }
           })
           .catch(error => {
-            const msg = typeof error === 'string' ? error : (error?.response?.data?.error || error?.message || 'Invalid or expired verbal code.');
+            const msg = typeof error === 'string' ? error : (error?.response?.data?.error || error?.message || t('home.joinCode.error.invalid'));
             setVerbalError(msg);
             hapticError();
           })
@@ -83,7 +85,7 @@ const Home = ({ children }) => {
   const handleJoinRoom = async (e) => {
     e.preventDefault();
     if (!roomCode.trim() || roomCode.length !== 10) {
-      alert('Please enter a valid 10-character room code');
+      alert(t('home.joinCode.error.roomCode'));
       return;
     }
 
@@ -93,11 +95,11 @@ const Home = ({ children }) => {
       if (data.exists) {
         navigate(`/room/${roomCode.toUpperCase()}`);
       } else {
-        alert('Room not found. Please check the room code.');
+        alert(t('home.joinCode.error.notFound'));
       }
     } catch (error) {
       console.error('Error checking room:', error);
-      alert('Failed to check room. Please try again.');
+      alert(t('home.joinCode.error.failed'));
     } finally {
       setIsJoining(false);
     }
@@ -108,14 +110,14 @@ const Home = ({ children }) => {
     const trimmedCode = verbalCode.trim().toLowerCase();
 
     if (!trimmedCode) {
-      setVerbalError('Please enter a verbal code');
+      setVerbalError(t('home.joinCode.error.empty'));
       hapticError();
       return;
     }
 
     const words = trimmedCode.split(' ').filter(w => w.length > 0);
     if (words.length !== 4) {
-      setVerbalError('Please enter 4 words separated by spaces');
+      setVerbalError(t('home.joinCode.error.format'));
       hapticError();
       return;
     }
@@ -134,7 +136,7 @@ const Home = ({ children }) => {
         });
       }
     } catch (error) {
-      setVerbalError(typeof error === 'string' ? error : 'Invalid or expired code');
+      setVerbalError(typeof error === 'string' ? error : t('home.joinCode.error.invalid'));
       hapticError();
     } finally {
       setIsJoiningVerbal(false);
@@ -147,12 +149,12 @@ const Home = ({ children }) => {
   };
 
   const features = [
-    { icon: Zap,   title: 'Real-Time Chat',  description: 'Instant messaging' },
-    { icon: Wifi,  title: 'WebSocket Powered', description: 'Low-latency connections' },
-    { icon: UserX, title: 'No user account', description: 'No registration needed' },
-    { icon: Edit,  title: 'Pick Nickname',   description: 'Choose a name' },
-    { icon: Clock, title: 'Ephemeral',       description: 'Auto-delete messages' },
-    { icon: Lock,  title: 'Private',         description: 'Optional passwords' },
+    { icon: Zap,   title: t('home.features.realTime.title'),  description: t('home.features.realTime.desc') },
+    { icon: Wifi,  title: t('home.features.websocket.title'), description: t('home.features.websocket.desc') },
+    { icon: UserX, title: t('home.features.noAccount.title'), description: t('home.features.noAccount.desc') },
+    { icon: Edit,  title: t('home.features.nickname.title'),  description: t('home.features.nickname.desc') },
+    { icon: Clock, title: t('home.features.ephemeral.title'), description: t('home.features.ephemeral.desc') },
+    { icon: Lock,  title: t('home.features.private.title'),   description: t('home.features.private.desc') },
   ];
 
   return (
@@ -184,10 +186,10 @@ const Home = ({ children }) => {
             {/* Hero Section */}
             <div className="text-center mb-8 sm:mb-16">
               <h2 className="text-2xl sm:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight lg:text-6xl">
-                Secure, Temporary Chat Rooms
+                {t('home.tagline')}
               </h2>
               <p className="mt-3 sm:mt-4 max-w-2xl mx-auto text-sm sm:text-xl text-gray-600 dark:text-gray-400">
-                Create or join a room to start chatting.
+                {t('home.subtitle')}
               </p>
             </div>
 
@@ -199,7 +201,7 @@ const Home = ({ children }) => {
                   className="w-full flex justify-center items-center px-4 py-2.5 sm:py-4 text-sm sm:text-lg font-bold rounded-xl text-white bg-[#22c55e] hover:bg-[#16a34a] transition-all transform active:scale-[0.98] shadow-lg shadow-green-500/20"
                 >
                   <Plus className="-ml-1 mr-2 h-5 w-5" />
-                  Create New Room
+                  {t('home.createRoom')}
                 </button>
 
                 <button
@@ -207,14 +209,14 @@ const Home = ({ children }) => {
                   className="w-full flex justify-center items-center px-4 py-2.5 sm:py-3.5 text-sm sm:text-lg font-semibold rounded-xl text-gray-700 dark:text-gray-300 bg-slate-100 dark:bg-gray-800/50 hover:bg-slate-200 dark:hover:bg-gray-800/80 transition-all transform active:scale-[0.98] border border-slate-200 dark:border-gray-700 mt-3"
                 >
                   <Timer className="-ml-1 mr-2 h-5 w-5" />
-                  My Rooms
+                  {t('home.myRooms')}
                 </button>
 
                 {/* Ephemeral Drops Section */}
                 <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                   <p className="text-center text-xs font-medium text-purple-700 dark:text-purple-400 mb-3 flex items-center justify-center gap-1">
                     <Package className="w-3.5 h-3.5" />
-                    Ephemeral Drops — Encrypted Dead Drops
+                    {t('home.drops.title')}
                   </p>
                   <div className="grid grid-cols-2 gap-2">
                     <button
@@ -222,21 +224,21 @@ const Home = ({ children }) => {
                       className="flex justify-center items-center px-3 py-2.5 text-sm font-bold rounded-xl text-white bg-purple-500 hover:bg-purple-600 transition-all transform active:scale-[0.98] shadow-lg shadow-purple-500/20"
                     >
                       <Package className="-ml-1 mr-1.5 h-4 w-4" />
-                      Create Drop
+                      {t('home.drops.create')}
                     </button>
                     <button
                       onClick={() => setShowClaimDropModal(true)}
                       className="flex justify-center items-center px-3 py-2.5 text-sm font-bold rounded-xl text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-all transform active:scale-[0.98] border border-purple-200 dark:border-purple-800/50"
                     >
                       <Download className="-ml-1 mr-1.5 h-4 w-4" />
-                      Claim Drop
+                      {t('home.drops.claim')}
                     </button>
                   </div>
                   <button
                     onClick={() => navigate('/my-drops')}
                     className="w-full flex justify-center items-center px-4 py-2 text-xs font-medium rounded-lg text-purple-500 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all mt-2"
                   >
-                    My Drops →
+                    {t('home.drops.myDrops')}
                   </button>
                 </div>
 
@@ -244,24 +246,24 @@ const Home = ({ children }) => {
                 <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                   <p className="text-center text-xs font-medium text-emerald-700 dark:text-emerald-400 mb-3 flex items-center justify-center gap-1">
                     <Radio className="w-3.5 h-3.5" />
-                    Nearby Transfer — P2P File Sharing
+                    {t('home.nearby.title')}
                   </p>
                   <button
                     onClick={() => navigate('/nearby')}
                     className="w-full flex justify-center items-center px-4 py-2.5 text-sm font-bold rounded-xl text-white bg-emerald-500 hover:bg-emerald-600 transition-all transform active:scale-[0.98] shadow-lg shadow-emerald-500/20"
                   >
                     <Radio className="-ml-1 mr-2 h-4 w-4" />
-                    Nearby Transfer
+                    {t('home.nearby.button')}
                   </button>
                   <p className="text-center text-[10px] text-gray-700 dark:text-gray-500 mt-1.5">
-                    Send files &amp; messages to devices on the same network
+                    {t('home.nearby.subtitle')}
                   </p>
                 </div>
 
                 {/* Verbal Join Section */}
                 <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
                   <p className="text-center text-sm font-semibold text-gray-900 dark:text-gray-300 mb-3">
-                    Have a join code?
+                    {t('home.joinCode.title')}
                   </p>
                   <form onSubmit={handleVerbalJoin} className="flex gap-2">
                     <div className="relative flex-1">
@@ -270,7 +272,7 @@ const Home = ({ children }) => {
                         type="text"
                         value={verbalCode}
                         onChange={(e) => setVerbalCode(e.target.value)}
-                        placeholder="clarity compass journey peace"
+                        placeholder={t('home.joinCode.placeholder')}
                         data-allow-copy="true"
                         className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                         disabled={isJoiningVerbal}
@@ -284,7 +286,7 @@ const Home = ({ children }) => {
                       {isJoiningVerbal ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        'Join'
+                        t('home.joinCode.join')
                       )}
                     </button>
                   </form>
@@ -296,7 +298,7 @@ const Home = ({ children }) => {
                 </div>
 
                 <p className="mt-4 text-center text-xs text-gray-700 dark:text-gray-500">
-                  Or use an invite link shared by the host
+                  {t('home.inviteLink')}
                 </p>
               </div>
 
@@ -305,14 +307,14 @@ const Home = ({ children }) => {
                 className="w-full flex justify-center items-center px-4 py-3 text-sm font-semibold rounded-xl text-gray-800 dark:text-gray-400 bg-white/80 dark:bg-gray-800/50 hover:bg-white dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 transition-all transform active:scale-[0.98]"
               >
                 <Shield className="mr-2 h-4 w-4" />
-                Trace Forensic Hash
+                {t('home.trace')}
               </button>
             </div>
 
             {/* Features Info Section */}
             <div className="mt-12">
               <p className="text-center text-xs text-gray-700 dark:text-gray-400 mb-4 font-medium">
-                Why use Ephemeral Chat?
+                {t('home.features.title')}
               </p>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5 sm:gap-2 max-w-lg mx-auto">
                 {features.map((feature, index) => (
@@ -384,12 +386,12 @@ const Home = ({ children }) => {
       <footer className="bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 py-6 transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center space-y-2 text-sm text-gray-700 dark:text-gray-400">
-            <p>Ephemeral Chat offers a fast, secure, and private experience</p>
+            <p>{t('home.footer.tagline')}</p>
             <button
               onClick={() => navigate('/privacy')}
               className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors font-medium underline underline-offset-4"
             >
-              Privacy Policy
+              {t('home.footer.privacy')}
             </button>
           </div>
         </div>

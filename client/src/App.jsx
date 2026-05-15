@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
@@ -53,6 +54,7 @@ const API = typeof window !== 'undefined' ? window.electronAPI : null;
 const isDesktop = () => !!API?.isElectron;
 
 function App() {
+  const { t } = useTranslation();
   const isAndroid = Capacitor.getPlatform() === 'android';
   const [isLocked, setIsLocked] = useState(isAndroid);
   const [desktopLocked, setDesktopLocked] = useState(false);
@@ -135,7 +137,7 @@ function App() {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',
                     height: '100vh', background: '#111', color: '#fff', fontSize: '1.1rem' }}>
-        Authentication required
+        {t('lock.authRequired')}
       </div>
     );
   }

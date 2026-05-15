@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   X, Sun, Moon, SunMoon, Bell, BellOff, Volume2, VolumeX, Monitor, Shield,
-  RefreshCw, Maximize2, ExternalLink, Settings2, Keyboard, Info, Lock,
+  RefreshCw, Maximize2, ExternalLink, Settings2, Keyboard, Info, Lock, Languages,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
+import i18n, { LANGUAGES, applyDocumentDir } from '../i18n/index.js';
 
 const API = typeof window !== 'undefined' ? window.electronAPI : null;
 const isDesktop = () => !!API?.isElectron;
@@ -62,10 +64,11 @@ function Section({ title, children }) {
 
 function ThemeSelector() {
   const { theme, setTheme } = useTheme();
+  const { t } = useTranslation();
   const options = [
-    { value: 'light',  label: 'Light',  Icon: Sun },
-    { value: 'dark',   label: 'Dark',   Icon: Moon },
-    { value: 'system', label: 'System', Icon: SunMoon },
+    { value: 'light',  label: t('settings.appearance.light'),  Icon: Sun },
+    { value: 'dark',   label: t('settings.appearance.dark'),   Icon: Moon },
+    { value: 'system', label: t('settings.appearance.system'), Icon: SunMoon },
   ];
   return (
     <div className="flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-700/60 p-1">
@@ -87,7 +90,33 @@ function ThemeSelector() {
   );
 }
 
+function LanguageSelector() {
+  const { t } = useTranslation();
+  const [currentLang, setCurrentLang] = useState(i18n.language?.split('-')[0] || 'en');
+
+  const handleChange = (code) => {
+    setCurrentLang(code);
+    i18n.changeLanguage(code);
+    localStorage.setItem('app_language', code);
+    applyDocumentDir(code);
+  };
+
+  return (
+    <select
+      value={currentLang}
+      onChange={e => handleChange(e.target.value)}
+      className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg px-2 py-1 border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500 max-w-[160px]"
+      aria-label={t('settings.language.label')}
+    >
+      {LANGUAGES.map(({ code, nativeName }) => (
+        <option key={code} value={code}>{nativeName}</option>
+      ))}
+    </select>
+  );
+}
+
 function GeneralSettings({ settings, updateSetting, version, onCheckForUpdates, updateStatus, onShowLicenses }) {
+  const { t } = useTranslation();
   const [autostartEnabled, setAutostartEnabled] = useState(false);
 
   useEffect(() => {
@@ -113,18 +142,28 @@ function GeneralSettings({ settings, updateSetting, version, onCheckForUpdates, 
 
   return (
     <>
-      <Section title="Appearance">
+      <Section title={t('settings.appearance.title')}>
         <div className="py-2.5">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Theme</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{t('settings.appearance.theme')}</p>
           <ThemeSelector />
         </div>
       </Section>
 
-      <Section title="Notifications">
+      <Section title={t('settings.language.title')}>
+        <SettingRow
+          icon={Languages}
+          label={t('settings.language.label')}
+          description={t('settings.language.desc')}
+        >
+          <LanguageSelector />
+        </SettingRow>
+      </Section>
+
+      <Section title={t('settings.notifications.title')}>
         <SettingRow
           icon={settings?.notificationsEnabled !== false ? Bell : BellOff}
-          label="Desktop Notifications"
-          description="Show system notifications for messages"
+          label={t('settings.notifications.desktop')}
+          description={t('settings.notifications.desktopDesc')}
         >
           <Toggle
             value={settings?.notificationsEnabled !== false}
@@ -133,8 +172,8 @@ function GeneralSettings({ settings, updateSetting, version, onCheckForUpdates, 
         </SettingRow>
         <SettingRow
           icon={settings?.soundEnabled !== false ? Volume2 : VolumeX}
-          label="Notification Sound"
-          description="Play sound for new messages"
+          label={t('settings.notifications.sound')}
+          description={t('settings.notifications.soundDesc')}
         >
           <Toggle
             value={settings?.soundEnabled !== false}
@@ -144,18 +183,18 @@ function GeneralSettings({ settings, updateSetting, version, onCheckForUpdates, 
       </Section>
 
       {isDesktop() && (
-        <Section title="Window">
+        <Section title={t('settings.window.title')}>
           <SettingRow
             icon={Monitor}
-            label="Start on Boot"
-            description="Launch Ephemeral Chat when Windows starts"
+            label={t('settings.window.startOnBoot')}
+            description={t('settings.window.startOnBootDesc')}
           >
             <Toggle value={autostartEnabled} onChange={handleAutostart} />
           </SettingRow>
           <SettingRow
             icon={Monitor}
-            label="Start Minimized"
-            description="Launch hidden in system tray"
+            label={t('settings.window.startMinimized')}
+            description={t('settings.window.startMinimizedDesc')}
           >
             <Toggle
               value={!!settings?.startMinimized}
@@ -164,8 +203,8 @@ function GeneralSettings({ settings, updateSetting, version, onCheckForUpdates, 
           </SettingRow>
           <SettingRow
             icon={Monitor}
-            label="Minimize to Tray"
-            description="Keep running when the window is minimized"
+            label={t('settings.window.minimizeToTray')}
+            description={t('settings.window.minimizeToTrayDesc')}
           >
             <Toggle
               value={settings?.minimizeToTray !== false}
@@ -174,8 +213,8 @@ function GeneralSettings({ settings, updateSetting, version, onCheckForUpdates, 
           </SettingRow>
           <SettingRow
             icon={Monitor}
-            label="Always on Top"
-            description="Keep window above all other apps"
+            label={t('settings.window.alwaysOnTop')}
+            description={t('settings.window.alwaysOnTopDesc')}
           >
             <Toggle
               value={!!settings?.alwaysOnTop}
@@ -186,26 +225,26 @@ function GeneralSettings({ settings, updateSetting, version, onCheckForUpdates, 
       )}
 
       {isDesktop() && (
-        <Section title="Security">
+        <Section title={t('settings.security.title')}>
           <SettingRow
             icon={Shield}
-            label="Security Mode"
-            description="High: screen capture blocked"
+            label={t('settings.security.mode')}
+            description={t('settings.security.modeDesc')}
           >
             <select
               value={settings?.securityMode ?? 'high'}
               onChange={e => updateSetting('securityMode', e.target.value)}
               className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg px-2 py-1 border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500"
             >
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
+              <option value="high">{t('settings.security.high')}</option>
+              <option value="medium">{t('settings.security.medium')}</option>
+              <option value="low">{t('settings.security.low')}</option>
             </select>
           </SettingRow>
           <SettingRow
             icon={Lock}
-            label="Biometric Lock"
-            description="Lock app when idle or manually from tray"
+            label={t('settings.security.biometric')}
+            description={t('settings.security.biometricDesc')}
           >
             <Toggle
               value={!!settings?.biometricLockEnabled}
@@ -215,19 +254,19 @@ function GeneralSettings({ settings, updateSetting, version, onCheckForUpdates, 
           {settings?.biometricLockEnabled && (
             <SettingRow
               icon={Lock}
-              label="Auto-Lock After Idle"
-              description="Minutes of inactivity before locking"
+              label={t('settings.security.autoLock')}
+              description={t('settings.security.autoLockDesc')}
             >
               <select
                 value={settings?.lockDelay ?? 5}
                 onChange={e => updateSetting('lockDelay', Number(e.target.value))}
                 className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg px-2 py-1 border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500"
               >
-                <option value={0}>Immediate</option>
-                <option value={1}>1 minute</option>
-                <option value={5}>5 minutes</option>
-                <option value={10}>10 minutes</option>
-                <option value={30}>30 minutes</option>
+                <option value={0}>{t('settings.security.immediate')}</option>
+                <option value={1}>{t('settings.security.minute_one', { count: 1 })}</option>
+                <option value={5}>{t('settings.security.minute_other', { count: 5 })}</option>
+                <option value={10}>{t('settings.security.minute_other', { count: 10 })}</option>
+                <option value={30}>{t('settings.security.minute_other', { count: 30 })}</option>
               </select>
             </SettingRow>
           )}
@@ -235,10 +274,10 @@ function GeneralSettings({ settings, updateSetting, version, onCheckForUpdates, 
       )}
 
       {isDesktop() && (
-        <Section title="Window Actions">
+        <Section title={t('settings.windowActions.title')}>
           <SettingRow
             icon={RefreshCw}
-            label="Reload App"
+            label={t('settings.windowActions.reload')}
             description="Ctrl+R"
             onClick={() => API?.reload?.() || window.location.reload()}
           >
@@ -246,7 +285,7 @@ function GeneralSettings({ settings, updateSetting, version, onCheckForUpdates, 
           </SettingRow>
           <SettingRow
             icon={Maximize2}
-            label="Toggle Fullscreen"
+            label={t('settings.windowActions.fullscreen')}
             description="F11"
             onClick={() => API?.toggleFullscreen?.()}
           >
@@ -255,7 +294,7 @@ function GeneralSettings({ settings, updateSetting, version, onCheckForUpdates, 
         </Section>
       )}
 
-      <Section title="About">
+      <Section title={t('settings.about.title')}>
         <div className="py-2.5 flex items-center gap-2">
           <Info className="w-4 h-4 text-gray-400 flex-shrink-0" />
           <span className="text-sm text-gray-600 dark:text-gray-400">
@@ -267,28 +306,28 @@ function GeneralSettings({ settings, updateSetting, version, onCheckForUpdates, 
           <>
             <SettingRow
               icon={ExternalLink}
-              label="Visit Website"
-              description="ephchat.kyere.me"
+              label={t('settings.about.website')}
+              description={t('settings.about.websiteDesc')}
               onClick={() => API?.openUrlExternal?.('https://ephchat.kyere.me')}
             />
             <SettingRow
               icon={Info}
-              label="Third Party Licenses"
+              label={t('settings.about.licenses')}
               onClick={onShowLicenses}
             />
             <SettingRow
               icon={RefreshCw}
-              label="Check for Updates"
+              label={t('settings.about.checkUpdates')}
               onClick={onCheckForUpdates}
             >
               {updateStatus === 'checking' && (
-                <span className="text-xs text-gray-400 animate-pulse">Checking…</span>
+                <span className="text-xs text-gray-400 animate-pulse">{t('settings.about.checking')}</span>
               )}
               {updateStatus === 'up-to-date' && (
-                <span className="text-xs text-teal-500 font-medium">Up to date ✓</span>
+                <span className="text-xs text-teal-500 font-medium">{t('settings.about.upToDate')}</span>
               )}
               {updateStatus === 'available' && (
-                <span className="text-xs text-amber-500 font-medium">Update available</span>
+                <span className="text-xs text-amber-500 font-medium">{t('settings.about.updateAvailable')}</span>
               )}
             </SettingRow>
           </>
@@ -301,6 +340,7 @@ function GeneralSettings({ settings, updateSetting, version, onCheckForUpdates, 
 // ── Chat Tab ────────────────────────────────────────────────────────────────
 
 function ChatSettings() {
+  const { t } = useTranslation();
   const [typingPreview, setTypingPreview] = useState(
     () => localStorage.getItem('typingPreview_enabled') !== 'false'
   );
@@ -311,33 +351,33 @@ function ChatSettings() {
   };
 
   const shortcuts = [
-    { label: 'Panic Burn (delete room content)', key: 'Ctrl+Z' },
-    { label: 'Toggle Anonymous Mode',            key: 'Ctrl+Y' },
-    { label: 'Toggle Stealth Mode',              key: 'Ctrl+Shift+H' },
-    { label: 'Self-Destruct Override (10s)',      key: 'Ctrl+Shift+D' },
-    { label: 'Show / Hide window (global)',       key: 'Alt+Shift+E' },
-    { label: 'New Room (global)',                 key: 'Alt+Shift+N' },
-    { label: 'Picture-in-Picture mode',           key: 'Alt+Shift+P' },
-    { label: 'Toggle Fullscreen',                 key: 'F11' },
-    { label: 'Reload',                            key: 'Ctrl+R' },
+    { labelKey: 'settings.chat.shortcuts.panicBurn',    key: 'Ctrl+Z' },
+    { labelKey: 'settings.chat.shortcuts.toggleAnon',   key: 'Ctrl+Y' },
+    { labelKey: 'settings.chat.shortcuts.toggleStealth',key: 'Ctrl+Shift+H' },
+    { labelKey: 'settings.chat.shortcuts.selfDestruct',  key: 'Ctrl+Shift+D' },
+    { labelKey: 'settings.chat.shortcuts.showHide',      key: 'Alt+Shift+E' },
+    { labelKey: 'settings.chat.shortcuts.newRoom',       key: 'Alt+Shift+N' },
+    { labelKey: 'settings.chat.shortcuts.pip',           key: 'Alt+Shift+P' },
+    { labelKey: 'settings.chat.shortcuts.fullscreen',    key: 'F11' },
+    { labelKey: 'settings.chat.shortcuts.reload',        key: 'Ctrl+R' },
   ];
 
   return (
     <>
-      <Section title="Chat Preferences">
+      <Section title={t('settings.chat.title')}>
         <SettingRow
-          label="Live Typing Preview"
-          description="See what others type as they type it"
+          label={t('settings.chat.typingPreview')}
+          description={t('settings.chat.typingPreviewDesc')}
         >
           <Toggle value={typingPreview} onChange={handleTypingPreview} />
         </SettingRow>
       </Section>
 
-      <Section title="Keyboard Shortcuts">
+      <Section title={t('settings.chat.shortcutsTitle')}>
         <div className="py-2 space-y-2">
-          {shortcuts.map(({ label, key }) => (
+          {shortcuts.map(({ labelKey, key }) => (
             <div key={key} className="flex items-center justify-between gap-4">
-              <span className="text-xs text-gray-600 dark:text-gray-400 leading-snug">{label}</span>
+              <span className="text-xs text-gray-600 dark:text-gray-400 leading-snug">{t(labelKey)}</span>
               <span className="text-[10px] font-mono bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded flex-shrink-0">{key}</span>
             </div>
           ))}
@@ -346,9 +386,10 @@ function ChatSettings() {
 
       <div className="flex items-start gap-2 px-3 py-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
         <Keyboard className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
-        <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
-          Sound effects, sidebar position, and more room-specific options are in the <strong>Tools</strong> panel while inside a chat room.
-        </p>
+        <p
+          className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed"
+          dangerouslySetInnerHTML={{ __html: t('settings.chat.hint') }}
+        />
       </div>
     </>
   );
@@ -373,12 +414,13 @@ const LICENSES = [
 ];
 
 function LicensesModal({ onClose }) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm flex flex-col max-h-[80vh]">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
-          <span className="text-sm font-bold text-gray-900 dark:text-white">Third Party Licenses</span>
+          <span className="text-sm font-bold text-gray-900 dark:text-white">{t('licenses.title')}</span>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
             <X className="w-4 h-4 text-gray-500" />
           </button>
@@ -395,7 +437,7 @@ function LicensesModal({ onClose }) {
           ))}
         </div>
         <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
-          <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center">Full license texts are available in the source repository.</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center">{t('licenses.footer')}</p>
         </div>
       </div>
     </div>
@@ -403,6 +445,7 @@ function LicensesModal({ onClose }) {
 }
 
 export default function SettingsModal({ isOpen, onClose, initialTab = 'general' }) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [settings, setSettings] = useState(null);
   const [version, setVersion] = useState('');
@@ -486,7 +529,7 @@ export default function SettingsModal({ isOpen, onClose, initialTab = 'general' 
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <Settings2 className="w-4 h-4 text-teal-500" />
-            <h2 className="text-sm font-bold text-gray-900 dark:text-white">Settings</h2>
+            <h2 className="text-sm font-bold text-gray-900 dark:text-white">{t('settings.title')}</h2>
           </div>
           <button
             onClick={onClose}
@@ -499,8 +542,8 @@ export default function SettingsModal({ isOpen, onClose, initialTab = 'general' 
         {/* Tab bar */}
         <div className="flex gap-0 px-5 pt-0 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
           {[
-            { id: 'general', label: 'General' },
-            { id: 'chat',    label: 'Chat' },
+            { id: 'general', label: t('settings.tabs.general') },
+            { id: 'chat',    label: t('settings.tabs.chat') },
           ].map(({ id, label }) => (
             <button
               key={id}

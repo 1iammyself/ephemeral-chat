@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;700&family=Noto+Sans+Devanagari:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap&font-display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -882,4 +883,35 @@ input[type="range"]::-moz-range-thumb {
   font-size: 0 !important;
   pointer-events: none !important;
 }
+
+/* ── RTL / language support ────────────────────────────────────────────────── */
+html[lang="ar"] {
+  font-family: 'Noto Sans Arabic', 'Segoe UI', system-ui, sans-serif;
+}
+
+html[lang="hi"] {
+  font-family: 'Noto Sans Devanagari', 'Segoe UI', system-ui, sans-serif;
+}
+
+html[lang="ja"] {
+  font-family: 'Noto Sans JP', 'Segoe UI', system-ui, sans-serif;
+}
+
+html[lang="zh"] {
+  font-family: 'Noto Sans SC', 'Segoe UI', system-ui, sans-serif;
+}
+
+/* RTL layout flips */
+html[dir="rtl"] .flex { flex-direction: row-reverse; }
+html[dir="rtl"] .flex-col { flex-direction: column; }
+html[dir="rtl"] .ml-1 { margin-left: 0; margin-right: 0.25rem; }
+html[dir="rtl"] .ml-2 { margin-left: 0; margin-right: 0.5rem; }
+html[dir="rtl"] .mr-2 { margin-right: 0; margin-left: 0.5rem; }
+html[dir="rtl"] .mr-3 { margin-right: 0; margin-left: 0.75rem; }
+html[dir="rtl"] .pl-10 { padding-left: 0; padding-right: 2.5rem; }
+html[dir="rtl"] .pr-3 { padding-right: 0; padding-left: 0.75rem; }
+html[dir="rtl"] .left-3 { left: auto; right: 0.75rem; }
+html[dir="rtl"] .rounded-l-full { border-radius: 0 9999px 9999px 0; }
+html[dir="rtl"] .rounded-r-full { border-radius: 9999px 0 0 9999px; }
+html[dir="rtl"] .text-left { text-align: right; }
 
