@@ -153,6 +153,14 @@ if (process.env.TRUST_PROXY === 'true' || process.env.RENDER) {
 // Serve static files from .well-known directory (for Digital Asset Links)
 app.use('/.well-known', express.static(path.join(__dirname, '../client/public/.well-known')));
 
+// Games must be embeddable in iframes — strip frame-blocking headers before serving
+app.use('/games', (req, res, next) => {
+  res.removeHeader('X-Frame-Options');
+  res.setHeader('Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; img-src 'self' data:; frame-ancestors 'self'");
+  next();
+});
+
 // Serve react-tetris game as an embedded activity
 app.use('/games/tetris', express.static(path.join(__dirname, '../react-tetris/docs')));
 
