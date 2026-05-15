@@ -100,6 +100,7 @@ import { getRandomIcebreaker } from '../utils/icebreakers';
 import { AppRefreshButton } from './AppRefreshButton';
 import CodeShareModal from './CodeShareModal';
 import RoomToolsPanel from './RoomToolsPanel';
+import SettingsModal from './SettingsModal';
 import FloatingPanel from './FloatingPanel';
 import { usePanelManager } from '../hooks/usePanelManager';
 import { getCreatorId } from '../utils/creator';
@@ -646,6 +647,13 @@ const ChatRoom = () => {
   const [roomKey, setRoomKey] = useState(null);
   const [currentUserRole, setCurrentUserRole] = useState('user');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState('general');
+
+  const openSettings = useCallback((tab = 'general') => {
+    setSettingsInitialTab(tab);
+    setShowSettingsModal(true);
+  }, []);
   const [selectedRecipients, setSelectedRecipients] = useState([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [reactionTargetId, setReactionTargetId] = useState(null);
@@ -732,7 +740,7 @@ const ChatRoom = () => {
   const anonClickCountRef = useRef(0);
   const anonClickTimerRef = useRef(null);
   const anonHoldTimerRef = useRef(null);
-  const { theme } = useTheme();
+  const { theme, effective: themeEffective } = useTheme();
 
   const [audioViewOnce, setAudioViewOnce] = useState(true);
   const [isAnonymousMode, setIsAnonymousMode] = useState(false);
@@ -3054,11 +3062,11 @@ const ChatRoom = () => {
                 <div
                   className="shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full transition-colors"
                   style={{
-                    backgroundColor: theme === 'dark' ? `${vibeHex}dd` : `${vibeHex}20`,
+                    backgroundColor: themeEffective === 'dark' ? `${vibeHex}dd` : `${vibeHex}20`,
                   }}
                 >
-                  <Clock className={`w-3 h-3 ${timeLeft === '00:00' ? 'animate-bounce text-red-500 dark:text-red-300' : 'animate-pulse'}`} style={timeLeft !== '00:00' ? { color: theme === 'dark' ? '#ffffff' : vibeHex } : undefined} />
-                  <span className={`font-mono text-xs font-bold tracking-wider ${timeLeft === '00:00' ? 'text-red-600 dark:text-red-100' : ''}`} style={timeLeft !== '00:00' ? { color: theme === 'dark' ? '#ffffff' : vibeHex } : undefined}>{timeLeft || '00:00'}</span>
+                  <Clock className={`w-3 h-3 ${timeLeft === '00:00' ? 'animate-bounce text-red-500 dark:text-red-300' : 'animate-pulse'}`} style={timeLeft !== '00:00' ? { color: themeEffective === 'dark' ? '#ffffff' : vibeHex } : undefined} />
+                  <span className={`font-mono text-xs font-bold tracking-wider ${timeLeft === '00:00' ? 'text-red-600 dark:text-red-100' : ''}`} style={timeLeft !== '00:00' ? { color: themeEffective === 'dark' ? '#ffffff' : vibeHex } : undefined}>{timeLeft || '00:00'}</span>
                   {canManageRoom(currentUserRole) && (
                     <button onClick={handleStopTimer} className="p-0.5 rounded-full transition-colors hover:bg-black/5 dark:hover:bg-white/20" title="Stop Timer">
                       <X className={`w-3 h-3 ${timeLeft === '00:00' ? 'text-red-500 dark:text-red-300' : 'text-red-300'}`} />
@@ -3481,7 +3489,7 @@ const ChatRoom = () => {
                         <div className="absolute inset-0 bg-white/40 dark:bg-white/[0.06] backdrop-blur-2xl rounded-[1.25rem] shadow-2xl border border-white/20 dark:border-white/10 -z-10" />
                         <EmojiPicker
                           onEmojiClick={onEmojiClick}
-                          theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
+                          theme={themeEffective === 'dark' ? Theme.DARK : Theme.LIGHT}
                           lazyLoadEmojis={true}
                           skinTonesDisabled
                           autoFocusSearch={false}
@@ -3532,6 +3540,9 @@ const ChatRoom = () => {
                       <input
                         ref={messageInputRef}
                         type="text"
+                        spellCheck={true}
+                        autoCorrect="on"
+                        autoCapitalize="sentences"
                         value={newMessage}
                         onChange={(e) => { setNewMessage(e.target.value); handleTyping(e.target.value); }}
                         onKeyDown={handleKeyDown}
@@ -3672,7 +3683,7 @@ const ChatRoom = () => {
               <div className="w-full h-full pb-5">
                 <EmojiPicker
                   onEmojiClick={onEmojiClick}
-                  theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
+                  theme={themeEffective === 'dark' ? Theme.DARK : Theme.LIGHT}
                   lazyLoadEmojis={true}
                   skinTonesDisabled
                   autoFocusSearch={false}
@@ -3792,6 +3803,7 @@ const ChatRoom = () => {
                 showSearch={showSearch}
                 setShowSearch={setShowSearch}
                 clearSearch={clearSearch}
+                onOpenSettings={openSettings}
                 onClose={null}
               />
             )}
@@ -3867,6 +3879,7 @@ const ChatRoom = () => {
                     showSearch={showSearch}
                     setShowSearch={setShowSearch}
                     clearSearch={clearSearch}
+                    onOpenSettings={openSettings}
                     onClose={() => setShowMobileMenu(false)}
                   />
                 )}
@@ -3877,6 +3890,12 @@ const ChatRoom = () => {
       }
 
       {showCallModal && <AudioCallModal isOpen={showCallModal} onClose={() => setShowCallModal(false)} roomCode={roomCode} />}
+
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        initialTab={settingsInitialTab}
+      />
       {hotSeatTarget && (
         <HotSeat
           hotSeatTarget={hotSeatTarget}

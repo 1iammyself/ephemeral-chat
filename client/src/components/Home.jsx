@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { UserX, Clock, Shield, Plus, Zap, Wifi, Edit, Lock, KeyRound, Loader2, Timer, Package, Download, Radio } from 'lucide-react';
+import { UserX, Clock, Shield, Plus, Zap, Wifi, Edit, Lock, KeyRound, Loader2, Timer, Package, Download, Radio, Settings } from 'lucide-react';
 import CreateRoomModal from './CreateRoomModal';
 import CreateDropModal from './CreateDropModal';
 import DropCreatedModal from './DropCreatedModal';
 import ClaimDropModal from './ClaimDropModal';
 import DropViewer from './DropViewer';
 import TraceHashModal from './TraceHashModal';
-import ThemeToggle from './ThemeToggle';
+import SettingsModal from './SettingsModal';
 import { joinWithVerbalCode, checkRoom } from '../utils/api';
 import { hapticError } from '../utils/platform';
 
@@ -16,6 +16,7 @@ const Home = ({ children }) => {
   const [verbalCode, setVerbalCode] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showTraceModal, setShowTraceModal] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [showCreateDropModal, setShowCreateDropModal] = useState(false);
   const [showClaimDropModal, setShowClaimDropModal] = useState(false);
   const [dropCreatedData, setDropCreatedData] = useState(null);
@@ -164,7 +165,14 @@ const Home = ({ children }) => {
             Ephemeral Chat
           </h1>
           <div className="flex items-center space-x-2">
-            <ThemeToggle />
+            <button
+              onClick={() => setShowSettings(true)}
+              className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              title="Settings"
+              aria-label="Open settings"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </header>
@@ -365,6 +373,12 @@ const Home = ({ children }) => {
           />
         )}
       </main>
+
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        initialTab="general"
+      />
 
       {/* Footer */}
       <footer className="bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 py-6 transition-colors duration-200">

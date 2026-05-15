@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Lock, Code2, Activity, Eye, PanelLeft, PanelRight, FileText, RefreshCw, Zap, Volume2, VolumeX, Search } from 'lucide-react';
+import { Lock, Code2, Activity, Eye, PanelLeft, PanelRight, FileText, RefreshCw, Zap, Volume2, VolumeX, Search, Settings2 } from 'lucide-react';
 import { hapticSuccess } from '../utils/platform';
 
 const FEATURES = [
@@ -21,6 +21,7 @@ export default function RoomToolsPanel({
   showSearch = false,
   setShowSearch,
   clearSearch,
+  onOpenSettings,
   onClose,
 }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -159,6 +160,17 @@ export default function RoomToolsPanel({
               {!codeCopied && (
                 <span className="ml-auto text-[10px] text-gray-400 dark:text-gray-500 font-mono truncate max-w-[90px]">{verbalCode}</span>
               )}
+            </button>
+          )}
+
+          {/* Settings */}
+          {onOpenSettings && (
+            <button
+              onClick={() => { onOpenSettings('chat'); onClose?.(); }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
+            >
+              <Settings2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+              <span className="text-xs text-gray-700 dark:text-gray-300">Settings</span>
             </button>
           )}
 

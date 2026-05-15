@@ -2,7 +2,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::mdns::{MdnsManager, MdnsMyInfo, MdnsPeer};
 use crate::masque::MasqueState;
@@ -158,6 +158,56 @@ fn epoch_ms() -> u128 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis())
         .unwrap_or(0)
+}
+
+// ─── Window management ────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn window_reload(app: AppHandle) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.eval("window.location.reload()");
+    }
+}
+
+#[tauri::command]
+pub fn window_toggle_fullscreen(app: AppHandle) {
+    if let Some(win) = app.get_webview_window("main") {
+        let is_fs = win.is_fullscreen().unwrap_or(false);
+        let _ = win.set_fullscreen(!is_fs);
+    }
+}
+
+#[tauri::command]
+pub fn window_set_always_on_top(app: AppHandle, value: bool) -> bool {
+    use tauri_plugin_store::StoreExt;
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.set_always_on_top(value);
+        if let Ok(store) = app.store("settings.json") {
+            store.set("alwaysOnTop", serde_json::json!(value));
+            return store.save().is_ok();
+        }
+    }
+    false
+}
+
+#[tauri::command]
+pub fn window_minimize(app: AppHandle) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.minimize();
+    }
+}
+
+#[tauri::command]
+pub fn window_zoom(app: AppHandle, direction: String) {
+    if let Some(win) = app.get_webview_window("main") {
+        let script = match direction.as_str() {
+            "in"    => "window.__zoom=Math.min(2.0,(window.__zoom||1.0)+0.1);document.documentElement.style.zoom=window.__zoom",
+            "out"   => "window.__zoom=Math.max(0.5,(window.__zoom||1.0)-0.1);document.documentElement.style.zoom=window.__zoom",
+            "reset" => "window.__zoom=1.0;document.documentElement.style.zoom=1",
+            _ => return,
+        };
+        let _ = win.eval(script);
+    }
 }
 
 // ─── Proximity (basic, non-QUIC) ──────────────────────────────────────────────

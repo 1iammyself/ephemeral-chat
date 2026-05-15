@@ -57,6 +57,15 @@
     listenEvent('toggle-anonymous', function () {
       if (_handlers['toggle-anonymous']) _handlers['toggle-anonymous']();
     });
+    listenEvent('open-settings', function () {
+      if (_handlers['open-settings']) _handlers['open-settings']();
+    });
+    listenEvent('check-for-updates-menu', function () {
+      if (_handlers['check-for-updates-menu']) _handlers['check-for-updates-menu']();
+    });
+    listenEvent('lock-app', function () {
+      if (_handlers['lock-app']) _handlers['lock-app']();
+    });
     listenEvent('update-available', function (e) {
       if (_handlers['update-available']) _handlers['update-available'](e.payload);
     });
@@ -121,6 +130,18 @@
     onToggleOverrideTtl: function (cb) { _handlers['toggle-override-ttl'] = cb; },
     onPanicBurn: function (cb) { _handlers['panic-burn'] = cb; },
     onToggleAnonymous: function (cb) { _handlers['toggle-anonymous'] = cb; },
+    onOpenSettings: function (cb) { _handlers['open-settings'] = cb; },
+    onCheckForUpdatesMenu: function (cb) { _handlers['check-for-updates-menu'] = cb; },
+    onLockApp: function (cb) { _handlers['lock-app'] = cb; },
+
+    // ── Window management ─────────────────────────────────────────────────
+    reload: function () { return invoke('window_reload'); },
+    toggleFullscreen: function () { return invoke('window_toggle_fullscreen'); },
+    setAlwaysOnTop: function (value) { return invoke('window_set_always_on_top', { value: value }); },
+    minimize: function () { return invoke('window_minimize'); },
+    zoomIn: function () { return invoke('window_zoom', { direction: 'in' }); },
+    zoomOut: function () { return invoke('window_zoom', { direction: 'out' }); },
+    resetZoom: function () { return invoke('window_zoom', { direction: 'reset' }); },
 
     // ── Proximity (nearby transfer) ───────────────────────────────────────
     proximity: {

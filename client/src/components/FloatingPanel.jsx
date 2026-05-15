@@ -29,8 +29,8 @@ export default function FloatingPanel({
   zIndex  = 220,
   onFocus,
 }) {
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
+  const { effective } = useTheme();
+  const isDark = effective === 'dark';
 
   const ix = defaultX ?? Math.max(20, (window.innerWidth  - (defaultWidth  ?? 660)) / 2);
   const iy = defaultY ?? Math.max(60, (window.innerHeight - (defaultHeight ?? 500)) / 3);

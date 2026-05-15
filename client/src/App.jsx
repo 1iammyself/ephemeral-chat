@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import { BiometricPlugin } from './capacitor/security-plugins';
+import LockScreen from './components/LockScreen';
 import Home from './components/Home';
 import LandingRedirect from './components/LandingRedirect';
 import ChatRoom from './components/ChatRoom';
@@ -48,11 +49,43 @@ async function runBiometricGate(setIsLocked) {
   }
 }
 
+const API = typeof window !== 'undefined' ? window.electronAPI : null;
+const isDesktop = () => !!API?.isElectron;
+
 function App() {
   const isAndroid = Capacitor.getPlatform() === 'android';
   const [isLocked, setIsLocked] = useState(isAndroid);
+  const [desktopLocked, setDesktopLocked] = useState(false);
+  const idleCheckRef = useRef(null);
 
   useAppResume();
+
+  // ── Desktop lock-app event from tray ──────────────────────────────────────
+  useEffect(() => {
+    if (!isDesktop() || !API.onLockApp) return;
+    API.onLockApp(() => setDesktopLocked(true));
+  }, []);
+
+  // ── Idle auto-lock ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isDesktop()) return;
+
+    const check = async () => {
+      try {
+        const settings = await API.getSettings();
+        if (!settings?.biometricLockEnabled) return;
+        const delayMinutes = settings?.lockDelay ?? 5;
+        if (delayMinutes === 0) return;
+        const idleSecs = await API.getSystemIdleTime();
+        if (idleSecs >= delayMinutes * 60) {
+          setDesktopLocked(true);
+        }
+      } catch {}
+    };
+
+    idleCheckRef.current = setInterval(check, 30_000);
+    return () => clearInterval(idleCheckRef.current);
+  }, []);
 
   // Run biometric gate on mount
   useEffect(() => {
@@ -113,6 +146,7 @@ function App() {
         <DesktopSecurityGuard />
         <DeepLinkHandler />
         <AppRestrictionBanner />
+        {desktopLocked && <LockScreen onUnlock={() => setDesktopLocked(false)} />}
         <Routes>
           <Route path="/" element={<LandingRedirect />} />
           <Route path="/my-rooms" element={<MyRooms />} /> {/* Add MyRooms route */}

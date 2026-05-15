@@ -6,7 +6,7 @@ use commands::PpTokenStore;
 use masque::MasqueState;
 use mdns::MdnsManager;
 use tauri::{
-    menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder},
+    menu::{CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, SubmenuBuilder},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager, WebviewUrl, WebviewWindowBuilder,
 };
@@ -55,6 +55,11 @@ pub fn run() {
             commands::set_badge,
             commands::open_url_external,
             commands::open_url_in_app,
+            commands::window_reload,
+            commands::window_toggle_fullscreen,
+            commands::window_set_always_on_top,
+            commands::window_minimize,
+            commands::window_zoom,
             commands::proximity_get_network_info,
             commands::proximity_get_local_ip,
             commands::proximity_get_device_id,
@@ -98,11 +103,20 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     .visible(true)
     .build()?;
 
-    // Restore previous window size/position
     let _ = win.restore_state(StateFlags::all());
-
-    // Screen capture protection — prevents window appearing in screenshots/recordings
     let _ = win.set_content_protected(true);
+
+    let h = app.handle().clone();
+
+    // Honour start-minimized setting
+    if store_get_bool(&h, "startMinimized", false) {
+        let _ = win.hide();
+    }
+
+    // Restore always-on-top
+    if store_get_bool(&h, "alwaysOnTop", false) {
+        let _ = win.set_always_on_top(true);
+    }
 
     // Intercept close → hide to tray
     win.on_window_event({
@@ -120,13 +134,65 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     });
 
     setup_tray(app)?;
-    setup_app_menu(app)?;
     setup_shortcuts(app)?;
 
     Ok(())
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Store helpers ────────────────────────────────────────────────────────────
+
+fn store_get_bool(app: &tauri::AppHandle, key: &str, default: bool) -> bool {
+    use tauri_plugin_store::StoreExt;
+    app.store("settings.json")
+        .ok()
+        .and_then(|s| s.get(key))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(default)
+}
+
+fn store_set_bool(app: &tauri::AppHandle, key: &str, value: bool) {
+    use tauri_plugin_store::StoreExt;
+    if let Ok(store) = app.store("settings.json") {
+        store.set(key, serde_json::json!(value));
+        let _ = store.save();
+    }
+}
+
+fn store_get_str(app: &tauri::AppHandle, key: &str, default: &str) -> String {
+    use tauri_plugin_store::StoreExt;
+    app.store("settings.json")
+        .ok()
+        .and_then(|s| s.get(key))
+        .and_then(|v| v.as_str().map(|s| s.to_owned()))
+        .unwrap_or_else(|| default.to_owned())
+}
+
+fn store_set_str(app: &tauri::AppHandle, key: &str, value: &str) {
+    use tauri_plugin_store::StoreExt;
+    if let Ok(store) = app.store("settings.json") {
+        store.set(key, serde_json::json!(value));
+        let _ = store.save();
+    }
+}
+
+fn store_get_i64(app: &tauri::AppHandle, key: &str, default: i64) -> i64 {
+    use tauri_plugin_store::StoreExt;
+    app.store("settings.json")
+        .ok()
+        .and_then(|s| s.get(key))
+        .and_then(|v| v.as_i64())
+        .unwrap_or(default)
+}
+
+fn store_set_i64(app: &tauri::AppHandle, key: &str, value: i64) {
+    use tauri_plugin_store::StoreExt;
+    if let Ok(store) = app.store("settings.json") {
+        store.set(key, serde_json::json!(value));
+        let _ = store.save();
+    }
+}
+
+// ─── Window helpers ───────────────────────────────────────────────────────────
 
 fn show_main(app: &tauri::AppHandle) {
     if let Some(win) = app.get_webview_window("main") {
@@ -145,19 +211,80 @@ fn navigate_main(app: &tauri::AppHandle, suffix: &str) {
 // ─── System Tray ──────────────────────────────────────────────────────────────
 
 fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    let show = MenuItemBuilder::with_id("show", "Open Ephemeral Chat").build(app)?;
-    let new_room = MenuItemBuilder::with_id("new_room", "Create New Room").build(app)?;
-    let sep = PredefinedMenuItem::separator(app)?;
-    let sep2 = PredefinedMenuItem::separator(app)?;
-    let quit = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
-    let content_protect = MenuItemBuilder::with_id("toggle_protection", "Toggle Screen Protection").build(app)?;
+    let h = app.handle().clone();
+
+    // Initial setting values
+    let aot_val       = store_get_bool(&h, "alwaysOnTop", false);
+    let start_min_val = store_get_bool(&h, "startMinimized", false);
+    let start_boot_val= store_get_bool(&h, "startOnBoot", false);
+    let notifs_val    = store_get_bool(&h, "notificationsEnabled", true);
+    let sound_val     = store_get_bool(&h, "soundEnabled", true);
+    let biometric_val = store_get_bool(&h, "biometricLockEnabled", false);
+    let sec_mode      = store_get_str(&h, "securityMode", "high");
+    let lock_delay    = store_get_i64(&h, "lockDelay", 5);
+
+    // ── Basic items ──
+    let show      = MenuItemBuilder::with_id("tray_show",     "Open Ephemeral Chat").build(app)?;
+    let lock_now  = MenuItemBuilder::with_id("tray_lock_now", "Lock App Now").build(app)?;
+    let new_room  = MenuItemBuilder::with_id("tray_new_room", "Create New Room").build(app)?;
+
+    // ── Checkbox items ──
+    let aot       = CheckMenuItemBuilder::with_id("tray_aot",        "Always on Top").checked(aot_val).build(app)?;
+    let start_min = CheckMenuItemBuilder::with_id("tray_start_min",  "Start Minimized").checked(start_min_val).build(app)?;
+    let start_boot= CheckMenuItemBuilder::with_id("tray_start_boot", "Start with Windows").checked(start_boot_val).build(app)?;
+    let notifs    = CheckMenuItemBuilder::with_id("tray_notifs",     "Notifications").checked(notifs_val).build(app)?;
+    let sound     = CheckMenuItemBuilder::with_id("tray_sound",      "Sound").checked(sound_val).build(app)?;
+    let biometric = CheckMenuItemBuilder::with_id("tray_biometric",  "Biometric Lock").checked(biometric_val).build(app)?;
+
+    // ── Security Mode submenu (simulated radio) ──
+    let sec_high   = CheckMenuItemBuilder::with_id("tray_sec_high",   "High (Recommended)").checked(sec_mode == "high").build(app)?;
+    let sec_medium = CheckMenuItemBuilder::with_id("tray_sec_medium", "Medium").checked(sec_mode == "medium").build(app)?;
+    let sec_low    = CheckMenuItemBuilder::with_id("tray_sec_low",    "Low").checked(sec_mode == "low").build(app)?;
+    let sec_sub    = SubmenuBuilder::new(app, "Security Mode")
+        .item(&sec_high).item(&sec_medium).item(&sec_low).build()?;
+
+    // ── Lock Delay submenu (simulated radio) ──
+    let delay_imm = CheckMenuItemBuilder::with_id("tray_delay_0",  "Immediate").checked(lock_delay == 0).build(app)?;
+    let delay_1m  = CheckMenuItemBuilder::with_id("tray_delay_1",  "1 Minute").checked(lock_delay == 1).build(app)?;
+    let delay_5m  = CheckMenuItemBuilder::with_id("tray_delay_5",  "5 Minutes").checked(lock_delay == 5).build(app)?;
+    let delay_10m = CheckMenuItemBuilder::with_id("tray_delay_10", "10 Minutes").checked(lock_delay == 10).build(app)?;
+    let delay_30m = CheckMenuItemBuilder::with_id("tray_delay_30", "30 Minutes").checked(lock_delay == 30).build(app)?;
+    let delay_sub = SubmenuBuilder::new(app, "Lock Delay")
+        .item(&delay_imm).item(&delay_1m).item(&delay_5m).item(&delay_10m).item(&delay_30m).build()?;
+
+    let settings_btn = MenuItemBuilder::with_id("tray_settings",      "Settings...").build(app)?;
+    let check_upd    = MenuItemBuilder::with_id("tray_check_updates", "Check for Updates").build(app)?;
+    let quit         = MenuItemBuilder::with_id("tray_quit",          "Quit").build(app)?;
+
+    // ── Clones captured by event closure ──
+    let (aot_c, start_min_c, start_boot_c, notifs_c, sound_c, biometric_c) = (
+        aot.clone(), start_min.clone(), start_boot.clone(), notifs.clone(), sound.clone(), biometric.clone(),
+    );
+    let (sec_high_c, sec_medium_c, sec_low_c) = (sec_high.clone(), sec_medium.clone(), sec_low.clone());
+    let (delay_imm_c, delay_1m_c, delay_5m_c, delay_10m_c, delay_30m_c) = (
+        delay_imm.clone(), delay_1m.clone(), delay_5m.clone(), delay_10m.clone(), delay_30m.clone(),
+    );
 
     let menu = MenuBuilder::new(app)
         .item(&show)
+        .item(&lock_now)
         .item(&new_room)
-        .item(&sep)
-        .item(&content_protect)
-        .item(&sep2)
+        .separator()
+        .item(&aot)
+        .item(&start_min)
+        .item(&start_boot)
+        .separator()
+        .item(&notifs)
+        .item(&sound)
+        .separator()
+        .item(&sec_sub)
+        .separator()
+        .item(&biometric)
+        .item(&delay_sub)
+        .separator()
+        .item(&settings_btn)
+        .item(&check_upd)
+        .separator()
         .item(&quit)
         .build()?;
 
@@ -165,20 +292,141 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         .icon(app.default_window_icon().unwrap().clone())
         .tooltip("Ephemeral Chat")
         .menu(&menu)
-        .on_menu_event(|app, event| match event.id().as_ref() {
-            "show" => show_main(app),
-            "new_room" => {
-                show_main(app);
-                navigate_main(app, "?action=create");
-            }
-            "toggle_protection" => {
-                if let Some(win) = app.get_webview_window("main") {
-                    let protected = win.is_focused().unwrap_or(false);
-                    let _ = win.set_content_protected(!protected);
+        .on_menu_event(move |app, event| {
+            match event.id().as_ref() {
+                // ── Navigation ──
+                "tray_show" => show_main(app),
+                "tray_lock_now" => {
+                    show_main(app);
+                    let _ = app.emit("lock-app", ());
                 }
+                "tray_new_room" => {
+                    show_main(app);
+                    navigate_main(app, "?action=create");
+                }
+
+                // ── Window toggles ──
+                "tray_aot" => {
+                    let v = !store_get_bool(app, "alwaysOnTop", false);
+                    let _ = aot_c.set_checked(v);
+                    store_set_bool(app, "alwaysOnTop", v);
+                    if let Some(win) = app.get_webview_window("main") {
+                        let _ = win.set_always_on_top(v);
+                    }
+                }
+                "tray_start_min" => {
+                    let v = !store_get_bool(app, "startMinimized", false);
+                    let _ = start_min_c.set_checked(v);
+                    store_set_bool(app, "startMinimized", v);
+                }
+                "tray_start_boot" => {
+                    let v = !store_get_bool(app, "startOnBoot", false);
+                    let _ = start_boot_c.set_checked(v);
+                    store_set_bool(app, "startOnBoot", v);
+                    use tauri_plugin_autostart::ManagerExt;
+                    if v { let _ = app.autolaunch().enable(); }
+                    else { let _ = app.autolaunch().disable(); }
+                }
+                "tray_notifs" => {
+                    let v = !store_get_bool(app, "notificationsEnabled", true);
+                    let _ = notifs_c.set_checked(v);
+                    store_set_bool(app, "notificationsEnabled", v);
+                }
+                "tray_sound" => {
+                    let v = !store_get_bool(app, "soundEnabled", true);
+                    let _ = sound_c.set_checked(v);
+                    store_set_bool(app, "soundEnabled", v);
+                }
+
+                // ── Security Mode (radio simulation) ──
+                "tray_sec_high" => {
+                    let _ = sec_high_c.set_checked(true);
+                    let _ = sec_medium_c.set_checked(false);
+                    let _ = sec_low_c.set_checked(false);
+                    store_set_str(app, "securityMode", "high");
+                    if let Some(win) = app.get_webview_window("main") {
+                        let _ = win.set_content_protected(true);
+                    }
+                }
+                "tray_sec_medium" => {
+                    let _ = sec_high_c.set_checked(false);
+                    let _ = sec_medium_c.set_checked(true);
+                    let _ = sec_low_c.set_checked(false);
+                    store_set_str(app, "securityMode", "medium");
+                    if let Some(win) = app.get_webview_window("main") {
+                        let _ = win.set_content_protected(true);
+                    }
+                }
+                "tray_sec_low" => {
+                    let _ = sec_high_c.set_checked(false);
+                    let _ = sec_medium_c.set_checked(false);
+                    let _ = sec_low_c.set_checked(true);
+                    store_set_str(app, "securityMode", "low");
+                    if let Some(win) = app.get_webview_window("main") {
+                        let _ = win.set_content_protected(false);
+                    }
+                }
+
+                // ── Biometric Lock ──
+                "tray_biometric" => {
+                    let v = !store_get_bool(app, "biometricLockEnabled", false);
+                    let _ = biometric_c.set_checked(v);
+                    store_set_bool(app, "biometricLockEnabled", v);
+                }
+
+                // ── Lock Delay (radio simulation) ──
+                "tray_delay_0" => {
+                    let _ = delay_imm_c.set_checked(true);
+                    let _ = delay_1m_c.set_checked(false);
+                    let _ = delay_5m_c.set_checked(false);
+                    let _ = delay_10m_c.set_checked(false);
+                    let _ = delay_30m_c.set_checked(false);
+                    store_set_i64(app, "lockDelay", 0);
+                }
+                "tray_delay_1" => {
+                    let _ = delay_imm_c.set_checked(false);
+                    let _ = delay_1m_c.set_checked(true);
+                    let _ = delay_5m_c.set_checked(false);
+                    let _ = delay_10m_c.set_checked(false);
+                    let _ = delay_30m_c.set_checked(false);
+                    store_set_i64(app, "lockDelay", 1);
+                }
+                "tray_delay_5" => {
+                    let _ = delay_imm_c.set_checked(false);
+                    let _ = delay_1m_c.set_checked(false);
+                    let _ = delay_5m_c.set_checked(true);
+                    let _ = delay_10m_c.set_checked(false);
+                    let _ = delay_30m_c.set_checked(false);
+                    store_set_i64(app, "lockDelay", 5);
+                }
+                "tray_delay_10" => {
+                    let _ = delay_imm_c.set_checked(false);
+                    let _ = delay_1m_c.set_checked(false);
+                    let _ = delay_5m_c.set_checked(false);
+                    let _ = delay_10m_c.set_checked(true);
+                    let _ = delay_30m_c.set_checked(false);
+                    store_set_i64(app, "lockDelay", 10);
+                }
+                "tray_delay_30" => {
+                    let _ = delay_imm_c.set_checked(false);
+                    let _ = delay_1m_c.set_checked(false);
+                    let _ = delay_5m_c.set_checked(false);
+                    let _ = delay_10m_c.set_checked(false);
+                    let _ = delay_30m_c.set_checked(true);
+                    store_set_i64(app, "lockDelay", 30);
+                }
+
+                // ── Misc ──
+                "tray_settings" => {
+                    show_main(app);
+                    let _ = app.emit("open-settings", ());
+                }
+                "tray_check_updates" => {
+                    let _ = app.emit("check-for-updates-menu", ());
+                }
+                "tray_quit" => app.exit(0),
+                _ => {}
             }
-            "quit" => app.exit(0),
-            _ => {}
         })
         .on_tray_icon_event(|tray, event| {
             if let TrayIconEvent::Click {
@@ -195,75 +443,6 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// ─── Application Menu ─────────────────────────────────────────────────────────
-
-fn setup_app_menu(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    let file = SubmenuBuilder::new(app, "File")
-        .item(&MenuItemBuilder::with_id("file_new_room", "New Room").build(app)?)
-        .item(&MenuItemBuilder::with_id("file_home", "Home").build(app)?)
-        .separator()
-        .item(&MenuItemBuilder::with_id("file_quit", "Quit").build(app)?)
-        .build()?;
-
-    let security_menu = SubmenuBuilder::new(app, "Security")
-        .item(&MenuItemBuilder::with_id("sec_panic", "Panic Burn").build(app)?)
-        .item(&MenuItemBuilder::with_id("sec_anon", "Toggle Anonymous").build(app)?)
-        .separator()
-        .item(&MenuItemBuilder::with_id("sec_stealth", "Toggle Stealth").build(app)?)
-        .item(&MenuItemBuilder::with_id("sec_override_ttl", "Toggle 10s Self-Destruct Override").build(app)?)
-        .separator()
-        .item(&MenuItemBuilder::with_id("sec_protection", "Toggle Screen Protection").build(app)?)
-        .build()?;
-
-    let view = SubmenuBuilder::new(app, "View")
-        .item(&PredefinedMenuItem::fullscreen(app, None)?)
-        .build()?;
-
-    let menu = MenuBuilder::new(app)
-        .item(&file)
-        .item(&security_menu)
-        .item(&view)
-        .build()?;
-
-    app.set_menu(menu)?;
-
-    app.on_menu_event(|app, event| match event.id().as_ref() {
-        "file_new_room" => navigate_main(app, "?action=create"),
-        "file_home" => {
-            if let Some(win) = app.get_webview_window("main") {
-                let _ = win.eval(&format!("window.location.href = {:?}", CHAT_URL));
-            }
-        }
-        "file_quit" => app.exit(0),
-        "sec_panic" => {
-            let _ = app.emit("panic-burn", ());
-        }
-        "sec_anon" => {
-            let _ = app.emit("toggle-anonymous", ());
-        }
-        "sec_stealth" => {
-            let _ = app.emit("toggle-stealth", ());
-        }
-        "sec_override_ttl" => {
-            let _ = app.emit("toggle-override-ttl", ());
-        }
-        "sec_protection" => {
-            if let Some(win) = app.get_webview_window("main") {
-                // Read current state from a toggle; default to enabling (true)
-                static PROTECTED: std::sync::atomic::AtomicBool =
-                    std::sync::atomic::AtomicBool::new(true);
-                let current = PROTECTED.load(std::sync::atomic::Ordering::Relaxed);
-                let new_state = !current;
-                PROTECTED.store(new_state, std::sync::atomic::Ordering::Relaxed);
-                let _ = win.set_content_protected(new_state);
-            }
-        }
-        _ => {}
-    });
-
-    Ok(())
-}
-
 // ─── Global Shortcuts ─────────────────────────────────────────────────────────
 
 fn setup_shortcuts(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
@@ -272,12 +451,10 @@ fn setup_shortcuts(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error
     // Alt+Shift+E — toggle show/hide
     app.global_shortcut().on_shortcut(
         Shortcut::new(Some(Modifiers::ALT | Modifiers::SHIFT), Code::KeyE),
-        |app, _shortcut, event| {
+        |app, _s, event| {
             if event.state() == ShortcutState::Pressed {
                 if let Some(win) = app.get_webview_window("main") {
-                    let visible = win.is_visible().unwrap_or(false);
-                    let focused = win.is_focused().unwrap_or(false);
-                    if visible && focused {
+                    if win.is_visible().unwrap_or(false) && win.is_focused().unwrap_or(false) {
                         let _ = win.hide();
                     } else {
                         let _ = win.show();
@@ -288,10 +465,10 @@ fn setup_shortcuts(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error
         },
     )?;
 
-    // Alt+Shift+N — new room
+    // Alt+Shift+N — new room (global)
     app.global_shortcut().on_shortcut(
         Shortcut::new(Some(Modifiers::ALT | Modifiers::SHIFT), Code::KeyN),
-        |app, _shortcut, event| {
+        |app, _s, event| {
             if event.state() == ShortcutState::Pressed {
                 show_main(app);
                 navigate_main(app, "?action=create");
@@ -302,22 +479,35 @@ fn setup_shortcuts(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error
     // Alt+Shift+P — picture-in-picture mini mode
     app.global_shortcut().on_shortcut(
         Shortcut::new(Some(Modifiers::ALT | Modifiers::SHIFT), Code::KeyP),
-        |app, _shortcut, event| {
+        |app, _s, event| {
             if event.state() == ShortcutState::Pressed {
                 if let Some(win) = app.get_webview_window("main") {
                     if let Ok(size) = win.inner_size() {
                         let is_pip = size.width <= 380 && size.height <= 500;
                         if is_pip {
-                            let _ = win
-                                .set_size(tauri::Size::Physical(tauri::PhysicalSize::new(1200, 800)));
+                            let _ = win.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(1200, 800)));
                             let _ = win.set_always_on_top(false);
                         } else {
-                            let _ = win
-                                .set_size(tauri::Size::Physical(tauri::PhysicalSize::new(380, 500)));
+                            let _ = win.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(380, 500)));
                             let _ = win.set_always_on_top(true);
                         }
                         let _ = win.show();
                         let _ = win.set_focus();
+                    }
+                }
+            }
+        },
+    )?;
+
+    // F11 — toggle fullscreen (focus-gated: only fires for our window)
+    app.global_shortcut().on_shortcut(
+        Shortcut::new(None, Code::F11),
+        |app, _s, event| {
+            if event.state() == ShortcutState::Pressed {
+                if let Some(win) = app.get_webview_window("main") {
+                    if win.is_focused().unwrap_or(false) {
+                        let is_fs = win.is_fullscreen().unwrap_or(false);
+                        let _ = win.set_fullscreen(!is_fs);
                     }
                 }
             }
