@@ -57,11 +57,12 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
   const [myLevel, setMyLevel] = useState(1);
   const [p1State, setP1State] = useState(null);
   const [p2State, setP2State] = useState(null);
-  const [gameOver, setGameOver] = useState(null); // 'won' | 'lost' | 'ended'
+  const [gameOver, setGameOver] = useState(null); // 'won' | 'lost'
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
   const [garbageTotal, setGarbageTotal] = useState(0);
   const [gameKey, setGameKey] = useState(0); // increment to remount TetrisGame
   const relayThrottleRef = useRef(0);
+  const prevEndedAtRef = useRef(null);
 
   const vibe = getVibeById(roomVibe);
   const gameData = message?.gameData;
@@ -164,17 +165,19 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
     };
   }, [messageId, isSpectator]);
 
-  // Derive game-over state from server message
+  // Derive game-over state from server message — use endedAt as a stable sentinel
+  // so this fires exactly once per game-ending event and doesn't re-trigger when
+  // handleGameRestart clears gameOver.
   useEffect(() => {
-    if (!gameData || gameData.status !== 'finished' || isSpectator || gameOver) return;
+    if (!gameData || gameData.status !== 'finished' || isSpectator) return;
+    if (gameData.endedAt === prevEndedAtRef.current) return;
+    prevEndedAtRef.current = gameData.endedAt;
     if (gameData.winner) {
       const winnerName = gameData.winner === 'player1' ? gameData.player1?.name : gameData.player2?.name;
       setGameOver(winnerName === currentNickname ? 'won' : 'lost');
-    } else if (!gameData.player2) {
-      // Solo forfeit / End Game
-      setGameOver('ended');
     }
-  }, [gameData?.status, gameData?.winner, isSpectator, currentNickname, gameOver]);
+    // Solo "End Game" now emits delete-message — no 'ended' state needed here
+  }, [gameData?.status, gameData?.winner, gameData?.endedAt, isSpectator, currentNickname]);
 
   if (!gameData) return null;
 
@@ -311,12 +314,7 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
           )}
 
           {/* Action buttons */}
-          {gameOver === 'ended' ? (
-            <button
-              onClick={handleNewGame}
-              className="w-full py-1.5 text-[9px] font-black rounded-lg bg-cyan-800/50 text-cyan-300 border border-cyan-700/40 hover:bg-cyan-800/80 transition-colors"
-            >↺ New Game</button>
-          ) : !gameOver ? (
+          {!gameOver ? (
             <>
               {!gameData.player2 && (
                 <button
@@ -325,7 +323,10 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
                 >↺ Reset</button>
               )}
               <button
-                onClick={() => socketManager.emit('tetris-forfeit', { messageId })}
+                onClick={() => gameData.player2
+                  ? socketManager.emit('tetris-forfeit', { messageId })
+                  : socketManager.emit('delete-message', { messageId })
+                }
                 className="w-full py-1.5 text-[9px] font-black rounded-lg bg-red-900/30 text-red-400 border border-red-800/40 hover:bg-red-900/60 transition-colors"
               >
                 {gameData.player2 ? 'Forfeit' : 'End Game'}

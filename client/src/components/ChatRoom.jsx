@@ -1325,7 +1325,11 @@ const ChatRoom = () => {
       setMessages(prev => [...prev, message]);
     };
 
-    const handleMessageDeleted = ({ messageId }) => setMessages(prev => prev.filter(m => m.id !== messageId));
+    const handleMessageDeleted = ({ messageId }) => {
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+      setActiveTetrisMessage(prev => prev?.id === messageId ? null : prev);
+      setActiveChessMessage(prev => prev?.id === messageId ? null : prev);
+    };
 
     const handleUserJoined = ({ user, roomUsers }) => {
       if (Array.isArray(roomUsers)) setUsers(roomUsers);
@@ -2694,6 +2698,11 @@ const ChatRoom = () => {
     setActiveTetrisMessage(message);
     openPanel('tetris');
   };
+
+  // Close tetris panel when the game message is deleted
+  useEffect(() => {
+    if (!activeTetrisMessage && isPanelOpen('tetris')) closePanel('tetris');
+  }, [activeTetrisMessage]);
 
   const handleChessJoin = (messageId) => {
     socketManager.emit('chess-join', { messageId, userId: persistentUserId });
