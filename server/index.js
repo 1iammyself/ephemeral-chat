@@ -153,6 +153,9 @@ if (process.env.TRUST_PROXY === 'true' || process.env.RENDER) {
 // Serve static files from .well-known directory (for Digital Asset Links)
 app.use('/.well-known', express.static(path.join(__dirname, '../client/public/.well-known')));
 
+// Serve react-tetris game as an embedded activity
+app.use('/games/tetris', express.static(path.join(__dirname, '../react-tetris/docs')));
+
 // Serve static files from the client dist directory in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));
@@ -1201,6 +1204,8 @@ function cleanupRoomChaff(roomCode) {
   stopServerChaff(roomCode);
 }
 
+const tetrisDisconnectTimeouts = new Map(); // persistentUserId → timeout handle
+
 io.on('connection', (socket) => {
   // logger.info(`🔌 User connected: ${socket.id}`);
 
@@ -2212,6 +2217,27 @@ io.on('connection', (socket) => {
                 }
               }
 
+              if (gd.gameType === 'tetris' && gd.status !== 'finished') {
+                const pid = userId || socket.id;
+                if (gd.player1 && (gd.player1.id === pid || gd.player1.name === userNickname)) {
+                  // Cancel any pending forfeit for this player
+                  const prevTimeout = tetrisDisconnectTimeouts.get(gd.player1.id);
+                  if (prevTimeout) { clearTimeout(prevTimeout); tetrisDisconnectTimeouts.delete(gd.player1.id); }
+                  gd.player1.socketId = socket.id;
+                  if (userId) gd.player1.id = userId;
+                  gamesUpdated = true;
+                  if (gd.player2?.socketId) io.to(gd.player2.socketId).emit('tetris-opponent-reconnected', { messageId: msg.id });
+                }
+                if (gd.player2 && (gd.player2.id === pid || gd.player2.name === userNickname)) {
+                  const prevTimeout = tetrisDisconnectTimeouts.get(gd.player2.id);
+                  if (prevTimeout) { clearTimeout(prevTimeout); tetrisDisconnectTimeouts.delete(gd.player2.id); }
+                  gd.player2.socketId = socket.id;
+                  if (userId) gd.player2.id = userId;
+                  gamesUpdated = true;
+                  if (gd.player1?.socketId) io.to(gd.player1.socketId).emit('tetris-opponent-reconnected', { messageId: msg.id });
+                }
+              }
+
               if (msg.sender && msg.sender.nickname === userNickname && msg.sender.id !== userId && userId) {
                 msg.sender.id = userId;
                 msg.sender.socketId = socket.id;
@@ -2573,11 +2599,27 @@ io.on('connection', (socket) => {
           };
           // Chess games must never expire while active; overrideTtl=0 signals "never expire"
           overrideTtl = 0;
+        } else if (gameData.gameType === 'tetris') {
+          const senderId = socket.persistentUserId || data.userId || socket.id;
+          const gameId = `tetris_${Date.now()}_${nodeCrypto.randomBytes(4).toString('hex')}`;
+          data.gameData = {
+            gameType: 'tetris',
+            gameId,
+            player1: { id: senderId, socketId: socket.id, name: socket.nickname },
+            player2: null,
+            status: 'waiting',
+            winner: null,
+            scores: { player1: 0, player2: 0 },
+            startedAt: null,
+            endedAt: null,
+          };
+          overrideTtl = 0;
+          messageContent = 'Tetris Battle';
         } else {
           socket.emit('error', { message: 'Unknown game type' });
           return;
         }
-        messageContent = 'Chess';
+        if (gameData.gameType === 'chess') messageContent = 'Chess';
       } else if (!['text', 'image', 'audio', 'poll', 'file'].includes(messageType)) {
         socket.emit('error', { message: 'Unsupported message type' });
         return;
@@ -2974,6 +3016,138 @@ io.on('connection', (socket) => {
         await roomManager.saveRoom(socket.roomCode, room);
       }
     } catch (err) { logger.error('chess-replace-response err:', err); }
+  });
+
+  // ─── Tetris Handlers ──────────────────────────────────────────────────────
+
+  socket.on('tetris-join', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'tetris') return;
+
+      const { gameData } = message;
+      if (gameData.status === 'finished') return;
+
+      const joinerId = socket.persistentUserId || socket.id;
+
+      // Reconnecting player1 — just update socketId (handled by join-room re-sync, but guard here too)
+      if (gameData.player1?.id === joinerId || gameData.player1?.name === socket.nickname) {
+        gameData.player1.socketId = socket.id;
+        await roomManager.saveRoom(socket.roomCode, room);
+        return;
+      }
+
+      // Only allow joining as player2 if slot is open
+      if (gameData.player2 || gameData.status !== 'waiting') return;
+
+      gameData.player2 = { id: joinerId, socketId: socket.id, name: socket.nickname };
+      gameData.status = 'playing';
+      gameData.startedAt = Date.now();
+
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('tetris-join err:', err); }
+  });
+
+  socket.on('tetris-state-update', async ({ messageId, score, lines, level, matrix }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.gameData?.gameType !== 'tetris') return;
+
+      const { gameData } = message;
+      const isP1 = gameData.player1?.socketId === socket.id || gameData.player1?.id === (socket.persistentUserId || socket.id);
+      const role = isP1 ? 'player1' : 'player2';
+
+      if (gameData.scores) gameData.scores[role] = score;
+
+      // Relay board snapshot to the whole room (opponent + spectators)
+      io.to(socket.roomCode).emit('tetris-opponent-state', { messageId, role, score, lines, level, matrix });
+    } catch (err) { logger.error('tetris-state-update err:', err); }
+  });
+
+  socket.on('tetris-garbage', async ({ messageId, count }) => {
+    try {
+      if (!socket.roomCode || !messageId || !count) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.gameData?.gameType !== 'tetris') return;
+
+      const { gameData } = message;
+      const isP1 = gameData.player1?.socketId === socket.id || gameData.player1?.id === (socket.persistentUserId || socket.id);
+      const opponent = isP1 ? gameData.player2 : gameData.player1;
+
+      if (opponent?.socketId) {
+        io.to(opponent.socketId).emit('tetris-add-garbage', { messageId, count });
+      }
+    } catch (err) { logger.error('tetris-garbage err:', err); }
+  });
+
+  socket.on('tetris-game-over', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.gameData?.gameType !== 'tetris') return;
+
+      const { gameData } = message;
+      if (gameData.status === 'finished') return;
+
+      // Solo game — no winner, just mark finished
+      if (!gameData.player2) {
+        gameData.winner = null;
+        gameData.status = 'finished';
+        gameData.endedAt = Date.now();
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        return;
+      }
+
+      const loserId = socket.persistentUserId || socket.id;
+      const isP1Losing = gameData.player1?.id === loserId || gameData.player1?.socketId === socket.id;
+      gameData.winner = isP1Losing ? 'player2' : 'player1';
+      gameData.status = 'finished';
+      gameData.endedAt = Date.now();
+
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('tetris-game-over err:', err); }
+  });
+
+  socket.on('tetris-forfeit', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.gameData?.gameType !== 'tetris') return;
+
+      const { gameData } = message;
+      if (gameData.status === 'finished') return;
+
+      const forfeitorId = socket.persistentUserId || socket.id;
+      const isP1 = gameData.player1?.id === forfeitorId || gameData.player1?.socketId === socket.id;
+
+      if (!gameData.player2) {
+        // Solo — just cancel the game
+        gameData.status = 'finished';
+        gameData.winner = null;
+      } else {
+        gameData.winner = isP1 ? 'player2' : 'player1';
+        gameData.status = 'finished';
+      }
+      gameData.endedAt = Date.now();
+
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('tetris-forfeit err:', err); }
   });
 
   // Handle ephemeral view token requests
@@ -3866,6 +4040,54 @@ io.on('connection', (socket) => {
       const knockSet = pendingKnocks.get(socket.roomCode);
       knockSet.delete(socket.id);
       if (knockSet.size === 0) pendingKnocks.delete(socket.roomCode);
+    }
+
+    // Notify tetris opponents of disconnect and schedule auto-forfeit after 30s
+    if (socket.roomCode) {
+      try {
+        const room = await roomManager.getRoom(socket.roomCode);
+        if (room && room.messages) {
+          for (const msg of room.messages) {
+            if (msg.messageType !== 'game' || msg.gameData?.gameType !== 'tetris') continue;
+            const gd = msg.gameData;
+            if (gd.status === 'finished') continue;
+
+            const playerId = socket.persistentUserId || socket.id;
+            const isP1 = gd.player1?.id === playerId || gd.player1?.socketId === socket.id;
+            const isP2 = gd.player2?.id === playerId || gd.player2?.socketId === socket.id;
+            if (!isP1 && !isP2) continue;
+
+            const opponent = isP1 ? gd.player2 : gd.player1;
+            if (opponent?.socketId) {
+              io.to(opponent.socketId).emit('tetris-opponent-disconnected', { messageId: msg.id });
+            }
+
+            // Auto-forfeit after 30 seconds if they don't reconnect
+            const timeoutKey = playerId;
+            const existing = tetrisDisconnectTimeouts.get(timeoutKey);
+            if (existing) clearTimeout(existing);
+
+            const handle = setTimeout(async () => {
+              tetrisDisconnectTimeouts.delete(timeoutKey);
+              try {
+                const freshRoom = await roomManager.getRoom(socket.roomCode);
+                if (!freshRoom) return;
+                const freshMsg = (freshRoom.messages || []).find(m => m.id === msg.id);
+                if (!freshMsg || freshMsg.gameData?.status === 'finished') return;
+                const freshGd = freshMsg.gameData;
+                freshGd.winner = isP1 ? 'player2' : 'player1';
+                if (!freshGd.player2) { freshGd.winner = null; }
+                freshGd.status = 'finished';
+                freshGd.endedAt = Date.now();
+                await roomManager.saveRoom(socket.roomCode, freshRoom);
+                io.to(socket.roomCode).emit('message-updated', freshMsg);
+              } catch (e) { logger.error('tetris auto-forfeit err:', e); }
+            }, 30000);
+
+            tetrisDisconnectTimeouts.set(timeoutKey, handle);
+          }
+        }
+      } catch (e) { logger.error('tetris disconnect handler err:', e); }
     }
 
     // Note: Media watcher cleanup is handled inside handleUserDeparture

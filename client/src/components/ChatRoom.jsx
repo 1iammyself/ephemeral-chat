@@ -38,6 +38,7 @@ import {
   Lock,
   LayoutGrid,
   Trophy,
+  Gamepad2,
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -89,6 +90,8 @@ import CameraModal from './CameraModal';
 import StegoModal from './StegoModal';
 import ChessMessage from './ChessMessage';
 import ChessPanel from './ChessPanel';
+import TetrisMessage from './TetrisMessage';
+import TetrisPanel from './TetrisPanel';
 import { getVibeById, getAllVibes } from '../utils/vibes';
 import SharedMediaPlayer, { detectMediaUrl } from './SharedMediaPlayer';
 import WatchPartyModal from './WatchPartyModal';
@@ -126,6 +129,7 @@ const SLASH_COMMANDS = [
   { icon: FileText, label: 'Stego', value: '/stego', desc: 'Hide a secret in a photo' },
   { icon: Code2, label: 'Code Share', value: '/code', desc: 'Collaborative code editor' },
   { icon: Trophy, label: 'Chess', value: '/chess', desc: 'Start a chess match' },
+  { icon: Gamepad2, label: 'Tetris', value: '/tetris', desc: 'Start a Tetris battle' },
 ];
 
 const CONFETTI_COLORS = [
@@ -657,6 +661,7 @@ const ChatRoom = () => {
   const [stegoExtractImage, setStegoExtractImage] = useState(null);
   const [activeChessMessage, setActiveChessMessage] = useState(null);
   const [chessApprovalRequest, setChessApprovalRequest] = useState(null);
+  const [activeTetrisMessage, setActiveTetrisMessage] = useState(null);
   const setShowStegoModal = (v) => { if (!v) setStegoExtractImage(null); v ? openPanel('secrets') : closePanel('secrets'); };
   const setShowCodeShare    = (v) => v ? openPanel('code')    : closePanel('code');
   const openChessPanel = (message) => { setActiveChessMessage(message); openPanel('chess'); };
@@ -1405,8 +1410,9 @@ const ChatRoom = () => {
         }
       }
       setMessages(prev => prev.map(m => m.id === finalMessage.id ? finalMessage : m));
-      // Keep open chess panel in sync
+      // Keep open game panels in sync
       setActiveChessMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
+      setActiveTetrisMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
     };
 
     // Role and moderation event handlers
@@ -2109,6 +2115,9 @@ const ChatRoom = () => {
         case '/chess':
           handleSendChess();
           break;
+        case '/tetris':
+          handleSendTetris();
+          break;
         default: break;
       }
       if (cmd.startsWith('/')) {
@@ -2654,6 +2663,38 @@ const ChatRoom = () => {
     hapticLight();
   };
 
+  const handleSendTetris = () => {
+    if (!isConnected) return;
+    socketManager.emit('send-message', {
+      messageType: 'game',
+      gameData: { gameType: 'tetris' },
+      userId: persistentUserId,
+      isAnonymous: false,
+    });
+  };
+
+  const handleTetrisJoin = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('tetris-join', { messageId });
+    // Open panel immediately for the joining player
+    setMessages(prev => {
+      const msg = prev.find(m => m.id === messageId);
+      if (msg) { setActiveTetrisMessage(msg); openPanel('tetris'); }
+      return prev;
+    });
+  };
+
+  const handleTetrisLaunch = (message) => {
+    setActiveTetrisMessage(message);
+    openPanel('tetris');
+    hapticLight();
+  };
+
+  const handleTetrisSpectate = (message) => {
+    setActiveTetrisMessage(message);
+    openPanel('tetris');
+  };
+
   const handleChessJoin = (messageId) => {
     socketManager.emit('chess-join', { messageId, userId: persistentUserId });
   };
@@ -3092,6 +3133,9 @@ const ChatRoom = () => {
               onStegoExtract={handleStegoExtract}
               onChessJoin={handleChessJoin}
               onChessLaunch={handleLaunchChess}
+              onTetrisJoin={handleTetrisJoin}
+              onTetrisSpectate={handleTetrisSpectate}
+              onTetrisLaunch={handleTetrisLaunch}
               linkPreviews={linkPreviews}
               onOpenEmojiPicker={(messageId) => {
                 setReactionTargetId(messageId);
@@ -3929,6 +3973,28 @@ const ChatRoom = () => {
             currentNickname={currentUser?.nickname}
             users={users}
             onMove={handleChessAction}
+            roomVibe={roomVibe}
+          />
+        </FloatingPanel>
+      )}
+
+      {/* ── Tetris FloatingPanel ─────────────────────────────────────── */}
+      {isPanelOpen('tetris') && (
+        <FloatingPanel
+          title="Tetris Battle"
+          icon={Gamepad2}
+          iconColor="text-cyan-400"
+          onClose={() => closePanel('tetris')}
+          onFocus={() => focusPanel('tetris')}
+          zIndex={getZ('tetris')}
+          defaultWidth={580}
+          defaultHeight={520}
+          defaultX={100}
+          defaultY={70}
+        >
+          <TetrisPanel
+            message={activeTetrisMessage}
+            currentUser={currentUser}
             roomVibe={roomVibe}
           />
         </FloatingPanel>
