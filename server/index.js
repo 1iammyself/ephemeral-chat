@@ -264,7 +264,7 @@ app.use(helmet({
         "https://drive.google.com",
         "https://w.soundcloud.com"
       ],
-      frameAncestors: ["'none'"],       // Stronger clickjacking protection than X-Frame-Options
+      frameAncestors: ["'self'"],        // Allow same-origin iframes (games panel); external clickjacking still blocked
       objectSrc: ["'none'"],
       baseUri: ["'none'"],              // Prevent base tag injection
       formAction: ["'self'"],           // Prevent form hijacking to external targets
