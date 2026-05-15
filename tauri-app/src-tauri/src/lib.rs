@@ -103,14 +103,19 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     .visible(true)
     .build()?;
 
-    let _ = win.restore_state(StateFlags::all());
+    // Restore position/size/maximized only — never restore VISIBLE state
+    // (app was hidden to tray on close; we don't want that to persist across restarts)
+    let _ = win.restore_state(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED | StateFlags::FULLSCREEN);
     let _ = win.set_content_protected(true);
 
     let h = app.handle().clone();
 
-    // Honour start-minimized setting
+    // Respect start-minimized; otherwise always show normally
     if store_get_bool(&h, "startMinimized", false) {
         let _ = win.hide();
+    } else {
+        let _ = win.show();
+        let _ = win.set_focus();
     }
 
     // Restore always-on-top
@@ -125,7 +130,12 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             match event {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
                     use tauri_plugin_window_state::AppHandleExt;
-                    let _ = handle.save_window_state(tauri_plugin_window_state::StateFlags::all());
+                    let _ = handle.save_window_state(
+                        tauri_plugin_window_state::StateFlags::SIZE
+                            | tauri_plugin_window_state::StateFlags::POSITION
+                            | tauri_plugin_window_state::StateFlags::MAXIMIZED
+                            | tauri_plugin_window_state::StateFlags::FULLSCREEN,
+                    );
                     api.prevent_close();
                     if let Some(w) = handle.get_webview_window("main") {
                         let _ = w.hide();

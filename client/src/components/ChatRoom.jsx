@@ -608,7 +608,7 @@ const ChatRoom = () => {
   const messageReactionOverlayRef = useRef(null);
   const lastReactionTime = useRef(0);
 
-  // Sound FX
+  // Sound FX — initialise from localStorage (kept in sync with Tauri store by init_script)
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('soundFX_enabled') !== 'false');
   const { playMessageSound } = useSoundFX();
   const { fetchPosition: fetchGeoPosition } = useGeofence();
@@ -636,8 +636,20 @@ const ChatRoom = () => {
     setSoundEnabled(prev => {
       const next = !prev;
       localStorage.setItem('soundFX_enabled', next ? 'true' : 'false');
+      // Keep Tauri store in sync so Settings modal and tray reflect the correct state
+      window.electronAPI?.setSetting?.('soundEnabled', next).catch?.(() => {});
       return next;
     });
+  }, []);
+
+  // Live-sync sound state when changed from Settings modal or tray
+  useEffect(() => {
+    const handler = (e) => {
+      setSoundEnabled(e.detail);
+      // localStorage was already updated by init_script.js
+    };
+    window.addEventListener('ephchat:soundEnabled', handler);
+    return () => window.removeEventListener('ephchat:soundEnabled', handler);
   }, []);
 
   // Knock-to-Join & Host State

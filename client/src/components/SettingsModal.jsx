@@ -87,7 +87,7 @@ function ThemeSelector() {
   );
 }
 
-function GeneralSettings({ settings, updateSetting, version, onCheckForUpdates, updateStatus }) {
+function GeneralSettings({ settings, updateSetting, version, onCheckForUpdates, updateStatus, onShowLicenses }) {
   const [autostartEnabled, setAutostartEnabled] = useState(false);
 
   useEffect(() => {
@@ -274,7 +274,7 @@ function GeneralSettings({ settings, updateSetting, version, onCheckForUpdates, 
             <SettingRow
               icon={Info}
               label="Third Party Licenses"
-              onClick={() => API?.openUrlExternal?.('https://ephchat.kyere.me')}
+              onClick={onShowLicenses}
             />
             <SettingRow
               icon={RefreshCw}
@@ -356,11 +356,58 @@ function ChatSettings() {
 
 // ── Modal ────────────────────────────────────────────────────────────────────
 
+const LICENSES = [
+  { name: 'React',          license: 'MIT',            author: 'Meta Platforms, Inc.' },
+  { name: 'Tauri',          license: 'MIT / Apache-2.0', author: 'Tauri Programme' },
+  { name: 'Vite',           license: 'MIT',            author: 'Evan You' },
+  { name: 'Tailwind CSS',   license: 'MIT',            author: 'Tailwind Labs, Inc.' },
+  { name: 'Lucide React',   license: 'ISC',            author: 'Lucide Contributors' },
+  { name: 'Socket.IO',      license: 'MIT',            author: 'Automattic, Inc.' },
+  { name: 'Yjs',            license: 'MIT',            author: 'Kevin Jahns' },
+  { name: 'react-router-dom', license: 'MIT',          author: 'Remix Software, Inc.' },
+  { name: 'tokio',          license: 'MIT',            author: 'Tokio Contributors' },
+  { name: 'serde',          license: 'MIT / Apache-2.0', author: 'David Tolnay' },
+  { name: 'serde_json',     license: 'MIT / Apache-2.0', author: 'David Tolnay' },
+  { name: 'tauri-plugin-store', license: 'MIT / Apache-2.0', author: 'Tauri Programme' },
+  { name: 'rand',           license: 'MIT / Apache-2.0', author: 'Rust Random Contributors' },
+];
+
+function LicensesModal({ onClose }) {
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm flex flex-col max-h-[80vh]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+          <span className="text-sm font-bold text-gray-900 dark:text-white">Third Party Licenses</span>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+            <X className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-0 divide-y divide-gray-100 dark:divide-gray-800">
+          {LICENSES.map(({ name, license, author }) => (
+            <div key={name} className="py-2.5 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{name}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{author}</p>
+              </div>
+              <span className="text-[10px] font-mono bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded flex-shrink-0 mt-0.5">{license}</span>
+            </div>
+          ))}
+        </div>
+        <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center">Full license texts are available in the source repository.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsModal({ isOpen, onClose, initialTab = 'general' }) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [settings, setSettings] = useState(null);
   const [version, setVersion] = useState('');
   const [updateStatus, setUpdateStatus] = useState(null); // null | 'checking' | 'up-to-date' | 'available'
+  const [showLicenses, setShowLicenses] = useState(false);
 
   useEffect(() => {
     if (isOpen) setActiveTab(initialTab);
@@ -426,6 +473,8 @@ export default function SettingsModal({ isOpen, onClose, initialTab = 'general' 
   if (!isOpen) return null;
 
   return (
+    <>
+    {showLicenses && <LicensesModal onClose={() => setShowLicenses(false)} />}
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -476,6 +525,7 @@ export default function SettingsModal({ isOpen, onClose, initialTab = 'general' 
               version={version}
               onCheckForUpdates={handleCheckForUpdates}
               updateStatus={updateStatus}
+              onShowLicenses={() => setShowLicenses(true)}
             />
           ) : (
             <ChatSettings />
@@ -483,5 +533,6 @@ export default function SettingsModal({ isOpen, onClose, initialTab = 'general' 
         </div>
       </div>
     </div>
+    </>
   );
 }

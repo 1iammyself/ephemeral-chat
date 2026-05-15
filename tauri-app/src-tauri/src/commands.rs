@@ -92,6 +92,11 @@ pub fn get_app_version(app: AppHandle) -> String {
 
 #[tauri::command]
 pub fn show_notification(app: AppHandle, title: String, body: String) {
+    use tauri_plugin_store::StoreExt;
+    let enabled = app.store("settings.json")
+        .map(|s| s.get("notificationsEnabled").and_then(|v| v.as_bool()).unwrap_or(true))
+        .unwrap_or(true);
+    if !enabled { return; }
     use tauri_plugin_notification::NotificationExt;
     let _ = app.notification().builder().title(&title).body(&body).show();
 }
@@ -154,9 +159,11 @@ pub fn set_badge(_count: i64) {
 
 #[tauri::command]
 pub fn open_url_external(app: AppHandle, url: String) {
-    use tauri_plugin_opener::OpenerExt;
-    if url.starts_with("http://") || url.starts_with("https://") {
-        let _ = app.opener().open_url(&url, None::<&str>);
+    if !url.starts_with("http://") && !url.starts_with("https://") { return; }
+    #[allow(deprecated)] // shell::open is more reliable on Windows; opener is the future path
+    {
+        use tauri_plugin_shell::ShellExt;
+        let _ = app.shell().open(&url, None);
     }
 }
 

@@ -67,7 +67,19 @@
       if (_handlers['lock-app']) _handlers['lock-app']();
     });
     listenEvent('settings-changed', function (e) {
-      if (_handlers['settings-changed']) _handlers['settings-changed'](e.payload);
+      var p = e.payload;
+      if (p) {
+        // Bridge sound/notification settings to localStorage so useSoundFX and
+        // other hooks that read localStorage directly stay in sync
+        if (p.key === 'soundEnabled') {
+          localStorage.setItem('soundFX_enabled', p.value ? 'true' : 'false');
+          window.dispatchEvent(new CustomEvent('ephchat:soundEnabled', { detail: p.value }));
+        }
+        if (p.key === 'notificationsEnabled') {
+          window.dispatchEvent(new CustomEvent('ephchat:notificationsEnabled', { detail: p.value }));
+        }
+      }
+      if (_handlers['settings-changed']) _handlers['settings-changed'](p);
     });
     listenEvent('update-available', function (e) {
       if (_handlers['update-available']) _handlers['update-available'](e.payload);
@@ -244,6 +256,15 @@
       offUpdate: function () { delete _handlers['now-playing-update']; },
     },
   };
+
+  // Sync Tauri settings → localStorage on startup so React hooks that read
+  // localStorage (useSoundFX, etc.) start with the correct values
+  invoke('get_settings').then(function (s) {
+    if (!s) return;
+    if (typeof s.soundEnabled === 'boolean') {
+      localStorage.setItem('soundFX_enabled', s.soundEnabled ? 'true' : 'false');
+    }
+  }).catch(function () {});
 
   // Compatibility: add electron-app CSS class and fire electron-ready event
   document.addEventListener('DOMContentLoaded', function () {
