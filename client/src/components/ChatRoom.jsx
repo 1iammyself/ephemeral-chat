@@ -3987,10 +3987,10 @@ const ChatRoom = () => {
           onClose={() => closePanel('tetris')}
           onFocus={() => focusPanel('tetris')}
           zIndex={getZ('tetris')}
-          defaultWidth={580}
-          defaultHeight={520}
+          defaultWidth={560}
+          defaultHeight={560}
           defaultX={100}
-          defaultY={70}
+          defaultY={60}
         >
           <TetrisPanel
             message={activeTetrisMessage}

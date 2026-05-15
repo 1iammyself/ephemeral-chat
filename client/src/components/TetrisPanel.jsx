@@ -198,21 +198,19 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
 
   // ── Player view ──────────────────────────────────────────────────
   return (
-    <div className="flex h-full overflow-hidden bg-gray-950" style={{ minHeight: 480 }}>
-      {/* Game area */}
-      <div className="relative flex-shrink-0" style={{ width: 320, height: '100%' }}>
-        <div className="h-full overflow-y-auto">
-          <TetrisGame
-            onStateUpdate={handleStateUpdate}
-            onLinesCleared={handleLinesCleared}
-            onGameOver={handleGameOver}
-            onGameRestart={handleGameRestart}
-            garbageTotal={garbageTotal}
-          />
-        </div>
+    <div className="flex h-full overflow-hidden bg-gray-950">
+      {/* Game area — dominant, fills available space */}
+      <div className="relative flex-1 min-w-0 min-h-0">
+        <TetrisGame
+          onStateUpdate={handleStateUpdate}
+          onLinesCleared={handleLinesCleared}
+          onGameOver={handleGameOver}
+          onGameRestart={handleGameRestart}
+          garbageTotal={garbageTotal}
+        />
 
         {gameOver && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm z-10 pointer-events-none">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm z-30 pointer-events-none">
             <div className="text-center space-y-2 px-4">
               {gameOver === 'won' ? (
                 <>
@@ -234,8 +232,8 @@ const TetrisPanel = ({ message, currentUser, roomVibe }) => {
         )}
       </div>
 
-      {/* Side panel */}
-      <div className="flex-1 flex flex-col bg-gray-900 overflow-y-auto min-w-0">
+      {/* Side panel — compact, fixed width */}
+      <div className="flex-shrink-0 w-36 flex flex-col bg-gray-900 overflow-y-auto border-l border-gray-800">
         {/* Mode badge */}
         <div className={`px-3 py-2 ${vibe.accentClass} flex items-center gap-2 shrink-0`}>
           <Gamepad2 className="w-3.5 h-3.5 text-white" />
