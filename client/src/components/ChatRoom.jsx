@@ -900,7 +900,6 @@ const ChatRoom = () => {
       }
       if (!response.success && response.error === 'geofence-location-required') {
         // Room requires GPS — fetch location and retry once
-        setActivityLogs(prev => [{ id: `log_geo_${Date.now()}`, type: 'system', content: 'This room requires your location. Requesting GPS…', timestamp: new Date().toISOString() }, ...prev].slice(0, 50));
         const pos = await fetchGeoPosition();
         if (pos) {
           performJoin({ ...params, lat: pos.lat, lng: pos.lng });
@@ -1238,15 +1237,9 @@ const ChatRoom = () => {
 
     const handleDisconnect = (reason) => {
       setIsConnected(false);
-      if (reason === 'io server disconnect') {
-        setActivityLogs(prev => [{ id: `log_dc_${Date.now()}`, type: 'system', content: 'You have been disconnected by the server', timestamp: new Date().toISOString() }, ...prev].slice(0, 50));
-        setHasNewLogs(true);
-      } else if (reason === 'transport close' || reason === 'ping timeout') {
+      if (reason === 'transport close' || reason === 'ping timeout') {
         if (stateRef.current.isJoined) {
           setIsReconnecting(true);
-        } else {
-          setActivityLogs(prev => [{ id: `log_dc_${Date.now()}`, type: 'system', content: 'Connection lost. Trying to reconnect…', timestamp: new Date().toISOString() }, ...prev].slice(0, 50));
-          setHasNewLogs(true);
         }
       }
     };
@@ -1386,8 +1379,6 @@ const ChatRoom = () => {
 
     const handleError = ({ code, message }) => {
       if (code === 'INVALID_KEY_BUNDLE') return;
-      setActivityLogs(prev => [{ id: `log_err_${Date.now()}`, type: 'system', content: message, timestamp: new Date().toISOString() }, ...prev].slice(0, 50));
-      setHasNewLogs(true);
       if (message.includes('Invalid') || message.includes('expired')) { setError(message); setShowJoinModal(true); }
     };
 
