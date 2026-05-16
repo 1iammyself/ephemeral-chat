@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE } from './resolve-url.js';
+import { getAuthToken, isPrivacyPassReady, refreshTokensIfNeeded } from '../crypto/privacy-pass.js';
 
 // ---------------------------------------------------------------------------
 // 1.  Resolve the backend URL
@@ -20,9 +21,6 @@ const api = axios.create({
 // ---------------------------------------------------------------------------
 api.interceptors.request.use(async (config) => {
   try {
-    const { getAuthToken, isPrivacyPassReady, refreshTokensIfNeeded } =
-      await import('../crypto/privacy-pass.js');
-
     if (isPrivacyPassReady()) {
       const token = getAuthToken();
       if (token) {

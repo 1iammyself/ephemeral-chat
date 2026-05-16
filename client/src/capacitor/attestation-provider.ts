@@ -19,6 +19,8 @@
  *   npx cap sync
  */
 
+import { IntegrityPlugin } from './security-plugins';
+
 // ─── Types ────────────────────────────────────────────────
 
 interface AttestationResult {
@@ -109,7 +111,6 @@ export class AttestationProvider {
    */
   private static async _getAndroidAttestation(nonce: string): Promise<AttestationResult> {
     try {
-      const { IntegrityPlugin } = await import('./security-plugins');
       const result = await (IntegrityPlugin as { requestIntegrityToken: (args: { nonce: string }) => Promise<{ token: string }> })
         .requestIntegrityToken({ nonce });
       return { token: result.token, nonce, platform: 'android' };
