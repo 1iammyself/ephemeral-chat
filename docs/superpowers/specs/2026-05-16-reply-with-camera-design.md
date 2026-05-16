@@ -211,7 +211,7 @@ Chunks collected on `ondataavailable`. On stop: `new Blob(chunks, { type: mimeTy
   replyTo: { id, content, nickname },  // frozen at intent-start
   viewOnce: true,
   duration: <ms>,
-  // video: base64 data URL (Phase 1); signed upload URL (Phase 2 optimization)
+  // video: base64 data URL (E2EE path via existing MLS socket pipeline)
 }
 ```
 
@@ -288,7 +288,6 @@ Standalone (attachment tray) entry skips `replyTo` context — sends as standalo
 - "Undo within 2s" send buffer
 - Auto-stop on silence/inactivity
 - Optional dual-camera (BeReal-style moment capture)
-- Signed upload URL instead of base64
 
 ### Phase 3
 - Video reaction overlay (Snap-style face overlay)

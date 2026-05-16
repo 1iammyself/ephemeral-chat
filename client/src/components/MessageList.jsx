@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, FileText, Download, Check, CheckCheck, Pencil, X, Pin, MessageSquare } from 'lucide-react';
+import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, FileText, Download, Check, CheckCheck, Pencil, X, Pin, MessageSquare, Video } from 'lucide-react';
+import VideoReplyMessage from './VideoReplyMessage';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
 import ImageViewer from './ImageViewer';
@@ -19,7 +20,7 @@ import { FileOpener } from '@capacitor-community/file-opener';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀', '🍕', '🍔', '🍦', '🍩', '🍺', '🎸', '🎮', '🚀', '🌈', '🍄'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onPin, onViewThread, isHost, pinnedMessageId, roomVibe, linkPreviews = {}, onOpenEmojiPicker, highlightMap = {}, focusedMessageId = null, onStegoExtract, onChessJoin, onChessLaunch, onTetrisJoin, onTetrisSpectate, onTetrisLaunch }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onPin, onViewThread, isHost, pinnedMessageId, roomVibe, linkPreviews = {}, onOpenEmojiPicker, highlightMap = {}, focusedMessageId = null, onStegoExtract, onChessJoin, onChessLaunch, onTetrisJoin, onTetrisSpectate, onTetrisLaunch, onVideoReply = null }) => {
   const { t } = useTranslation();
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
@@ -35,13 +36,28 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   const [newMessages, setNewMessages] = useState(new Set());
   const [linkPreviewUrl, setLinkPreviewUrl] = useState(null);
 
-  // Swipe to reply / Long press to react states
+  // Map of messageId → number of videoReply messages that reference it (reaction threads)
+  const videoReplyCountById = useMemo(() => {
+    const map = {};
+    messages.forEach(m => {
+      if (m.messageType === 'videoReply' && m.replyTo?.id) {
+        map[m.replyTo.id] = (map[m.replyTo.id] || 0) + 1;
+      }
+    });
+    return map;
+  }, [messages]);
+
+  // Swipe to reply / Long press to react / Video reply states
   const touchState = React.useRef({
     startX: 0,
     startY: 0,
     messageId: null,
     longPressTimer: null,
-    isSwipe: false
+    isSwipe: false,
+    videoArmTimer: null,
+    videoIntentTimer: null,
+    videoIntentLocked: false,
+    videoMessage: null,
   });
 
   // Click away listener for reaction bar and context menu
@@ -224,23 +240,43 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
     } catch { /* invalid URL, show modal */ }
   }, []);
 
-  // Touch handlers for mobile swipe-to-reply and long-press-to-react
+  // Touch handlers for mobile swipe-to-reply, long-press-to-react, and video reply
   const handleTouchStart = (e, message) => {
     if (e.touches.length > 1) return;
     const touch = e.touches[0];
+
+    // Clear any leftover video timers from a previous touch
+    clearTimeout(touchState.current.videoArmTimer);
+    clearTimeout(touchState.current.videoIntentTimer);
+
     touchState.current = {
       startX: touch.clientX,
       startY: touch.clientY,
       messageId: message.id,
       isSwipe: false,
+      videoIntentLocked: false,
+      videoMessage: message,
+      // Reaction picker at 500ms — cancelled if video intent locks first
       longPressTimer: setTimeout(() => {
-        if (!touchState.current.isSwipe) {
+        if (!touchState.current.isSwipe && !touchState.current.videoIntentLocked) {
           navigator.vibrate?.(50);
           setActiveReactionId(message.id);
           setShowFullPicker(false);
           touchState.current.messageId = null;
         }
-      }, 500)
+      }, 500),
+      // Silent arm at 70ms — prewarm camera without any UI
+      videoArmTimer: onVideoReply ? setTimeout(() => {
+        onVideoReply({ phase: 'arm', message });
+      }, 70) : null,
+      // Intent lock at 120ms — sheet mounts, recording starts
+      videoIntentTimer: onVideoReply ? setTimeout(() => {
+        if (touchState.current.isSwipe) return;
+        touchState.current.videoIntentLocked = true;
+        // Video intent takes over; cancel the reaction timer
+        clearTimeout(touchState.current.longPressTimer);
+        onVideoReply({ phase: 'intent', message });
+      }, 120) : null,
     };
   };
 
@@ -248,10 +284,25 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
     if (!touchState.current.messageId || touchState.current.messageId !== message.id) return;
     const touch = e.touches[0];
     const diffX = touch.clientX - touchState.current.startX;
-    const diffY = Math.abs(touch.clientY - touchState.current.startY);
+    const diffY = touch.clientY - touchState.current.startY;
+    const drift = Math.sqrt(diffX * diffX + diffY * diffY);
 
-    if (diffY > 20) {
+    // Video intent: cancel on >= 8px drift (spec §4.2)
+    if (drift >= 8 && touchState.current.videoIntentLocked) {
+      clearTimeout(touchState.current.videoArmTimer);
+      clearTimeout(touchState.current.videoIntentTimer);
+      touchState.current.videoIntentLocked = false;
+      onVideoReply?.({ phase: 'cancel' });
+    }
+    if (drift >= 8) {
+      clearTimeout(touchState.current.videoArmTimer);
+      clearTimeout(touchState.current.videoIntentTimer);
+    }
+
+    if (Math.abs(diffY) > 20) {
       clearTimeout(touchState.current.longPressTimer);
+      clearTimeout(touchState.current.videoArmTimer);
+      clearTimeout(touchState.current.videoIntentTimer);
       touchState.current.messageId = null;
       return;
     }
@@ -259,6 +310,8 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
     if (Math.abs(diffX) > 10) {
       touchState.current.isSwipe = true;
       clearTimeout(touchState.current.longPressTimer);
+      clearTimeout(touchState.current.videoArmTimer);
+      clearTimeout(touchState.current.videoIntentTimer);
       const el = document.getElementById(message.id)?.querySelector('.group\\\\/bubble');
       if (el) {
         const boundedDiff = Math.max(-60, Math.min(60, diffX));
@@ -270,6 +323,17 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   const handleTouchEnd = (e, message) => {
     if (!touchState.current.messageId || touchState.current.messageId !== message.id) return;
     clearTimeout(touchState.current.longPressTimer);
+    clearTimeout(touchState.current.videoArmTimer);
+    clearTimeout(touchState.current.videoIntentTimer);
+
+    // Video release — trigger send pipeline; skip swipe-reply processing
+    if (touchState.current.videoIntentLocked) {
+      touchState.current.videoIntentLocked = false;
+      touchState.current.messageId = null;
+      onVideoReply?.({ phase: 'release' });
+      return;
+    }
+
     const touch = e.changedTouches[0];
     const diffX = touch.clientX - touchState.current.startX;
 
@@ -323,8 +387,11 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
           desktopPickerClass = 'sm:left-full sm:ml-2';
         }
 
+        const isVideoReply = message.messageType === 'videoReply';
+
         // Viewed View-Once Content Layout
-        if (isViewOnce && hasBeenViewed && !(isAudio && playingAudioId === message.id)) {
+        // videoReply handles its own viewed state inside VideoReplyMessage
+        if (isViewOnce && hasBeenViewed && !isVideoReply && !(isAudio && playingAudioId === message.id)) {
           return (
             <div key={message.id} className={`flex ${isOwnMessage ? 'justify-end pr-1' : 'justify-start pl-1'} mb-1 sm:mb-2`}>
               <div className="max-w-[70%] px-4 py-2 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-dashed border-gray-200 dark:border-gray-800 text-gray-400 dark:text-gray-500 italic text-xs flex items-center space-x-2">
@@ -474,6 +541,14 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                       />
                     ) : message.messageType === 'poll' ? (
                       <PollMessage message={message} currentUser={currentUser} onVote={onVote} roomVibe={roomVibe} />
+                    ) : message.messageType === 'videoReply' ? (
+                      <VideoReplyMessage
+                        message={message}
+                        isOwnMessage={isOwnMessage}
+                        onViewed={(msgId) => {
+                          socketManager.emit('message-viewed', { messageId: msgId });
+                        }}
+                      />
                     ) : message.messageType === 'file' ? (
                       <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 w-full max-w-[260px]">
                         <div className="p-1.5 sm:p-2 bg-black/10 dark:bg-white/10 rounded-lg shrink-0"><FileText className="w-4 h-4 sm:w-5 sm:h-5" /></div>
@@ -515,6 +590,19 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                           <span>{emoji}</span><span>{userIds.length}</span>
                         </button>
                       ))}
+                    </div>
+                  )}
+                  {/* Video reaction thread badge — shows how many video replies reference this message */}
+                  {videoReplyCountById[message.id] > 0 && message.messageType !== 'videoReply' && (
+                    <div className="flex items-center gap-1 mt-1.5">
+                      <div className="flex items-center gap-1 bg-rose-500/10 dark:bg-rose-500/20 border border-rose-500/20 rounded-full px-2 py-0.5 cursor-pointer hover:bg-rose-500/20 transition-colors"
+                        onClick={() => onViewThread?.(message.id)}
+                      >
+                        <Video className="w-2.5 h-2.5 text-rose-500" />
+                        <span className="text-[10px] font-bold text-rose-500">
+                          {t('messageList.videoReactions', { count: videoReplyCountById[message.id] })}
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>

@@ -40,6 +40,7 @@ import {
   LayoutGrid,
   Trophy,
   Gamepad2,
+  Video,
 } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -114,6 +115,8 @@ import FileTransferModal from './FileTransferModal';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { useGeofence } from '../hooks/useGeofence';
+import QuickVideoCapture from './QuickVideoCapture';
+import { cameraPrewarmService } from '../utils/CameraPrewarmService';
 
 const SLASH_COMMANDS = [
   { icon: Camera, label: 'Camera', value: '/camera', cmdKey: 'camera' },
@@ -685,6 +688,9 @@ const ChatRoom = () => {
   const [activeTimer, setActiveTimer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
+  const [showVideoCapture, setShowVideoCapture] = useState(false);
+  const [videoReplyTarget, setVideoReplyTarget] = useState(null);
+  const videoCaptureSendRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [typingUsers, setTypingUsers] = useState(new Map());
   const [editingMessage, setEditingMessage] = useState(null);
@@ -2903,6 +2909,73 @@ const ChatRoom = () => {
     reader.readAsDataURL(audioBlob);
   };
 
+  const sendVideoReply = async (blob, replyTo, duration, mimeType, filterStyle, overlays, allowSave) => {
+    if (!blob || blob.size === 0) return;
+    if (blob.size > 8 * 1024 * 1024) {
+      setError('Video reply is too large (max 8MB).');
+      return;
+    }
+    // Yield main thread for large blobs to avoid UI stutter during base64 encode
+    if (blob.size > 4 * 1024 * 1024) await new Promise(r => setTimeout(r, 0));
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64Video = reader.result.split(',')[1];
+      try {
+        const v2Payload = await encryptMLSMessage(base64Video, roomCode);
+        await withJitter(() => {
+          socketManager.emit('send-message', {
+            ...v2Payload,
+            messageType: 'videoReply',
+            isEncrypted: true,
+            isViewOnce: !allowSave,
+            duration,
+            mimeType: mimeType || 'video/webm',
+            filterStyle: filterStyle && filterStyle !== 'none' ? filterStyle : undefined,
+            overlays: overlays && overlays.length > 0 ? overlays : undefined,
+            recipients: selectedRecipients,
+            replyTo: replyTo ? {
+              id: replyTo.id,
+              content: replyTo.messageType === 'image' ? 'Image'
+                : replyTo.messageType === 'audio' ? 'Voice Note'
+                : replyTo.messageType === 'videoReply' ? 'Video Reply'
+                : replyTo.content,
+              sender: replyTo.sender?.nickname ?? replyTo.sender
+            } : null,
+          });
+        });
+        emitSound('send');
+      } catch (e) {
+        console.error('Video reply encryption failed:', e.message);
+        setError('Failed to encrypt video reply.');
+      }
+    };
+    reader.readAsDataURL(blob);
+  };
+
+  const handleVideoReplyGesture = useCallback(({ phase, message }) => {
+    switch (phase) {
+      case 'arm':
+        cameraPrewarmService.prewarm('user').catch(() => {});
+        break;
+      case 'intent':
+        setVideoReplyTarget(message ?? null);
+        setShowVideoCapture(true);
+        hapticLight();
+        emitSound('tap');
+        break;
+      case 'release':
+        videoCaptureSendRef.current?.();
+        break;
+      case 'cancel':
+        setShowVideoCapture(false);
+        setVideoReplyTarget(null);
+        cameraPrewarmService.suspend();
+        break;
+      default:
+        break;
+    }
+  }, [emitSound, hapticLight]);
+
   useEffect(() => {
     const unsubscribe = webRTCService.onCallStateChange((state) => {
       setCallState(state);
@@ -3182,6 +3255,7 @@ const ChatRoom = () => {
               }}
               highlightMap={highlightMap}
               focusedMessageId={focusedMessageId}
+              onVideoReply={handleVideoReplyGesture}
             />
             <div ref={messagesEndRef} />
           </div>
@@ -3370,6 +3444,12 @@ const ChatRoom = () => {
                                 <Snowflake className="w-4 h-4 text-cyan-500" />
                               </div>
                               <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">{t('chatRoom.icebreaker')}</span>
+                            </button>
+                            <button type="button" onClick={() => { setVideoReplyTarget(null); setShowVideoCapture(true); setShowFeatureMenu(false); cameraPrewarmService.prewarm('user').catch(() => {}); }} disabled={!isConnected} className="flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group" title={t('chatRoom.videoReply')}>
+                              <div className="sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/10 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm">
+                                <Video className="w-4 h-4 text-rose-500" />
+                              </div>
+                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">{t('chatRoom.videoReply')}</span>
                             </button>
                             <button type="button" onClick={() => { setShowWatchPartyModal(true); setShowFeatureMenu(false); }} disabled={!isConnected} className="flex sm:hidden items-center justify-center p-1.5 rounded-lg bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group" title={t('chatRoom.watchParty')}>
                               <div className="flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -3778,7 +3858,7 @@ const ChatRoom = () => {
                 onClick={() => setSidebarTab('tools')}
                 className={`flex-1 py-2.5 text-xs font-bold transition-colors ${sidebarTab === 'tools' ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500 dark:border-indigo-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
               >
-                {t('chatRoom.tools')}
+                {t('chatRoom.toolsTab')}
               </button>
             </div>
 
@@ -3851,7 +3931,7 @@ const ChatRoom = () => {
                   onClick={() => setSidebarTab('tools')}
                   className={`flex-1 py-3 text-xs font-bold transition-colors ${sidebarTab === 'tools' ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 dark:text-gray-400'}`}
                 >
-                  {t('chatRoom.tools')}
+                  {t('chatRoom.toolsTab')}
                 </button>
                 <button onClick={() => setShowMobileMenu(false)} className="px-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                   <X className="w-5 h-5" />
@@ -3969,6 +4049,13 @@ const ChatRoom = () => {
         isOpen={showCameraModal}
         onClose={() => setShowCameraModal(false)}
         onCapture={handleCameraCapture}
+      />
+      <QuickVideoCapture
+        open={showVideoCapture}
+        replyTo={videoReplyTarget}
+        sendTriggerRef={videoCaptureSendRef}
+        onSend={sendVideoReply}
+        onDismiss={() => { setShowVideoCapture(false); setVideoReplyTarget(null); }}
       />
       {/* ── Floating feature panels ─────────────────────────────────── */}
       {isPanelOpen('secrets') && (
