@@ -303,14 +303,21 @@ function GeneralSettings({ settings, updateSetting, version, onCheckForUpdates, 
             {version && <span className="font-mono text-gray-800 dark:text-gray-200 ml-1.5">v{version}</span>}
           </span>
         </div>
+        <SettingRow
+          icon={ExternalLink}
+          label={t('settings.about.website')}
+          description={t('settings.about.websiteDesc')}
+          onClick={() => {
+            const url = import.meta.env.VITE_LANDING_URL || 'https://ephchat.kyere.me';
+            if (isDesktop()) {
+              API?.openUrlExternal?.(url);
+            } else {
+              window.open(url, '_blank', 'noopener,noreferrer');
+            }
+          }}
+        />
         {isDesktop() && (
           <>
-            <SettingRow
-              icon={ExternalLink}
-              label={t('settings.about.website')}
-              description={t('settings.about.websiteDesc')}
-              onClick={() => API?.openUrlExternal?.('https://ephchat.kyere.me')}
-            />
             <SettingRow
               icon={Info}
               label={t('settings.about.licenses')}
