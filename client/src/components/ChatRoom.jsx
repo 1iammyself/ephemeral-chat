@@ -106,7 +106,8 @@ import FloatingPanel from './FloatingPanel';
 import { usePanelManager } from '../hooks/usePanelManager';
 import { getCreatorId } from '../utils/creator';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess } from '../utils/platform';
-import { useSoundFX } from '../hooks/useSoundFX';
+import { useSound } from '../hooks/useSound';
+import { useAudioSettings } from '../hooks/useAudioSettings';
 import { useMessageSearch } from '../hooks/useMessageSearch';
 import MessageSearch from './MessageSearch';
 import FileTransferModal from './FileTransferModal';
@@ -610,9 +611,10 @@ const ChatRoom = () => {
   const messageReactionOverlayRef = useRef(null);
   const lastReactionTime = useRef(0);
 
-  // Sound FX — initialise from localStorage (kept in sync with Tauri store by init_script)
-  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('soundFX_enabled') !== 'false');
-  const { playMessageSound } = useSoundFX();
+  // Sound engine
+  const { emit: emitSound, setSoundContext } = useSound();
+  const { settings: audioSettings, update: updateAudioSettings } = useAudioSettings();
+  const soundEnabled = audioSettings.master;
   const { fetchPosition: fetchGeoPosition } = useGeofence();
 
   // Message Search (M1)
@@ -635,24 +637,15 @@ const ChatRoom = () => {
   }, [focusedMessageId]);
 
   const toggleSound = useCallback(() => {
-    setSoundEnabled(prev => {
-      const next = !prev;
-      localStorage.setItem('soundFX_enabled', next ? 'true' : 'false');
-      // Keep Tauri store in sync so Settings modal and tray reflect the correct state
-      window.electronAPI?.setSetting?.('soundEnabled', next).catch?.(() => {});
-      return next;
-    });
-  }, []);
+    updateAudioSettings({ master: !audioSettings.master });
+  }, [audioSettings.master, updateAudioSettings]);
 
-  // Live-sync sound state when changed from Settings modal or tray
+  // Live-sync sound state when changed from Settings modal or tray (Electron/init_script)
   useEffect(() => {
-    const handler = (e) => {
-      setSoundEnabled(e.detail);
-      // localStorage was already updated by init_script.js
-    };
+    const handler = (e) => updateAudioSettings({ master: !!e.detail });
     window.addEventListener('ephchat:soundEnabled', handler);
     return () => window.removeEventListener('ephchat:soundEnabled', handler);
-  }, []);
+  }, [updateAudioSettings]);
 
   // Knock-to-Join & Host State
   const [isWaitingForHost, setIsWaitingForHost] = useState(false);
@@ -1331,7 +1324,7 @@ const ChatRoom = () => {
           console.warn('[ChatRoom] Decrypt error:', e.message);
           message.content = '⚠️ Decryption failed';
         }
-        if (!isOwnMessage) playMessageSound();
+        if (!isOwnMessage) emitSound('receive');
         setMessages(prev => [...prev, message]);
         return;
       }
@@ -1361,6 +1354,7 @@ const ChatRoom = () => {
         transportManagerRef.current.connect(user.socketId, roomCode).catch(() => { });
       }
 
+      emitSound('roomJoin');
       const displayName = user?.nickname || 'Someone';
       const log = { id: `log_${Date.now()}`, type: 'join', content: `${displayName} joined the room`, timestamp: new Date().toISOString() };
       setActivityLogs(prev => [log, ...prev].slice(0, 50));
@@ -1371,6 +1365,7 @@ const ChatRoom = () => {
       if (socketId) setUsers(prev => prev.filter(u => u.socketId !== socketId));
       else if (typeof userCount === 'number') setUsers(prev => prev.slice(0, userCount));
 
+      emitSound('roomLeave');
       const displayName = nickname || 'A user';
       const log = { id: `log_${Date.now()}`, type: 'leave', content: `${displayName} left the room`, timestamp: new Date().toISOString() };
       setActivityLogs(prev => [log, ...prev].slice(0, 50));
@@ -2221,6 +2216,7 @@ const ChatRoom = () => {
       if (overrideTtl) setOverrideTtl(null);
       if (!isStealthMode) socketManager.emit('user-activity');
       hapticLight();
+      emitSound('send');
 
       // ── Clear message while keeping keyboard open ──
       // We clear state after sends. On mobile, we avoid disabling the input 
@@ -2803,6 +2799,7 @@ const ChatRoom = () => {
       mediaRecorderRef.current.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       mediaRecorderRef.current.start();
       setIsRecording(true);
+      setSoundContext({ recording: true });
       setRecordingDuration(0);
       recordingTimerRef.current = setInterval(() => {
         setRecordingDuration(prev => {
@@ -2838,6 +2835,7 @@ const ChatRoom = () => {
       mediaRecorderRef.current.stop();
     }
     setIsRecording(false);
+    setSoundContext({ recording: false });
     clearInterval(recordingTimerRef.current);
   };
 
@@ -2847,6 +2845,7 @@ const ChatRoom = () => {
       mediaRecorderRef.current.stop();
     }
     setIsRecording(false);
+    setSoundContext({ recording: false });
     setRecordingDuration(0);
     clearInterval(recordingTimerRef.current);
   };
@@ -2891,11 +2890,13 @@ const ChatRoom = () => {
   useEffect(() => {
     const unsubscribe = webRTCService.onCallStateChange((state) => {
       setCallState(state);
+      const inCall = state.state !== CallState.IDLE;
+      setSoundContext({ inCall });
       if (state.state === CallState.INCOMING) setShowCallModal(true);
       if (state.state === CallState.IDLE && showCallModal) setTimeout(() => setShowCallModal(false), 1000);
     });
     return unsubscribe;
-  }, [showCallModal]);
+  }, [showCallModal, setSoundContext]);
 
   const currentVibe = getVibeById(roomVibe);
   const vibeAccent = currentVibe.accent || 'primary';
