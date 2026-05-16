@@ -99,6 +99,7 @@ function LanguageSelector() {
     i18n.changeLanguage(code);
     localStorage.setItem('app_language', code);
     applyDocumentDir(code);
+    window.electronAPI?.setSetting?.('lang', code);
   };
 
   return (

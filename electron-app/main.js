@@ -45,9 +45,105 @@ const store = new Store({
     securityMode: 'high', // 'high', 'medium', 'low'
     biometricLockEnabled: false,
     lockDelay: 5, // minutes
-    hasShownTrayNotification: false
+    hasShownTrayNotification: false,
+    lang: 'en'
   }
 });
+
+// ==================== TRAY I18N ====================
+
+const TRAY_TRANSLATIONS = {
+  en: {
+    open: 'Open Ephemeral Chat', lock: 'Lock App Now', newRoom: 'Create New Room',
+    alwaysOnTop: 'Always on Top', startMinimized: 'Start Minimized', startOnBoot: 'Start with Windows',
+    notifications: 'Notifications', sound: 'Sound',
+    securityMode: 'Security Mode', high: 'High (Recommended)', medium: 'Medium', low: 'Low',
+    biometricLock: 'Biometric Lock', lockDelay: 'Lock Delay',
+    immediate: 'Immediate', min1: '1 Minute', min5: '5 Minutes', min10: '10 Minutes', min30: '30 Minutes',
+    checkUpdates: 'Check for Updates', quit: 'Quit',
+  },
+  ar: {
+    open: 'فتح المحادثة المؤقتة', lock: 'قفل التطبيق الآن', newRoom: 'إنشاء غرفة جديدة',
+    alwaysOnTop: 'دائماً في الأعلى', startMinimized: 'البدء مصغراً', startOnBoot: 'البدء مع ويندوز',
+    notifications: 'الإشعارات', sound: 'الصوت',
+    securityMode: 'وضع الأمان', high: 'عالٍ (موصى به)', medium: 'متوسط', low: 'منخفض',
+    biometricLock: 'القفل البيومتري', lockDelay: 'تأخير القفل',
+    immediate: 'فوري', min1: 'دقيقة واحدة', min5: '٥ دقائق', min10: '١٠ دقائق', min30: '٣٠ دقيقة',
+    checkUpdates: 'التحقق من التحديثات', quit: 'خروج',
+  },
+  de: {
+    open: 'Ephemeral Chat öffnen', lock: 'App jetzt sperren', newRoom: 'Neuen Raum erstellen',
+    alwaysOnTop: 'Immer im Vordergrund', startMinimized: 'Minimiert starten', startOnBoot: 'Mit Windows starten',
+    notifications: 'Benachrichtigungen', sound: 'Ton',
+    securityMode: 'Sicherheitsmodus', high: 'Hoch (Empfohlen)', medium: 'Mittel', low: 'Niedrig',
+    biometricLock: 'Biometrische Sperre', lockDelay: 'Sperrverzögerung',
+    immediate: 'Sofort', min1: '1 Minute', min5: '5 Minuten', min10: '10 Minuten', min30: '30 Minuten',
+    checkUpdates: 'Nach Updates suchen', quit: 'Beenden',
+  },
+  es: {
+    open: 'Abrir Ephemeral Chat', lock: 'Bloquear app ahora', newRoom: 'Crear nueva sala',
+    alwaysOnTop: 'Siempre encima', startMinimized: 'Iniciar minimizado', startOnBoot: 'Iniciar con Windows',
+    notifications: 'Notificaciones', sound: 'Sonido',
+    securityMode: 'Modo de seguridad', high: 'Alto (Recomendado)', medium: 'Medio', low: 'Bajo',
+    biometricLock: 'Bloqueo biométrico', lockDelay: 'Retraso de bloqueo',
+    immediate: 'Inmediato', min1: '1 minuto', min5: '5 minutos', min10: '10 minutos', min30: '30 minutos',
+    checkUpdates: 'Buscar actualizaciones', quit: 'Salir',
+  },
+  fr: {
+    open: 'Ouvrir Ephemeral Chat', lock: 'Verrouiller maintenant', newRoom: 'Créer une salle',
+    alwaysOnTop: 'Toujours au premier plan', startMinimized: 'Démarrer réduit', startOnBoot: 'Démarrer avec Windows',
+    notifications: 'Notifications', sound: 'Son',
+    securityMode: 'Mode de sécurité', high: 'Élevé (Recommandé)', medium: 'Moyen', low: 'Faible',
+    biometricLock: 'Verrou biométrique', lockDelay: 'Délai de verrouillage',
+    immediate: 'Immédiat', min1: '1 minute', min5: '5 minutes', min10: '10 minutes', min30: '30 minutes',
+    checkUpdates: 'Vérifier les mises à jour', quit: 'Quitter',
+  },
+  hi: {
+    open: 'Ephemeral Chat खोलें', lock: 'अभी ऐप लॉक करें', newRoom: 'नया कमरा बनाएं',
+    alwaysOnTop: 'हमेशा ऊपर', startMinimized: 'छोटा करके शुरू करें', startOnBoot: 'Windows के साथ शुरू करें',
+    notifications: 'सूचनाएं', sound: 'ध्वनि',
+    securityMode: 'सुरक्षा मोड', high: 'उच्च (अनुशंसित)', medium: 'मध्यम', low: 'निम्न',
+    biometricLock: 'बायोमेट्रिक लॉक', lockDelay: 'लॉक विलंब',
+    immediate: 'तत्काल', min1: '1 मिनट', min5: '5 मिनट', min10: '10 मिनट', min30: '30 मिनट',
+    checkUpdates: 'अपडेट जांचें', quit: 'बाहर निकलें',
+  },
+  ja: {
+    open: 'Ephemeral Chatを開く', lock: '今すぐロック', newRoom: '新しいルームを作成',
+    alwaysOnTop: '常に最前面', startMinimized: '最小化して起動', startOnBoot: 'Windowsと共に起動',
+    notifications: '通知', sound: 'サウンド',
+    securityMode: 'セキュリティモード', high: '高（推奨）', medium: '中', low: '低',
+    biometricLock: '生体認証ロック', lockDelay: 'ロック遅延',
+    immediate: '即時', min1: '1分', min5: '5分', min10: '10分', min30: '30分',
+    checkUpdates: 'アップデートを確認', quit: '終了',
+  },
+  pt: {
+    open: 'Abrir Ephemeral Chat', lock: 'Bloquear app agora', newRoom: 'Criar nova sala',
+    alwaysOnTop: 'Sempre no topo', startMinimized: 'Iniciar minimizado', startOnBoot: 'Iniciar com o Windows',
+    notifications: 'Notificações', sound: 'Som',
+    securityMode: 'Modo de segurança', high: 'Alto (Recomendado)', medium: 'Médio', low: 'Baixo',
+    biometricLock: 'Bloqueio biométrico', lockDelay: 'Atraso de bloqueio',
+    immediate: 'Imediato', min1: '1 minuto', min5: '5 minutos', min10: '10 minutos', min30: '30 minutos',
+    checkUpdates: 'Verificar atualizações', quit: 'Sair',
+  },
+  ru: {
+    open: 'Открыть Ephemeral Chat', lock: 'Заблокировать сейчас', newRoom: 'Создать новую комнату',
+    alwaysOnTop: 'Всегда поверх', startMinimized: 'Запускать свёрнутым', startOnBoot: 'Запускать с Windows',
+    notifications: 'Уведомления', sound: 'Звук',
+    securityMode: 'Режим безопасности', high: 'Высокий (Рекомендуется)', medium: 'Средний', low: 'Низкий',
+    biometricLock: 'Биометрическая блокировка', lockDelay: 'Задержка блокировки',
+    immediate: 'Немедленно', min1: '1 минута', min5: '5 минут', min10: '10 минут', min30: '30 минут',
+    checkUpdates: 'Проверить обновления', quit: 'Выход',
+  },
+  zh: {
+    open: '打开 Ephemeral Chat', lock: '立即锁定', newRoom: '创建新房间',
+    alwaysOnTop: '始终置顶', startMinimized: '最小化启动', startOnBoot: '随 Windows 启动',
+    notifications: '通知', sound: '声音',
+    securityMode: '安全模式', high: '高（推荐）', medium: '中', low: '低',
+    biometricLock: '生物识别锁', lockDelay: '锁定延迟',
+    immediate: '立即', min1: '1 分钟', min5: '5 分钟', min10: '10 分钟', min30: '30 分钟',
+    checkUpdates: '检查更新', quit: '退出',
+  },
+};
 
 // Constants
 const CHAT_URL = process.env.CHAT_URL || 'https://chat.kyere.me';
@@ -606,22 +702,25 @@ function createTray() {
 }
 
 function updateTrayMenu() {
+  const lang = store.get('lang', 'en');
+  const T = TRAY_TRANSLATIONS[lang] || TRAY_TRANSLATIONS.en;
+
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Open Ephemeral Chat',
+      label: T.open,
       click: () => {
         unlockApp();
       }
     },
     {
-      label: 'Lock App Now',
+      label: T.lock,
       enabled: store.get('biometricLockEnabled'),
       click: () => {
         lockApp();
       }
     },
     {
-      label: 'Create New Room',
+      label: T.newRoom,
       accelerator: 'Alt+Shift+N',
       click: () => {
         mainWindow.show();
@@ -631,7 +730,7 @@ function updateTrayMenu() {
     },
     { type: 'separator' },
     {
-      label: 'Always on Top',
+      label: T.alwaysOnTop,
       type: 'checkbox',
       checked: store.get('alwaysOnTop'),
       click: (menuItem) => {
@@ -640,7 +739,7 @@ function updateTrayMenu() {
       }
     },
     {
-      label: 'Start Minimized',
+      label: T.startMinimized,
       type: 'checkbox',
       checked: store.get('startMinimized'),
       click: (menuItem) => {
@@ -648,7 +747,7 @@ function updateTrayMenu() {
       }
     },
     {
-      label: 'Start with Windows',
+      label: T.startOnBoot,
       type: 'checkbox',
       checked: store.get('startOnBoot'),
       click: (menuItem) => {
@@ -662,7 +761,7 @@ function updateTrayMenu() {
     },
     { type: 'separator' },
     {
-      label: 'Notifications',
+      label: T.notifications,
       type: 'checkbox',
       checked: store.get('notificationsEnabled'),
       click: (menuItem) => {
@@ -670,7 +769,7 @@ function updateTrayMenu() {
       }
     },
     {
-      label: 'Sound',
+      label: T.sound,
       type: 'checkbox',
       checked: store.get('soundEnabled'),
       click: (menuItem) => {
@@ -679,10 +778,10 @@ function updateTrayMenu() {
     },
     { type: 'separator' },
     {
-      label: 'Security Mode',
+      label: T.securityMode,
       submenu: [
         {
-          label: 'High (Recommended)',
+          label: T.high,
           type: 'radio',
           checked: store.get('securityMode') === 'high',
           click: () => {
@@ -693,7 +792,7 @@ function updateTrayMenu() {
           }
         },
         {
-          label: 'Medium',
+          label: T.medium,
           type: 'radio',
           checked: store.get('securityMode') === 'medium',
           click: () => {
@@ -704,7 +803,7 @@ function updateTrayMenu() {
           }
         },
         {
-          label: 'Low',
+          label: T.low,
           type: 'radio',
           checked: store.get('securityMode') === 'low',
           click: () => {
@@ -718,7 +817,7 @@ function updateTrayMenu() {
     },
     { type: 'separator' },
     {
-      label: 'Biometric Lock',
+      label: T.biometricLock,
       type: 'checkbox',
       checked: store.get('biometricLockEnabled'),
       click: (menuItem) => {
@@ -727,35 +826,35 @@ function updateTrayMenu() {
       }
     },
     {
-      label: 'Lock Delay',
+      label: T.lockDelay,
       enabled: store.get('biometricLockEnabled'),
       submenu: [
         {
-          label: 'Immediate',
+          label: T.immediate,
           type: 'radio',
           checked: store.get('lockDelay') === 0,
           click: () => { store.set('lockDelay', 0); updateTrayMenu(); }
         },
         {
-          label: '1 Minute',
+          label: T.min1,
           type: 'radio',
           checked: store.get('lockDelay') === 1,
           click: () => { store.set('lockDelay', 1); updateTrayMenu(); }
         },
         {
-          label: '5 Minutes',
+          label: T.min5,
           type: 'radio',
           checked: store.get('lockDelay') === 5,
           click: () => { store.set('lockDelay', 5); updateTrayMenu(); }
         },
         {
-          label: '10 Minutes',
+          label: T.min10,
           type: 'radio',
           checked: store.get('lockDelay') === 10,
           click: () => { store.set('lockDelay', 10); updateTrayMenu(); }
         },
         {
-          label: '30 Minutes',
+          label: T.min30,
           type: 'radio',
           checked: store.get('lockDelay') === 30,
           click: () => { store.set('lockDelay', 30); updateTrayMenu(); }
@@ -764,7 +863,7 @@ function updateTrayMenu() {
     },
     { type: 'separator' },
     {
-      label: 'Check for Updates',
+      label: T.checkUpdates,
       click: () => {
         autoUpdater.checkForUpdates().catch(err => {
           console.error('Manual update check failed:', err);
@@ -774,7 +873,7 @@ function updateTrayMenu() {
     },
     { type: 'separator' },
     {
-      label: 'Quit',
+      label: T.quit,
       accelerator: 'Alt+F4',
       click: () => {
         isQuitting = true;
