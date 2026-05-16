@@ -2408,7 +2408,8 @@ io.on('connection', (socket) => {
       // ─── v5 PQXDH + Double Ratchet / Megolm-style group encryption ───
       let { content, messageType = 'text', isViewOnce = false, imageData, pollData, gameData, recipients = [], replyTo, parentId, isEncrypted, iv, fileName, mimeType, fileSize, isAnonymous, overrideTtl,
         v: payloadVersion, header: ratchetHeader, ciphertext: ratchetCiphertext, ratchet: isRatchet, mls: mlsCiphertext,
-        ct: aesCiphertext, dr: drPayload, sk: skPayload } = data;
+        ct: aesCiphertext, dr: drPayload, sk: skPayload,
+        duration: videoDuration, filterStyle: videoFilterStyle, overlays: videoOverlays } = data;
 
       // ─── v5 normalization: map DR ciphertext or sender-key ct → content ──────
       const isV5 = payloadVersion === 5 && (drPayload || skPayload);
@@ -2628,6 +2629,9 @@ io.on('connection', (socket) => {
           return;
         }
         if (gameData.gameType === 'chess') messageContent = 'Chess';
+      } else if (messageType === 'videoReply') {
+        // Always encrypted; content holds the ciphertext forwarded from v4/v5 payload
+        messageContent = content;
       } else if (!['text', 'image', 'audio', 'poll', 'file'].includes(messageType)) {
         socket.emit('error', { message: 'Unsupported message type' });
         return;
@@ -2643,8 +2647,11 @@ io.on('connection', (socket) => {
         pollData: messageType === 'poll' ? data.pollData : undefined,
         gameData: messageType === 'game' ? data.gameData : undefined,
         fileName: messageType === 'file' ? fileName : undefined,
-        mimeType: messageType === 'file' ? mimeType : undefined,
+        mimeType: messageType === 'file' ? mimeType : (messageType === 'videoReply' ? (mimeType || 'video/webm') : undefined),
         fileSize: messageType === 'file' ? fileSize : undefined,
+        duration: messageType === 'videoReply' ? (videoDuration || undefined) : undefined,
+        filterStyle: messageType === 'videoReply' ? (videoFilterStyle || undefined) : undefined,
+        overlays: messageType === 'videoReply' ? (videoOverlays || undefined) : undefined,
         recipients, // Store recipients
         isEncrypted: !!isEncrypted, // Store encryption flag
         iv: iv || null, // Store IV if encrypted
