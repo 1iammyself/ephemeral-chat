@@ -64,8 +64,8 @@ export default defineConfig(({ mode }) => {
     build: {
       target: 'esnext',
       outDir: 'dist',
-      sourcemap: isProd ? false : true, // Disable sourcemaps in prod for security
-      minify: 'esbuild',
+      sourcemap: isProd ? false : true,
+      minify: true,
       rollupOptions: {
         // Capacitor plugins are native-only; externalize so the web build doesn't fail.
         // The attestation-provider uses dynamic imports with try/catch fallbacks,
@@ -111,9 +111,6 @@ export default defineConfig(({ mode }) => {
       // Raise the warning limit slightly so large but split bundles don't spam warnings.
       // Still keep it reasonably low to encourage further splitting if necessary.
       chunkSizeWarningLimit: 1000
-    },
-    esbuild: {
-      drop: isProd ? ['console', 'debugger'] : []
     },
     optimizeDeps: {
       include: ['react', 'react-dom', 'react-router-dom', 'socket.io-client'],
