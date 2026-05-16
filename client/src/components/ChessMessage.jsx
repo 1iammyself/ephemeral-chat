@@ -72,7 +72,13 @@ const ChessMessage = ({ message, currentUser, onJoin, onLaunch, onDelete, roomVi
           <Trophy className="w-4 h-4 text-white" />
           <h3 className="text-white font-bold text-xs sm:text-sm">Chess Match</h3>
         </div>
-        {!gameData.players.black?.id && (
+        {gameData.isCPU && (
+          <div className="flex items-center gap-1 bg-white/20 rounded-full px-2 py-0.5">
+            <span className="text-[10px]">🤖</span>
+            <span className="text-[9px] font-black text-white uppercase tracking-tighter">{gameData.cpuDifficulty || 'CPU'}</span>
+          </div>
+        )}
+        {!gameData.players.black?.id && !gameData.isCPU && (
           <div className="flex items-center gap-1.5 bg-white/20 rounded-full px-2 py-0.5">
             <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
             <span className="text-[9px] font-black text-white uppercase tracking-tighter">Waiting</span>
@@ -103,7 +109,7 @@ const ChessMessage = ({ message, currentUser, onJoin, onLaunch, onDelete, roomVi
               ♚
             </div>
             <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 truncate max-w-[64px] text-center">
-              {gameData.players.black?.name || gameData.invitedNickname || '???'}
+              {gameData.players.black?.name || (gameData.isCPU ? '🤖 CPU' : gameData.invitedNickname || '???')}
             </span>
           </div>
         </div>

@@ -207,6 +207,9 @@ export default {
         watchParty: 'Watch-Party',
         chess: 'Schachpartie',
         tetris: 'Tetris-Schlacht',
+        anagram: 'Wortduell',
+        hangman: 'Wortfalle',
+        typesprint: 'Tippsprint',
       },
       commands: {
         camera: 'Foto aufnehmen',
@@ -226,6 +229,10 @@ export default {
         codeShare: 'Kollaborativer Code-Editor',
         chess: 'Schachpartie starten',
         tetris: 'Tetris-Duell starten',
+        'chess-cpu': 'Schach gegen KI spielen',
+        anagram: 'Wortduell starten',
+        hangman: 'Wortfalle starten',
+        typesprint: 'Tippsprint starten',
       },
       tools: {
         preferences: 'Einstellungen',

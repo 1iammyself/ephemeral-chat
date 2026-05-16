@@ -63,16 +63,23 @@ const ChessPanel = ({ message, currentUserId, currentNickname, users, onMove, ro
       <div className={`px-4 py-3 ${vibe.accentClass} flex items-center justify-between shrink-0`}>
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 bg-white/20 rounded-lg">
-            <Trophy className="w-4 h-4 text-white" />
+            {gameData.isCPU ? <span className="text-lg leading-none">🤖</span> : <Trophy className="w-4 h-4 text-white" />}
           </div>
           <div>
-            <h3 className="text-white font-black text-sm leading-none">Chess Match</h3>
+            <h3 className="text-white font-black text-sm leading-none">
+              {gameData.isCPU ? 'vs CPU' : 'Chess Match'}
+            </h3>
             <p className="text-white/60 text-[9px] font-bold uppercase tracking-widest leading-none mt-0.5">
-              {gameData.winner ? 'Match Ended' : 'Live Battle'}
+              {gameData.winner ? 'Match Ended' : gameData.isCPU ? `Difficulty: ${gameData.cpuDifficulty || 'medium'}` : 'Live Battle'}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
+          {gameData.isCPU && !gameData.winner && (
+            <span className="px-2 py-0.5 bg-white/20 rounded-full text-white text-[8px] font-black uppercase tracking-widest">
+              Solo
+            </span>
+          )}
           {!gameData.winner && <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />}
           <span className="text-white/60 text-[9px] font-bold uppercase tracking-wider">
             {amPlaying ? 'Playing' : 'Spectating'}
@@ -199,8 +206,8 @@ const ChessPanel = ({ message, currentUserId, currentNickname, users, onMove, ro
               </div>
             </div>
 
-            {/* Host management — only show when both players are in */}
-            {isHost && !gameData.winner && gameData.players.white?.id && gameData.players.black?.id && (
+            {/* Host management — only show when both players are in (not in CPU mode) */}
+            {!gameData.isCPU && isHost && !gameData.winner && gameData.players.white?.id && gameData.players.black?.id && (
               <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-3 border border-gray-200 dark:border-gray-800">
                 <div className="flex items-center gap-1.5 mb-2.5 text-gray-400">
                   <Shield className="w-3.5 h-3.5" />

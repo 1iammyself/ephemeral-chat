@@ -207,6 +207,9 @@ export default {
         watchParty: 'Soirée ciné',
         chess: "Partie d\'échecs",
         tetris: 'Bataille Tetris',
+        anagram: 'Duel de mots',
+        hangman: 'Piège de mots',
+        typesprint: 'Sprint de frappe',
       },
       commands: {
         camera: 'Prendre une photo',
@@ -226,6 +229,10 @@ export default {
         codeShare: 'Éditeur de code collaboratif',
         chess: "Démarrer une partie d'échecs",
         tetris: 'Démarrer une bataille Tetris',
+        'chess-cpu': 'Jouer aux échecs contre CPU',
+        anagram: 'Démarrer un duel de mots',
+        hangman: 'Démarrer un piège de mots',
+        typesprint: 'Démarrer un sprint de frappe',
       },
       tools: {
         preferences: 'Préférences',

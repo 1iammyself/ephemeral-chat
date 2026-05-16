@@ -94,6 +94,12 @@ import ChessMessage from './ChessMessage';
 import ChessPanel from './ChessPanel';
 import TetrisMessage from './TetrisMessage';
 import TetrisPanel from './TetrisPanel';
+import AnagramMessage from './AnagramMessage';
+import AnagramPanel from './AnagramPanel';
+import HangmanMessage from './HangmanMessage';
+import HangmanPanel from './HangmanPanel';
+import TypingMessage from './TypingMessage';
+import TypingPanel from './TypingPanel';
 import { getVibeById, getAllVibes } from '../utils/vibes';
 import SharedMediaPlayer, { detectMediaUrl } from './SharedMediaPlayer';
 import WatchPartyModal from './WatchPartyModal';
@@ -135,7 +141,13 @@ const SLASH_COMMANDS = [
   { icon: FileText, label: 'Stego', value: '/stego', cmdKey: 'stego' },
   { icon: Code2, label: 'Code Share', value: '/code', cmdKey: 'codeShare' },
   { icon: Trophy, label: 'Chess', value: '/chess', cmdKey: 'chess' },
+  { icon: Trophy, label: 'Chess vs CPU (Easy)', value: '/chess-cpu easy', cmdKey: 'chess-cpu' },
+  { icon: Trophy, label: 'Chess vs CPU (Medium)', value: '/chess-cpu medium', cmdKey: 'chess-cpu' },
+  { icon: Trophy, label: 'Chess vs CPU (Hard)', value: '/chess-cpu hard', cmdKey: 'chess-cpu' },
   { icon: Gamepad2, label: 'Tetris', value: '/tetris', cmdKey: 'tetris' },
+  { icon: Gamepad2, label: 'Word Duel', value: '/anagram', cmdKey: 'anagram' },
+  { icon: Gamepad2, label: 'Word Trap', value: '/hangman', cmdKey: 'hangman' },
+  { icon: Gamepad2, label: 'Type Sprint', value: '/typesprint', cmdKey: 'typesprint' },
 ];
 
 const CONFETTI_COLORS = [
@@ -681,6 +693,9 @@ const ChatRoom = () => {
   const [activeChessMessage, setActiveChessMessage] = useState(null);
   const [chessApprovalRequest, setChessApprovalRequest] = useState(null);
   const [activeTetrisMessage, setActiveTetrisMessage] = useState(null);
+  const [activeAnagramMessage, setActiveAnagramMessage] = useState(null);
+  const [activeHangmanMessage, setActiveHangmanMessage] = useState(null);
+  const [activeTypingMessage, setActiveTypingMessage] = useState(null);
   const setShowStegoModal = (v) => { if (!v) setStegoExtractImage(null); v ? openPanel('secrets') : closePanel('secrets'); };
   const setShowCodeShare    = (v) => v ? openPanel('code')    : closePanel('code');
   const openChessPanel = (message) => { setActiveChessMessage(message); openPanel('chess'); };
@@ -1351,6 +1366,9 @@ const ChatRoom = () => {
       setMessages(prev => prev.filter(m => m.id !== messageId));
       setActiveTetrisMessage(prev => prev?.id === messageId ? null : prev);
       setActiveChessMessage(prev => prev?.id === messageId ? null : prev);
+      setActiveAnagramMessage(prev => prev?.id === messageId ? null : prev);
+      setActiveHangmanMessage(prev => prev?.id === messageId ? null : prev);
+      setActiveTypingMessage(prev => prev?.id === messageId ? null : prev);
     };
 
     const handleUserJoined = ({ user, roomUsers }) => {
@@ -1439,6 +1457,9 @@ const ChatRoom = () => {
       // Keep open game panels in sync
       setActiveChessMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
       setActiveTetrisMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
+      setActiveAnagramMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
+      setActiveHangmanMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
+      setActiveTypingMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
     };
 
     // Role and moderation event handlers
@@ -2144,13 +2165,28 @@ const ChatRoom = () => {
         case '/chess':
           handleSendChess();
           break;
+        case '/chess-cpu': {
+          const diff = parts[1]?.toLowerCase();
+          const validDiff = ['easy', 'medium', 'hard'].includes(diff) ? diff : 'medium';
+          handleSendChessCPU(validDiff);
+          break;
+        }
         case '/tetris':
           handleSendTetris();
+          break;
+        case '/anagram':
+          handleSendAnagram();
+          break;
+        case '/hangman':
+          handleSendHangman();
+          break;
+        case '/typesprint':
+          handleSendTypeSprint();
           break;
         default: break;
       }
       if (cmd.startsWith('/')) {
-        const isValid = SLASH_COMMANDS.some(c => c.value === cmd);
+        const isValid = SLASH_COMMANDS.some(c => c.value === cmd || c.value.startsWith(cmd + ' '));
         if (isValid) { if (cmd !== '/ice') setNewMessage(''); return; }
       }
     }
@@ -2732,6 +2768,110 @@ const ChatRoom = () => {
     if (!activeTetrisMessage && isPanelOpen('tetris')) closePanel('tetris');
   }, [activeTetrisMessage]);
 
+  // ─── Chess vs CPU ─────────────────────────────────────────────────
+  const handleSendChessCPU = (difficulty = 'medium') => {
+    if (!isConnected) return;
+    socketManager.emit('send-message', {
+      messageType: 'game',
+      gameData: { gameType: 'chess', isCPU: true, cpuDifficulty: difficulty },
+      userId: persistentUserId,
+      isAnonymous: false,
+    });
+  };
+
+  // ─── Anagram game handlers ─────────────────────────────────────────
+  const handleSendAnagram = () => {
+    if (!isConnected) return;
+    socketManager.emit('send-message', {
+      messageType: 'game',
+      gameData: { gameType: 'anagram' },
+      userId: persistentUserId,
+      isAnonymous: false,
+    });
+  };
+
+  const handleAnagramJoin = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('anagram-join', { messageId });
+    setMessages(prev => {
+      const msg = prev.find(m => m.id === messageId);
+      if (msg) { setActiveAnagramMessage(msg); openPanel('anagram'); }
+      return prev;
+    });
+  };
+
+  const handleAnagramLaunch = (message) => {
+    setActiveAnagramMessage(message);
+    openPanel('anagram');
+    hapticLight();
+  };
+
+  useEffect(() => {
+    if (!activeAnagramMessage && isPanelOpen('anagram')) closePanel('anagram');
+  }, [activeAnagramMessage]);
+
+  // ─── Hangman game handlers ─────────────────────────────────────────
+  const handleSendHangman = () => {
+    if (!isConnected) return;
+    socketManager.emit('send-message', {
+      messageType: 'game',
+      gameData: { gameType: 'hangman' },
+      userId: persistentUserId,
+      isAnonymous: false,
+    });
+  };
+
+  const handleHangmanJoin = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('hangman-join', { messageId });
+    setMessages(prev => {
+      const msg = prev.find(m => m.id === messageId);
+      if (msg) { setActiveHangmanMessage(msg); openPanel('hangman'); }
+      return prev;
+    });
+  };
+
+  const handleHangmanLaunch = (message) => {
+    setActiveHangmanMessage(message);
+    openPanel('hangman');
+    hapticLight();
+  };
+
+  useEffect(() => {
+    if (!activeHangmanMessage && isPanelOpen('hangman')) closePanel('hangman');
+  }, [activeHangmanMessage]);
+
+  // ─── Typing Sprint handlers ────────────────────────────────────────
+  const handleSendTypeSprint = () => {
+    if (!isConnected) return;
+    socketManager.emit('send-message', {
+      messageType: 'game',
+      gameData: { gameType: 'typesprint' },
+      userId: persistentUserId,
+      isAnonymous: false,
+    });
+  };
+
+  const handleTypeSprintJoin = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('typesprint-join', { messageId });
+    setMessages(prev => {
+      const msg = prev.find(m => m.id === messageId);
+      if (msg) { setActiveTypingMessage(msg); openPanel('typesprint'); }
+      return prev;
+    });
+  };
+
+  const handleTypeSprintLaunch = (message) => {
+    setActiveTypingMessage(message);
+    openPanel('typesprint');
+    hapticLight();
+  };
+
+  useEffect(() => {
+    if (!activeTypingMessage && isPanelOpen('typesprint')) closePanel('typesprint');
+  }, [activeTypingMessage]);
+
   const handleChessJoin = (messageId) => {
     socketManager.emit('chess-join', { messageId, userId: persistentUserId });
   };
@@ -3248,6 +3388,12 @@ const ChatRoom = () => {
               onTetrisJoin={handleTetrisJoin}
               onTetrisSpectate={handleTetrisSpectate}
               onTetrisLaunch={handleTetrisLaunch}
+              onAnagramJoin={handleAnagramJoin}
+              onAnagramLaunch={handleAnagramLaunch}
+              onHangmanJoin={handleHangmanJoin}
+              onHangmanLaunch={handleHangmanLaunch}
+              onTypeSprintJoin={handleTypeSprintJoin}
+              onTypeSprintLaunch={handleTypeSprintLaunch}
               linkPreviews={linkPreviews}
               onOpenEmojiPicker={(messageId) => {
                 setReactionTargetId(messageId);
@@ -4135,6 +4281,60 @@ const ChatRoom = () => {
             currentUser={currentUser}
             roomVibe={roomVibe}
           />
+        </FloatingPanel>
+      )}
+
+      {/* ── Anagram FloatingPanel ─────────────────────────────────────── */}
+      {isPanelOpen('anagram') && activeAnagramMessage && (
+        <FloatingPanel
+          title="Word Duel"
+          icon={Gamepad2}
+          iconColor="text-purple-400"
+          onClose={() => closePanel('anagram')}
+          onFocus={() => focusPanel('anagram')}
+          zIndex={getZ('anagram')}
+          defaultWidth={480}
+          defaultHeight={520}
+          defaultX={120}
+          defaultY={80}
+        >
+          <AnagramPanel message={activeAnagramMessage} currentUser={currentUser} roomVibe={roomVibe} />
+        </FloatingPanel>
+      )}
+
+      {/* ── Hangman FloatingPanel ─────────────────────────────────────── */}
+      {isPanelOpen('hangman') && activeHangmanMessage && (
+        <FloatingPanel
+          title="Word Trap"
+          icon={Gamepad2}
+          iconColor="text-red-400"
+          onClose={() => closePanel('hangman')}
+          onFocus={() => focusPanel('hangman')}
+          zIndex={getZ('hangman')}
+          defaultWidth={480}
+          defaultHeight={540}
+          defaultX={140}
+          defaultY={80}
+        >
+          <HangmanPanel message={activeHangmanMessage} currentUser={currentUser} roomVibe={roomVibe} />
+        </FloatingPanel>
+      )}
+
+      {/* ── Type Sprint FloatingPanel ──────────────────────────────────── */}
+      {isPanelOpen('typesprint') && activeTypingMessage && (
+        <FloatingPanel
+          title="Type Sprint"
+          icon={Gamepad2}
+          iconColor="text-green-400"
+          onClose={() => closePanel('typesprint')}
+          onFocus={() => focusPanel('typesprint')}
+          zIndex={getZ('typesprint')}
+          defaultWidth={520}
+          defaultHeight={520}
+          defaultX={160}
+          defaultY={80}
+        >
+          <TypingPanel message={activeTypingMessage} currentUser={currentUser} roomVibe={roomVibe} />
         </FloatingPanel>
       )}
 

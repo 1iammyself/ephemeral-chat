@@ -207,6 +207,9 @@ export default {
         watchParty: 'حفلة مشاهدة',
         chess: 'مباراة شطرنج',
         tetris: 'معركة تتريس',
+        anagram: 'مبارزة الكلمات',
+        hangman: 'فخ الكلمات',
+        typesprint: 'سباق الكتابة',
       },
       commands: {
         camera: 'التقط صورة',
@@ -225,7 +228,11 @@ export default {
         stego: 'إخفاء سر في صورة',
         codeShare: 'محرر كود تعاوني',
         chess: 'بدء مباراة شطرنج',
+        'chess-cpu': 'لعب الشطرنج ضد الكمبيوتر',
         tetris: 'بدء معركة تتريس',
+        anagram: 'بدء مبارزة الكلمات',
+        hangman: 'بدء فخ الكلمات',
+        typesprint: 'بدء سباق الكتابة',
       },
       tools: {
         preferences: 'التفضيلات',

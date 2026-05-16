@@ -207,6 +207,9 @@ export default {
         watchParty: 'ウォッチパーティー',
         chess: 'チェス対局',
         tetris: 'テトリス対戦',
+        anagram: 'ワードデュエル',
+        hangman: 'ワードトラップ',
+        typesprint: 'タイピングレース',
       },
       commands: {
         camera: '写真を撮る',
@@ -226,6 +229,10 @@ export default {
         codeShare: '共同コードエディター',
         chess: 'チェスマッチを開始',
         tetris: 'テトリスバトルを開始',
+        'chess-cpu': 'チェスAI対戦',
+        anagram: 'ワードデュエルを開始',
+        hangman: 'ワードトラップを開始',
+        typesprint: 'タイピングレースを開始',
       },
       tools: {
         preferences: '設定',

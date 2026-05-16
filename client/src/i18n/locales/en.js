@@ -207,6 +207,9 @@ export default {
         watchParty: 'Watch Party',
         chess: 'Chess Match',
         tetris: 'Tetris Battle',
+        anagram: 'Word Duel',
+        hangman: 'Word Trap',
+        typesprint: 'Type Sprint',
       },
       commands: {
         camera: 'Take a photo',
@@ -225,7 +228,11 @@ export default {
         stego: 'Hide a secret in a photo',
         codeShare: 'Collaborative code editor',
         chess: 'Start a chess match',
+        'chess-cpu': 'Play chess vs CPU',
         tetris: 'Start a Tetris battle',
+        anagram: 'Start a Word Duel',
+        hangman: 'Start a Word Trap',
+        typesprint: 'Start a Type Sprint',
       },
       tools: {
         preferences: 'Preferences',

@@ -207,6 +207,9 @@ export default {
         watchParty: 'Sessão de filmes',
         chess: 'Partida de xadrez',
         tetris: 'Batalha Tetris',
+        anagram: 'Duelo de palavras',
+        hangman: 'Armadilha de palavras',
+        typesprint: 'Sprint de digitação',
       },
       commands: {
         camera: 'Tirar uma foto',
@@ -226,6 +229,10 @@ export default {
         codeShare: 'Editor de código colaborativo',
         chess: 'Iniciar partida de xadrez',
         tetris: 'Iniciar batalha de Tetris',
+        'chess-cpu': 'Jogar xadrez contra CPU',
+        anagram: 'Iniciar duelo de palavras',
+        hangman: 'Iniciar armadilha de palavras',
+        typesprint: 'Iniciar sprint de digitação',
       },
       tools: {
         preferences: 'Preferências',

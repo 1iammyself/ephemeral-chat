@@ -207,6 +207,9 @@ export default {
         watchParty: '一起看',
         chess: '象棋对局',
         tetris: '俄罗斯方块对战',
+        anagram: '单词决斗',
+        hangman: '单词陷阱',
+        typesprint: '打字竞速',
       },
       commands: {
         camera: '拍照',
@@ -226,6 +229,10 @@ export default {
         codeShare: '协作代码编辑器',
         chess: '开始国际象棋对局',
         tetris: '开始俄罗斯方块对战',
+        'chess-cpu': '与电脑下象棋',
+        anagram: '开始单词决斗',
+        hangman: '开始单词陷阱',
+        typesprint: '开始打字竞速',
       },
       tools: {
         preferences: '偏好设置',

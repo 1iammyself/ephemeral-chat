@@ -1,6 +1,149 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Chess } from '../../utils/chess-lib';
 import { getVibeById } from '../../utils/vibes';
+
+// ── Chess AI Engine ──────────────────────────────────────────────────────────
+const PIECE_VALUES = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
+
+// Piece-square tables (white perspective, rank 0 = rank 1)
+const PST = {
+  p: [
+     0,  0,  0,  0,  0,  0,  0,  0,
+    50, 50, 50, 50, 50, 50, 50, 50,
+    10, 10, 20, 30, 30, 20, 10, 10,
+     5,  5, 10, 25, 25, 10,  5,  5,
+     0,  0,  0, 20, 20,  0,  0,  0,
+     5, -5,-10,  0,  0,-10, -5,  5,
+     5, 10, 10,-20,-20, 10, 10,  5,
+     0,  0,  0,  0,  0,  0,  0,  0,
+  ],
+  n: [
+    -50,-40,-30,-30,-30,-30,-40,-50,
+    -40,-20,  0,  0,  0,  0,-20,-40,
+    -30,  0, 10, 15, 15, 10,  0,-30,
+    -30,  5, 15, 20, 20, 15,  5,-30,
+    -30,  0, 15, 20, 20, 15,  0,-30,
+    -30,  5, 10, 15, 15, 10,  5,-30,
+    -40,-20,  0,  5,  5,  0,-20,-40,
+    -50,-40,-30,-30,-30,-30,-40,-50,
+  ],
+  b: [
+    -20,-10,-10,-10,-10,-10,-10,-20,
+    -10,  0,  0,  0,  0,  0,  0,-10,
+    -10,  0,  5, 10, 10,  5,  0,-10,
+    -10,  5,  5, 10, 10,  5,  5,-10,
+    -10,  0, 10, 10, 10, 10,  0,-10,
+    -10, 10, 10, 10, 10, 10, 10,-10,
+    -10,  5,  0,  0,  0,  0,  5,-10,
+    -20,-10,-10,-10,-10,-10,-10,-20,
+  ],
+  r: [
+     0,  0,  0,  0,  0,  0,  0,  0,
+     5, 10, 10, 10, 10, 10, 10,  5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+     0,  0,  0,  5,  5,  0,  0,  0,
+  ],
+  q: [
+    -20,-10,-10, -5, -5,-10,-10,-20,
+    -10,  0,  0,  0,  0,  0,  0,-10,
+    -10,  0,  5,  5,  5,  5,  0,-10,
+     -5,  0,  5,  5,  5,  5,  0, -5,
+      0,  0,  5,  5,  5,  5,  0, -5,
+    -10,  5,  5,  5,  5,  5,  0,-10,
+    -10,  0,  5,  0,  0,  0,  0,-10,
+    -20,-10,-10, -5, -5,-10,-10,-20,
+  ],
+  k: [
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -20,-30,-30,-40,-40,-30,-30,-20,
+    -10,-20,-20,-20,-20,-20,-20,-10,
+     20, 20,  0,  0,  0,  0, 20, 20,
+     20, 30, 10,  0,  0, 10, 30, 20,
+  ],
+};
+
+function pstScore(piece, square) {
+  const file = square.charCodeAt(0) - 97;
+  const rank = parseInt(square[1]) - 1;
+  const idx = piece.color === 'w' ? (7 - rank) * 8 + file : rank * 8 + file;
+  return (PST[piece.type]?.[idx] ?? 0);
+}
+
+function evaluateBoard(chess) {
+  if (chess.isCheckmate()) return chess.turn() === 'w' ? -99999 : 99999;
+  if (chess.isDraw()) return 0;
+  let score = 0;
+  chess.board().flat().forEach(p => {
+    if (!p) return;
+    const val = PIECE_VALUES[p.type] + pstScore(p, p.square);
+    score += p.color === 'w' ? val : -val;
+  });
+  return score;
+}
+
+function minimax(chess, depth, alpha, beta, maximizing) {
+  if (depth === 0 || chess.isGameOver()) return evaluateBoard(chess);
+  const moves = chess.moves();
+  if (maximizing) {
+    let best = -Infinity;
+    for (const move of moves) {
+      chess.move(move);
+      best = Math.max(best, minimax(chess, depth - 1, alpha, beta, false));
+      chess.undo();
+      alpha = Math.max(alpha, best);
+      if (beta <= alpha) break;
+    }
+    return best;
+  } else {
+    let best = Infinity;
+    for (const move of moves) {
+      chess.move(move);
+      best = Math.min(best, minimax(chess, depth - 1, alpha, beta, true));
+      chess.undo();
+      beta = Math.min(beta, best);
+      if (beta <= alpha) break;
+    }
+    return best;
+  }
+}
+
+function getBestMove(fen, difficulty) {
+  const chess = new Chess(fen);
+  const moves = chess.moves();
+  if (!moves.length) return null;
+
+  if (difficulty === 'easy') {
+    // 70% random, 30% captures/checks
+    const captures = moves.filter(m => m.includes('x') || m.includes('+'));
+    if (captures.length && Math.random() < 0.3) return captures[Math.floor(Math.random() * captures.length)];
+    return moves[Math.floor(Math.random() * moves.length)];
+  }
+
+  const depth = difficulty === 'hard' ? 4 : 2;
+  const isMax = chess.turn() === 'w';
+  let bestScore = isMax ? -Infinity : Infinity;
+  let bestMoves = [];
+
+  for (const move of moves) {
+    chess.move(move);
+    const score = minimax(chess, depth - 1, -Infinity, Infinity, !isMax);
+    chess.undo();
+    if (isMax ? score > bestScore : score < bestScore) {
+      bestScore = score;
+      bestMoves = [move];
+    } else if (score === bestScore) {
+      bestMoves.push(move);
+    }
+  }
+  return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+}
 
 // SVG Pieces — standalone, no external assets
 const PIECES = {
@@ -123,8 +266,13 @@ const ChessGame = ({ gameData, currentUserId, currentNickname, onMove, vibeId })
   const [selectedSquare, setSelectedSquare] = useState(null);
   const [validMoves, setValidMoves] = useState([]);
   const [pendingPromotion, setPendingPromotion] = useState(null);
+  const [cpuThinking, setCpuThinking] = useState(false);
+  const cpuTimerRef = useRef(null);
   const vibe = getVibeById(vibeId);
   const primary = vibe.colors?.primary || '#6366f1';
+
+  const isCPU = !!gameData?.isCPU;
+  const cpuDifficulty = gameData?.cpuDifficulty || 'medium';
 
   const isWhite =
     gameData?.players?.white?.id === currentUserId ||
@@ -135,13 +283,35 @@ const ChessGame = ({ gameData, currentUserId, currentNickname, onMove, vibeId })
   const isMyTurn =
     (game.turn() === 'w' && isWhite) || (game.turn() === 'b' && isBlack);
 
+  // Trigger CPU move when it's black's turn in CPU mode
+  const triggerCpuMove = useCallback((fen) => {
+    if (!isCPU || game.isGameOver()) return;
+    setCpuThinking(true);
+    const delay = cpuDifficulty === 'easy' ? 400 : cpuDifficulty === 'medium' ? 700 : 1200;
+    cpuTimerRef.current = setTimeout(() => {
+      const move = getBestMove(fen, cpuDifficulty);
+      if (move) {
+        const tempChess = new Chess(fen);
+        const result = tempChess.move(move);
+        if (result) onMove({ from: result.from, to: result.to, promotion: result.promotion || undefined, isCpuMove: true });
+      }
+      setCpuThinking(false);
+    }, delay);
+  }, [isCPU, cpuDifficulty, game, onMove]);
+
   useEffect(() => {
     if (gameData?.fen) {
-      setGame(new Chess(gameData.fen));
+      const newGame = new Chess(gameData.fen);
+      setGame(newGame);
       setSelectedSquare(null);
       setValidMoves([]);
+      // Fire CPU move if it's black's turn in CPU mode and game is still active
+      if (isCPU && newGame.turn() === 'b' && !newGame.isGameOver()) {
+        triggerCpuMove(gameData.fen);
+      }
     }
-  }, [gameData?.fen]);
+    return () => { if (cpuTimerRef.current) clearTimeout(cpuTimerRef.current); };
+  }, [gameData?.fen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSquareClick = (square) => {
     if (!isMyTurn || game.isGameOver()) return;
@@ -311,8 +481,28 @@ const ChessGame = ({ gameData, currentUserId, currentNickname, onMove, vibeId })
       }}>
         {squares}
 
+        {/* CPU thinking overlay */}
+        {isCPU && cpuThinking && (
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 30,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(1px)',
+            borderRadius: 10, pointerEvents: 'none',
+          }}>
+            <div style={{
+              background: `${primary}33`, border: `1.5px solid ${primary}88`,
+              borderRadius: 12, padding: '12px 22px', textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 22, marginBottom: 4 }}>🤖</div>
+              <p style={{ color: '#f9fafb', fontWeight: 700, fontSize: '0.8rem', margin: 0 }}>
+                CPU is thinking…
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Waiting for opponent overlay */}
-        {!gameData?.players?.black?.id && !gameData?.winner && (
+        {!gameData?.players?.black?.id && !gameData?.winner && !isCPU && (
           <div style={{
             position: 'absolute', inset: 0, zIndex: 30,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -358,9 +548,11 @@ const ChessGame = ({ gameData, currentUserId, currentNickname, onMove, vibeId })
           <span style={{ color: isMyTurn ? primary : '#9ca3af' }}>
             {game.isGameOver()
               ? (game.isCheckmate() ? 'Checkmate!' : 'Draw!')
-              : !gameData?.players?.black?.id
-                ? 'Waiting for opponent…'
-                : isMyTurn ? 'Your turn' : `${game.turn() === 'w' ? 'White' : 'Black'}'s turn`}
+              : isCPU && cpuThinking
+                ? `🤖 CPU thinking (${cpuDifficulty})…`
+                : !gameData?.players?.black?.id && !isCPU
+                  ? 'Waiting for opponent…'
+                  : isMyTurn ? 'Your turn' : `${game.turn() === 'w' ? 'White' : 'Black'}'s turn`}
           </span>
         </div>
         {inCheck && !game.isGameOver() && (

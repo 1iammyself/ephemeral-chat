@@ -207,6 +207,9 @@ export default {
         watchParty: 'वॉच पार्टी',
         chess: 'शतरंज मैच',
         tetris: 'टेट्रिस युद्ध',
+        anagram: 'शब्द द्वंद्व',
+        hangman: 'शब्द फंदा',
+        typesprint: 'टाइपिंग स्प्रिंट',
       },
       commands: {
         camera: 'फ़ोटो लें',
@@ -226,6 +229,10 @@ export default {
         codeShare: 'सहयोगी कोड एडिटर',
         chess: 'शतरंज मैच शुरू करें',
         tetris: 'टेट्रिस युद्ध शुरू करें',
+        'chess-cpu': 'CPU के खिलाफ शतरंज',
+        anagram: 'शब्द द्वंद्व शुरू करें',
+        hangman: 'शब्द फंदा शुरू करें',
+        typesprint: 'टाइपिंग स्प्रिंट शुरू करें',
       },
       tools: {
         preferences: 'प्राथमिकताएं',
