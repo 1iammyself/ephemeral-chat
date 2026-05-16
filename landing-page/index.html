@@ -17,6 +17,22 @@
 </head>
 
 <body>
+    <!-- Language Selector -->
+    <div class="lang-selector" id="lang-selector">
+        <select id="lang-select" aria-label="Select language">
+            <option value="en">English</option>
+            <option value="ar">العربية</option>
+            <option value="de">Deutsch</option>
+            <option value="es">Español</option>
+            <option value="fr">Français</option>
+            <option value="hi">हिन्दी</option>
+            <option value="ja">日本語</option>
+            <option value="pt">Português</option>
+            <option value="ru">Русский</option>
+            <option value="zh">中文</option>
+        </select>
+    </div>
+
     <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
         <svg class="sun-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
             stroke-width="2">
@@ -39,9 +55,9 @@
     <section class="hero">
         <div class="container">
             <div class="hero-content">
-                <div class="badge">🔒 Privacy First</div>
-                <h1 class="hero-title">Chat Without a Trace</h1>
-                <p class="hero-subtitle">Ephemeral messaging with privacy. No history</p>
+                <div class="badge" data-i18n="hero.badge">🔒 Privacy First</div>
+                <h1 class="hero-title" data-i18n="hero.title">Chat Without a Trace</h1>
+                <p class="hero-subtitle" data-i18n="hero.subtitle">Ephemeral messaging with privacy. No history</p>
                 <div class="cta-buttons">
                     <a href="https://github.com/cLLeB/ephemeral-chat/releases/download/chapter/app-release.apk"
                         class="btn btn-primary">
@@ -51,18 +67,18 @@
                             <polyline points="7 10 12 15 17 10"></polyline>
                             <line x1="12" y1="15" x2="12" y2="3"></line>
                         </svg>
-                        Download for Android
+                        <span data-i18n="hero.downloadAndroid">Download for Android</span>
                     </a>
                 </div>
                 <div class="platform-links">
-                    <a
-                        href="https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.4/Ephemeral.Chat-1.1.4-win.exe">Windows</a>
+                    <a href="https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.4/Ephemeral.Chat-1.1.4-win.exe"
+                        data-i18n="hero.windows">Windows</a>
                     <span>•</span>
-                    <a
-                        href="https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.4/Ephemeral.Chat-1.1.4-mac-arm64.dmg">macOS</a>
+                    <a href="https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.4/Ephemeral.Chat-1.1.4-mac-arm64.dmg"
+                        data-i18n="hero.macos">macOS</a>
                     <span>•</span>
-                    <a
-                        href="https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.4/Ephemeral.Chat-1.1.4-linux-x86_64.AppImage">Linux</a>
+                    <a href="https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.4/Ephemeral.Chat-1.1.4-linux-x86_64.AppImage"
+                        data-i18n="hero.linux">Linux</a>
                 </div>
             </div>
         </div>
@@ -73,41 +89,40 @@
     <section class="features">
         <div class="container">
             <div class="section-header">
-                <h2>Privacy by Design</h2>
-                <p>Every feature is built to protect your conversations</p>
+                <h2 data-i18n="features.title">Privacy by Design</h2>
+                <p data-i18n="features.subtitle">Every feature is built to protect your conversations</p>
             </div>
             <div class="carousel-container features-carousel">
                 <div class="features-grid carousel-track">
                     <div class="feature-card carousel-item">
                         <div class="feature-icon">🔥</div>
-                        <h3>Truly Ephemeral</h3>
-                        <p>Messages disappear when you leave the room. No message history, no data retention.</p>
+                        <h3 data-i18n="features.ephemeral.title">Truly Ephemeral</h3>
+                        <p data-i18n="features.ephemeral.desc">Messages disappear when you leave the room. No message history, no data retention.</p>
                     </div>
                     <div class="feature-card carousel-item">
                         <div class="feature-icon">📸</div>
-                        <h3>Screenshot Protection</h3>
-                        <p>Blocks screenshots and screen recording. Your conversations stay private.</p>
+                        <h3 data-i18n="features.screenshot.title">Screenshot Protection</h3>
+                        <p data-i18n="features.screenshot.desc">Blocks screenshots and screen recording. Your conversations stay private.</p>
                     </div>
                     <div class="feature-card carousel-item">
                         <div class="feature-icon">🎭</div>
-                        <h3>Anonymous by Default</h3>
-                        <p>No accounts, no emails, no phone numbers. Just pick a nickname and start chatting.</p>
+                        <h3 data-i18n="features.anonymous.title">Anonymous by Default</h3>
+                        <p data-i18n="features.anonymous.desc">No accounts, no emails, no phone numbers. Just pick a nickname and start chatting.</p>
                     </div>
                     <div class="feature-card carousel-item">
                         <div class="feature-icon">🔐</div>
-                        <h3>End-to-End Encrypted</h3>
-                        <p>Communication is encrypted in transit.</p>
+                        <h3 data-i18n="features.encrypted.title">End-to-End Encrypted</h3>
+                        <p data-i18n="features.encrypted.desc">Communication is encrypted in transit.</p>
                     </div>
                     <div class="feature-card carousel-item">
                         <div class="feature-icon">📞</div>
-                        <h3>Voice Calls</h3>
-                        <p>High-quality WebRTC peer-to-peer calls </p>
+                        <h3 data-i18n="features.voice.title">Voice Calls</h3>
+                        <p data-i18n="features.voice.desc">High-quality WebRTC peer-to-peer calls</p>
                     </div>
                     <div class="feature-card carousel-item">
                         <div class="feature-icon">📁</div>
-                        <h3>E2ECP File Sharing</h3>
-                        <p>Send photos, videos, and documents with confidence. Files are never stored on our servers.
-                        </p>
+                        <h3 data-i18n="features.fileShare.title">E2ECP File Sharing</h3>
+                        <p data-i18n="features.fileShare.desc">Send photos, videos, and documents with confidence. Files are never stored on our servers.</p>
                     </div>
                 </div>
                 <div class="carousel-controls">
@@ -123,27 +138,27 @@
     <section class="how-it-works">
         <div class="container">
             <div class="section-header">
-                <h2>How It Works</h2>
-                <p>Get started in seconds</p>
+                <h2 data-i18n="howItWorks.title">How It Works</h2>
+                <p data-i18n="howItWorks.subtitle">Get started in seconds</p>
             </div>
             <div class="carousel-container steps-carousel">
                 <div class="steps carousel-track">
                     <div class="step carousel-item">
                         <div class="step-number">1</div>
-                        <h3>Create a Room</h3>
-                        <p>Generate a unique room code or use a custom phrase</p>
+                        <h3 data-i18n="howItWorks.step1.title">Create a Room</h3>
+                        <p data-i18n="howItWorks.step1.desc">Generate a unique room code or use a custom phrase</p>
                     </div>
                     <div class="step-arrow">→</div>
                     <div class="step carousel-item">
                         <div class="step-number">2</div>
-                        <h3>Share the Code</h3>
-                        <p>Send the room code to your friends via any channel</p>
+                        <h3 data-i18n="howItWorks.step2.title">Share the Code</h3>
+                        <p data-i18n="howItWorks.step2.desc">Send the room code to your friends via any channel</p>
                     </div>
                     <div class="step-arrow">→</div>
                     <div class="step carousel-item">
                         <div class="step-number">3</div>
-                        <h3>Start Chatting</h3>
-                        <p>Messages totally disappear</p>
+                        <h3 data-i18n="howItWorks.step3.title">Start Chatting</h3>
+                        <p data-i18n="howItWorks.step3.desc">Messages totally disappear</p>
                     </div>
                 </div>
                 <div class="carousel-controls hide-desktop">
@@ -159,8 +174,8 @@
     <section class="download">
         <div class="container">
             <div class="section-header">
-                <h2>Download Ephchat</h2>
-                <p>Available on all your devices</p>
+                <h2 data-i18n="download.title">Download Ephchat</h2>
+                <p data-i18n="download.subtitle">Available on all your devices</p>
             </div>
             <div class="carousel-container download-carousel">
                 <div class="download-grid carousel-track">
@@ -172,10 +187,10 @@
                                 <line x1="12" y1="18" x2="12.01" y2="18"></line>
                             </svg>
                         </div>
-                        <h3>Android</h3>
-                        <p>APK for Android 8.0+</p>
+                        <h3 data-i18n="download.android.title">Android</h3>
+                        <p data-i18n="download.android.desc">APK for Android 8.0+</p>
                         <a href="https://github.com/cLLeB/ephemeral-chat/releases/download/chapter/app-release.apk"
-                            class="download-btn">Download APK</a>
+                            class="download-btn" data-i18n="download.android.btn">Download APK</a>
                     </div>
                     <div class="download-card carousel-item">
                         <div class="download-icon">
@@ -186,9 +201,10 @@
                                 <line x1="12" y1="17" x2="12" y2="21"></line>
                             </svg>
                         </div>
-                        <h3>Windows</h3>
-                        <p>Installer for Windows</p>
-                        <a href="https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.4/Ephemeral.Chat-1.1.4-win.exe" class="download-btn">Download .exe</a>
+                        <h3 data-i18n="download.windows.title">Windows</h3>
+                        <p data-i18n="download.windows.desc">Installer for Windows</p>
+                        <a href="https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.4/Ephemeral.Chat-1.1.4-win.exe"
+                            class="download-btn" data-i18n="download.windows.btn">Download .exe</a>
                     </div>
                     <div class="download-card carousel-item">
                         <div class="download-icon">
@@ -199,9 +215,10 @@
                                 <line x1="12" y1="17" x2="12" y2="21"></line>
                             </svg>
                         </div>
-                        <h3>macOS</h3>
-                        <p>DMG for macOS</p>
-                        <a href="https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.4/Ephemeral.Chat-1.1.4-mac-arm64.dmg" class="download-btn">Download .dmg</a>
+                        <h3 data-i18n="download.macos.title">macOS</h3>
+                        <p data-i18n="download.macos.desc">DMG for macOS</p>
+                        <a href="https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.4/Ephemeral.Chat-1.1.4-mac-arm64.dmg"
+                            class="download-btn" data-i18n="download.macos.btn">Download .dmg</a>
                     </div>
                     <div class="download-card carousel-item">
                         <div class="download-icon">
@@ -212,9 +229,10 @@
                                 <line x1="12" y1="17" x2="12" y2="21"></line>
                             </svg>
                         </div>
-                        <h3>Linux</h3>
-                        <p>AppImage for Linux</p>
-                        <a href="https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.4/Ephemeral.Chat-1.1.4-linux-x86_64.AppImage" class="download-btn">Download AppImage</a>
+                        <h3 data-i18n="download.linux.title">Linux</h3>
+                        <p data-i18n="download.linux.desc">AppImage for Linux</p>
+                        <a href="https://github.com/1iammyself/ephemeral-chat/releases/download/v1.1.4/Ephemeral.Chat-1.1.4-linux-x86_64.AppImage"
+                            class="download-btn" data-i18n="download.linux.btn">Download AppImage</a>
                     </div>
                 </div>
                 <div class="carousel-controls hide-desktop">
@@ -230,36 +248,36 @@
     <section class="faq">
         <div class="container">
             <div class="section-header">
-                <h2>Frequently Asked Questions</h2>
+                <h2 data-i18n="faq.title">Frequently Asked Questions</h2>
             </div>
             <div class="faq-accordion">
                 <div class="faq-row">
                     <button class="faq-header">
-                        How does screenshot protection work?
+                        <span data-i18n="faq.q1.question">How does screenshot protection work?</span>
                         <span class="faq-icon">+</span>
                     </button>
                     <div class="faq-content">
-                        <p>The Android and Desktop apps use platform-specific APIs to block screenshot capture and
+                        <p data-i18n="faq.q1.answer">The Android and Desktop apps use platform-specific APIs to block screenshot capture and
                             screen recording while the app is active.</p>
                     </div>
                 </div>
                 <div class="faq-row">
                     <button class="faq-header">
-                        Where are messages stored?
+                        <span data-i18n="faq.q2.question">Where are messages stored?</span>
                         <span class="faq-icon">+</span>
                     </button>
                     <div class="faq-content">
-                        <p>Messages are never stored on our servers. They exist only on your device
+                        <p data-i18n="faq.q2.answer">Messages are never stored on our servers. They exist only on your device
                             while the chat is open and disappear instantly.</p>
                     </div>
                 </div>
                 <div class="faq-row">
                     <button class="faq-header">
-                        Is it end-to-end encrypted?
+                        <span data-i18n="faq.q3.question">Is it end-to-end encrypted?</span>
                         <span class="faq-icon">+</span>
                     </button>
                     <div class="faq-content">
-                        <p>Yes. All communication is end-to-end encrypted using industry-standard protocols. Your
+                        <p data-i18n="faq.q3.answer">Yes. All communication is end-to-end encrypted using industry-standard protocols. Your
                             messages and calls are private and secure.</p>
                     </div>
                 </div>
@@ -274,24 +292,26 @@
 
                 <div class="footer-links">
                     <div class="footer-column">
-                        <h4>Product</h4>
-                        <a href="https://github.com/1iammyself/ephemeral-chat/releases/tag/v1.1.4">Downloads</a>
-                        <a href="https://chat.kyere.me/privacy">Privacy Policy</a>
+                        <h4 data-i18n="footer.product">Product</h4>
+                        <a href="https://github.com/1iammyself/ephemeral-chat/releases/tag/v1.1.4"
+                            data-i18n="footer.downloads">Downloads</a>
+                        <a href="https://chat.kyere.me/privacy" data-i18n="footer.privacy">Privacy Policy</a>
                     </div>
                     <div class="footer-column">
-                        <h4>Resources</h4>
-                        <a
-                            href="https://github.com/cLLeB/ephemeral-chat/blob/tried_something/README.md">Documentation</a>
-                        <a href="mailto:ephchat@gmail.com">Contact</a>
+                        <h4 data-i18n="footer.resources">Resources</h4>
+                        <a href="https://github.com/cLLeB/ephemeral-chat/blob/tried_something/README.md"
+                            data-i18n="footer.docs">Documentation</a>
+                        <a href="mailto:ephchat@gmail.com" data-i18n="footer.contact">Contact</a>
                     </div>
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>&copy; 2026 Ephchat</p>
+                <p data-i18n="footer.copyright">&copy; 2026 Ephchat</p>
             </div>
         </div>
     </footer>
 
+    <script src="i18n.js"></script>
     <script src="script.js"></script>
 </body>
 

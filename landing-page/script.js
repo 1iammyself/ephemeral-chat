@@ -156,3 +156,22 @@ window.addEventListener('scroll', () => {
         themeToggle.classList.remove('hidden');
     }
 });
+
+// Language selector — hide on scroll like theme toggle
+const langSelector = document.getElementById('lang-selector');
+window.addEventListener('scroll', () => {
+    if (window.scrollY > 100) {
+        langSelector.classList.add('hidden');
+    } else {
+        langSelector.classList.remove('hidden');
+    }
+});
+
+// Language switching
+const langSelect = document.getElementById('lang-select');
+langSelect.addEventListener('change', () => setLang(langSelect.value));
+
+// Apply saved/detected language on load
+const initialLang = getStoredLang();
+langSelect.value = initialLang;
+applyTranslations(initialLang);
