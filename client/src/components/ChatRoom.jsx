@@ -2715,7 +2715,8 @@ const ChatRoom = () => {
   const handleChessAction = (messageId, action, payload) => {
     if (!isConnected) return;
     if (action === 'chess-move') {
-      socketManager.emit('chess-move', { messageId, move: payload, userId: persistentUserId });
+      const { isCpuMove, ...cleanMove } = payload;
+      socketManager.emit('chess-move', { messageId, move: cleanMove, userId: persistentUserId, isCpuMove: !!isCpuMove });
     } else if (action === 'chess-join') {
       socketManager.emit('chess-join', { messageId, userId: persistentUserId });
     } else if (action === 'chess-swap') {
@@ -2800,6 +2801,16 @@ const ChatRoom = () => {
     });
   };
 
+  const handleAnagramSolo = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('anagram-solo', { messageId });
+    setMessages(prev => {
+      const msg = prev.find(m => m.id === messageId);
+      if (msg) { setActiveAnagramMessage(msg); openPanel('anagram'); }
+      return prev;
+    });
+  };
+
   const handleAnagramLaunch = (message) => {
     setActiveAnagramMessage(message);
     openPanel('anagram');
@@ -2831,6 +2842,16 @@ const ChatRoom = () => {
     });
   };
 
+  const handleHangmanSolo = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('hangman-solo', { messageId });
+    setMessages(prev => {
+      const msg = prev.find(m => m.id === messageId);
+      if (msg) { setActiveHangmanMessage(msg); openPanel('hangman'); }
+      return prev;
+    });
+  };
+
   const handleHangmanLaunch = (message) => {
     setActiveHangmanMessage(message);
     openPanel('hangman');
@@ -2855,6 +2876,16 @@ const ChatRoom = () => {
   const handleTypeSprintJoin = (messageId) => {
     if (!isConnected) return;
     socketManager.emit('typesprint-join', { messageId });
+    setMessages(prev => {
+      const msg = prev.find(m => m.id === messageId);
+      if (msg) { setActiveTypingMessage(msg); openPanel('typesprint'); }
+      return prev;
+    });
+  };
+
+  const handleTypeSprintSolo = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('typesprint-solo', { messageId });
     setMessages(prev => {
       const msg = prev.find(m => m.id === messageId);
       if (msg) { setActiveTypingMessage(msg); openPanel('typesprint'); }
@@ -3389,10 +3420,13 @@ const ChatRoom = () => {
               onTetrisSpectate={handleTetrisSpectate}
               onTetrisLaunch={handleTetrisLaunch}
               onAnagramJoin={handleAnagramJoin}
+              onAnagramSolo={handleAnagramSolo}
               onAnagramLaunch={handleAnagramLaunch}
               onHangmanJoin={handleHangmanJoin}
+              onHangmanSolo={handleHangmanSolo}
               onHangmanLaunch={handleHangmanLaunch}
               onTypeSprintJoin={handleTypeSprintJoin}
+              onTypeSprintSolo={handleTypeSprintSolo}
               onTypeSprintLaunch={handleTypeSprintLaunch}
               linkPreviews={linkPreviews}
               onOpenEmojiPicker={(messageId) => {

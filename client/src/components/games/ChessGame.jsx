@@ -506,8 +506,8 @@ const ChessGame = ({ gameData, currentUserId, currentNickname, onMove, vibeId })
           <div style={{
             position: 'absolute', inset: 0, zIndex: 30,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)',
-            borderRadius: 10,
+            background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)',
+            borderRadius: 10, pointerEvents: 'none',
           }}>
             <div style={{
               background: `${primary}22`, border: `1.5px solid ${primary}66`,

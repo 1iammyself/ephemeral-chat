@@ -18,6 +18,7 @@ const TypingGame = ({ gameData, currentUserId, currentNickname, onProgress, onJo
   const myRole = isP1 ? 'player1' : isP2 ? 'player2' : null;
   const oppRole = isP1 ? 'player2' : isP2 ? 'player1' : null;
   const canJoin = !gameData?.player2 && !isP1 && gameData?.status === 'waiting';
+  const isSolo = !!gameData?.isSolo;
 
   const passage = gameData?.passage || '';
   const myProgress = gameData?.progress?.[myRole] ?? 0;
@@ -90,8 +91,8 @@ const TypingGame = ({ gameData, currentUserId, currentNickname, onProgress, onJo
               <div style={{ height: '100%', width: `${myProgress}%`, background: primary, borderRadius: 3, transition: 'width 0.3s ease' }} />
             </div>
           </div>
-          {/* Opponent progress */}
-          {oppName && (
+          {/* Opponent progress — hidden in solo mode */}
+          {oppName && !isSolo && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, fontSize: '0.72rem', color: '#9ca3af', fontFamily: 'monospace' }}>
                 <span style={{ color: '#f59e0b' }}>{oppName} — {oppWPM} WPM</span>
@@ -156,11 +157,13 @@ const TypingGame = ({ gameData, currentUserId, currentNickname, onProgress, onJo
       {isFinished && (
         <div style={{ textAlign: 'center', padding: '12px', borderRadius: 10, background: `${primary}22`, border: `1.5px solid ${primary}44`, marginTop: 8 }}>
           <p style={{ color: '#f9fafb', fontWeight: 700, fontFamily: 'monospace', margin: 0 }}>
-            {gameData.winner === myRole ? '🏆 You won!' : gameData.winner ? `${oppName} wins!` : '🤝 Draw!'}
+            {isSolo ? `🏆 Done! ${myWPM} WPM` : (gameData.winner === myRole ? '🏆 You won!' : gameData.winner ? `${oppName} wins!` : '🤝 Draw!')}
           </p>
-          <p style={{ color: '#9ca3af', fontSize: '0.72rem', marginTop: 4, fontFamily: 'monospace' }}>
-            You: {myWPM} WPM · Opp: {oppWPM} WPM
-          </p>
+          {!isSolo && (
+            <p style={{ color: '#9ca3af', fontSize: '0.72rem', marginTop: 4, fontFamily: 'monospace' }}>
+              You: {myWPM} WPM · Opp: {oppWPM} WPM
+            </p>
+          )}
         </div>
       )}
     </div>

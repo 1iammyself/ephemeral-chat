@@ -2969,6 +2969,7 @@ io.on('connection', (socket) => {
 
         gameData.history = gameData.history || [];
         gameData.history.push(moveResult.san);
+        gameData.lastRawMove = { from: moveResult.from, to: moveResult.to };
         gameData.lastActivity = Date.now();
 
         await roomManager.saveRoom(socket.roomCode, room);
@@ -4249,8 +4250,64 @@ io.on('connection', (socket) => {
     } catch (err) { logger.error('anagram-guess err:', err); }
   });
 
+  socket.on('anagram-solo', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.gameData?.gameType !== 'anagram') return;
+      const gd = message.gameData;
+      if (gd.status !== 'waiting') return;
+      const hostId = socket.persistentUserId || socket.id;
+      if (gd.host.id !== hostId && gd.host.name !== socket.nickname) return;
+      gd.isSolo = true;
+      gd.challenger = { id: 'bot', name: 'Bot', isBot: true };
+      const words = WORD_LISTS['medium'];
+      const word = words[Math.floor(Math.random() * words.length)];
+      gd.currentWord = word;
+      gd.currentScrambled = scramble(word);
+      gd.round = 1;
+      gd.status = 'playing';
+      gd.startedAt = Date.now();
+      gd.roundDeadline = Date.now() + 30000;
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('anagram-solo err:', err); }
+  });
+
   // ─── Hangman Game Handlers ──────────────────────────────────────────────────
   const HANGMAN_WORDS = ['algorithm','blueprint','cognition','democracy','evolution','fantastic','geography','hibernate','illusion','journalism','keyboard','lightning','magazine','nitrogen','obsidian','photograph','question','rhythmic','symmetry','technology','umbrella','vibration','wavelength','xenolith','yesterday','zodiac'];
+
+  socket.on('hangman-solo', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.gameData?.gameType !== 'hangman') return;
+      const gd = message.gameData;
+      if (gd.status !== 'waiting') return;
+      const hostId = socket.persistentUserId || socket.id;
+      if (gd.wordmaster.id !== hostId && gd.wordmaster.name !== socket.nickname) return;
+      // Computer picks a random word, player guesses
+      const word = HANGMAN_WORDS[Math.floor(Math.random() * HANGMAN_WORDS.length)];
+      gd.isSolo = true;
+      gd.guesser = { id: hostId, socketId: socket.id, name: socket.nickname };
+      gd.wordmaster = { id: 'computer', name: 'Computer', isBot: true };
+      gd.currentWord = word;
+      gd.wordLength = word.length;
+      gd.revealedLetters = Array(word.length).fill(null);
+      gd.wrongGuesses = [];
+      gd.status = 'playing';
+      gd.startedAt = Date.now();
+      await roomManager.saveRoom(socket.roomCode, room);
+      // Only send word to guesser (same user here, but keep pattern)
+      const maskedMessage = { ...message, gameData: { ...gd, currentWord: null } };
+      io.to(socket.roomCode).emit('message-updated', maskedMessage);
+      io.to(socket.id).emit('hangman-your-word', { messageId, word });
+    } catch (err) { logger.error('hangman-solo err:', err); }
+  });
 
   socket.on('hangman-join', async ({ messageId }) => {
     try {
@@ -4310,8 +4367,8 @@ io.on('connection', (socket) => {
       if (gd.winner || gd.status !== 'playing') return;
       const guesserId = socket.persistentUserId || socket.id;
       const isGuesser = gd.guesser?.id === guesserId || gd.guesser?.name === socket.nickname;
-      // Also allow spectators to guess
-      const isSpectator = !isGuesser && gd.wordmaster.id !== guesserId;
+      // In solo mode wordmaster is 'computer' — only the guesser can guess; otherwise allow spectators too
+      const isSpectator = !gd.isSolo && !isGuesser && gd.wordmaster.id !== guesserId;
       if (!isGuesser && !isSpectator) return;
       const l = letter.toLowerCase();
       if (gd.revealedLetters.includes(l) || gd.wrongGuesses.includes(l)) return;
@@ -4332,6 +4389,30 @@ io.on('connection', (socket) => {
   });
 
   // ─── Type Sprint Game Handlers ──────────────────────────────────────────────
+
+  socket.on('typesprint-solo', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = (room.messages || []).find(m => m.id === messageId);
+      if (!message || message.gameData?.gameType !== 'typesprint') return;
+      const gd = message.gameData;
+      if (gd.status !== 'waiting') return;
+      const p1Id = socket.persistentUserId || socket.id;
+      if (gd.player1.id !== p1Id && gd.player1.name !== socket.nickname) return;
+      gd.isSolo = true;
+      gd.player2 = { id: 'bot', name: 'Bot', isBot: true };
+      gd.passage = PASSAGES[Math.floor(Math.random() * PASSAGES.length)];
+      gd.status = 'countdown';
+      gd.startedAt = Date.now() + 3000;
+      gd.progress = { player1: 0, player2: 0 };
+      gd.wpm = { player1: 0, player2: 0 };
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('typesprint-solo err:', err); }
+  });
+
   const PASSAGES = [
     "The quick brown fox jumps over the lazy dog and runs away into the sunset.",
     "Programming is the art of telling another human being what one wants the computer to do.",

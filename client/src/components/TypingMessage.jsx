@@ -1,7 +1,7 @@
 import React from 'react';
 import { getVibeById } from '../utils/vibes';
 
-const TypingMessage = ({ message, currentUser, onJoin, onLaunch, roomVibe }) => {
+const TypingMessage = ({ message, currentUser, onJoin, onSolo, onLaunch, roomVibe }) => {
   const { gameData } = message;
   const vibe = getVibeById(roomVibe);
   const currentUserId = currentUser?.id || currentUser?.socketId;
@@ -11,6 +11,7 @@ const TypingMessage = ({ message, currentUser, onJoin, onLaunch, roomVibe }) => 
   const isP2 = gameData.player2?.id === currentUserId || (currentNickname && gameData.player2?.name === currentNickname);
   const isPlayer = isP1 || isP2;
   const canJoin = !gameData.player2 && !isP1 && gameData.status === 'waiting';
+  const canSolo = isP1 && gameData.status === 'waiting' && !gameData.player2;
   const isLive = gameData.status === 'playing' || gameData.status === 'countdown';
   const isFinished = gameData.status === 'finished';
   const p1Progress = gameData.progress?.player1 ?? 0;
@@ -81,6 +82,12 @@ const TypingMessage = ({ message, currentUser, onJoin, onLaunch, roomVibe }) => 
           <button onClick={() => onJoin(message.id)}
             className={`w-full py-2.5 rounded-xl ${vibe.accentClass} text-white font-black text-xs uppercase tracking-widest shadow-md hover:scale-[1.02] active:scale-95 transition-all`}>
             Join Race
+          </button>
+        )}
+        {canSolo && (
+          <button onClick={() => onSolo(message.id)}
+            className="w-full py-2 rounded-xl bg-gray-700 text-white font-black text-xs uppercase tracking-widest shadow hover:scale-[1.02] active:scale-95 transition-all">
+            ⌨️ Solo Time Trial
           </button>
         )}
         {!canJoin && !isFinished && (

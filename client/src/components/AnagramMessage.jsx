@@ -1,7 +1,7 @@
 import React from 'react';
 import { getVibeById } from '../utils/vibes';
 
-const AnagramMessage = ({ message, currentUser, onJoin, onLaunch, roomVibe }) => {
+const AnagramMessage = ({ message, currentUser, onJoin, onSolo, onLaunch, roomVibe }) => {
   const { gameData } = message;
   const vibe = getVibeById(roomVibe);
   const currentUserId = currentUser?.id || currentUser?.socketId;
@@ -11,6 +11,7 @@ const AnagramMessage = ({ message, currentUser, onJoin, onLaunch, roomVibe }) =>
   const isChallenger = gameData.challenger?.id === currentUserId || (currentNickname && gameData.challenger?.name === currentNickname);
   const isPlayer = isHost || isChallenger;
   const canJoin = !gameData.challenger && !isHost && gameData.status === 'waiting';
+  const canSolo = isHost && gameData.status === 'waiting' && !gameData.challenger;
   const isLive = gameData.status === 'playing';
   const isFinished = gameData.status === 'finished';
   const winnerName = gameData.winner === 'host' ? gameData.host?.name : gameData.challenger?.name;
@@ -73,6 +74,12 @@ const AnagramMessage = ({ message, currentUser, onJoin, onLaunch, roomVibe }) =>
           <button onClick={() => onJoin(message.id)}
             className={`w-full py-2.5 rounded-xl ${vibe.accentClass} text-white font-black text-xs uppercase tracking-widest shadow-md hover:scale-[1.02] active:scale-95 transition-all`}>
             Join Duel
+          </button>
+        )}
+        {canSolo && (
+          <button onClick={() => onSolo(message.id)}
+            className="w-full py-2 rounded-xl bg-gray-700 text-white font-black text-xs uppercase tracking-widest shadow hover:scale-[1.02] active:scale-95 transition-all">
+            🤖 Play Solo
           </button>
         )}
         {!canJoin && !isFinished && (

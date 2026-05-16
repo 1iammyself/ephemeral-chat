@@ -1,7 +1,7 @@
 import React from 'react';
 import { getVibeById } from '../utils/vibes';
 
-const HangmanMessage = ({ message, currentUser, onJoin, onLaunch, roomVibe }) => {
+const HangmanMessage = ({ message, currentUser, onJoin, onSolo, onLaunch, roomVibe }) => {
   const { gameData } = message;
   const vibe = getVibeById(roomVibe);
   const currentUserId = currentUser?.id || currentUser?.socketId;
@@ -11,6 +11,7 @@ const HangmanMessage = ({ message, currentUser, onJoin, onLaunch, roomVibe }) =>
   const isGuesser = gameData.guesser?.id === currentUserId || (currentNickname && gameData.guesser?.name === currentNickname);
   const isPlayer = isWordmaster || isGuesser;
   const canJoin = !gameData.guesser && !isWordmaster && gameData.status === 'waiting';
+  const canSolo = isWordmaster && gameData.status === 'waiting' && !gameData.guesser;
   const isLive = gameData.status === 'playing' || gameData.status === 'picking';
   const isFinished = gameData.status === 'finished';
   const wrong = gameData.wrongGuesses?.length || 0;
@@ -80,6 +81,12 @@ const HangmanMessage = ({ message, currentUser, onJoin, onLaunch, roomVibe }) =>
           <button onClick={() => onJoin(message.id)}
             className={`w-full py-2.5 rounded-xl ${vibe.accentClass} text-white font-black text-xs uppercase tracking-widest shadow-md hover:scale-[1.02] active:scale-95 transition-all`}>
             Join as Guesser
+          </button>
+        )}
+        {canSolo && (
+          <button onClick={() => onSolo(message.id)}
+            className="w-full py-2 rounded-xl bg-gray-700 text-white font-black text-xs uppercase tracking-widest shadow hover:scale-[1.02] active:scale-95 transition-all">
+            🤖 vs Computer
           </button>
         )}
         {!canJoin && !isFinished && (

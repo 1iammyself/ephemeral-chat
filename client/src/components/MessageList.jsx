@@ -23,7 +23,7 @@ import { FileOpener } from '@capacitor-community/file-opener';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀', '🍕', '🍔', '🍦', '🍩', '🍺', '🎸', '🎮', '🚀', '🌈', '🍄'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onPin, onViewThread, isHost, pinnedMessageId, roomVibe, linkPreviews = {}, onOpenEmojiPicker, highlightMap = {}, focusedMessageId = null, onStegoExtract, onChessJoin, onChessLaunch, onTetrisJoin, onTetrisSpectate, onTetrisLaunch, onAnagramJoin, onAnagramLaunch, onHangmanJoin, onHangmanLaunch, onTypeSprintJoin, onTypeSprintLaunch, onVideoReply = null }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onPin, onViewThread, isHost, pinnedMessageId, roomVibe, linkPreviews = {}, onOpenEmojiPicker, highlightMap = {}, focusedMessageId = null, onStegoExtract, onChessJoin, onChessLaunch, onTetrisJoin, onTetrisSpectate, onTetrisLaunch, onAnagramJoin, onAnagramSolo, onAnagramLaunch, onHangmanJoin, onHangmanSolo, onHangmanLaunch, onTypeSprintJoin, onTypeSprintSolo, onTypeSprintLaunch, onVideoReply = null }) => {
   const { t } = useTranslation();
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
@@ -547,6 +547,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         message={message}
                         currentUser={currentUser}
                         onJoin={onAnagramJoin}
+                        onSolo={onAnagramSolo}
                         onLaunch={onAnagramLaunch}
                         roomVibe={roomVibe}
                       />
@@ -555,6 +556,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         message={message}
                         currentUser={currentUser}
                         onJoin={onHangmanJoin}
+                        onSolo={onHangmanSolo}
                         onLaunch={onHangmanLaunch}
                         roomVibe={roomVibe}
                       />
@@ -563,6 +565,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         message={message}
                         currentUser={currentUser}
                         onJoin={onTypeSprintJoin}
+                        onSolo={onTypeSprintSolo}
                         onLaunch={onTypeSprintLaunch}
                         roomVibe={roomVibe}
                       />
