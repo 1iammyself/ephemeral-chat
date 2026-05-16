@@ -736,6 +736,80 @@ export default {
     privacy: {
       back: 'Back',
       title: 'Privacy Policy',
+      hero: {
+        pageTitle: 'Privacy Policy for Ephemeral Chat',
+        lastUpdated: 'Last Updated: February 5, 2026',
+        intro: 'Ephemeral Chat ("the App") is built with a "Privacy by Design" philosophy. Our goal is to provide a secure, anonymous communication platform where your data stays yours.',
+      },
+      s1: {
+        title: '1. Information Collection',
+        cards: [
+          { title: 'No Personal Data', desc: 'We do not require registration, names, email addresses, or phone numbers.' },
+          { title: 'No Message Logs', desc: 'Messages are ephemeral. They are held in memory only as long as necessary for delivery and are never permanently stored on our servers.' },
+          { title: 'Anonymous Usage', desc: 'We do not track individual users or create user profiles.' },
+        ],
+      },
+      s2: {
+        title: '2. Device Permissions',
+        subtitle: 'The App requires the following permissions to function:',
+        colPerm: 'Permission',
+        colPurpose: 'Purpose',
+        colHandling: 'Data Handling',
+        perms: [
+          { name: 'Internet Access', purpose: 'Required to connect to chat rooms and transmit messages/calls.', handling: 'Encrypted data transmitted to our relay servers.' },
+          { name: 'Microphone', purpose: 'Used only when you explicitly start a voice call or record a voice note.', handling: 'Audio is transmitted peer-to-peer or processed for immediate delivery and is not recorded by the developer.' },
+          { name: 'Camera', purpose: 'Used only when you explicitly capture a photo to share in chat.', handling: 'Photos are encrypted and transmitted directly to chat recipients. We do not store or access your photos.' },
+          { name: 'File Access', purpose: 'Used when you choose to send or receive files in chat.', handling: 'Files are encrypted end-to-end and transmitted directly between users. We do not store or access your files.' },
+          { name: 'Local Storage', purpose: 'Used to optionally save chat history locally on your device (if you enable persistent mode).', handling: 'Data is stored only on your device and is never uploaded to our servers.' },
+        ],
+      },
+      s3: {
+        title: '3. Data Encryption',
+        b0: 'All messages are encrypted client-side using <strong>AES-GCM</strong>.',
+        b1: 'The encryption keys are stored in the URL hash of your chat room and are <strong>never sent to our servers</strong>.',
+        b2: 'Only people with the specific room link can decrypt messages.',
+        b3: 'File transfers use end-to-end encryption.',
+      },
+      s4: {
+        title: '4. Local Storage',
+        b0: 'If you enable persistent storage, your chat history is saved only on your device.',
+        b1: 'This data never leaves your device and is not accessible to us.',
+        b2: 'You can delete this data at any time through the app settings.',
+      },
+      s5: {
+        title: '5. Third-Party Sharing',
+        b0: 'We do <strong>not</strong> sell, trade, or share any information with third parties.',
+        b1: 'We do <strong>not</strong> use third-party analytics or advertising trackers.',
+      },
+      s6: {
+        title: '6. Desktop App',
+        b0: '<strong>Screen Capture Protection:</strong> Prevents screenshots and screen recording on Windows.',
+        b1: '<strong>Sandboxed Execution:</strong> The app runs in an isolated environment for security.',
+        b2: '<strong>No Telemetry:</strong> The desktop app does not collect or transmit usage data.',
+      },
+      s7: {
+        title: '7. Data Retention',
+        items: [
+          { label: 'Messages', value: 'Automatically deleted based on room settings (30 seconds to 1 hour).' },
+          { label: 'Rooms', value: 'Expire and are deleted after 24 hours of inactivity.' },
+          { label: 'Files', value: 'Not stored on our servers; transmitted directly between users.' },
+          { label: 'Local Data', value: 'Retained on your device until you delete it.' },
+        ],
+      },
+      s8: {
+        title: "8. Children's Privacy",
+        text: 'The App is not intended for children under 13. We do not knowingly collect any information from children.',
+      },
+      s9: {
+        title: '9. Changes to This Policy',
+        text: 'We may update this Privacy Policy from time to time. Any changes will be posted on this page with an updated "Last Updated" date.',
+      },
+      s10: {
+        title: '10. Contact',
+        subtitle: 'If you have any questions about this Privacy Policy, you can reach out via:',
+        github: 'GitHub Repository',
+      },
+      footer: 'This privacy policy applies to Ephemeral Chat version 1.1.0 and later.',
     },
     messageList: {
       noMessages: 'No messages yet',

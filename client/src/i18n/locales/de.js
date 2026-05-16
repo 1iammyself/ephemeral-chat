@@ -728,6 +728,80 @@ export default {
     privacy: {
       back: 'Zurück',
       title: 'Datenschutzrichtlinie',
+      hero: {
+        pageTitle: 'Datenschutzrichtlinie für Ephemeral Chat',
+        lastUpdated: 'Zuletzt aktualisiert: 5. Februar 2026',
+        intro: 'Ephemeral Chat ("die App") wurde mit einer "Privacy by Design"-Philosophie entwickelt. Unser Ziel ist es, eine sichere, anonyme Kommunikationsplattform bereitzustellen, auf der Ihre Daten Ihnen gehören.',
+      },
+      s1: {
+        title: '1. Informationserfassung',
+        cards: [
+          { title: 'Keine persönlichen Daten', desc: 'Wir verlangen keine Registrierung, Namen, E-Mail-Adressen oder Telefonnummern.' },
+          { title: 'Keine Nachrichtenprotokolle', desc: 'Nachrichten sind ephemer. Sie werden nur so lange im Speicher gehalten, wie es für die Zustellung erforderlich ist, und werden niemals dauerhaft auf unseren Servern gespeichert.' },
+          { title: 'Anonyme Nutzung', desc: 'Wir verfolgen keine einzelnen Benutzer und erstellen keine Benutzerprofile.' },
+        ],
+      },
+      s2: {
+        title: '2. Geräteberechtigungen',
+        subtitle: 'Die App benötigt folgende Berechtigungen zum Funktionieren:',
+        colPerm: 'Berechtigung',
+        colPurpose: 'Zweck',
+        colHandling: 'Datenverarbeitung',
+        perms: [
+          { name: 'Internetzugang', purpose: 'Erforderlich zur Verbindung mit Chatrooms und zur Übertragung von Nachrichten/Anrufen.', handling: 'Verschlüsselte Daten werden an unsere Relay-Server übertragen.' },
+          { name: 'Mikrofon', purpose: 'Wird nur verwendet, wenn Sie explizit einen Sprachanruf starten oder eine Sprachnotiz aufnehmen.', handling: 'Audio wird peer-to-peer übertragen oder für die sofortige Zustellung verarbeitet und wird nicht vom Entwickler aufgezeichnet.' },
+          { name: 'Kamera', purpose: 'Wird nur verwendet, wenn Sie explizit ein Foto zum Teilen im Chat aufnehmen.', handling: 'Fotos werden verschlüsselt und direkt an Chat-Empfänger übertragen. Wir speichern oder greifen nicht auf Ihre Fotos zu.' },
+          { name: 'Dateizugriff', purpose: 'Wird verwendet, wenn Sie Dateien im Chat senden oder empfangen möchten.', handling: 'Dateien werden Ende-zu-Ende-verschlüsselt und direkt zwischen Benutzern übertragen. Wir speichern oder greifen nicht auf Ihre Dateien zu.' },
+          { name: 'Lokaler Speicher', purpose: 'Wird verwendet, um den Chat-Verlauf optional lokal auf Ihrem Gerät zu speichern (wenn Sie den persistenten Modus aktivieren).', handling: 'Daten werden nur auf Ihrem Gerät gespeichert und werden niemals auf unsere Server hochgeladen.' },
+        ],
+      },
+      s3: {
+        title: '3. Datenverschlüsselung',
+        b0: 'Alle Nachrichten werden client-seitig mit <strong>AES-GCM</strong> verschlüsselt.',
+        b1: 'Die Verschlüsselungsschlüssel werden im URL-Hash Ihres Chatrooms gespeichert und <strong>niemals an unsere Server gesendet</strong>.',
+        b2: 'Nur Personen mit dem spezifischen Raumlink können Nachrichten entschlüsseln.',
+        b3: 'Dateiübertragungen verwenden Ende-zu-Ende-Verschlüsselung.',
+      },
+      s4: {
+        title: '4. Lokaler Speicher',
+        b0: 'Wenn Sie den persistenten Speicher aktivieren, wird Ihr Chat-Verlauf nur auf Ihrem Gerät gespeichert.',
+        b1: 'Diese Daten verlassen niemals Ihr Gerät und sind für uns nicht zugänglich.',
+        b2: 'Sie können diese Daten jederzeit über die App-Einstellungen löschen.',
+      },
+      s5: {
+        title: '5. Weitergabe an Dritte',
+        b0: 'Wir verkaufen, tauschen oder teilen <strong>keine</strong> Informationen mit Dritten.',
+        b1: 'Wir verwenden <strong>keine</strong> Analysen oder Werbe-Tracker von Drittanbietern.',
+      },
+      s6: {
+        title: '6. Desktop-App',
+        b0: '<strong>Schutz vor Bildschirmaufnahmen:</strong> Verhindert Screenshots und Bildschirmaufzeichnungen unter Windows.',
+        b1: '<strong>Sandbox-Ausführung:</strong> Die App läuft in einer isolierten Umgebung für mehr Sicherheit.',
+        b2: '<strong>Keine Telemetrie:</strong> Die Desktop-App erfasst oder überträgt keine Nutzungsdaten.',
+      },
+      s7: {
+        title: '7. Datenspeicherung',
+        items: [
+          { label: 'Nachrichten', value: 'Werden automatisch gemäß den Raumeinstellungen gelöscht (30 Sekunden bis 1 Stunde).' },
+          { label: 'Räume', value: 'Laufen ab und werden nach 24 Stunden Inaktivität gelöscht.' },
+          { label: 'Dateien', value: 'Werden nicht auf unseren Servern gespeichert; werden direkt zwischen Benutzern übertragen.' },
+          { label: 'Lokale Daten', value: 'Bleiben auf Ihrem Gerät, bis Sie sie löschen.' },
+        ],
+      },
+      s8: {
+        title: '8. Datenschutz für Kinder',
+        text: 'Die App ist nicht für Kinder unter 13 Jahren bestimmt. Wir erfassen wissentlich keine Informationen von Kindern.',
+      },
+      s9: {
+        title: '9. Änderungen dieser Richtlinie',
+        text: 'Wir können diese Datenschutzrichtlinie von Zeit zu Zeit aktualisieren. Alle Änderungen werden auf dieser Seite mit einem aktualisierten "Zuletzt aktualisiert"-Datum veröffentlicht.',
+      },
+      s10: {
+        title: '10. Kontakt',
+        subtitle: 'Wenn Sie Fragen zu dieser Datenschutzrichtlinie haben, können Sie uns über folgende Wege erreichen:',
+        github: 'GitHub-Repository',
+      },
+      footer: 'Diese Datenschutzrichtlinie gilt für Ephemeral Chat Version 1.1.0 und höher.',
     },
     messageList: {
       noMessages: 'Noch keine Nachrichten',

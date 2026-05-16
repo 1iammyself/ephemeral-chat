@@ -732,6 +732,80 @@ export default {
     privacy: {
       back: 'Volver',
       title: 'Política de privacidad',
+      hero: {
+        pageTitle: 'Política de privacidad de Ephemeral Chat',
+        lastUpdated: 'Última actualización: 5 de febrero de 2026',
+        intro: 'Ephemeral Chat ("la App") está construida con una filosofía de "Privacidad desde el diseño". Nuestro objetivo es proporcionar una plataforma de comunicación segura y anónima donde tus datos sean tuyos.',
+      },
+      s1: {
+        title: '1. Recopilación de información',
+        cards: [
+          { title: 'Sin datos personales', desc: 'No requerimos registro, nombres, direcciones de correo electrónico ni números de teléfono.' },
+          { title: 'Sin registros de mensajes', desc: 'Los mensajes son efímeros. Se mantienen en memoria solo el tiempo necesario para su entrega y nunca se almacenan permanentemente en nuestros servidores.' },
+          { title: 'Uso anónimo', desc: 'No rastreamos usuarios individuales ni creamos perfiles de usuario.' },
+        ],
+      },
+      s2: {
+        title: '2. Permisos del dispositivo',
+        subtitle: 'La aplicación requiere los siguientes permisos para funcionar:',
+        colPerm: 'Permiso',
+        colPurpose: 'Propósito',
+        colHandling: 'Manejo de datos',
+        perms: [
+          { name: 'Acceso a Internet', purpose: 'Necesario para conectarse a salas de chat y transmitir mensajes/llamadas.', handling: 'Datos cifrados transmitidos a nuestros servidores de retransmisión.' },
+          { name: 'Micrófono', purpose: 'Se usa solo cuando inicias explícitamente una llamada de voz o grabas una nota de voz.', handling: 'El audio se transmite de igual a igual o se procesa para entrega inmediata y no es grabado por el desarrollador.' },
+          { name: 'Cámara', purpose: 'Se usa solo cuando capturas explícitamente una foto para compartir en el chat.', handling: 'Las fotos se cifran y transmiten directamente a los destinatarios del chat. No almacenamos ni accedemos a tus fotos.' },
+          { name: 'Acceso a archivos', purpose: 'Se usa cuando eliges enviar o recibir archivos en el chat.', handling: 'Los archivos se cifran de extremo a extremo y se transmiten directamente entre usuarios. No almacenamos ni accedemos a tus archivos.' },
+          { name: 'Almacenamiento local', purpose: 'Se usa para guardar opcionalmente el historial del chat en tu dispositivo (si activas el modo persistente).', handling: 'Los datos se almacenan solo en tu dispositivo y nunca se suben a nuestros servidores.' },
+        ],
+      },
+      s3: {
+        title: '3. Cifrado de datos',
+        b0: 'Todos los mensajes se cifran en el lado del cliente usando <strong>AES-GCM</strong>.',
+        b1: 'Las claves de cifrado se almacenan en el hash de la URL de tu sala y <strong>nunca se envían a nuestros servidores</strong>.',
+        b2: 'Solo las personas con el enlace específico de la sala pueden descifrar los mensajes.',
+        b3: 'Las transferencias de archivos usan cifrado de extremo a extremo.',
+      },
+      s4: {
+        title: '4. Almacenamiento local',
+        b0: 'Si activas el almacenamiento persistente, tu historial de chat se guarda solo en tu dispositivo.',
+        b1: 'Estos datos nunca abandonan tu dispositivo y no son accesibles para nosotros.',
+        b2: 'Puedes eliminar estos datos en cualquier momento desde la configuración de la aplicación.',
+      },
+      s5: {
+        title: '5. Compartir con terceros',
+        b0: 'No <strong>vendemos</strong>, intercambiamos ni compartimos ninguna información con terceros.',
+        b1: 'No <strong>utilizamos</strong> análisis de terceros ni rastreadores publicitarios.',
+      },
+      s6: {
+        title: '6. Aplicación de escritorio',
+        b0: '<strong>Protección contra capturas de pantalla:</strong> Evita capturas de pantalla y grabación de pantalla en Windows.',
+        b1: '<strong>Ejecución en sandbox:</strong> La aplicación se ejecuta en un entorno aislado por seguridad.',
+        b2: '<strong>Sin telemetría:</strong> La aplicación de escritorio no recopila ni transmite datos de uso.',
+      },
+      s7: {
+        title: '7. Retención de datos',
+        items: [
+          { label: 'Mensajes', value: 'Eliminados automáticamente según la configuración de la sala (30 segundos a 1 hora).' },
+          { label: 'Salas', value: 'Expiran y se eliminan tras 24 horas de inactividad.' },
+          { label: 'Archivos', value: 'No se almacenan en nuestros servidores; se transmiten directamente entre usuarios.' },
+          { label: 'Datos locales', value: 'Se conservan en tu dispositivo hasta que los elimines.' },
+        ],
+      },
+      s8: {
+        title: '8. Privacidad de los niños',
+        text: 'La aplicación no está destinada a niños menores de 13 años. No recopilamos conscientemente ninguna información de niños.',
+      },
+      s9: {
+        title: '9. Cambios en esta política',
+        text: 'Podemos actualizar esta Política de privacidad de vez en cuando. Cualquier cambio se publicará en esta página con una fecha "Última actualización" actualizada.',
+      },
+      s10: {
+        title: '10. Contacto',
+        subtitle: 'Si tienes alguna pregunta sobre esta Política de privacidad, puedes contactarnos a través de:',
+        github: 'Repositorio de GitHub',
+      },
+      footer: 'Esta política de privacidad se aplica a Ephemeral Chat versión 1.1.0 y posteriores.',
     },
     messageList: {
       noMessages: 'Sin mensajes aún',
