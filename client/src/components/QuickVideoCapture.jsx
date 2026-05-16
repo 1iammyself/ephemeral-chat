@@ -39,6 +39,7 @@ export default function QuickVideoCapture({ open, replyTo, sendTriggerRef, onSen
   const [isReady, setIsReady] = useState(false);
   const [showWarmingIndicator, setShowWarmingIndicator] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [isFrontCamera, setIsFrontCamera] = useState(true);
   const [filterIdx, setFilterIdx] = useState(0);
   const [undoPending, setUndoPending] = useState(false);
   const [undoSecsLeft, setUndoSecsLeft] = useState(UNDO_SECS);
@@ -248,6 +249,7 @@ export default function QuickVideoCapture({ open, replyTo, sendTriggerRef, onSen
     if (recording) return;
     setIsDualEnabled(false);
     await cameraPrewarmService.flipCamera();
+    setIsFrontCamera(f => !f);
   }, [recording]);
 
   const handleDualToggle = useCallback(async () => {
@@ -340,6 +342,7 @@ export default function QuickVideoCapture({ open, replyTo, sendTriggerRef, onSen
               opacity: isReady ? 1 : 0.4,
               transition: 'opacity 0.3s ease',
               filter: FILTERS[filterIdx].css,
+              transform: isFrontCamera ? 'scaleX(-1)' : 'none',
             }}
             muted
             playsInline

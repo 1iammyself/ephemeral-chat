@@ -76,9 +76,6 @@ export default defineConfig(({ mode }) => {
           '@capacitor-community/apple-sign-in',
         ],
         output: {
-          // Use a function to place very large deps in their own chunks.
-          // This helps keep the main chunk smaller and allows browsers to cache
-          // large vendor files separately.
           manualChunks(id) {
             if (id.includes('node_modules')) {
               if (id.includes('agora-rtc-sdk-ng') || /AgoraRTC/.test(id) || id.includes('agora')) {
@@ -93,24 +90,35 @@ export default defineConfig(({ mode }) => {
               if (id.includes('/yjs/') || id.includes('y-protocols') || id.includes('y-codemirror') || id.includes('yjs')) {
                 return 'yjs';
               }
-              if (id.includes('@codemirror/') || id.includes('@lezer/') || id.includes('codemirror')) {
+              if (id.includes('@codemirror/') || id.includes('@lezer/') || id.includes('codemirror') || id.includes('@uiw/react-codemirror') || id.includes('@uiw/codemirror-')) {
                 return 'codemirror';
               }
               if (id.includes('lucide-react')) {
                 return 'lucide';
               }
-              if (id.includes('tweetnacl') || id.includes('libsodium') || id.includes('openmls')) {
+              if (id.includes('tweetnacl') || id.includes('libsodium') || id.includes('openmls') || id.includes('mlkem') || id.includes('hpke') || id.includes('@noble/')) {
                 return 'crypto-libs';
+              }
+              if (id.includes('emoji-picker-react')) {
+                return 'emoji-picker';
+              }
+              if (id.includes('i18next') || id.includes('react-i18next')) {
+                return 'i18n';
+              }
+              if (id.includes('lamejs')) {
+                return 'audio-libs';
               }
               // fallback vendor chunk for other node_modules
               return 'vendor';
             }
+            // Split heavy local modules out of the main chunk
+            if (id.includes('/src/crypto/')) return 'app-crypto';
+            if (id.includes('/src/utils/aesEncryption') || id.includes('/src/utils/mlsEncryption') || id.includes('/src/utils/security')) return 'app-e2ee';
+            if (id.includes('/src/i18n/')) return 'app-i18n';
           }
         }
       },
-      // Raise the warning limit slightly so large but split bundles don't spam warnings.
-      // Still keep it reasonably low to encourage further splitting if necessary.
-      chunkSizeWarningLimit: 1000
+      chunkSizeWarningLimit: 1500
     },
     optimizeDeps: {
       include: ['react', 'react-dom', 'react-router-dom', 'socket.io-client'],
