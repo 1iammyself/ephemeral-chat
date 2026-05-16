@@ -136,10 +136,15 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                             | tauri_plugin_window_state::StateFlags::MAXIMIZED
                             | tauri_plugin_window_state::StateFlags::FULLSCREEN,
                     );
-                    api.prevent_close();
-                    if let Some(w) = handle.get_webview_window("main") {
-                        let _ = w.hide();
+                    // Respect "Close to tray" setting. When disabled (e.g. user unchecks it),
+                    // Alt+F4 / window-X actually quits the app instead of hiding to tray.
+                    if store_get_bool(&handle, "closeToTray", true) {
+                        api.prevent_close();
+                        if let Some(w) = handle.get_webview_window("main") {
+                            let _ = w.hide();
+                        }
                     }
+                    // else: let the close propagate → app exits normally
                 }
                 tauri::WindowEvent::Focused(false) => {
                     let h = handle.clone();
@@ -245,14 +250,15 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let h = app.handle().clone();
 
     // Initial setting values
-    let aot_val        = store_get_bool(&h, "alwaysOnTop", false);
-    let start_min_val  = store_get_bool(&h, "startMinimized", false);
-    let start_boot_val = store_get_bool(&h, "startOnBoot", false);
-    let notifs_val     = store_get_bool(&h, "notificationsEnabled", true);
-    let sound_val      = store_get_bool(&h, "soundEnabled", true);
-    let biometric_val  = store_get_bool(&h, "biometricLockEnabled", false);
-    let sec_mode       = store_get_str(&h, "securityMode", "high");
-    let lock_delay     = store_get_i64(&h, "lockDelay", 5);
+    let aot_val         = store_get_bool(&h, "alwaysOnTop", false);
+    let start_min_val   = store_get_bool(&h, "startMinimized", false);
+    let start_boot_val  = store_get_bool(&h, "startOnBoot", false);
+    let close_tray_val  = store_get_bool(&h, "closeToTray", true);
+    let notifs_val      = store_get_bool(&h, "notificationsEnabled", true);
+    let sound_val       = store_get_bool(&h, "soundEnabled", true);
+    let biometric_val   = store_get_bool(&h, "biometricLockEnabled", false);
+    let sec_mode        = store_get_str(&h, "securityMode", "high");
+    let lock_delay      = store_get_i64(&h, "lockDelay", 5);
 
     // ── Basic items ──
     let show     = MenuItemBuilder::with_id("tray_show",     "Open Ephemeral Chat").build(app)?;
@@ -263,6 +269,7 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let aot        = CheckMenuItemBuilder::with_id("tray_aot",        "Always on Top").checked(aot_val).build(app)?;
     let start_min  = CheckMenuItemBuilder::with_id("tray_start_min",  "Start Minimized").checked(start_min_val).build(app)?;
     let start_boot = CheckMenuItemBuilder::with_id("tray_start_boot", "Start with Windows").checked(start_boot_val).build(app)?;
+    let close_tray = CheckMenuItemBuilder::with_id("tray_close_tray", "Close to Tray (disable for Alt+F4 quit)").checked(close_tray_val).build(app)?;
     let notifs     = CheckMenuItemBuilder::with_id("tray_notifs",     "Notifications").checked(notifs_val).build(app)?;
     let sound      = CheckMenuItemBuilder::with_id("tray_sound",      "Sound").checked(sound_val).build(app)?;
     let biometric  = CheckMenuItemBuilder::with_id("tray_biometric",  "Biometric Lock").checked(biometric_val).build(app)?;
@@ -288,8 +295,8 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let quit         = MenuItemBuilder::with_id("tray_quit",          "Quit").build(app)?;
 
     // ── Clones for on_menu_event closure ──
-    let (aot_c, start_min_c, start_boot_c, notifs_c, sound_c, biometric_c) = (
-        aot.clone(), start_min.clone(), start_boot.clone(), notifs.clone(), sound.clone(), biometric.clone(),
+    let (aot_c, start_min_c, start_boot_c, close_tray_c, notifs_c, sound_c, biometric_c) = (
+        aot.clone(), start_min.clone(), start_boot.clone(), close_tray.clone(), notifs.clone(), sound.clone(), biometric.clone(),
     );
     let (sec_high_c, sec_medium_c, sec_low_c) = (sec_high.clone(), sec_medium.clone(), sec_low.clone());
     let (delay_imm_c, delay_1m_c, delay_5m_c, delay_10m_c, delay_30m_c) = (
@@ -297,9 +304,10 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // ── Clones for settings-changed → tray sync listener ──
-    let (aot_l, start_min_l, start_boot_l, notifs_l, sound_l, biometric_l) = (
-        aot.clone(), start_min.clone(), start_boot.clone(), notifs.clone(), sound.clone(), biometric.clone(),
+    let (aot_l, start_min_l, start_boot_l, close_tray_l, notifs_l, sound_l, biometric_l) = (
+        aot.clone(), start_min.clone(), start_boot.clone(), close_tray.clone(), notifs.clone(), sound.clone(), biometric.clone(),
     );
+    let app_handle_l = app.handle().clone();
     let (sec_high_l, sec_medium_l, sec_low_l) = (sec_high.clone(), sec_medium.clone(), sec_low.clone());
     let (delay_imm_l, delay_1m_l, delay_5m_l, delay_10m_l, delay_30m_l) = (
         delay_imm.clone(), delay_1m.clone(), delay_5m.clone(), delay_10m.clone(), delay_30m.clone(),
@@ -313,6 +321,7 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         .item(&aot)
         .item(&start_min)
         .item(&start_boot)
+        .item(&close_tray)
         .separator()
         .item(&notifs)
         .item(&sound)
@@ -369,6 +378,12 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     if v { let _ = app.autolaunch().enable(); }
                     else { let _ = app.autolaunch().disable(); }
                     let _ = app.emit("settings-changed", serde_json::json!({"key":"startOnBoot","value":v}));
+                }
+                "tray_close_tray" => {
+                    let v = !store_get_bool(app, "closeToTray", true);
+                    let _ = close_tray_c.set_checked(v);
+                    store_set_bool(app, "closeToTray", v);
+                    let _ = app.emit("settings-changed", serde_json::json!({"key":"closeToTray","value":v}));
                 }
                 "tray_notifs" => {
                     let v = !store_get_bool(app, "notificationsEnabled", true);
@@ -489,14 +504,26 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         })
         .build(app)?;
 
-    // Sync tray checkmarks when settings change via the modal
+    // Sync tray checkmarks AND apply native side-effects when settings change via the UI modal
     app.listen("settings-changed", move |e: tauri::Event| {
         let Ok(p) = serde_json::from_str::<serde_json::Value>(e.payload()) else { return };
         let key = p["key"].as_str().unwrap_or("");
         match key {
-            "alwaysOnTop"          => { let _ = aot_l.set_checked(p["value"].as_bool().unwrap_or(false)); }
+            "alwaysOnTop" => {
+                let v = p["value"].as_bool().unwrap_or(false);
+                let _ = aot_l.set_checked(v);
+                // Native effect is already applied by set_setting in commands.rs
+            }
             "startMinimized"       => { let _ = start_min_l.set_checked(p["value"].as_bool().unwrap_or(false)); }
-            "startOnBoot"          => { let _ = start_boot_l.set_checked(p["value"].as_bool().unwrap_or(false)); }
+            "startOnBoot" => {
+                let v = p["value"].as_bool().unwrap_or(false);
+                let _ = start_boot_l.set_checked(v);
+                // Apply autolaunch — set_setting now handles this, but guard here too
+                use tauri_plugin_autostart::ManagerExt;
+                if v { let _ = app_handle_l.autolaunch().enable(); }
+                else { let _ = app_handle_l.autolaunch().disable(); }
+            }
+            "closeToTray"          => { let _ = close_tray_l.set_checked(p["value"].as_bool().unwrap_or(true)); }
             "notificationsEnabled" => { let _ = notifs_l.set_checked(p["value"].as_bool().unwrap_or(true)); }
             "soundEnabled"         => { let _ = sound_l.set_checked(p["value"].as_bool().unwrap_or(true)); }
             "biometricLockEnabled" => { let _ = biometric_l.set_checked(p["value"].as_bool().unwrap_or(false)); }
@@ -505,6 +532,7 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 let _ = sec_high_l.set_checked(v == "high");
                 let _ = sec_medium_l.set_checked(v == "medium");
                 let _ = sec_low_l.set_checked(v == "low");
+                // Native effect (content_protected) already applied by set_setting
             }
             "lockDelay" => {
                 let v = p["value"].as_i64().unwrap_or(5);

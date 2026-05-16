@@ -23,6 +23,7 @@ pub fn get_settings(app: AppHandle) -> serde_json::Value {
         "windowPosition": null,
         "startMinimized": false,
         "minimizeToTray": true,
+        "closeToTray": true,
         "alwaysOnTop": false,
         "startOnBoot": false,
         "theme": "system",
@@ -59,7 +60,7 @@ pub fn set_setting(app: AppHandle, key: String, value: serde_json::Value) -> boo
     store.set(key.clone(), value.clone());
     let saved = store.save().is_ok();
 
-    // Apply immediate side effects
+    // Apply immediate native side effects
     match key.as_str() {
         "securityMode" => {
             let protect = value.as_str() != Some("low");
@@ -70,6 +71,14 @@ pub fn set_setting(app: AppHandle, key: String, value: serde_json::Value) -> boo
         "alwaysOnTop" => {
             if let Some(win) = app.get_webview_window("main") {
                 let _ = win.set_always_on_top(value.as_bool().unwrap_or(false));
+            }
+        }
+        "startOnBoot" => {
+            use tauri_plugin_autostart::ManagerExt;
+            if value.as_bool().unwrap_or(false) {
+                let _ = app.autolaunch().enable();
+            } else {
+                let _ = app.autolaunch().disable();
             }
         }
         _ => {}
