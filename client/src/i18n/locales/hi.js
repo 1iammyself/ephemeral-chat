@@ -641,7 +641,7 @@ export default {
     },
     settings: {
       title: 'सेटिंग',
-      tabs: { general: 'सामान्य', chat: 'चैट' },
+      tabs: { general: 'सामान्य', chat: 'चैट', sound: 'ध्वनि' },
       appearance: {
         title: 'दिखावट',
         theme: 'थीम',
@@ -719,6 +719,27 @@ export default {
         title: 'भाषा',
         label: 'ऐप भाषा',
         desc: 'अपनी पसंदीदा भाषा चुनें',
+      },
+      sound: {
+        master: { title: 'मास्टर', label: 'ध्वनि', desc: 'सभी ऑडियो आउटपुट सक्षम करें' },
+        categories: {
+          title: 'श्रेणियां',
+          ui: 'UI ध्वनियां', uiDesc: 'टैप, भेजें, टॉगल',
+          presence: 'उपस्थिति', presenceDesc: 'रूम जॉइन, प्रतिक्रियाएं, टाइपिंग',
+          attention: 'ध्यान', attentionDesc: 'मेंशन, कॉल, रिकॉर्डिंग',
+          ambient: 'परिवेश', ambientDesc: 'हल्का वातावरणीय रूम टोन',
+        },
+        volume: 'वॉल्यूम',
+        theme: 'ध्वनि थीम',
+        accessibility: 'पहुंच',
+        access: {
+          normal: 'सामान्य',
+          reduced: 'कम',
+          mono: 'मोनो',
+          tinnitusSafe: 'टिनिटस-सुरक्षित (4 kHz सीमा)',
+          lowFrequency: 'कम आवृत्ति (−20% पिच)',
+          hearingSensitivity: 'श्रवण संवेदनशीलता (−50% लाभ)',
+        },
       },
     },
     licenses: {

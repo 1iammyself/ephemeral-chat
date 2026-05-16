@@ -649,7 +649,28 @@ export default {
     },
     settings: {
       title: 'Settings',
-      tabs: { general: 'General', chat: 'Chat' },
+      tabs: { general: 'General', chat: 'Chat', sound: 'Sound' },
+      sound: {
+        master: { title: 'Master', label: 'Sound', desc: 'Enable all audio output' },
+        categories: {
+          title: 'Categories',
+          ui: 'UI Sounds', uiDesc: 'Taps, sends, toggles',
+          presence: 'Presence', presenceDesc: 'Room joins, reactions, typing',
+          attention: 'Attention', attentionDesc: 'Mentions, calls, recording',
+          ambient: 'Ambient', ambientDesc: 'Sparse atmospheric room tone',
+        },
+        volume: 'Volume',
+        theme: 'Sound Theme',
+        accessibility: 'Accessibility',
+        access: {
+          normal: 'Normal',
+          reduced: 'Reduced',
+          mono: 'Mono',
+          tinnitusSafe: 'Tinnitus-safe (4 kHz cap)',
+          lowFrequency: 'Low frequency (−20% pitch)',
+          hearingSensitivity: 'Hearing sensitivity (−50% gain)',
+        },
+      },
       appearance: {
         title: 'Appearance',
         theme: 'Theme',

@@ -1,5 +1,7 @@
-// Audio bus graph: buses → FX chains → master → destination.
-// Stereo widener is a pass-through GainNode in Phase 1; Phase 2 will add mid-side processing.
+// Audio bus graph: buses → FX chains → master → accessibilityFilter → destination.
+// Volume nodes sit after each FX chain, giving per-category user-controlled gain.
+// Ducking (_applyDucking) controls bus input gain nodes directly.
+// Stereo widener on presenceBus: headphone-aware width, smoothed via lerp.
 
 function saturationCurve(amount = 28) {
   const n = 256;
@@ -24,12 +26,19 @@ function reverbIR(ctx, durationSec = 0.4, decay = 4) {
 }
 
 export function setupBuses(ctx) {
+  // ── Accessibility filter → destination ──
+  const accessibilityFilter = ctx.createBiquadFilter();
+  accessibilityFilter.type = 'lowpass';
+  accessibilityFilter.frequency.value = 20000;
+  accessibilityFilter.Q.value = 0.5;
+  accessibilityFilter.connect(ctx.destination);
+
   // ── Master ──
   const masterBus = ctx.createGain();
   masterBus.gain.value = 1.0;
-  masterBus.connect(ctx.destination);
+  masterBus.connect(accessibilityFilter);
 
-  // ── uiBus: soft saturation → limiter → master ──
+  // ── uiBus: (ducking) → saturation → limiter → uiVolume → master ──
   const uiBus = ctx.createGain();
   uiBus.gain.value = 1.0;
 
@@ -44,11 +53,15 @@ export function setupBuses(ctx) {
   limiter.attack.value = 0.001;
   limiter.release.value = 0.05;
 
+  const uiVolume = ctx.createGain();
+  uiVolume.gain.value = 1.0;
+
   uiBus.connect(saturation);
   saturation.connect(limiter);
-  limiter.connect(masterBus);
+  limiter.connect(uiVolume);
+  uiVolume.connect(masterBus);
 
-  // ── presenceBus: compressor → dry/wet split → master ──
+  // ── presenceBus: (ducking) → compressor → stereoWidener → dry/wet/burst → presenceVolume → master ──
   const presenceBus = ctx.createGain();
   presenceBus.gain.value = 1.0;
 
@@ -59,23 +72,56 @@ export function setupBuses(ctx) {
   compressor.attack.value = 0.003;
   compressor.release.value = 0.25;
 
+  // Stereo widener: Haas-effect pseudo-stereo from mono source.
+  // widenerDelay.delayTime controls width: 0 = mono, 0.02 = 20ms (max width).
+  // Engine updates delayTime via _applyWidener() when headset state changes.
+  const widenerDelay = ctx.createDelay(0.05);
+  widenerDelay.delayTime.value = 0.001; // start nearly mono (speaker assumption)
+
+  const widenerMerger = ctx.createChannelMerger(2);
+  compressor.connect(widenerMerger, 0, 0); // left: direct (no delay)
+  compressor.connect(widenerDelay);
+  widenerDelay.connect(widenerMerger, 0, 1); // right: delayed
+
+  // Short reverb (0.4s) — normal presence sounds
   const dryGain = ctx.createGain();
   dryGain.gain.value = 0.85;
 
   const reverb = ctx.createConvolver();
   reverb.buffer = reverbIR(ctx, 0.4, 4);
 
-  const wetGain = ctx.createGain();
-  wetGain.gain.value = 0.15;
+  const presenceWetGain = ctx.createGain();
+  presenceWetGain.gain.value = 0.15;
+
+  // Long reverb (1.5s) — reaction burst tail.
+  // Engine opens burstWetGain when burst detected; tail extends naturally on repeat bursts.
+  const burstReverb = ctx.createConvolver();
+  burstReverb.buffer = reverbIR(ctx, 1.5, 3);
+
+  const burstWetGain = ctx.createGain();
+  burstWetGain.gain.value = 0;
+
+  // burstReverbSend: engine feeds short impulses here to seed the long reverb tail.
+  const burstReverbSend = ctx.createGain();
+  burstReverbSend.gain.value = 1.0;
+
+  const presenceVolume = ctx.createGain();
+  presenceVolume.gain.value = 1.0;
 
   presenceBus.connect(compressor);
-  compressor.connect(dryGain);
-  compressor.connect(reverb);
-  reverb.connect(wetGain);
-  dryGain.connect(masterBus);
-  wetGain.connect(masterBus);
+  widenerMerger.connect(dryGain);
+  widenerMerger.connect(reverb);
+  reverb.connect(presenceWetGain);
+  dryGain.connect(presenceVolume);
+  presenceWetGain.connect(presenceVolume);
 
-  // ── attentionBus: compressor → limiter → master (Phase 2 sounds) ──
+  burstReverbSend.connect(burstReverb);
+  burstReverb.connect(burstWetGain);
+  burstWetGain.connect(presenceVolume);
+
+  presenceVolume.connect(masterBus);
+
+  // ── attentionBus: compressor → limiter → attentionVolume → master ──
   const attentionBus = ctx.createGain();
   attentionBus.gain.value = 1.0;
 
@@ -85,13 +131,55 @@ export function setupBuses(ctx) {
   attentionComp.attack.value = 0.001;
   attentionComp.release.value = 0.1;
 
+  const attentionLimiter = ctx.createDynamicsCompressor();
+  attentionLimiter.threshold.value = -1;
+  attentionLimiter.knee.value = 0;
+  attentionLimiter.ratio.value = 20;
+  attentionLimiter.attack.value = 0.001;
+  attentionLimiter.release.value = 0.05;
+
+  const attentionVolume = ctx.createGain();
+  attentionVolume.gain.value = 1.0;
+
   attentionBus.connect(attentionComp);
-  attentionComp.connect(masterBus);
+  attentionComp.connect(attentionLimiter);
+  attentionLimiter.connect(attentionVolume);
+  attentionVolume.connect(masterBus);
 
-  // ── ambientBus: muted until Phase 2 ──
+  // ── ambientBus: lowpass filter → reverb → ambientVolume → master ──
+  // Fully wet reverb treatment gives the lush atmospheric quality ambient requires.
   const ambientBus = ctx.createGain();
-  ambientBus.gain.value = 0.0;
-  ambientBus.connect(masterBus);
+  ambientBus.gain.value = 1.0;
 
-  return { masterBus, uiBus, presenceBus, attentionBus, ambientBus };
+  const ambientLowpass = ctx.createBiquadFilter();
+  ambientLowpass.type = 'lowpass';
+  ambientLowpass.frequency.value = 800;
+  ambientLowpass.Q.value = 0.5;
+
+  const ambientReverb = ctx.createConvolver();
+  ambientReverb.buffer = reverbIR(ctx, 1.5, 3);
+
+  const ambientVolume = ctx.createGain();
+  ambientVolume.gain.value = 0.0; // muted until settings.ambient = true
+
+  ambientBus.connect(ambientLowpass);
+  ambientLowpass.connect(ambientReverb);
+  ambientReverb.connect(ambientVolume);
+  ambientVolume.connect(masterBus);
+
+  // ── voiceBus: reserved for future call audio mixing ──
+  const voiceBus = ctx.createGain();
+  voiceBus.gain.value = 0.0;
+  voiceBus.connect(masterBus);
+
+  return {
+    masterBus,
+    accessibilityFilter,
+    uiBus, presenceBus, attentionBus, ambientBus, voiceBus,
+    uiVolume, presenceVolume, attentionVolume, ambientVolume,
+    // Presence FX controls — used by engine for performance modes and burst tails
+    presenceWetGain,
+    burstReverbSend, burstWetGain,
+    widenerDelay,
+  };
 }

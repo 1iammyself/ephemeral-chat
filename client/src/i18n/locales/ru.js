@@ -645,7 +645,7 @@ export default {
     },
     settings: {
       title: 'Настройки',
-      tabs: { general: 'Общие', chat: 'Чат' },
+      tabs: { general: 'Общие', chat: 'Чат', sound: 'Звук' },
       appearance: {
         title: 'Внешний вид',
         theme: 'Тема',
@@ -725,6 +725,27 @@ export default {
         title: 'Язык',
         label: 'Язык приложения',
         desc: 'Выберите предпочитаемый язык',
+      },
+      sound: {
+        master: { title: 'Мастер', label: 'Звук', desc: 'Включить весь аудиовывод' },
+        categories: {
+          title: 'Категории',
+          ui: 'Звуки интерфейса', uiDesc: 'Нажатия, отправка, переключения',
+          presence: 'Присутствие', presenceDesc: 'Вход в комнату, реакции, ввод текста',
+          attention: 'Внимание', attentionDesc: 'Упоминания, звонки, запись',
+          ambient: 'Фоновый звук', ambientDesc: 'Ненавязчивый атмосферный тон комнаты',
+        },
+        volume: 'Громкость',
+        theme: 'Звуковая тема',
+        accessibility: 'Доступность',
+        access: {
+          normal: 'Обычный',
+          reduced: 'Сниженный',
+          mono: 'Моно',
+          tinnitusSafe: 'Безопасно для тиннитуса (ограничение 4 кГц)',
+          lowFrequency: 'Низкие частоты (высота −20%)',
+          hearingSensitivity: 'Чувствительность слуха (усиление −50%)',
+        },
       },
     },
     licenses: {

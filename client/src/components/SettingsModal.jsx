@@ -6,6 +6,7 @@ import {
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import i18n, { LANGUAGES, applyDocumentDir } from '../i18n/index.js';
+import { useAudioSettings, THEME_NAMES } from '../hooks/useAudioSettings';
 
 const API = typeof window !== 'undefined' ? window.electronAPI : null;
 const isDesktop = () => !!API?.isElectron;
@@ -345,6 +346,127 @@ function GeneralSettings({ settings, updateSetting, version, onCheckForUpdates, 
   );
 }
 
+// ── Sound Tab ───────────────────────────────────────────────────────────────
+
+function VolumeRow({ label, value, onChange, disabled }) {
+  return (
+    <div className={`py-2 ${disabled ? 'opacity-40 pointer-events-none' : ''}`}>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-xs text-gray-600 dark:text-gray-400">{label}</span>
+        <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500">{Math.round(value * 100)}%</span>
+      </div>
+      <input
+        type="range" min={0} max={1} step={0.05}
+        value={value}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        className="w-full h-1 accent-teal-500 rounded-full cursor-pointer"
+      />
+    </div>
+  );
+}
+
+function SoundSettings() {
+  const { settings, update } = useAudioSettings();
+  const { t } = useTranslation();
+
+  const accessibilityOptions = [
+    { value: 'normal',              label: t('settings.sound.access.normal') },
+    { value: 'reduced',             label: t('settings.sound.access.reduced') },
+    { value: 'mono',                label: t('settings.sound.access.mono') },
+    { value: 'tinnitus-safe',       label: t('settings.sound.access.tinnitusSafe') },
+    { value: 'low-frequency',       label: t('settings.sound.access.lowFrequency') },
+    { value: 'hearing-sensitivity', label: t('settings.sound.access.hearingSensitivity') },
+  ];
+
+  return (
+    <>
+      <Section title={t('settings.sound.master.title')}>
+        <SettingRow
+          icon={settings.master ? Volume2 : VolumeX}
+          label={t('settings.sound.master.label')}
+          description={t('settings.sound.master.desc')}
+        >
+          <Toggle value={settings.master} onChange={val => update({ master: val })} />
+        </SettingRow>
+      </Section>
+
+      <Section title={t('settings.sound.categories.title')}>
+        <SettingRow icon={Volume2} label={t('settings.sound.categories.ui')} description={t('settings.sound.categories.uiDesc')}>
+          <Toggle value={settings.ui} onChange={val => update({ ui: val })} />
+        </SettingRow>
+        <SettingRow icon={Volume2} label={t('settings.sound.categories.presence')} description={t('settings.sound.categories.presenceDesc')}>
+          <Toggle value={settings.presence} onChange={val => update({ presence: val })} />
+        </SettingRow>
+        <SettingRow icon={Volume2} label={t('settings.sound.categories.attention')} description={t('settings.sound.categories.attentionDesc')}>
+          <Toggle value={settings.attention} onChange={val => update({ attention: val })} />
+        </SettingRow>
+        <SettingRow icon={Volume2} label={t('settings.sound.categories.ambient')} description={t('settings.sound.categories.ambientDesc')}>
+          <Toggle value={settings.ambient} onChange={val => update({ ambient: val })} />
+        </SettingRow>
+      </Section>
+
+      <Section title={t('settings.sound.volume')}>
+        <div className="py-1 divide-y divide-gray-100/80 dark:divide-gray-700/40">
+          <VolumeRow
+            label={t('settings.sound.categories.ui')}
+            value={settings.uiVolume}
+            onChange={val => update({ uiVolume: val })}
+            disabled={!settings.ui}
+          />
+          <VolumeRow
+            label={t('settings.sound.categories.presence')}
+            value={settings.presenceVolume}
+            onChange={val => update({ presenceVolume: val })}
+            disabled={!settings.presence}
+          />
+          <VolumeRow
+            label={t('settings.sound.categories.attention')}
+            value={settings.attentionVolume}
+            onChange={val => update({ attentionVolume: val })}
+            disabled={!settings.attention}
+          />
+          <VolumeRow
+            label={t('settings.sound.categories.ambient')}
+            value={settings.ambientVolume}
+            onChange={val => update({ ambientVolume: val })}
+            disabled={!settings.ambient}
+          />
+        </div>
+      </Section>
+
+      <Section title={t('settings.sound.theme')}>
+        <div className="py-2.5">
+          <select
+            value={settings.theme}
+            onChange={e => update({ theme: e.target.value })}
+            className="w-full text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg px-2 py-1.5 border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500"
+          >
+            {THEME_NAMES.map(name => (
+              <option key={name} value={name}>
+                {name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+              </option>
+            ))}
+          </select>
+        </div>
+      </Section>
+
+      <Section title={t('settings.sound.accessibility')}>
+        <div className="py-2.5">
+          <select
+            value={settings.accessibility}
+            onChange={e => update({ accessibility: e.target.value })}
+            className="w-full text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg px-2 py-1.5 border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500"
+          >
+            {accessibilityOptions.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </div>
+      </Section>
+    </>
+  );
+}
+
 // ── Chat Tab ────────────────────────────────────────────────────────────────
 
 function ChatSettings() {
@@ -552,6 +674,7 @@ export default function SettingsModal({ isOpen, onClose, initialTab = 'general' 
           {[
             { id: 'general', label: t('settings.tabs.general') },
             { id: 'chat',    label: t('settings.tabs.chat') },
+            { id: 'sound',   label: t('settings.tabs.sound') },
           ].map(({ id, label }) => (
             <button
               key={id}
@@ -578,6 +701,8 @@ export default function SettingsModal({ isOpen, onClose, initialTab = 'general' 
               updateStatus={updateStatus}
               onShowLicenses={() => setShowLicenses(true)}
             />
+          ) : activeTab === 'sound' ? (
+            <SoundSettings />
           ) : (
             <ChatSettings />
           )}

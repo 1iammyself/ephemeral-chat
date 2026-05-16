@@ -641,7 +641,7 @@ export default {
     },
     settings: {
       title: '設定',
-      tabs: { general: '一般', chat: 'チャット' },
+      tabs: { general: '一般', chat: 'チャット', sound: 'サウンド' },
       appearance: {
         title: '外観',
         theme: 'テーマ',
@@ -719,6 +719,27 @@ export default {
         title: '言語',
         label: 'アプリの言語',
         desc: '希望する言語を選択してください',
+      },
+      sound: {
+        master: { title: 'マスター', label: 'サウンド', desc: 'すべての音声出力を有効にする' },
+        categories: {
+          title: 'カテゴリー',
+          ui: 'UIサウンド', uiDesc: 'タップ、送信、切替',
+          presence: 'プレゼンス', presenceDesc: 'ルーム参加、リアクション、入力中',
+          attention: 'アテンション', attentionDesc: 'メンション、通話、録音',
+          ambient: 'アンビエント', ambientDesc: 'まばらな環境音',
+        },
+        volume: '音量',
+        theme: 'サウンドテーマ',
+        accessibility: 'アクセシビリティ',
+        access: {
+          normal: '標準',
+          reduced: '低減',
+          mono: 'モノラル',
+          tinnitusSafe: '耳鳴り安全（4 kHz上限）',
+          lowFrequency: '低周波数（ピッチ −20%）',
+          hearingSensitivity: '聴覚過敏（ゲイン −50%）',
+        },
       },
     },
     licenses: {

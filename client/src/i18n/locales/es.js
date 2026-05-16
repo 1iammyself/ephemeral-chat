@@ -645,7 +645,7 @@ export default {
     },
     settings: {
       title: 'Configuración',
-      tabs: { general: 'General', chat: 'Chat' },
+      tabs: { general: 'General', chat: 'Chat', sound: 'Sonido' },
       appearance: {
         title: 'Apariencia',
         theme: 'Tema',
@@ -723,6 +723,27 @@ export default {
         title: 'Idioma',
         label: 'Idioma de la app',
         desc: 'Elige tu idioma preferido',
+      },
+      sound: {
+        master: { title: 'Principal', label: 'Sonido', desc: 'Activar toda la salida de audio' },
+        categories: {
+          title: 'Categorías',
+          ui: 'Sonidos de UI', uiDesc: 'Toques, envíos, interruptores',
+          presence: 'Presencia', presenceDesc: 'Entradas a sala, reacciones, escritura',
+          attention: 'Atención', attentionDesc: 'Menciones, llamadas, grabación',
+          ambient: 'Ambiente', ambientDesc: 'Tono ambiental disperso de sala',
+        },
+        volume: 'Volumen',
+        theme: 'Tema de sonido',
+        accessibility: 'Accesibilidad',
+        access: {
+          normal: 'Normal',
+          reduced: 'Reducido',
+          mono: 'Mono',
+          tinnitusSafe: 'Seguro para tinnitus (límite 4 kHz)',
+          lowFrequency: 'Frecuencia baja (−20% tono)',
+          hearingSensitivity: 'Sensibilidad auditiva (−50% ganancia)',
+        },
       },
     },
     licenses: {

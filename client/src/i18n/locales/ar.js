@@ -649,7 +649,7 @@ export default {
     },
     settings: {
       title: 'الإعدادات',
-      tabs: { general: 'عام', chat: 'دردشة' },
+      tabs: { general: 'عام', chat: 'دردشة', sound: 'الصوت' },
       appearance: {
         title: 'المظهر',
         theme: 'السمة',
@@ -731,6 +731,27 @@ export default {
         title: 'اللغة',
         label: 'لغة التطبيق',
         desc: 'اختر لغتك المفضلة',
+      },
+      sound: {
+        master: { title: 'رئيسي', label: 'الصوت', desc: 'تفعيل جميع مخرجات الصوت' },
+        categories: {
+          title: 'الفئات',
+          ui: 'أصوات الواجهة', uiDesc: 'النقر، الإرسال، التبديل',
+          presence: 'الحضور', presenceDesc: 'دخول الغرفة، التفاعلات، الكتابة',
+          attention: 'التنبيه', attentionDesc: 'الإشارات، المكالمات، التسجيل',
+          ambient: 'الخلفية', ambientDesc: 'نغمة الغرفة الجوية الخفيفة',
+        },
+        volume: 'مستوى الصوت',
+        theme: 'سمة الصوت',
+        accessibility: 'إمكانية الوصول',
+        access: {
+          normal: 'عادي',
+          reduced: 'مخفض',
+          mono: 'أحادي',
+          tinnitusSafe: 'آمن للطنين (حد 4 كيلوهرتز)',
+          lowFrequency: 'تردد منخفض (نغمة −20%)',
+          hearingSensitivity: 'حساسية سمعية (كسب −50%)',
+        },
       },
     },
     licenses: {

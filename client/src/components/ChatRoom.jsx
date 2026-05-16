@@ -660,6 +660,7 @@ const ChatRoom = () => {
   const openSettings = useCallback((tab = 'general') => {
     setSettingsInitialTab(tab);
     setShowSettingsModal(true);
+    emitSound('toggle');
   }, []);
   const [selectedRecipients, setSelectedRecipients] = useState([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -747,6 +748,7 @@ const ChatRoom = () => {
   const anonClickCountRef = useRef(0);
   const anonClickTimerRef = useRef(null);
   const anonHoldTimerRef = useRef(null);
+  const currentUserRef = useRef(null);
   const { theme, effective: themeEffective } = useTheme();
 
   const [audioViewOnce, setAudioViewOnce] = useState(true);
@@ -754,6 +756,7 @@ const ChatRoom = () => {
 
   // ─── Sync MLS ref with state ───────────────────────────
   useEffect(() => { mlsReadyRef.current = mlsReady; }, [mlsReady]);
+  useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
 
   // ─── Initialize AES room-key on mount (no WASM needed) ───
   useEffect(() => {
@@ -956,6 +959,7 @@ const ChatRoom = () => {
         setIsWaitingForHost(false); // Clear here, after join is confirmed
         setIsReconnecting(false);
         setError(null);
+        emitSound('connectionEstablished');
 
         // ─── AES-GCM Room Key Setup ───────────────────────
         // All members derive the same key from the roomCode via HKDF.
@@ -1324,12 +1328,16 @@ const ChatRoom = () => {
           console.warn('[ChatRoom] Decrypt error:', e.message);
           message.content = '⚠️ Decryption failed';
         }
-        if (!isOwnMessage) emitSound('receive');
+        if (!isOwnMessage) {
+          const myNick = currentUserRef.current?.nickname;
+          const hasMention = myNick && new RegExp(`@${myNick}\\b`, 'i').test(message.content ?? '');
+          emitSound(hasMention ? 'mention' : 'receive');
+        }
         setMessages(prev => [...prev, message]);
         return;
       }
       // Unencrypted — show as-is
-      if (!isOwnMessage) playMessageSound();
+      if (!isOwnMessage) emitSound('receive');
       setMessages(prev => [...prev, message]);
     };
 
@@ -1513,6 +1521,7 @@ const ChatRoom = () => {
         next.set(userId, nickname);
         return next;
       });
+      if (userId !== socketManager.socket?.id) emitSound('typingNearby');
     };
 
     const handleUserStopTyping = ({ userId }) => {
@@ -1603,6 +1612,7 @@ const ChatRoom = () => {
       const msg = forkIsHost ? `Forked room ${newRoomCode} is ready.` : `${fromNickname} forked the room — join code: ${newRoomCode}`;
       setActivityLogs(prev => [{ id: `log_fork_${Date.now()}`, type: 'system', content: msg, timestamp: new Date().toISOString() }, ...prev].slice(0, 50));
       setHasNewLogs(true);
+      emitSound('roomInvite');
     });
     socketManager.on('file-transfer-invite', handleFileTransferInvite);
 
@@ -2063,6 +2073,7 @@ const ChatRoom = () => {
       const cmd = parts[0].toLowerCase();
       const args = parts.slice(1).join(' ');
 
+      emitSound('tap');
       switch (cmd) {
         case '/camera': setShowCameraModal(true); break;
         case '/poll': setShowPollModal(true); break;
@@ -2383,6 +2394,7 @@ const ChatRoom = () => {
   const handleReaction = (messageId, emoji) => {
     spawnMessageReaction(messageId, emoji);
     socketManager.emit('add-reaction', { messageId, emoji });
+    emitSound('reaction');
   };
 
   const handleDragEnter = (e) => {
@@ -2439,6 +2451,7 @@ const ChatRoom = () => {
     setNewMessage(`🧊 ${question}`);
     setShowFeatureMenu(false);
     hapticLight();
+    emitSound('tap');
     // Focus the input field so user can edit or send
     setTimeout(() => {
       messageInputRef.current?.focus();
@@ -2800,6 +2813,7 @@ const ChatRoom = () => {
       mediaRecorderRef.current.start();
       setIsRecording(true);
       setSoundContext({ recording: true });
+      emitSound('recordingStart');
       setRecordingDuration(0);
       recordingTimerRef.current = setInterval(() => {
         setRecordingDuration(prev => {
@@ -2836,6 +2850,7 @@ const ChatRoom = () => {
     }
     setIsRecording(false);
     setSoundContext({ recording: false });
+    emitSound('recordingStop');
     clearInterval(recordingTimerRef.current);
   };
 
@@ -2846,6 +2861,7 @@ const ChatRoom = () => {
     }
     setIsRecording(false);
     setSoundContext({ recording: false });
+    emitSound('recordingStop');
     setRecordingDuration(0);
     clearInterval(recordingTimerRef.current);
   };
@@ -3270,7 +3286,7 @@ const ChatRoom = () => {
                     >
                       <button
                         type="button"
-                        onClick={() => setShowFeatureMenu(!showFeatureMenu)}
+                        onClick={() => { emitSound('toggle'); setShowFeatureMenu(!showFeatureMenu); }}
                         disabled={!isConnected}
                         className={`p-1.5 sm:p-2.5 rounded-full transition-all duration-200 border-none outline-none focus:outline-none focus:ring-0 ${showFeatureMenu ? `bg-transparent hover:bg-transparent dark:bg-transparent dark:hover:bg-transparent text-${vibeAccent}-500 shadow-none` : `hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400`}`}
                         title={t('chatRoom.features')}
@@ -3469,6 +3485,7 @@ const ChatRoom = () => {
                           if (!showEmojiPicker) {
                             messageInputRef.current?.blur();
                           }
+                          emitSound('toggle');
                           setShowEmojiPicker(!showEmojiPicker);
                         }}
                         disabled={!isConnected}

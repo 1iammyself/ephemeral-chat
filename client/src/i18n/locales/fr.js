@@ -645,7 +645,28 @@ export default {
     },
     settings: {
       title: 'Paramètres',
-      tabs: { general: 'Général', chat: 'Chat' },
+      tabs: { general: 'Général', chat: 'Chat', sound: 'Son' },
+      sound: {
+        master: { title: 'Principal', label: 'Son', desc: 'Activer toutes les sorties audio' },
+        categories: {
+          title: 'Catégories',
+          ui: 'Sons UI', uiDesc: 'Tapotements, envois, bascules',
+          presence: 'Présence', presenceDesc: 'Entrées salon, réactions, frappe',
+          attention: 'Attention', attentionDesc: 'Mentions, appels, enregistrement',
+          ambient: 'Ambiance', ambientDesc: 'Son ambiant atmosphérique épars',
+        },
+        volume: 'Volume',
+        theme: 'Thème sonore',
+        accessibility: 'Accessibilité',
+        access: {
+          normal: 'Normal',
+          reduced: 'Réduit',
+          mono: 'Mono',
+          tinnitusSafe: 'Anti-acouphènes (limite 4 kHz)',
+          lowFrequency: 'Basse fréquence (hauteur −20 %)',
+          hearingSensitivity: 'Sensibilité auditive (volume −50 %)',
+        },
+      },
       appearance: {
         title: 'Apparence',
         theme: 'Thème',

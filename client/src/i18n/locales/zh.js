@@ -641,7 +641,7 @@ export default {
     },
     settings: {
       title: '设置',
-      tabs: { general: '常规', chat: '聊天' },
+      tabs: { general: '常规', chat: '聊天', sound: '声音' },
       appearance: {
         title: '外观',
         theme: '主题',
@@ -719,6 +719,27 @@ export default {
         title: '语言',
         label: '应用语言',
         desc: '选择您偏好的语言',
+      },
+      sound: {
+        master: { title: '主音量', label: '声音', desc: '启用所有音频输出' },
+        categories: {
+          title: '类别',
+          ui: 'UI 音效', uiDesc: '点击、发送、切换',
+          presence: '在场感', presenceDesc: '加入房间、反应、输入',
+          attention: '提醒', attentionDesc: '提及、通话、录音',
+          ambient: '环境音', ambientDesc: '稀疏的房间氛围音',
+        },
+        volume: '音量',
+        theme: '音效主题',
+        accessibility: '辅助功能',
+        access: {
+          normal: '正常',
+          reduced: '减弱',
+          mono: '单声道',
+          tinnitusSafe: '耳鸣友好（4 kHz 上限）',
+          lowFrequency: '低频（音调 −20%）',
+          hearingSensitivity: '听觉敏感（增益 −50%）',
+        },
       },
     },
     licenses: {
