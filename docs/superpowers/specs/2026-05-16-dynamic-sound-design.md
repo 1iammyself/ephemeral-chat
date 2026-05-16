@@ -74,7 +74,7 @@ masterBus
 | attentionBus | compressor → limiter |
 | ambientBus | lowpass filter → reverb |
 
-**Stereo widener rule:** headphones detected → width 0.3; speaker → width 0.05 (mono-safe). Never fixed.
+**Stereo widener rule:** headphones detected → width 0.3; speaker → width 0.05 (mono-safe). Never fixed. Width transitions are smoothed via `width(t) = lerp(previous, target, 0.15)` — prevents perceptual jumping when users plug/unplug headphones or switch Bluetooth routes.
 
 **uiBus transient character:** rounded attacks, soft saturation — tactile glass feel, not mechanical clicks.
 
@@ -148,6 +148,8 @@ Prevents repetition fatigue. Values are deliberately small — subconscious rich
 
 Combined uiBus + presenceBus spectral energy is tracked per second. If high-frequency content exceeds threshold, subsequent sounds auto-attenuate. Prevents metallic/fatiguing buildup from concurrent shimmery events.
 
+**Hierarchy:** Global brightness budget overrides local per-event spectral caps when exceeded. Per-event caps (e.g. reaction lowpass at 3kHz) are local constraints; the global budget is the ceiling. This ordering is fixed — without it, concurrent events can produce unpredictable and inconsistent attenuation behavior.
+
 ### 2.11 Density Cap
 
 - Reactions: max 1 composite per 2s window after initial burst
@@ -188,6 +190,7 @@ Does NOT trigger on: every card click, scroll, checkbox.
 
 - FM synthesis: carrier 380Hz, modulator 190Hz (2:1 ratio), modulation index 1.5
 - Spectral cap: lowpass at 3kHz, Q=0.7 — prevents metallic harshness
+- **Burst FM risk mitigation:** under high-density conditions (>3 composites per 2s), modulation index reduces to 0.8 dynamically, OR a post-FM low-shelf cut (-3dB at 2kHz) is applied. FM at 2:1 + index 1.5 risks metallic sidebands under stacking — this is the highest-risk sound in Phase 1.
 - Envelope: attack 15ms, brightness peak at 40ms, smooth harmonic decay to 150ms
 - Burst composite (>3 in 500ms): shared reverb tail, 1.5s decay, no restacking
 - Gain: 0.13
@@ -216,7 +219,7 @@ Does NOT trigger on: every card click, scroll, checkbox.
 - Oscillator: sine at 480Hz (mid-frequency for device perceptibility)
 - Slightly more defined attack than tap
 - Envelope: attack 8ms, decay 35–45ms
-- Gain: 0.10 minimum floor — never drops below audible threshold
+- Gain: adaptive to perceptual detectability threshold (device-dependent) — not a fixed floor. Target: always audible on the current output device without causing fatigue in quiet environments. Conflicts with accessibility modes resolved by accessibility mode taking precedence.
 
 ### 3.2 Ducking Rules (Phase 1)
 
@@ -249,17 +252,19 @@ Not a hardcoded 22:00–07:00 rule. Factors evaluated:
 - User activity level
 - OS focus/do-not-disturb mode
 
-Output: `nightIntensity` (0.0–1.0) applied as a multiplier on masterBus gain.
+Output: `nightIntensity` quantized into 5 stable levels (0.0, 0.25, 0.5, 0.75, 1.0) applied as a multiplier on masterBus gain. Quantization prevents fluid unpredictability and makes behavior debuggable and consistent across sessions.
 
 ---
 
 ## 5. Performance States
 
-| State | Behavior |
-|-------|----------|
-| full | All buses active, reverb tails, full polyphony |
-| balanced | Ambient disabled, reverb tails shortened |
-| lowPower | No reverb, polyphony cap halved, ambient muted, presence bus reduced |
+| State | Intent | Behavior |
+|-------|--------|----------|
+| full | Default | All buses active, reverb tails, full polyphony |
+| balanced | Aesthetic optimization | Ambient disabled, reverb tails shortened — user or system preference |
+| lowPower | System constraint | No reverb, polyphony cap halved, ambient muted, presence bus at 50% — triggered by device constraint, not preference |
+
+**Hierarchy:** `lowPower` is a system constraint mode, not a stricter version of `balanced`. They have different triggers and different semantics. Phase 2 ambient system integration must respect this boundary — ambient expansion only activates under `full` state.
 
 Low power activates automatically when `lowPowerMode=true` in Context Resolver.
 
@@ -314,7 +319,23 @@ Architected from the start even if UI ships later:
 
 ---
 
-## 9. Key Constraints
+## 9. Sound Persistence Decay Model
+
+Events contribute residual emotional energy to a short-lived buffer, creating continuity of presence rather than isolated discrete sounds.
+
+**Phase 1 implementation (basic):**
+- Reaction burst → shimmer tail persists 1.5s in presenceBus reverb; subsequent bursts extend the tail rather than restart it
+- roomJoin → brief 300ms ambient lift on presenceBus gain (fade in/out)
+
+**Phase 2 expansion:**
+- Room activity above threshold → micro-ambient lift sustains for up to 5s, decaying smoothly
+- Multiple rapid join events → layered presence texture that evolves rather than repeats
+
+This is the concept that separates "events" from "after-feel." Without it, the soundscape feels punctuated rather than alive.
+
+---
+
+## 10. Key Constraints
 
 1. Never play identical sounds repeatedly without randomization
 2. Presence sounds must feel environmental, not notification-like
