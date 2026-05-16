@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Clock, Play, RotateCcw } from 'lucide-react';
 
 const TimerModal = ({ isOpen, onClose, onStart }) => {
+    const { t } = useTranslation();
     const [minutes, setMinutes] = useState(5);
     const [seconds, setSeconds] = useState(0);
 
@@ -23,7 +25,7 @@ const TimerModal = ({ isOpen, onClose, onStart }) => {
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         <Clock className="w-5 h-5 text-primary-500" />
-                        Start Countdown
+                        {t('timer.title')}
                     </h2>
                     <button
                         onClick={onClose}
@@ -36,7 +38,7 @@ const TimerModal = ({ isOpen, onClose, onStart }) => {
                 <form onSubmit={handleSubmit}>
                     <div className="flex items-center justify-center gap-4 mb-8">
                         <div className="flex flex-col items-center">
-                            <label className="text-xs text-gray-500 uppercase font-semibold mb-1">Minutes</label>
+                            <label className="text-xs text-gray-500 uppercase font-semibold mb-1">{t('timer.minutes')}</label>
                             <input
                                 type="number"
                                 min="0"
@@ -48,7 +50,7 @@ const TimerModal = ({ isOpen, onClose, onStart }) => {
                         </div>
                         <span className="text-2xl font-bold text-gray-400 mt-4">:</span>
                         <div className="flex flex-col items-center">
-                            <label className="text-xs text-gray-500 uppercase font-semibold mb-1">Seconds</label>
+                            <label className="text-xs text-gray-500 uppercase font-semibold mb-1">{t('timer.seconds')}</label>
                             <input
                                 type="number"
                                 min="0"
@@ -66,14 +68,14 @@ const TimerModal = ({ isOpen, onClose, onStart }) => {
                             onClick={onClose}
                             className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
                         >
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                         <button
                             type="submit"
                             className="flex-1 px-4 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl transition-colors font-semibold flex items-center justify-center gap-2 shadow-lg shadow-primary-500/30"
                         >
                             <Play className="w-4 h-4 fill-current" />
-                            Start Timer
+                            {t('timer.start')}
                         </button>
                     </div>
                 </form>

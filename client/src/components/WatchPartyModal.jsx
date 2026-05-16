@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Link, Radio, Play, Music, Youtube, Figma, FileText } from 'lucide-react';
 import { detectMediaUrl } from './SharedMediaPlayer';
 import { getVibeById } from '../utils/vibes';
@@ -8,6 +9,7 @@ import { getVibeById } from '../utils/vibes';
  * to start a watch party. Shows validation feedback inline.
  */
 const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default', embedded = false }) => {
+  const { t } = useTranslation();
   const [urlInput, setUrlInput] = useState('');
   const inputRef = useRef(null);
 
@@ -56,8 +58,8 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default', embed
                 <Radio className={`w-5 h-5 text-${vibeAccent}-500`} />
               </div>
               <div>
-                <h3 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">Watch Party</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Share media with everyone in the room</p>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">{t('watchParty.title')}</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t('watchParty.subtitle')}</p>
               </div>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors">
@@ -78,7 +80,7 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default', embed
               onChange={(e) => setUrlInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleShare()}
               data-allow-copy="true"
-              placeholder="Paste YouTube URL..."
+              placeholder={t('watchParty.urlPlaceholder')}
               className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 outline-none min-w-0"
             />
             {urlInput && (
@@ -105,9 +107,9 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default', embed
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-gray-700 dark:text-gray-200">
-                  {detected.type === 'youtube' ? 'YouTube Video' :
-                      detected.type === 'soundcloud' ? 'SoundCloud Track' :
-                      detected.type === 'figma' ? 'Figma Project' : 'Document'} detected
+                  {detected.type === 'youtube' ? t('watchParty.youtubeDetected') :
+                      detected.type === 'soundcloud' ? t('watchParty.soundcloudDetected') :
+                      detected.type === 'figma' ? t('watchParty.figmaDetected') : t('watchParty.documentDetected')}
                 </p>
                 <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">{urlInput.trim()}</p>
               </div>
@@ -143,7 +145,7 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default', embed
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleShare}
@@ -156,7 +158,7 @@ const WatchPartyModal = ({ isOpen, onClose, onShare, roomVibe = 'default', embed
                 : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
               }`}
           >
-            Share to Room
+            {t('watchParty.shareToRoom')}
           </button>
         </div>
       </div>

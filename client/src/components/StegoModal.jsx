@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Lock, Eye, EyeOff, Download, Send, Image as ImageIcon, AlertCircle, CheckCircle } from 'lucide-react';
 import { embed, extract } from '../crypto/steganography';
 
 export default function StegoModal({ isOpen, onClose, onSendStego, embedded = false, initialExtractImage = null }) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState('hide');
 
   const [carrierFile, setCarrierFile] = useState(null);
@@ -129,8 +131,8 @@ export default function StegoModal({ isOpen, onClose, onSendStego, embedded = fa
               <Lock className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
             </div>
             <div className="flex-1">
-              <h2 className="text-sm font-black text-gray-900 dark:text-white">Steganography</h2>
-              <p className="text-[10px] text-gray-400">Hide secrets in plain sight</p>
+              <h2 className="text-sm font-black text-gray-900 dark:text-white">{t('stego.title')}</h2>
+              <p className="text-[10px] text-gray-400">{t('stego.subtitle')}</p>
             </div>
             <button onClick={handleClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
               <X className="w-4 h-4 text-gray-500" />
@@ -143,16 +145,16 @@ export default function StegoModal({ isOpen, onClose, onSendStego, embedded = fa
           ? "flex gap-px bg-white/[0.04] flex-shrink-0"
           : "flex gap-1 mx-5 mt-4 bg-gray-100 dark:bg-gray-800 rounded-xl p-1"
         }>
-          {['hide', 'extract'].map(t => (
+          {['hide', 'extract'].map(tabKey => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={tabKey}
+              onClick={() => setTab(tabKey)}
               className={embedded
-                ? `flex-1 py-3 text-xs font-bold tracking-wide transition-colors ${tab === t ? 'text-emerald-300 border-b-2 border-emerald-500' : 'text-gray-500 hover:text-gray-300'}`
-                : `flex-1 py-2 rounded-lg text-xs font-bold transition-all ${tab === t ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`
+                ? `flex-1 py-3 text-xs font-bold tracking-wide transition-colors ${tab === tabKey ? 'text-emerald-300 border-b-2 border-emerald-500' : 'text-gray-500 hover:text-gray-300'}`
+                : `flex-1 py-2 rounded-lg text-xs font-bold transition-all ${tab === tabKey ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`
               }
             >
-              {t === 'hide' ? 'Hide Message' : 'Extract Message'}
+              {tabKey === 'hide' ? t('stego.hideTab') : t('stego.extractTab')}
             </button>
           ))}
         </div>
@@ -162,7 +164,7 @@ export default function StegoModal({ isOpen, onClose, onSendStego, embedded = fa
             <>
               {/* Carrier image */}
               <div>
-                <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Carrier Image</label>
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">{t('stego.carrierImageLabel')}</label>
                 <input ref={hideFileRef} type="file" accept="image/*" className="hidden" onChange={e => handleCarrierSelect(e.target.files?.[0])} />
                 {carrierPreview ? (
                   <div
@@ -171,7 +173,7 @@ export default function StegoModal({ isOpen, onClose, onSendStego, embedded = fa
                   >
                     <img src={carrierPreview} alt="Carrier" className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">Change image</span>
+                      <span className="text-white text-xs font-bold">{t('stego.changeImage')}</span>
                     </div>
                   </div>
                 ) : (
@@ -180,18 +182,18 @@ export default function StegoModal({ isOpen, onClose, onSendStego, embedded = fa
                     className="w-full border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl py-6 flex flex-col items-center gap-2 hover:border-indigo-400 dark:hover:border-indigo-500 transition-colors group"
                   >
                     <ImageIcon className="w-6 h-6 text-gray-300 dark:text-gray-600 group-hover:text-indigo-400 transition-colors" />
-                    <span className="text-xs text-gray-400">Tap to pick image (PNG/JPEG)</span>
+                    <span className="text-xs text-gray-400">{t('stego.tapToPickImage')}</span>
                   </button>
                 )}
               </div>
 
               {/* Secret text */}
               <div>
-                <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Secret Message</label>
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">{t('stego.secretMessageLabel')}</label>
                 <textarea
                   value={secretText}
                   onChange={e => setSecretText(e.target.value)}
-                  placeholder="Type your hidden message…"
+                  placeholder={t('stego.secretPlaceholder')}
                   rows={3}
                   className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-200 placeholder-gray-400 px-3 py-2.5 outline-none focus:ring-2 focus:ring-indigo-400/40 resize-none"
                 />
@@ -199,20 +201,20 @@ export default function StegoModal({ isOpen, onClose, onSendStego, embedded = fa
 
               {/* Passphrase */}
               <div>
-                <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Passphrase</label>
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">{t('stego.passphraseLabel')}</label>
                 <div className="flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2.5 focus-within:ring-2 focus-within:ring-indigo-400/40">
                   <input
                     type={showHidePass ? 'text' : 'password'}
                     value={hidePassphrase}
                     onChange={e => setHidePassphrase(e.target.value)}
-                    placeholder="Share this key out-of-band"
+                    placeholder={t('stego.hidePassphrasePlaceholder')}
                     className="flex-1 bg-transparent text-sm text-gray-800 dark:text-gray-200 placeholder-gray-400 outline-none"
                   />
                   <button type="button" onClick={() => setShowHidePass(p => !p)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
                     {showHidePass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="text-[10px] text-gray-400 mt-1">Recipient needs this passphrase to extract the message.</p>
+                <p className="text-[10px] text-gray-400 mt-1">{t('stego.passphraseHint')}</p>
               </div>
 
               {/* Embed / result */}
@@ -222,13 +224,13 @@ export default function StegoModal({ isOpen, onClose, onSendStego, embedded = fa
                   disabled={isEmbedding || !carrierFile || !secretText.trim() || !hidePassphrase.trim()}
                   className="w-full py-3 rounded-xl bg-indigo-600 text-white text-sm font-bold disabled:opacity-40 hover:bg-indigo-700 transition-colors active:scale-95"
                 >
-                  {isEmbedding ? 'Embedding…' : 'Embed Message'}
+                  {isEmbedding ? t('stego.embedding') : t('stego.embedButton')}
                 </button>
               ) : (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl">
                     <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                    <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">Message embedded successfully!</p>
+                    <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">{t('stego.embedSuccess')}</p>
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -236,7 +238,7 @@ export default function StegoModal({ isOpen, onClose, onSendStego, embedded = fa
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      Save PNG
+                      {t('stego.savePng')}
                     </button>
                     {onSendStego && (
                       <button
@@ -249,7 +251,7 @@ export default function StegoModal({ isOpen, onClose, onSendStego, embedded = fa
                     )}
                   </div>
                   <button onClick={() => setEmbedResult(null)} className="w-full text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors py-1">
-                    Start over
+                    {t('stego.startOver')}
                   </button>
                 </div>
               )}
@@ -258,7 +260,7 @@ export default function StegoModal({ isOpen, onClose, onSendStego, embedded = fa
             <>
               {/* Extract: image picker */}
               <div>
-                <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Stego Image</label>
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">{t('stego.stegoImageLabel')}</label>
                 <input ref={extractFileRef} type="file" accept="image/*" className="hidden" onChange={e => handleExtractSelect(e.target.files?.[0])} />
                 {extractPreview ? (
                   <div
@@ -267,7 +269,7 @@ export default function StegoModal({ isOpen, onClose, onSendStego, embedded = fa
                   >
                     <img src={extractPreview} alt="Stego" className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">Change image</span>
+                      <span className="text-white text-xs font-bold">{t('stego.changeImage')}</span>
                     </div>
                   </div>
                 ) : (
@@ -276,20 +278,20 @@ export default function StegoModal({ isOpen, onClose, onSendStego, embedded = fa
                     className="w-full border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl py-6 flex flex-col items-center gap-2 hover:border-indigo-400 dark:hover:border-indigo-500 transition-colors group"
                   >
                     <ImageIcon className="w-6 h-6 text-gray-300 dark:text-gray-600 group-hover:text-indigo-400 transition-colors" />
-                    <span className="text-xs text-gray-400">Tap to pick stego image</span>
+                    <span className="text-xs text-gray-400">{t('stego.tapToPickStego')}</span>
                   </button>
                 )}
               </div>
 
               {/* Passphrase */}
               <div>
-                <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Passphrase</label>
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">{t('stego.passphraseLabel')}</label>
                 <div className="flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2.5 focus-within:ring-2 focus-within:ring-indigo-400/40">
                   <input
                     type={showExtractPass ? 'text' : 'password'}
                     value={extractPassphrase}
                     onChange={e => setExtractPassphrase(e.target.value)}
-                    placeholder="Enter the shared passphrase"
+                    placeholder={t('stego.extractPassphrasePlaceholder')}
                     onKeyDown={e => { if (e.key === 'Enter') handleExtract(); }}
                     className="flex-1 bg-transparent text-sm text-gray-800 dark:text-gray-200 placeholder-gray-400 outline-none"
                   />
@@ -304,7 +306,7 @@ export default function StegoModal({ isOpen, onClose, onSendStego, embedded = fa
                 disabled={isExtracting || !extractFile || !extractPassphrase.trim()}
                 className="w-full py-3 rounded-xl bg-indigo-600 text-white text-sm font-bold disabled:opacity-40 hover:bg-indigo-700 transition-colors active:scale-95"
               >
-                {isExtracting ? 'Extracting…' : 'Extract Message'}
+                {isExtracting ? t('stego.extracting') : t('stego.extractButton')}
               </button>
 
               {extractResult !== null && (
@@ -313,14 +315,14 @@ export default function StegoModal({ isOpen, onClose, onSendStego, embedded = fa
                     <div className="flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
                       <p className="text-xs text-red-700 dark:text-red-400 font-medium">
-                        {extractResult === 'not-found' ? 'No hidden message found or wrong passphrase.' : 'Extraction failed. Make sure this is a lossless PNG.'}
+                        {extractResult === 'not-found' ? t('stego.notFound') : t('stego.extractFailed')}
                       </p>
                     </div>
                   ) : (
                     <div className="flex items-start gap-2">
                       <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide mb-1">Hidden message revealed</p>
+                        <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide mb-1">{t('stego.hiddenRevealed')}</p>
                         <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">{extractResult}</p>
                       </div>
                     </div>

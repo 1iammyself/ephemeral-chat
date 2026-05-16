@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, MessageSquare, Send, CornerDownRight } from 'lucide-react';
 
 function formatTime(ts) {
@@ -6,6 +7,7 @@ function formatTime(ts) {
 }
 
 function ThreadMessage({ msg }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-0.5 group">
       <div className="flex items-center gap-1.5 text-[10px] text-gray-400 dark:text-gray-500">
@@ -24,6 +26,7 @@ function ThreadMessage({ msg }) {
 }
 
 export default function ThreadView({ parentMessage, messages, currentUser, isOpen, onClose, onSend, roomVibe }) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState('');
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
@@ -53,8 +56,8 @@ export default function ThreadView({ parentMessage, messages, currentUser, isOpe
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800 shrink-0">
         <MessageSquare className="w-4 h-4 text-indigo-500" />
-        <span className="font-black text-sm text-gray-900 dark:text-white flex-1">Thread</span>
-        <span className="text-xs text-gray-400">{threadReplies.length} {threadReplies.length === 1 ? 'reply' : 'replies'}</span>
+        <span className="font-black text-sm text-gray-900 dark:text-white flex-1">{t('thread.title')}</span>
+        <span className="text-xs text-gray-400">{t('thread.reply', { count: threadReplies.length })}</span>
         <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
           <X className="w-4 h-4 text-gray-500" />
         </button>
@@ -82,7 +85,7 @@ export default function ThreadView({ parentMessage, messages, currentUser, isOpe
         {threadReplies.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center gap-2 opacity-50">
             <CornerDownRight className="w-6 h-6 text-gray-400" />
-            <p className="text-xs text-gray-400">No replies yet. Start the thread!</p>
+            <p className="text-xs text-gray-400">{t('thread.noReplies')}</p>
           </div>
         ) : (
           threadReplies.map(m => <ThreadMessage key={m.id} msg={m} />)
@@ -98,7 +101,7 @@ export default function ThreadView({ parentMessage, messages, currentUser, isOpe
             value={draft}
             onChange={e => setDraft(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-            placeholder="Reply in thread…"
+            placeholder={t('thread.replyPlaceholder')}
             className="flex-1 bg-transparent text-sm text-gray-800 dark:text-gray-200 placeholder-gray-400 outline-none"
           />
           <button
@@ -109,7 +112,7 @@ export default function ThreadView({ parentMessage, messages, currentUser, isOpe
             <Send className="w-3.5 h-3.5" />
           </button>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1.5 text-center">Replies only visible in this thread</p>
+        <p className="text-[10px] text-gray-400 mt-1.5 text-center">{t('thread.repliesVisible')}</p>
       </div>
     </div>
   );

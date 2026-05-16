@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, X, ChevronUp, ChevronDown } from 'lucide-react';
 
 export default function MessageSearch({ query, setQuery, results, focusedIndex, onNext, onPrev, onClose }) {
+  const { t } = useTranslation();
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -16,8 +18,8 @@ export default function MessageSearch({ query, setQuery, results, focusedIndex, 
 
   const count = results.length;
   const label = count === 0
-    ? (query.trim() ? 'No results' : '')
-    : `${focusedIndex + 1} / ${count}`;
+    ? (query.trim() ? t('search.noResults') : '')
+    : t('search.resultCount', { current: focusedIndex + 1, total: count });
 
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 animate-in slide-in-from-top-2 duration-150">
@@ -27,7 +29,7 @@ export default function MessageSearch({ query, setQuery, results, focusedIndex, 
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Search messages…"
+        placeholder={t('search.placeholder')}
         className="flex-1 bg-transparent text-sm text-gray-800 dark:text-gray-200 placeholder-gray-400 outline-none"
       />
       {query.trim() && (
@@ -39,7 +41,7 @@ export default function MessageSearch({ query, setQuery, results, focusedIndex, 
         onClick={onPrev}
         disabled={count === 0}
         className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 transition-colors"
-        title="Previous match (Shift+Enter)"
+        title={t('search.prev')}
       >
         <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400" />
       </button>
@@ -47,14 +49,14 @@ export default function MessageSearch({ query, setQuery, results, focusedIndex, 
         onClick={onNext}
         disabled={count === 0}
         className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 transition-colors"
-        title="Next match (Enter)"
+        title={t('search.next')}
       >
         <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
       </button>
       <button
         onClick={onClose}
         className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ml-1"
-        title="Close search (Esc)"
+        title={t('search.close')}
       >
         <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
       </button>

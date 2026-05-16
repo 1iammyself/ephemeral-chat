@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { hapticSuccess } from '../utils/platform';
 import { X, Check, Copy, Users, Lock, Unlock, Timer, Zap, PartyPopper, Sun, Sunset, Settings, Clock, Shield, Share2, Hash, ToggleLeft, ToggleRight, Upload, Plus, Trash2, ClipboardList, MapPin, Locate, ChevronDown } from 'lucide-react';
 import { Share } from '@capacitor/share';
@@ -14,7 +15,7 @@ import { IntegrityPlugin } from '../capacitor/security-plugins';
 import { useGeofence } from '../hooks/useGeofence';
 
 const CreateRoomModal = ({ onClose, onRoomCreated }) => {
-
+  const { t } = useTranslation();
   const { theme } = useTheme();
   const [roomSettings, setSettings] = useState({
     messageTTL: '30sec',
@@ -62,12 +63,12 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
   }, []);
 
   const ttlOptions = [
-    { value: 'none',   label: 'Never',             short: 'Never', description: 'Messages stay until room expires' },
-    { value: '30sec',  label: '30 Seconds (Default)', short: '30s', description: 'Messages disappear after 30 seconds' },
-    { value: '1min',   label: '1 Minute',           short: '1m',   description: 'Messages disappear after 1 minute' },
-    { value: '5min',   label: '5 Minutes',          short: '5m',   description: 'Messages disappear after 5 minutes' },
-    { value: '30min',  label: '30 Minutes',         short: '30m',  description: 'Messages disappear after 30 minutes' },
-    { value: '1hour',  label: '1 Hour',             short: '1h',   description: 'Messages disappear after 1 hour' }
+    { value: 'none',   label: t('createRoom.ttl.never'),         short: 'Never', description: t('createRoom.ttl.neverDesc') },
+    { value: '30sec',  label: t('createRoom.ttl.thirtySeconds'), short: '30s',   description: t('createRoom.ttl.thirtySecondsDesc') },
+    { value: '1min',   label: t('createRoom.ttl.oneMinute'),     short: '1m',    description: t('createRoom.ttl.oneMinuteDesc') },
+    { value: '5min',   label: t('createRoom.ttl.fiveMinutes'),   short: '5m',    description: t('createRoom.ttl.fiveMinutesDesc') },
+    { value: '30min',  label: t('createRoom.ttl.thirtyMinutes'), short: '30m',   description: t('createRoom.ttl.thirtyMinutesDesc') },
+    { value: '1hour',  label: t('createRoom.ttl.oneHour'),       short: '1h',    description: t('createRoom.ttl.oneHourDesc') },
   ];
 
   const generateInviteLink = async (roomCode, password) => {
@@ -268,13 +269,13 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
           <div className="bg-gray-50 dark:bg-gray-800 rounded-lg w-full max-w-md relative border border-gray-300 dark:border-gray-700">
             <div className="p-6">
               <h2 className="text-2xl font-bold mb-4 text-green-600 dark:text-green-400">
-                Room Created Successfully!
+                {t('createRoom.created.title')}
               </h2>
 
               <div className="space-y-4 mb-6">
                 {createdRoom.password && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Access Key</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('createRoom.created.accessKey')}</label>
                     <div className="flex items-center">
                       <input
                         type="text"
@@ -298,8 +299,8 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
 
                 <div className="pt-2">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center justify-between">
-                    Invite Link
-                    <span className="text-[10px] text-gray-500 font-normal">Expires in 25 min</span>
+                    {t('createRoom.created.inviteLink')}
+                    <span className="text-[10px] text-gray-500 font-normal">{t('createRoom.created.expiresIn')}</span>
                   </label>
                   <div className="flex items-center w-full">
                     <div className="flex-1 min-w-0">
@@ -328,13 +329,13 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                       <Share2 className="w-4 h-4" />
                     </button>
                   </div>
-                  <p className="mt-1 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">Share this link with others to join easily</p>
+                  <p className="mt-1 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">{t('createRoom.created.inviteLinkDesc')}</p>
                 </div>
 
                 {verbalCode && (
                   <div className="pt-3">
                     <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-100 dark:border-blue-800">
-                      <label className="block text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Verbal Join Code</label>
+                      <label className="block text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">{t('createRoom.created.verbalCode')}</label>
                       <div className="flex items-center justify-between">
                         <span className="font-mono text-lg font-semibold text-blue-700 dark:text-blue-200 tracking-wide">
                           {verbalCode}
@@ -343,11 +344,11 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                           onClick={() => copyToClipboard(verbalCode, 'verbalCode')}
                           className={`ml-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${isCopied.verbalCode ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-700'}`}
                         >
-                          {isCopied.verbalCode ? 'Copied!' : 'Copy'}
+                          {isCopied.verbalCode ? t('common.copied') : t('common.copy')}
                         </button>
                       </div>
                       <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-                        Share this code, others can type it to join.
+                        {t('createRoom.created.verbalCodeDesc')}
                       </p>
                     </div>
                   </div>
@@ -359,13 +360,13 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                   onClick={handleNewRoom}
                   className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors order-2 sm:order-1"
                 >
-                  Create Another
+                  {t('createRoom.created.createAnother')}
                 </button>
                 <button
                   onClick={handleJoinRoom}
                   className="w-full sm:w-auto px-4 py-2 text-sm font-bold bg-blue-500 dark:bg-blue-600 text-white rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors order-1 sm:order-2"
                 >
-                  Join Room Now
+                  {t('createRoom.created.joinNow')}
                 </button>
               </div>
             </div>
@@ -401,7 +402,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
         <div className="p-4 sm:p-6 max-h-[90vh] overflow-y-auto no-scrollbar">
           <h2 className="text-xl font-bold mb-5 flex items-center gap-2 dark:text-white">
             <Settings className="w-5 h-5" />
-            Create a New Room
+            {t('createRoom.title')}
           </h2>
 
           <form onSubmit={handleCreate} autoComplete="off" className="space-y-5">
@@ -410,15 +411,15 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Timer className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                <label className="font-medium text-gray-900 dark:text-white text-sm">Room Duration</label>
-                <span className="ml-auto text-[11px] text-gray-400 dark:text-gray-500">Max 5 active rooms</span>
+                <label className="font-medium text-gray-900 dark:text-white text-sm">{t('createRoom.duration')}</label>
+                <span className="ml-auto text-[11px] text-gray-400 dark:text-gray-500">{t('createRoom.maxRooms')}</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { id: 'ephemeral', title: 'Quick Chat',  duration: '10 min',   icon: Zap,         desc: 'Vanishes when empty' },
-                  { id: 'gathering', title: 'Gathering',   duration: '3 hours',  icon: PartyPopper, desc: 'Stays when empty' },
-                  { id: 'social',    title: 'Social',      duration: '6 hours',  icon: Sun,         desc: 'Perfect for hangouts' },
-                  { id: 'extended',  title: 'Extended',    duration: '24 hours', icon: Sunset,      desc: 'All-day event' }
+                  { id: 'ephemeral', title: t('createRoom.quickChat'),  duration: t('createRoom.quickChatTime'),   icon: Zap,         desc: t('createRoom.quickChatDesc') },
+                  { id: 'gathering', title: t('createRoom.gathering'),  duration: t('createRoom.gatheringTime'),  icon: PartyPopper, desc: t('createRoom.gatheringDesc') },
+                  { id: 'social',    title: t('createRoom.social'),     duration: t('createRoom.socialTime'),     icon: Sun,         desc: t('createRoom.socialDesc') },
+                  { id: 'extended',  title: t('createRoom.extended'),   duration: t('createRoom.extendedTime'),   icon: Sunset,      desc: t('createRoom.extendedDesc') }
                 ].map(mode => {
                   const Icon = mode.icon;
                   return (
@@ -448,7 +449,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Clock className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                <label className="font-medium text-gray-900 dark:text-white text-sm">Message Auto-Delete</label>
+                <label className="font-medium text-gray-900 dark:text-white text-sm">{t('createRoom.messageTTL')}</label>
               </div>
               <div className="space-y-1">
                 {ttlOptions.map(opt => (
@@ -482,7 +483,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
               <div className="flex items-center gap-2 mb-2">
                 <Lock className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                 <label className="font-medium text-gray-900 dark:text-white text-sm">
-                  Access Key <span className="font-normal text-gray-400 dark:text-gray-500 text-xs">(optional)</span>
+                  {t('createRoom.accessKey')}
                 </label>
               </div>
               <input
@@ -497,7 +498,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 data-form-type="other"
                 name={`new_room_key_${Math.random().toString(36).substring(7)}`}
                 id="create-room-key-field"
-                placeholder="Set a private access key"
+                placeholder={t('createRoom.accessKey')}
                 value={roomSettings.password}
                 onChange={(e) => setSettings(prev => ({ ...prev, password: e.target.value }))}
                 onCopy={(e) => e.preventDefault()}
@@ -512,7 +513,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Users className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                <label className="font-medium text-gray-900 dark:text-white text-sm">Max Users</label>
+                <label className="font-medium text-gray-900 dark:text-white text-sm">{t('createRoom.maxUsers')}</label>
               </div>
               <div className="flex items-center justify-center gap-3 mb-3">
                 <button
@@ -534,7 +535,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 >
                   +
                 </button>
-                <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">people (max 10)</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">{t('createRoom.maxUsersSuffix')}</span>
               </div>
               <input
                 type="range"
@@ -560,7 +561,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
               >
                 <span className="flex items-center gap-2">
                   <Settings className="w-4 h-4 text-gray-400" />
-                  Advanced Options
+                  {t('createRoom.advanced')}
                 </span>
                 <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${showAdvanced ? 'rotate-180' : ''}`} />
               </button>
@@ -573,7 +574,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <Hash className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                        <label className="font-medium text-gray-900 dark:text-white text-sm">Custom Room Code</label>
+                        <label className="font-medium text-gray-900 dark:text-white text-sm">{t('createRoom.customCode')}</label>
                       </div>
                       <button
                         type="button"
@@ -586,23 +587,23 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                     {useCustomCode && (
                       <>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                          Use a memorable phrase instead of a random code (e.g. "friday-hangout")
+                          {t('createRoom.customCodeHint')}
                         </p>
                         <input
                           type="text"
                           autoComplete="off"
-                          placeholder="e.g. movie-night, study-group"
+                          placeholder={t('createRoom.customCodePlaceholder')}
                           value={customCode}
                           onChange={(e) => {
                             const val = e.target.value;
                             setCustomCode(val);
                             const normalized = val.trim().toLowerCase().replace(/\s+/g, '-');
                             if (normalized.length > 0 && normalized.length < 3) {
-                              setCustomCodeError('Must be at least 3 characters');
+                              setCustomCodeError(t('createRoom.codeMinLength'));
                             } else if (normalized.length > 30) {
-                              setCustomCodeError('Must be 30 characters or less');
+                              setCustomCodeError(t('createRoom.codeMaxLength'));
                             } else if (normalized.length > 0 && !/^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$/.test(normalized)) {
-                              setCustomCodeError('Only letters, numbers, and hyphens allowed');
+                              setCustomCodeError(t('createRoom.codeInvalid'));
                             } else {
                               setCustomCodeError('');
                             }
@@ -624,13 +625,13 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <Shield className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                      <label className="font-medium text-gray-900 dark:text-white text-sm">Access Control</label>
+                      <label className="font-medium text-gray-900 dark:text-white text-sm">{t('createRoom.accessControl')}</label>
                     </div>
 
                     <div className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 mb-3">
                       <div>
-                        <div className="font-medium text-sm dark:text-white">Auto-Approve Users</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Skip the waiting room for all joiners</div>
+                        <div className="font-medium text-sm dark:text-white">{t('createRoom.autoApprove')}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{t('createRoom.autoApproveDesc')}</div>
                       </div>
                       <button
                         type="button"
@@ -644,10 +645,10 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                     <div className="p-3 rounded-lg border border-gray-200 dark:border-gray-700">
                       <div className="flex items-center gap-2 mb-2">
                         <ClipboardList className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                        <span className="font-medium text-sm dark:text-white">Pre-Approved List</span>
+                        <span className="font-medium text-sm dark:text-white">{t('createRoom.preApproved')}</span>
                       </div>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                        Users on this list bypass the waiting room. Assign optional roles.
+                        {t('createRoom.preApprovedDesc')}
                       </p>
                       <textarea
                         value={preApprovedText}
@@ -715,9 +716,9 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                       <div>
                         <div className="font-medium text-sm dark:text-white flex items-center gap-1.5">
                           <Clock className="w-4 h-4 text-gray-400" />
-                          Schedule for Later
+                          {t('createRoom.scheduleLater')}
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Room opens at a future time; link is shareable now</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{t('createRoom.scheduleLaterDesc')}</div>
                       </div>
                       <button
                         type="button"
@@ -745,9 +746,9 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                       <div>
                         <div className="font-medium text-sm dark:text-white flex items-center gap-1.5">
                           <MapPin className="w-4 h-4 text-gray-400" />
-                          Geofenced Room
+                          {t('createRoom.geofenced')}
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Only users within the set radius can join</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{t('createRoom.geofencedDesc')}</div>
                       </div>
                       <button
                         type="button"
@@ -769,12 +770,12 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                           className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
                         >
                           <Locate className={`w-4 h-4 ${geoLoading ? 'animate-spin text-blue-500' : 'text-gray-500'}`} />
-                          {geoLoading ? 'Getting location…' : geofenceCenter ? 'Location set — tap to update' : 'Use my current location'}
+                          {geoLoading ? t('createRoom.gettingLocation') : geofenceCenter ? t('createRoom.locationSet') : t('createRoom.useMyLocation')}
                         </button>
                         {geoError && <p className="text-xs text-red-500">{geoError}</p>}
                         {geofenceCenter && (
                           <p className="text-xs text-green-600 dark:text-green-400">
-                            Centre locked ({geofenceCenter.lat.toFixed(4)}, {geofenceCenter.lng.toFixed(4)})
+                            {t('createRoom.centreLocked')} ({geofenceCenter.lat.toFixed(4)}, {geofenceCenter.lng.toFixed(4)})
                           </p>
                         )}
                         <div className="flex flex-col gap-1">
@@ -797,7 +798,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                           </div>
                         </div>
                         {geofenceEnabled && !geofenceCenter && (
-                          <p className="text-xs text-amber-500">Set a location before creating the room</p>
+                          <p className="text-xs text-amber-500">{t('createRoom.setLocationFirst')}</p>
                         )}
                       </div>
                     )}
@@ -839,7 +840,7 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                 className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-sm min-h-[44px]"
                 disabled={isCreating}
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="submit"
@@ -852,9 +853,9 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    Waking up secure server...
+                    {t('createRoom.waking')}
                   </>
-                ) : 'Create Room'}
+                ) : t('createRoom.createButton')}
               </button>
             </div>
           </form>

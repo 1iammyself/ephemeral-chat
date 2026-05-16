@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MessageCircle, Lock, Users, AlertCircle, Check, Loader2, Shield, Clock, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
 import { secureFetch } from '../utils/secure-fetch.js';
 import { API_BASE } from '../utils/resolve-url.js';
 // Removed @cap.js/widget - using honeypot instead
 
 const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite = false, isWaitingForHost = false }) => {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { theme } = useTheme();
@@ -159,19 +161,19 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 flex flex-col items-center max-w-md w-full text-center border border-gray-300 dark:border-gray-700">
           <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
           <h3 className="text-xl font-bold mb-2 dark:text-white">
-            {approved ? 'Connecting to Room…' : 'Waiting for Host'}
+            {approved ? t('joinRoom.connectingToRoom') : t('joinRoom.waitingForHost')}
           </h3>
           <p className="text-gray-700 dark:text-gray-300 mb-6">
             {approved
-              ? 'You have been approved. Setting up your secure session…'
-              : 'The host has been notified of your arrival. Please wait for them to let you in.'}
+              ? t('joinRoom.approved')
+              : t('joinRoom.waitingMessage')}
           </p>
           {!approved && (
             <button
               onClick={onCancel}
               className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
             >
-              Cancel Request
+              {t('joinRoom.cancelRequest')}
             </button>
           )}
         </div>
@@ -184,7 +186,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 flex flex-col items-center border border-gray-300 dark:border-gray-700">
           <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-2" />
-          <p className="text-gray-700 dark:text-gray-300">Loading room info...</p>
+          <p className="text-gray-700 dark:text-gray-300">{t('joinRoom.loadingRoomInfo')}</p>
         </div>
       </div>
     );
@@ -204,7 +206,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
         <div className="p-6">
           <h2 className="text-2xl font-bold mb-6 flex items-center dark:text-white">
             <MessageCircle className="w-6 h-6 mr-2 text-blue-600 dark:text-blue-400" />
-            Join Room
+            {t('joinRoom.title')}
           </h2>
 
           <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
@@ -213,12 +215,12 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
               <>
                 <div className="flex items-center text-sm text-gray-700 dark:text-gray-300 mb-1">
                   <Users className="w-4 h-4 mr-2" />
-                  {roomInfo.activeUsers} / {roomInfo.maxUsers} Users
+                  {roomInfo.activeUsers} / {roomInfo.maxUsers} {t('joinRoom.users')}
                 </div>
                 {roomInfo.expiresAt && (
                   <div className="flex items-center text-sm text-gray-700 dark:text-gray-300">
                     <Clock className="w-4 h-4 mr-2" />
-                    Expires in {formatTimeRemaining(roomInfo.expiresAt)}
+                    {t('joinRoom.expiresIn')} {formatTimeRemaining(roomInfo.expiresAt)}
                   </div>
                 )}
               </>
@@ -235,7 +237,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
           <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Nickname
+                {t('joinRoom.nickname')}
               </label>
               <input
                 type="text"
@@ -246,7 +248,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
                 data-lpignore="true"
                 data-form-type="other"
                 className="input-field w-full p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                placeholder="Enter your nickname"
+                placeholder={t('joinRoom.nicknamePlaceholder')}
                 maxLength={20}
                 required
                 disabled={isJoining || isProcessingInvite}
@@ -256,7 +258,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
             {requiresPassword && !inviteValid && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Room Access Key
+                  {t('joinRoom.accessKey')}
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -278,7 +280,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
                     onCut={(e) => e.preventDefault()}
                     onPaste={(e) => e.preventDefault()}
                     className="input-field w-full p-2 pl-9 dark:bg-gray-700 dark:border-gray-600 text-transparent dark:text-transparent placeholder:text-gray-500 dark:placeholder:text-gray-400 caret-blue-500 selection:bg-transparent selection:text-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter room access key"
+                    placeholder={t('joinRoom.accessKeyPlaceholder')}
                     required
                     disabled={isJoining || isProcessingInvite}
                   />
@@ -289,7 +291,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
             {fromInvite && inviteValid && (
               <div className="p-3 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-md flex items-center text-sm">
                 <Check className="w-4 h-4 mr-2" />
-                Valid invite link applied
+                {t('joinRoom.validInvite')}
               </div>
             )}
 
@@ -327,10 +329,10 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
                 {isJoining || isProcessingInvite ? (
                   <>
                     <Loader2 className="animate-spin h-4 w-4 mr-2" />
-                    {isProcessingInvite ? 'Joining...' : 'Verifying...'}
+                    {isProcessingInvite ? t('joinRoom.joining') : t('joinRoom.verifying')}
                   </>
                 ) : (
-                  'Join Room'
+                  t('joinRoom.joinRoom')
                 )}
               </button>
 
@@ -340,7 +342,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
                 disabled={isJoining || isProcessingInvite}
                 className="w-full py-2 px-4 rounded-lg font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
             </div>
           </form>

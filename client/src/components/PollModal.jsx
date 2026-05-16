@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Plus, Trash2, Send, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { getVibeById } from '../utils/vibes';
 
 const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
+    const { t } = useTranslation();
     const [question, setQuestion] = useState('');
     // Each option: { text: string, followUps: string[], showFollowUp: boolean }
     const [options, setOptions] = useState([
@@ -107,7 +109,7 @@ const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
                 <div className={`flex items-center justify-between px-3 py-2 sm:p-4 border-b border-gray-200 dark:border-gray-700 bg-${vibeAccent}-50/30 dark:bg-${vibeAccent}-900/10 shrink-0`}>
                     <h2 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white flex items-center">
                         <HelpCircle className={`w-4 h-4 sm:w-5 sm:h-5 mr-1.5 text-${vibeAccent}-500`} />
-                        Create Poll
+                        {t('poll.create.title')}
                     </h2>
                     <button onClick={onClose} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-500 transition-colors">
                         <X className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -118,12 +120,12 @@ const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
 
                     {/* Question */}
                     <div>
-                        <label className="block text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Question</label>
+                        <label className="block text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">{t('poll.create.question')}</label>
                         <input
                             type="text"
                             value={question}
                             onChange={(e) => setQuestion(e.target.value)}
-                            placeholder="Ask a question..."
+                            placeholder={t('poll.create.questionPlaceholder')}
                             className={`input-field bg-gray-50 dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-${vibeAccent}-500/20 focus:border-${vibeAccent}-500 text-sm`}
                             maxLength={200}
                             required
@@ -133,7 +135,7 @@ const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
                     {/* Options */}
                     <div className="space-y-2">
                         <label className="block text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-300">
-                            Options (Min 2 · Max 5)
+                            {t('poll.create.options')}
                         </label>
 
                         {options.map((option, idx) => (
@@ -148,7 +150,7 @@ const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
                                         type="text"
                                         value={option.text}
                                         onChange={(e) => updateOptionText(idx, e.target.value)}
-                                        placeholder={`Option ${idx + 1}`}
+                                        placeholder={t('poll.create.optionPlaceholder', { n: idx + 1 })}
                                         className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 outline-none"
                                         maxLength={100}
                                         required={idx < 2}
@@ -157,7 +159,7 @@ const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
                                     <button
                                         type="button"
                                         onClick={() => toggleFollowUp(idx)}
-                                        title="Add follow-up options for this answer"
+                                        title={t('poll.create.addFollowUp')}
                                         className={`shrink-0 p-1 rounded-lg text-[9px] font-bold border transition-colors ${option.showFollowUp ? `bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/30 border-${vibeAccent}-300 dark:border-${vibeAccent}-700 text-${vibeAccent}-600 dark:text-${vibeAccent}-400` : 'bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400'}`}
                                     >
                                         {option.showFollowUp ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -174,7 +176,7 @@ const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
                                 {option.showFollowUp && (
                                     <div className={`bg-${vibeAccent}-50/50 dark:bg-${vibeAccent}-900/10 border-t border-${vibeAccent}-200 dark:border-${vibeAccent}-800 p-2 space-y-1.5`}>
                                         <p className={`text-[9px] font-black uppercase tracking-wider text-${vibeAccent}-600 dark:text-${vibeAccent}-400 mb-1`}>
-                                            Follow-up options if someone picks "{option.text || `Option ${idx + 1}`}"
+                                            {t('poll.create.followUpHint', { option: option.text || t('poll.create.optionPlaceholder', { n: idx + 1 }) })}
                                         </p>
                                         {option.followUps.map((fu, fuIdx) => (
                                             <div key={fuIdx} className="flex items-center gap-1.5">
@@ -185,7 +187,7 @@ const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
                                                     type="text"
                                                     value={fu}
                                                     onChange={(e) => updateFollowUp(idx, fuIdx, e.target.value)}
-                                                    placeholder={`Follow-up ${fuIdx + 1}`}
+                                                    placeholder={t('poll.create.followUpPlaceholder', { n: fuIdx + 1 })}
                                                     className="flex-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-2 py-1 text-xs text-gray-900 dark:text-white outline-none focus:border-orange-400 transition-colors"
                                                     maxLength={80}
                                                 />
@@ -200,7 +202,7 @@ const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
                                                 onClick={() => addFollowUp(idx)}
                                                 className={`flex items-center gap-1 text-[10px] font-bold text-${vibeAccent}-600 dark:text-${vibeAccent}-400 hover:underline mt-0.5`}
                                             >
-                                                <Plus className="w-3 h-3" /> Add follow-up option
+                                                <Plus className="w-3 h-3" /> {t('poll.create.addFollowUpOption')}
                                             </button>
                                         )}
                                     </div>
@@ -215,7 +217,7 @@ const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
                                 className={`flex items-center text-${vibeAccent}-600 dark:text-${vibeAccent}-400 text-xs font-bold hover:underline p-1 active:scale-95 transition-transform`}
                             >
                                 <Plus className="w-4 h-4 mr-1" />
-                                Add Option
+                                {t('poll.create.addOption')}
                             </button>
                         )}
                     </div>
@@ -223,10 +225,10 @@ const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
                     {/* Toggles */}
                     <div className="space-y-1">
                         {[
-                            { label: 'Allow multiple answers', value: allowMultiple, toggle: () => setAllowMultiple(!allowMultiple) },
-                            { label: 'Allow "Other" answer', value: allowCustomAnswers, toggle: () => setAllowCustomAnswers(!allowCustomAnswers) },
-                        ].map(({ label, value, toggle }) => (
-                            <div key={label} className="flex items-center justify-between py-1.5">
+                            { key: 'allowMultiple', label: t('poll.create.allowMultiple'), value: allowMultiple, toggle: () => setAllowMultiple(!allowMultiple) },
+                            { key: 'allowOther', label: t('poll.create.allowOther'), value: allowCustomAnswers, toggle: () => setAllowCustomAnswers(!allowCustomAnswers) },
+                        ].map(({ key, label, value, toggle }) => (
+                            <div key={key} className="flex items-center justify-between py-1.5">
                                 <label className="text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-300">{label}</label>
                                 <button
                                     type="button"
@@ -249,7 +251,7 @@ const PollModal = ({ isOpen, onClose, onSend, roomVibe }) => {
                         className={`w-full py-2.5 sm:py-3 rounded-xl flex items-center justify-center gap-2 font-bold shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors`}
                     >
                         <Send className="w-4 h-4" />
-                        <span>Send Poll</span>
+                        <span>{t('poll.create.send')}</span>
                     </button>
                 </form>
             </div>

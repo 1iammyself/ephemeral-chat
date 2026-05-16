@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { getCreatorId } from '../utils/creator';
 import { secureFetch } from '../utils/secure-fetch.js';
 import { ArrowLeft, Trash2, LogIn, Timer, Users, Zap, PartyPopper, Sun, Sunset, RefreshCw } from 'lucide-react';
 import { API_BASE } from '../utils/resolve-url.js';
 
 const MyRooms = () => {
+    const { t } = useTranslation();
     const [rooms, setRooms] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -59,15 +61,15 @@ const MyRooms = () => {
     };
 
     const formatTimeRemaining = (ms) => {
-        if (ms <= 0) return 'Expired';
+        if (ms <= 0) return t('myRooms.status.expired');
 
         const hours = Math.floor(ms / (1000 * 60 * 60));
         const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
 
         if (hours > 0) {
-            return `${hours}h ${minutes}m remaining`;
+            return t('myRooms.remaining', { time: `${hours}h ${minutes}m` });
         }
-        return `${minutes}m remaining`;
+        return t('myRooms.remaining', { time: `${minutes}m` });
     };
 
     const getStatusBadge = (status) => {
@@ -78,9 +80,9 @@ const MyRooms = () => {
         };
 
         const labels = {
-            active: 'Active',
-            recoverable: 'Empty',
-            expired: 'Expired'
+            active: t('myRooms.status.active'),
+            recoverable: t('myRooms.status.empty'),
+            expired: t('myRooms.status.expired'),
         };
 
         return (
@@ -102,10 +104,10 @@ const MyRooms = () => {
 
     const getModeLabel = (mode) => {
         const labels = {
-            ephemeral: 'Quick Chat',
-            gathering: 'Gathering',
-            social: 'Social',
-            extended: 'Extended'
+            ephemeral: t('createRoom.quickChat'),
+            gathering: t('createRoom.gathering'),
+            social: t('createRoom.social'),
+            extended: t('createRoom.extended'),
         };
         return labels[mode] || mode;
     };
@@ -115,7 +117,7 @@ const MyRooms = () => {
             <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="mt-4 text-gray-600 dark:text-gray-400">Loading your rooms...</p>
+                    <p className="mt-4 text-gray-600 dark:text-gray-400">{t('myRooms.loading')}</p>
                 </div>
             </div>
         );
@@ -145,7 +147,7 @@ const MyRooms = () => {
 
                             <div className="flex items-center">
                                 <Users className="w-4 h-4 mr-1" />
-                                {room.userCount} {room.userCount === 1 ? 'user' : 'users'}
+                                {t('myRooms.users', { count: room.userCount })}
                             </div>
 
                             <div className="flex items-center">
@@ -164,7 +166,7 @@ const MyRooms = () => {
                             className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
                         >
                             <LogIn className="w-4 h-4 mr-2" />
-                            {room.status === 'active' ? 'Join' : 'Enter'} Room
+                            {room.status === 'active' ? t('myRooms.join') : t('myRooms.enter')} {t('myRooms.room')}
                         </button>
                     )}
 
@@ -174,7 +176,7 @@ const MyRooms = () => {
                             className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-sm"
                         >
                             <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
+                            {t('common.delete')}
                         </button>
                     )}
                 </div>
@@ -192,16 +194,16 @@ const MyRooms = () => {
                         className="flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-4 transition-colors"
                     >
                         <ArrowLeft className="w-5 h-5 mr-2" />
-                        Back to Home
+                        {t('myRooms.backToHome')}
                     </button>
 
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-                                My Rooms
+                                {t('myRooms.title')}
                             </h1>
                             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                {rooms.filter(r => r.isOwner).length}/5 rooms managed
+                                {t('myRooms.roomsManaged', { count: rooms.filter(r => r.isOwner).length })}
                             </p>
                         </div>
 
@@ -210,7 +212,7 @@ const MyRooms = () => {
                                 onClick={fetchRooms}
                                 disabled={loading}
                                 className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center justify-center border border-gray-200 dark:border-gray-700"
-                                title="Refresh room status"
+                                title={t('myRooms.refresh')}
                             >
                                 <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
                             </button>
@@ -218,7 +220,7 @@ const MyRooms = () => {
                                 onClick={() => navigate('/?action=create')}
                                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                             >
-                                Create New Room
+                                {t('myRooms.createRoom')}
                             </button>
                         </div>
                     </div>
@@ -238,16 +240,16 @@ const MyRooms = () => {
                             <Timer className="w-8 h-8 text-gray-400 dark:text-gray-500" />
                         </div>
                         <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                            No rooms yet
+                            {t('myRooms.noRooms')}
                         </h3>
                         <p className="text-gray-600 dark:text-gray-400 mb-6">
-                            Create your first room to get started
+                            {t('myRooms.noRoomsHint')}
                         </p>
                         <button
                             onClick={() => navigate('/?action=create')}
                             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                         >
-                            Create Room
+                            {t('createRoom.createButton')}
                         </button>
                     </div>
                 )}
@@ -259,7 +261,7 @@ const MyRooms = () => {
                         <div>
                             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                                 <Zap className="w-4 h-4 mr-2 text-blue-600" />
-                                Managed by Me
+                                {t('myRooms.managedByMe')}
                             </h2>
                             <div className="space-y-4">
                                 {rooms.filter(r => r.isOwner).map(room => renderRoomCard(room))}
@@ -272,7 +274,7 @@ const MyRooms = () => {
                         <div>
                             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                                 <Users className="w-4 h-4 mr-2 text-blue-600" />
-                                Joined Recently
+                                {t('myRooms.joinedRecently')}
                             </h2>
                             <div className="space-y-4">
                                 {rooms.filter(r => !r.isOwner).map(room => renderRoomCard(room))}

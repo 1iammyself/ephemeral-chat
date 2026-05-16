@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Phone,
     PhoneOff,
@@ -30,6 +31,7 @@ const AudioStream = ({ stream }) => {
 };
 
 const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
+    const { t } = useTranslation();
     const [callState, setCallState] = useState(webRTCService.getCurrentCallState());
     const [isMuted, setIsMuted] = useState(false);
     const [isSpeakerOn, setIsSpeakerOn] = useState(true);
@@ -139,11 +141,11 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
     };
 
     const getStatusText = () => {
-        if (callState.isIncomingCall) return 'Incoming call...';
-        if (callState.isCalling) return 'Calling...';
-        if (callState.isConnected) return 'Connected';
-        if (callState.isCallActive) return 'Connecting...';
-        return 'Call ended';
+        if (callState.isIncomingCall) return t('audio.incoming');
+        if (callState.isCalling) return t('audio.calling');
+        if (callState.isConnected) return t('audio.connected');
+        if (callState.isCallActive) return t('audio.connecting');
+        return t('audio.ended');
     };
 
     const getStatusColor = () => {
@@ -254,7 +256,7 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
 
                             <button
                                 onClick={toggleScrambler}
-                                title={isScrambled ? 'Disable voice scrambler' : 'Enable voice scrambler'}
+                                title={isScrambled ? t('audio.disableScrambler') : t('audio.enableScrambler')}
                                 className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${isScrambled
                                     ? 'bg-purple-500 text-white ring-2 ring-purple-400/50 animate-pulse shadow-lg shadow-purple-500/30'
                                     : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
@@ -276,7 +278,7 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
                 <div className="bg-green-50 dark:bg-green-900/20 border-t border-green-100 dark:border-green-800 px-4 py-3 text-center">
                     <p className="text-green-700 dark:text-green-400 text-sm flex items-center justify-center space-x-1">
                         <span>🔒</span>
-                        <span>End-to-end encrypted call</span>
+                        <span>{t('audio.encrypted')}</span>
                     </p>
                 </div>
 

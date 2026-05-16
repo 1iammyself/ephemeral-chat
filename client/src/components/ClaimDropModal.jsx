@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   X, Package, KeyRound, Hash, MessageSquare, FileUp,
   Loader2, AlertTriangle, ArrowRight, Shield, Upload
@@ -16,6 +17,7 @@ import {
 // ─── Component ────────────────────────────────────────────
 
 const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCode }) => {
+  const { t } = useTranslation();
   const { theme } = useTheme();
 
   // Input method: 'id' | 'verbal' | 'eph'
@@ -251,7 +253,7 @@ const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCo
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <Package className="w-5 h-5 text-purple-500" />
-            <h2 className="text-lg font-bold dark:text-white">Claim Drop</h2>
+            <h2 className="text-lg font-bold dark:text-white">{t('drops.claim.title')}</h2>
           </div>
           <button
             onClick={onClose}
@@ -297,13 +299,13 @@ const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCo
               {inputMethod === 'id' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Enter Drop ID
+                    {t('drops.claim.dropIdLabel')}
                   </label>
                   <input
                     type="text"
                     value={dropId}
                     onChange={(e) => setDropId(e.target.value.trim())}
-                    placeholder="e.g. d_abc123def456..."
+                    placeholder={t('drops.claim.dropIdPlaceholder')}
                     data-allow-copy="true"
                     className="w-full px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm font-mono"
                     onKeyDown={(e) => e.key === 'Enter' && handleResolve()}
@@ -315,19 +317,19 @@ const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCo
               {inputMethod === 'verbal' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Enter Verbal Code
+                    {t('drops.claim.verbalLabel')}
                   </label>
                   <input
                     type="text"
                     value={verbalCode}
                     onChange={(e) => setVerbalCode(e.target.value)}
-                    placeholder="clarity compass journey peace"
+                    placeholder={t('drops.claim.verbalPlaceholder')}
                     data-allow-copy="true"
                     className="w-full px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
                     onKeyDown={(e) => e.key === 'Enter' && handleResolve()}
                   />
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                    4 words separated by spaces
+                    {t('drops.claim.verbalHint')}
                   </p>
                 </div>
               )}
@@ -336,7 +338,7 @@ const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCo
               {inputMethod === 'eph' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Upload .eph File
+                    {t('drops.claim.uploadLabel')}
                   </label>
                   <div
                     onClick={() => ephInputRef.current?.click()}
@@ -359,7 +361,7 @@ const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCo
                         </p>
                         {ephPacket.encryptedHint && (
                           <p className="text-xs text-green-600 dark:text-green-400">
-                            Hint available after authentication
+                            {t('drops.claim.hintAfterAuth')}
                           </p>
                         )}
                         <button
@@ -379,10 +381,10 @@ const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCo
                       <div className="space-y-2">
                         <Upload className="w-8 h-8 text-gray-400 mx-auto" />
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                          Tap to select or drag & drop
+                          {t('drops.claim.tapToSelect')}
                         </p>
                         <p className="text-xs text-gray-400 dark:text-gray-500">
-                          Accepts .eph files
+                          {t('drops.claim.acceptsEph')}
                         </p>
                       </div>
                     )}
@@ -406,11 +408,11 @@ const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCo
               {dropInfo?.drop && (
                 <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-100 dark:border-purple-800/50">
                   <p className="text-xs font-medium text-purple-700 dark:text-purple-300 mb-1">
-                    Drop Found
+                    {t('drops.claim.dropFound')}
                   </p>
                   {dropInfo.drop.encryptedHint && (
                     <p className="text-sm text-purple-600 dark:text-purple-400 mb-1">
-                      Hint available after authentication
+                      {t('drops.claim.hintAfterAuth')}
                     </p>
                   )}
                   <div className="flex items-center gap-3 text-xs text-purple-600 dark:text-purple-400">
@@ -420,7 +422,7 @@ const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCo
                     {dropInfo.drop.viewOnce && (
                       <>
                         <span>•</span>
-                        <span className="font-medium">View Once</span>
+                        <span className="font-medium">{t('drops.claim.viewOnce')}</span>
                       </>
                     )}
                   </div>
@@ -431,10 +433,10 @@ const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCo
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
                   <KeyRound className="w-4 h-4" />
-                  Your Username
+                  {t('drops.claim.usernameLabel')}
                 </label>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                  Enter the username the sender assigned to you. This is your decryption key.
+                  {t('drops.claim.usernameDesc')}
                 </p>
                 <input
                   type="text"
@@ -443,7 +445,7 @@ const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCo
                     setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''));
                     setError('');
                   }}
-                  placeholder="your-username"
+                  placeholder={t('drops.claim.usernamePlaceholder')}
                   data-allow-copy="true"
                   maxLength={30}
                   autoFocus
@@ -456,8 +458,7 @@ const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCo
                 <div className="flex items-start gap-2">
                   <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
                   <p className="text-xs text-amber-700 dark:text-amber-300">
-                    Your username is never sent to the server. It&apos;s used locally to derive the decryption key. 
-                    If you enter the wrong username, decryption will fail silently.
+                    {t('drops.claim.usernameNote')}
                   </p>
                 </div>
               </div>
@@ -481,7 +482,7 @@ const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCo
             disabled={isClaiming}
             className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
           >
-            {step === 1 ? 'Cancel' : 'Back'}
+            {step === 1 ? t('common.cancel') : t('common.back')}
           </button>
 
           {step === 1 ? (
@@ -492,9 +493,9 @@ const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCo
               className="px-6 py-2 text-sm font-bold bg-purple-500 hover:bg-purple-600 disabled:bg-purple-300 dark:disabled:bg-purple-800 text-white rounded-lg transition-colors flex items-center gap-2"
             >
               {isLoading ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Looking up...</>
+                <><Loader2 className="w-4 h-4 animate-spin" /> {t('drops.claim.lookingUp')}</>
               ) : (
-                <><ArrowRight className="w-4 h-4" /> Find Drop</>
+                <><ArrowRight className="w-4 h-4" /> {t('drops.claim.findDrop')}</>
               )}
             </button>
           ) : (
@@ -505,9 +506,9 @@ const ClaimDropModal = ({ onClose, onDropClaimed, initialDropId, initialVerbalCo
               className="px-6 py-2 text-sm font-bold bg-purple-500 hover:bg-purple-600 disabled:bg-purple-300 dark:disabled:bg-purple-800 text-white rounded-lg transition-colors flex items-center gap-2"
             >
               {isClaiming ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Decrypting...</>
+                <><Loader2 className="w-4 h-4 animate-spin" /> {t('drops.claim.decrypting')}</>
               ) : (
-                <><KeyRound className="w-4 h-4" /> Claim & Decrypt</>
+                <><KeyRound className="w-4 h-4" /> {t('drops.claim.claimDecrypt')}</>
               )}
             </button>
           )}

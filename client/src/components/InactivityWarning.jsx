@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { formatTimeRemaining } from '../utils/security';
 
 const InactivityWarning = ({ 
@@ -12,6 +13,8 @@ const InactivityWarning = ({
   onContinue, 
   onLogout 
 }) => {
+  const { t } = useTranslation();
+
   if (!isOpen) return null;
 
   return (
@@ -36,13 +39,12 @@ const InactivityWarning = ({
 
         {/* Title */}
         <h3 className="text-xl font-semibold text-center text-gray-900 dark:text-white mb-2">
-          Still There?
+          {t('inactivity.title')}
         </h3>
 
         {/* Message */}
         <p className="text-center text-gray-600 dark:text-gray-300 mb-4">
-          You've been inactive for a while. For security reasons, you'll be automatically 
-          disconnected in:
+          {t('inactivity.message')}
         </p>
 
         {/* Countdown */}
@@ -51,7 +53,7 @@ const InactivityWarning = ({
             {formatTimeRemaining(timeRemaining)}
           </div>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            remaining
+            {t('inactivity.remaining')}
           </p>
         </div>
 
@@ -61,19 +63,19 @@ const InactivityWarning = ({
             onClick={onLogout}
             className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
           >
-            Logout Now
+            {t('inactivity.logoutNow')}
           </button>
           <button
             onClick={onContinue}
             className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
           >
-            Stay Connected
+            {t('inactivity.stayConnected')}
           </button>
         </div>
 
         {/* Info */}
         <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-4">
-          This helps protect your privacy and security
+          {t('inactivity.privacyNote')}
         </p>
       </div>
     </div>

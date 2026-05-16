@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   X, Check, Copy, Package, Hash, MessageSquare, Download,
   Share2, Clock, Eye, EyeOff, Shield, ExternalLink
@@ -12,6 +13,7 @@ import { downloadEphFileAPI } from '../utils/drops';
 import { downloadFileOnDevice } from '../utils/downloadHelper';
 
 const DropCreatedModal = ({ onClose, dropData }) => {
+  const { t } = useTranslation();
   const [isCopied, setIsCopied] = useState({
     dropId: false,
     verbalCode: false,
@@ -107,10 +109,10 @@ const DropCreatedModal = ({ onClose, dropData }) => {
               <Package className="w-8 h-8 text-green-600 dark:text-green-400" />
             </div>
             <h2 className="text-xl font-bold text-green-600 dark:text-green-400">
-              Drop Created!
+              {t('drops.created.title')}
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Your encrypted drop is ready. Share it securely.
+              {t('drops.created.subtitle')}
             </p>
           </div>
 
@@ -119,7 +121,7 @@ const DropCreatedModal = ({ onClose, dropData }) => {
             {/* Drop ID */}
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-1">
-                <Hash className="w-3 h-3" /> Drop ID
+                <Hash className="w-3 h-3" /> {t('drops.created.dropId')}
               </label>
               <div className="flex items-center gap-2">
                 <code className="flex-1 p-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm font-mono text-gray-900 dark:text-white truncate border border-gray-200 dark:border-gray-600">
@@ -142,7 +144,7 @@ const DropCreatedModal = ({ onClose, dropData }) => {
             {verbalCode && (
               <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-100 dark:border-purple-800/50">
                 <label className="block text-xs font-medium text-purple-700 dark:text-purple-300 mb-1.5 flex items-center gap-1">
-                  <MessageSquare className="w-3 h-3" /> Verbal Code
+                  <MessageSquare className="w-3 h-3" /> {t('drops.created.verbalCode')}
                 </label>
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-lg font-bold text-purple-700 dark:text-purple-200 tracking-wide">
@@ -156,11 +158,11 @@ const DropCreatedModal = ({ onClose, dropData }) => {
                         : 'bg-purple-100 dark:bg-purple-800/50 text-purple-700 dark:text-purple-200 hover:bg-purple-200 dark:hover:bg-purple-800'
                     }`}
                   >
-                    {isCopied.verbalCode ? 'Copied!' : 'Copy'}
+                    {isCopied.verbalCode ? t('common.copied') : t('common.copy')}
                   </button>
                 </div>
                 <p className="text-xs text-purple-600 dark:text-purple-400 mt-1.5">
-                  Share this code verbally or in a trusted channel
+                  {t('drops.created.verbalCodeDesc')}
                 </p>
               </div>
             )}
@@ -168,11 +170,10 @@ const DropCreatedModal = ({ onClose, dropData }) => {
             {/* .eph Secure File */}
             <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800/50">
               <label className="block text-xs font-medium text-blue-700 dark:text-blue-300 mb-2 flex items-center gap-1">
-                <Shield className="w-3 h-3" /> Secure Auth File (.eph)
+                <Shield className="w-3 h-3" /> {t('drops.created.authFile')}
               </label>
               <p className="text-xs text-blue-600 dark:text-blue-400 mb-2">
-                Send this file to recipients via Nearby Share, Bluetooth, AirDrop, or any trusted method.
-                It acts as a secure claim ticket.
+                {t('drops.created.authFileDesc')}
               </p>
               <div className="flex gap-2">
                 <button
@@ -185,9 +186,9 @@ const DropCreatedModal = ({ onClose, dropData }) => {
                   }`}
                 >
                   {ephDownloaded ? (
-                    <><Check className="w-4 h-4" /> Downloaded</>
+                    <><Check className="w-4 h-4" /> {t('drops.created.downloaded')}</>
                   ) : (
-                    <><Download className="w-4 h-4" /> Download .eph</>
+                    <><Download className="w-4 h-4" /> {t('drops.created.downloadEph')}</>
                   )}
                 </button>
                 {supportsNativeFileShare() && ephPacket && (
@@ -205,7 +206,7 @@ const DropCreatedModal = ({ onClose, dropData }) => {
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                 <Clock className="w-4 h-4 text-gray-400 mx-auto mb-1" />
-                <p className="text-xs text-gray-500 dark:text-gray-400">Expires</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t('drops.created.expires')}</p>
                 <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
                   {formatTimeRemaining(expiresAt)}
                 </p>
@@ -216,14 +217,14 @@ const DropCreatedModal = ({ onClose, dropData }) => {
                 ) : (
                   <Eye className="w-4 h-4 text-gray-400 mx-auto mb-1" />
                 )}
-                <p className="text-xs text-gray-500 dark:text-gray-400">View</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t('drops.created.view')}</p>
                 <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                  {viewOnce ? 'Once' : 'Multiple'}
+                  {viewOnce ? t('drops.created.once') : t('drops.created.multiple')}
                 </p>
               </div>
               <div className="p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                 <Shield className="w-4 h-4 text-gray-400 mx-auto mb-1" />
-                <p className="text-xs text-gray-500 dark:text-gray-400">For</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t('drops.created.for')}</p>
                 <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
                   {recipientCount} user{recipientCount !== 1 ? 's' : ''}
                 </p>
@@ -236,7 +237,7 @@ const DropCreatedModal = ({ onClose, dropData }) => {
               className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-xl transition-colors shadow-lg shadow-purple-500/20"
             >
               <Share2 className="w-5 h-5" />
-              Share Drop
+              {t('drops.created.shareDrop')}
             </button>
 
             {/* Close */}
@@ -244,7 +245,7 @@ const DropCreatedModal = ({ onClose, dropData }) => {
               onClick={onClose}
               className="w-full px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
             >
-              Done
+              {t('common.done')}
             </button>
           </div>
         </div>

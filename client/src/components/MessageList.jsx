@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, FileText, Download, Check, CheckCheck, Pencil, X, Pin, MessageSquare } from 'lucide-react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -19,6 +20,7 @@ import { FileOpener } from '@capacitor-community/file-opener';
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀', '🍕', '🍔', '🍦', '🍩', '🍺', '🎸', '🎮', '🚀', '🌈', '🍄'];
 
 const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onPin, onViewThread, isHost, pinnedMessageId, roomVibe, linkPreviews = {}, onOpenEmojiPicker, highlightMap = {}, focusedMessageId = null, onStegoExtract, onChessJoin, onChessLaunch, onTetrisJoin, onTetrisSpectate, onTetrisLaunch }) => {
+  const { t } = useTranslation();
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
   const [contextMenu, setContextMenu] = useState(null); // { messageId, x, y, messageText, senderNickname }
@@ -290,8 +292,8 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center text-gray-500 dark:text-gray-400">
           <User className="w-12 h-12 mx-auto mb-4 opacity-30" />
-          <p className="text-lg font-medium mb-1">No messages yet</p>
-          <p className="text-sm opacity-60">Start the conversation!</p>
+          <p className="text-lg font-medium mb-1">{t('messageList.noMessages')}</p>
+          <p className="text-sm opacity-60">{t('messageList.startConversation')}</p>
         </div>
       </div>
     );
@@ -327,7 +329,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
             <div key={message.id} className={`flex ${isOwnMessage ? 'justify-end pr-1' : 'justify-start pl-1'} mb-1 sm:mb-2`}>
               <div className="max-w-[70%] px-4 py-2 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-dashed border-gray-200 dark:border-gray-800 text-gray-400 dark:text-gray-500 italic text-xs flex items-center space-x-2">
                 <Lock className="w-3 h-3" />
-                <span>Opened view-once {isImage ? 'photo' : 'audio'}</span>
+                <span>{isImage ? t('messageList.viewOncePhoto') : t('messageList.viewOnceAudio')}</span>
               </div>
             </div>
           );
@@ -363,7 +365,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                   <span>•</span>
                   <span className="text-amber-500 dark:text-amber-400 flex items-center gap-1">
                     <Lock className="w-2.5 h-2.5" />
-                    Private
+                    {t('messageList.private')}
                   </span>
                 </>
               )}
@@ -408,13 +410,13 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         {isOwnMessage ? (
                           <div className="flex flex-col items-center justify-center p-4 bg-black/5 dark:bg-white/5 rounded-xl border border-dashed border-black/10 dark:border-white/10 opacity-70">
                             <ImageIcon className="w-8 h-8 mb-2 text-white/50" />
-                            <span className="text-[10px] font-bold uppercase tracking-wider">You sent a photo</span>
-                            {isViewOnce && <span className="text-[9px] opacity-60 mt-1">(View Once)</span>}
+                            <span className="text-[10px] font-bold uppercase tracking-wider">{t('messageList.youSentPhoto')}</span>
+                            {isViewOnce && <span className="text-[9px] opacity-60 mt-1">{t('messageList.viewOnce')}</span>}
                           </div>
                         ) : (isViewOnce && !hasBeenViewed) ? (
                           <div className="w-48 h-32 bg-black/5 dark:bg-white/5 rounded-xl flex flex-col items-center justify-center space-y-2 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
                             <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-500"><Eye className="w-5 h-5" /></div>
-                            <span className="text-xs font-bold uppercase tracking-wide">Tap to View</span>
+                            <span className="text-xs font-bold uppercase tracking-wide">{t('messageList.tapToView')}</span>
                           </div>
                         ) : (
                           <div className="relative inline-block">
@@ -426,7 +428,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                                 title="Extract hidden message"
                               >
                                 <Lock className="w-2.5 h-2.5" />
-                                Decode
+                                {t('messageList.decode')}
                               </button>
                             )}
                           </div>
@@ -438,14 +440,14 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                           <div className="flex items-center space-x-3 p-2 bg-black/5 dark:bg-white/5 rounded-xl border border-dashed border-black/10 dark:border-white/10 opacity-70">
                             <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white/50"><Mic className="w-5 h-5" /></div>
                             <div className="flex flex-col">
-                              <span className="text-sm font-bold">Voice Note Sent</span>
-                              {isViewOnce && <span className="text-[10px] opacity-60">View Once</span>}
+                              <span className="text-sm font-bold">{t('messageList.voiceNoteSent')}</span>
+                              {isViewOnce && <span className="text-[10px] opacity-60">{t('messageList.viewOnce')}</span>}
                             </div>
                           </div>
                         ) : isViewOnce && !hasBeenViewed && playingAudioId === message.id ? (
                           <div onClick={() => handleAudioPlay(message)} className="flex items-center space-x-3 cursor-pointer p-1">
                             <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-500"><Mic className="w-5 h-5" /></div>
-                            <div className="flex flex-col"><span className="text-sm font-bold">Voice Note</span><span className="text-[10px] opacity-70">View Once</span></div>
+                            <div className="flex flex-col"><span className="text-sm font-bold">{t('messageList.voiceNote')}</span><span className="text-[10px] opacity-70">{t('messageList.viewOnce')}</span></div>
                           </div>
                         ) : (
                           <AudioPlayer src={fixAudioContentForPlayback(message.content)} isOwnMessage={isOwnMessage} autoPlay={playingAudioId === message.id} onEnded={() => handleAudioEnded(message)} />
@@ -492,7 +494,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         {highlightMap[message.id]
                           ? renderHighlightedContent(message.content, highlightMap[message.id], message.id === focusedMessageId, currentUser, handleLinkClick)
                           : renderMessageContent(message.content, currentUser, handleLinkClick)}
-                        {message.isEdited && <span className="text-[10px] opacity-50 italic ml-1">(edited)</span>}
+                        {message.isEdited && <span className="text-[10px] opacity-50 italic ml-1">{t('messageList.edited')}</span>}
                       </div>
                     )}
 
@@ -558,7 +560,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                     ) : (
                       <div className="bg-white dark:bg-gray-900 shadow-2xl rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden animate-in fade-in zoom-in slide-in-from-top-4 duration-300 ring-1 ring-black/5 dark:ring-white/5">
                         <div className="p-2 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">All Emojis</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{t('messageList.allEmojis')}</span>
                           <button onClick={() => setShowFullPicker(false)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"><X className="w-3 h-3 text-gray-400" /></button>
                         </div>
                         <EmojiPicker
@@ -572,7 +574,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                           height={350}
                           skinTonesDisabled
                           autoFocusSearch={false}
-                          searchPlaceholder="Search..."
+                          searchPlaceholder={t('messageList.emojiSearch')}
                           previewConfig={{ showPreview: false }}
                         />
                       </div>
@@ -624,7 +626,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                   onClick={() => onViewThread?.(message)}
                   className={`mt-1 px-2 py-0.5 text-[10px] font-bold text-${uiAccentColor}-500 dark:text-${uiAccentColor}-400 hover:text-${uiAccentColor}-600 dark:hover:text-${uiAccentColor}-300 hover:bg-${uiAccentColor}-50 dark:hover:bg-${uiAccentColor}-900/20 rounded-full transition-colors flex items-center gap-1`}
                 >
-                  <span>💬 {replyCount} {replyCount === 1 ? 'reply' : 'replies'}</span>
+                  <span>💬 {t('messageList.reply', { count: replyCount })}</span>
                 </button>
               );
             })()}
@@ -648,7 +650,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
               }}
             >
               <MessageSquare className="w-3.5 h-3.5 text-indigo-500" />
-              Reply in thread
+              {t('messageList.replyInThread')}
             </button>
           )}
           {isHost && (
@@ -660,7 +662,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
               }}
             >
               <Pin className="w-3.5 h-3.5 text-amber-500" />
-              {pinnedMessageId === contextMenu.messageId ? 'Unpin' : 'Pin message'}
+              {pinnedMessageId === contextMenu.messageId ? t('messageList.unpin') : t('messageList.pinMessage')}
             </button>
           )}
         </div>

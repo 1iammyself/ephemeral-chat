@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Users, Crown, User, Check, X, ChevronDown, Shield, UserX, Info, Zap, Radio, ToggleLeft, ToggleRight, Upload, Plus, Trash2, ClipboardList, GitFork } from 'lucide-react';
 import { ROLES, ROLE_INFO, canKick, canChangeRole, canManageGuests, getAssignableRoles } from '../utils/roles';
 import { hapticSuccess } from '../utils/platform';
@@ -29,6 +30,7 @@ const UserList = ({
   parsePreApprovedText,
   onForkRoom,
 }) => {
+  const { t } = useTranslation();
   const [expandedUser, setExpandedUser] = useState(null);
   const [showPreApprovedPanel, setShowPreApprovedPanel] = useState(false);
   const [forkMode, setForkMode] = useState(false);
@@ -126,7 +128,7 @@ const UserList = ({
         <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 transition-colors duration-200">
           <h3 className="font-black text-yellow-800 dark:text-yellow-400 mb-2 text-[10px] uppercase tracking-widest flex items-center">
             <Users className="w-3 h-3 mr-1.5" />
-            Waiting Room ({pendingGuests.length})
+            {t('userList.waitingRoom', { count: pendingGuests.length })}
           </h3>
           <div className="space-y-1.5 max-h-40 overflow-y-auto scrollbar-thin">
             {pendingGuests.map(guest => (
@@ -166,12 +168,12 @@ const UserList = ({
           <div className="px-3 py-2.5 flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
               <Shield className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-              <span className="text-xs font-bold text-gray-600 dark:text-gray-300 tracking-tight truncate">Auto-Approve</span>
+              <span className="text-xs font-bold text-gray-600 dark:text-gray-300 tracking-tight truncate">{t('userList.autoApprove')}</span>
             </div>
             <button
               onClick={onToggleAutoApprove}
               className={`flex-shrink-0 transition-all active:scale-95 ${autoApprove ? 'text-green-500' : 'text-gray-400 dark:text-gray-500'}`}
-              title={autoApprove ? 'Auto-approve is ON \u2013 new users skip the waiting room' : 'Auto-approve is OFF \u2013 new users wait for approval'}
+              title={autoApprove ? t('userList.autoApproveOn') : t('userList.autoApproveOff')}
             >
               {autoApprove ? <ToggleRight className="w-7 h-7" /> : <ToggleLeft className="w-7 h-7" />}
             </button>
@@ -185,7 +187,7 @@ const UserList = ({
             <div className="flex items-center gap-2 min-w-0">
               <ClipboardList className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 flex-shrink-0" />
               <span className="text-xs font-bold text-gray-600 dark:text-gray-300 tracking-tight truncate">
-                Pre-Approved List
+                {t('userList.preApprovedList')}
               </span>
               {preApprovedList.length > 0 && (
                 <span className={`text-[9px] px-1.5 py-0.5 rounded-full bg-${vibeAccent}-100 dark:bg-${vibeAccent}-900/30 text-${vibeAccent}-600 dark:text-${vibeAccent}-400 font-black`}>
@@ -206,7 +208,7 @@ const UserList = ({
                   value={newPreApprovedName}
                   onChange={(e) => setNewPreApprovedName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleAddPreApproved(); }}
-                  placeholder="Username..."
+                  placeholder={t('userList.usernamePlaceholder')}
                   className="flex-1 min-w-0 px-2.5 py-1.5 text-xs bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primary-400"
                   maxLength={20}
                 />
@@ -215,15 +217,15 @@ const UserList = ({
                   onChange={(e) => setNewPreApprovedRole(e.target.value)}
                   className="w-[72px] px-1 py-1.5 text-[10px] bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary-400"
                 >
-                  <option value="none">User</option>
-                  <option value="admin">Admin</option>
-                  <option value="mod">Mod</option>
+                  <option value="none">{t('userList.roleUser')}</option>
+                  <option value="admin">{t('userList.roleAdmin')}</option>
+                  <option value="mod">{t('userList.roleMod')}</option>
                 </select>
                 <button
                   onClick={handleAddPreApproved}
                   disabled={!newPreApprovedName.trim()}
                   className={`p-1.5 ${vibe.accentClass} text-white rounded-lg disabled:opacity-40 transition-all active:scale-95 flex-shrink-0`}
-                  title="Add user"
+                  title={t('userList.addUser')}
                 >
                   <Plus className="w-3.5 h-3.5" />
                 </button>
@@ -236,7 +238,7 @@ const UserList = ({
                   className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-gray-100 dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-all active:scale-[0.98]"
                 >
                   <Upload className="w-3 h-3" />
-                  Import .txt
+                  {t('userList.importTxt')}
                 </button>
                 <input
                   ref={fileInputRef}
@@ -249,7 +251,7 @@ const UserList = ({
 
               {/* Format Hint */}
               <p className="text-[9px] text-gray-400 dark:text-gray-500 leading-snug">
-                Format: <code className="text-[9px] bg-gray-100 dark:bg-gray-700 px-1 rounded">user1(admin),user2,user3(mod)</code>
+                {t('userList.formatHint')} <code className="text-[9px] bg-gray-100 dark:bg-gray-700 px-1 rounded">user1(admin),user2,user3(mod)</code>
               </p>
 
               {/* Current List */}
@@ -269,14 +271,14 @@ const UserList = ({
                           onChange={(e) => handlePreApprovedRoleChange(index, e.target.value)}
                           className="w-[58px] px-0.5 py-0.5 text-[9px] bg-transparent border border-gray-200 dark:border-gray-600 rounded text-gray-600 dark:text-gray-400 focus:outline-none"
                         >
-                          <option value="none">User</option>
-                          <option value="admin">Admin</option>
-                          <option value="mod">Mod</option>
+                          <option value="none">{t('userList.roleUser')}</option>
+                          <option value="admin">{t('userList.roleAdmin')}</option>
+                          <option value="mod">{t('userList.roleMod')}</option>
                         </select>
                         <button
                           onClick={() => handleRemovePreApproved(index)}
                           className="p-1 text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors active:scale-95"
-                          title="Remove"
+                          title={t('userList.remove')}
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
@@ -288,7 +290,7 @@ const UserList = ({
 
               {preApprovedList.length === 0 && (
                 <p className="text-center text-[10px] text-gray-400 dark:text-gray-500 py-2 italic">
-                  No pre-approved users yet
+                  {t('userList.noPreApproved')}
                 </p>
               )}
             </div>
@@ -300,7 +302,7 @@ const UserList = ({
       {forkMode && (
         <div className="px-3 py-2 flex items-center gap-2 bg-indigo-50 dark:bg-indigo-900/20 border-b border-indigo-100 dark:border-indigo-800/30">
           <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium flex-1">
-            {forkTargets.size === 0 ? 'Select users to fork with' : `${forkTargets.size} selected`}
+            {forkTargets.size === 0 ? t('userList.selectToFork') : t('userList.selectedCount', { count: forkTargets.size })}
           </span>
           <button
             onClick={() => {
@@ -313,7 +315,7 @@ const UserList = ({
             disabled={forkTargets.size === 0}
             className="px-3 py-1 text-xs font-bold rounded-lg bg-indigo-500 text-white disabled:opacity-40 hover:bg-indigo-600 transition-colors active:scale-95"
           >
-            Fork Room
+            {t('userList.forkRoom')}
           </button>
           <button
             onClick={() => { setForkMode(false); setForkTargets(new Set()); }}
@@ -329,7 +331,7 @@ const UserList = ({
         <div className="flex items-center space-x-2">
           <Users className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400" />
           <h3 className="font-black text-sm sm:text-base text-gray-900 dark:text-white tracking-tight">
-            Participants ({users.length})
+            {t('userList.participants', { count: users.length })}
           </h3>
         </div>
         <div className="flex items-center space-x-2">
@@ -337,7 +339,7 @@ const UserList = ({
             <button
               onClick={() => { setForkMode(f => !f); setForkTargets(new Set()); }}
               className={`p-1.5 rounded-lg transition-all ${forkMode ? 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-              title="Fork Room — invite a subset of users into a new room"
+              title={t('userList.forkRoomTitle')}
             >
               <GitFork className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
@@ -346,7 +348,7 @@ const UserList = ({
             <button
               onClick={onShowActivityLogs}
               className={`p-1.5 rounded-lg transition-all relative ${hasNewLogs ? 'text-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-              title="Activity Log"
+              title={t('userList.activityLog')}
             >
               <Info className="w-4 h-4 sm:w-5 sm:h-5" />
               {hasNewLogs && <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-primary-500 rounded-full border border-white dark:border-gray-800"></span>}
@@ -360,7 +362,7 @@ const UserList = ({
         {users.length === 0 ? (
           <div className="text-center text-gray-600 dark:text-gray-400 py-8">
             <User className="w-8 h-8 mx-auto mb-2 opacity-30" />
-            <p className="text-sm font-semibold">No users online</p>
+            <p className="text-sm font-semibold">{t('userList.noUsersOnline')}</p>
           </div>
         ) : (
           <div className="space-y-1 sm:space-y-2">
@@ -415,7 +417,7 @@ const UserList = ({
                         <p className={`text-[13px] sm:text-sm font-bold truncate tracking-tight ${isCurrentUser ? `text-${vibeAccent}-700 dark:text-${vibeAccent}-300` : 'text-gray-900 dark:text-gray-200'
                           }`}>
                           {user.nickname}
-                          {isCurrentUser && <span className="opacity-60 font-medium ml-1">(You)</span>}
+                          {isCurrentUser && <span className="opacity-60 font-medium ml-1">{t('userList.you')}</span>}
                         </p>
                         {/* Role Badge */}
                         {roleInfo.badge && (
@@ -447,7 +449,7 @@ const UserList = ({
                         <div>
                           <p className="text-xs text-gray-600 dark:text-gray-400 mb-1 flex items-center">
                             <Shield className="w-3 h-3 mr-1" />
-                            Change Role
+                            {t('userList.changeRole')}
                           </p>
                           <div className="flex flex-wrap gap-1">
                             {assignableRoles.map(role => (
@@ -472,7 +474,7 @@ const UserList = ({
                           className="w-full flex items-center justify-center space-x-1 px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors text-sm font-medium"
                         >
                           <UserX className="w-3.5 h-3.5" />
-                          <span>Kick User</span>
+                          <span>{t('userList.kickUser')}</span>
                         </button>
                       )}
                     </div>

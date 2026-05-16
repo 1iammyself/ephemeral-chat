@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   X, Package, Clock, Eye, EyeOff, AlertTriangle,
   FileDown, Type, Image, Mic, FileUp, Shield, Loader2
@@ -10,6 +11,7 @@ import { downloadDataUrlOnDevice, downloadObjectUrlOnDevice } from '../utils/dow
 // ─── Component ────────────────────────────────────────────
 
 const DropViewer = ({ onClose, claimData }) => {
+  const { t } = useTranslation();
   const {
     dropId,
     username,
@@ -182,7 +184,7 @@ const DropViewer = ({ onClose, claimData }) => {
         <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <Package className="w-5 h-5 text-purple-500" />
-            <h2 className="text-lg font-bold dark:text-white">Ephemeral Drop</h2>
+            <h2 className="text-lg font-bold dark:text-white">{t('drops.viewer.title')}</h2>
           </div>
           <div className="flex items-center gap-2">
             {/* Timer */}
@@ -210,7 +212,7 @@ const DropViewer = ({ onClose, claimData }) => {
           {isDecrypting && (
             <div className="flex flex-col items-center justify-center py-12 space-y-3">
               <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
-              <p className="text-sm text-gray-500 dark:text-gray-400">Decrypting drop...</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{t('drops.viewer.decrypting')}</p>
             </div>
           )}
 
@@ -220,15 +222,15 @@ const DropViewer = ({ onClose, claimData }) => {
               <div className="w-16 h-16 mx-auto bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
                 <AlertTriangle className="w-8 h-8 text-red-500" />
               </div>
-              <h3 className="text-lg font-bold text-red-600 dark:text-red-400">Decryption Failed</h3>
+              <h3 className="text-lg font-bold text-red-600 dark:text-red-400">{t('drops.viewer.decryptionFailed')}</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mx-auto">
-                {decryptionError}
+                {t('drops.viewer.decryptionFailedDesc')}
               </p>
               <button
                 onClick={onClose}
                 className="mt-4 px-4 py-2 text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
               >
-                Close
+                {t('common.close')}
               </button>
             </div>
           )}
@@ -245,12 +247,12 @@ const DropViewer = ({ onClose, claimData }) => {
                 {viewOnce && (
                   <span className="flex items-center gap-1 px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full text-xs font-medium">
                     <EyeOff className="w-3 h-3" />
-                    View Once — will be destroyed
+                    {t('drops.viewer.viewOnceWarning')}
                   </span>
                 )}
                 <span className="flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full text-xs font-medium">
                   <Shield className="w-3 h-3" />
-                  E2E Encrypted
+                  {t('drops.viewer.encrypted')}
                 </span>
               </div>
 
@@ -285,7 +287,7 @@ const DropViewer = ({ onClose, claimData }) => {
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white font-medium rounded-lg transition-colors text-xs ml-auto"
                     >
                       <FileDown className="w-3.5 h-3.5" />
-                      Save Image
+                      {t('drops.viewer.saveImage')}
                     </button>
                   </div>
                 </div>
@@ -310,7 +312,7 @@ const DropViewer = ({ onClose, claimData }) => {
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white font-medium rounded-lg transition-colors text-xs ml-auto"
                     >
                       <FileDown className="w-3.5 h-3.5" />
-                      Save Audio
+                      {t('drops.viewer.saveAudio')}
                     </button>
                   </div>
                 </div>
@@ -321,7 +323,7 @@ const DropViewer = ({ onClose, claimData }) => {
                 <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 text-center space-y-3">
                   <FileDown className="w-10 h-10 text-gray-400 mx-auto" />
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {contentMeta?.fileName || 'Decrypted File'}
+                    {contentMeta?.fileName || t('drops.viewer.decryptedFile')}
                   </p>
                   {contentMeta?.size && (
                     <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -333,7 +335,7 @@ const DropViewer = ({ onClose, claimData }) => {
                     className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white font-medium rounded-lg transition-colors text-sm"
                   >
                     <FileDown className="w-4 h-4" />
-                    Download File
+                    {t('drops.viewer.downloadFile')}
                   </button>
                 </div>
               )}
@@ -343,8 +345,7 @@ const DropViewer = ({ onClose, claimData }) => {
                 <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800/50 flex items-start gap-2">
                   <EyeOff className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-red-600 dark:text-red-400">
-                    This is a <strong>view-once</strong> drop. It will be destroyed when you close this view.
-                    Save anything you need before closing.
+                    {t('drops.viewer.viewOnceNote')}
                   </p>
                 </div>
               )}
@@ -359,7 +360,7 @@ const DropViewer = ({ onClose, claimData }) => {
               onClick={onClose}
               className="px-6 py-2 text-sm font-bold bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors"
             >
-              {viewOnce ? 'Close & Destroy' : 'Close'}
+              {viewOnce ? t('drops.viewer.closeDestroy') : t('common.close')}
             </button>
           </div>
         )}

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   X, Package, Type, Image, Mic, FileUp, Plus, Minus,
   Clock, Eye, EyeOff, Users, Shield, Loader2, AlertTriangle
@@ -33,6 +34,7 @@ const TTL_OPTIONS = [
 // ─── Component ────────────────────────────────────────────
 
 const CreateDropModal = ({ onClose, onDropCreated }) => {
+  const { t } = useTranslation();
   const { theme } = useTheme();
 
   // Content
@@ -274,7 +276,7 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <Package className="w-5 h-5 text-purple-500" />
-            <h2 className="text-lg font-bold dark:text-white">Create Ephemeral Drop</h2>
+            <h2 className="text-lg font-bold dark:text-white">{t('drops.create.title')}</h2>
           </div>
           <button
             onClick={onClose}
@@ -297,7 +299,7 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
           ))}
         </div>
         <p className="px-4 pt-1 text-xs text-gray-500 dark:text-gray-400">
-          {step === 1 ? 'Step 1: Content' : step === 2 ? 'Step 2: Recipients' : 'Step 3: Settings'}
+          {step === 1 ? t('drops.create.step1') : step === 2 ? t('drops.create.step2') : t('drops.create.step3')}
         </p>
 
         {/* Body */}
@@ -308,7 +310,7 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
               {/* Content Type Selector */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  What do you want to drop?
+                  {t('drops.create.whatToDrop')}
                 </label>
                 <div className="grid grid-cols-4 gap-2">
                   {CONTENT_TYPES.map(ct => {
@@ -340,12 +342,12 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
               {contentType === 'text' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Message
+                    {t('drops.create.message')}
                   </label>
                   <textarea
                     value={textContent}
                     onChange={(e) => setTextContent(e.target.value)}
-                    placeholder="Type your secret message..."
+                    placeholder={t('drops.create.messagePlaceholder')}
                     data-allow-copy="true"
                     rows={5}
                     maxLength={MAX_TEXT_LENGTH}
@@ -361,7 +363,7 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
               {contentType !== 'text' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    {contentType === 'image' ? 'Select Image' : contentType === 'audio' ? 'Select Audio' : 'Select File'}
+                    {contentType === 'image' ? t('drops.create.selectImage') : contentType === 'audio' ? t('drops.create.selectAudio') : t('drops.create.selectFile')}
                   </label>
 
                   {/* Drop Zone */}
@@ -389,17 +391,17 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
                           onClick={(e) => { e.stopPropagation(); clearFile(); }}
                           className="text-xs text-red-500 hover:text-red-600 font-medium"
                         >
-                          Remove
+                          {t('common.remove')}
                         </button>
                       </div>
                     ) : (
                       <div className="space-y-2">
                         <FileUp className="w-8 h-8 text-gray-400 mx-auto" />
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                          Tap to select or drop a file here
+                          {t('drops.create.tapToSelect')}
                         </p>
                         <p className="text-xs text-gray-400 dark:text-gray-500">
-                          Max {MAX_FILE_SIZE / (1024 * 1024)}MB
+                          {t('drops.create.maxSize', { size: MAX_FILE_SIZE / (1024 * 1024) })}
                         </p>
                       </div>
                     )}
@@ -424,7 +426,7 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1">
                     <Users className="w-4 h-4" />
-                    Who can open this drop?
+                    {t('drops.create.whoCanOpen')}
                   </label>
                   <span className="text-xs text-gray-400 dark:text-gray-500">
                     {recipients.filter(r => r.trim()).length}/{MAX_RECIPIENTS}
@@ -432,8 +434,7 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
                 </div>
 
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                  Enter usernames. Recipients use their username as the decryption key — 
-                  <span className="text-purple-500 font-medium"> no password is transmitted or stored</span>.
+                  {t('drops.create.recipientsHint')}
                 </p>
 
                 <div className="space-y-2">
@@ -477,7 +478,7 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
                     className="mt-2 flex items-center gap-1 text-sm text-purple-500 hover:text-purple-600 font-medium"
                   >
                     <Plus className="w-4 h-4" />
-                    Add recipient
+                    {t('drops.create.addRecipient')}
                   </button>
                 )}
               </div>
@@ -486,9 +487,7 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
                 <div className="flex items-start gap-2">
                   <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
                   <p className="text-xs text-amber-700 dark:text-amber-300">
-                    Each username becomes a unique decryption key. The recipient must know 
-                    their exact username to decrypt the drop. Share usernames 
-                    securely — ideally in person or via a trusted channel.
+                    {t('drops.create.recipientNote')}
                   </p>
                 </div>
               </div>
@@ -503,7 +502,7 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
                 <div className="flex items-center gap-1 mb-2">
                   <Clock className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Self-Destruct Timer
+                    {t('drops.create.selfDestruct')}
                   </label>
                 </div>
                 <div className="grid grid-cols-4 gap-1.5">
@@ -523,7 +522,7 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
                   ))}
                 </div>
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                  Drop auto-destructs after this time, whether claimed or not.
+                  {t('drops.create.selfDestructDesc')}
                 </p>
               </div>
 
@@ -536,9 +535,9 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
                     <Eye className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                   )}
                   <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">View Once</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{t('drops.create.viewOnce')}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {viewOnce ? 'Each recipient can only view once' : 'Recipients can view multiple times'}
+                      {viewOnce ? t('drops.create.viewOnceOn') : t('drops.create.viewOnceOff')}
                     </p>
                   </div>
                 </div>
@@ -560,40 +559,40 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
               {/* Hint */}
               <div>
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">
-                  Hint (Optional)
+                  {t('drops.create.hint')}
                 </label>
                 <input
                   type="text"
                   value={hint}
                   onChange={(e) => setHint(e.target.value)}
-                  placeholder="e.g. 'For the meeting' or 'Birthday surprise'"
+                  placeholder={t('drops.create.hintPlaceholder')}
                   data-allow-copy="true"
                   maxLength={100}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
                 />
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                  Visible to anyone with the drop ID. Don't include secrets here.
+                  {t('drops.create.hintNote')}
                 </p>
               </div>
 
               {/* Summary */}
               <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg space-y-1.5 text-xs">
-                <p className="font-medium text-gray-700 dark:text-gray-300 text-sm">Summary</p>
+                <p className="font-medium text-gray-700 dark:text-gray-300 text-sm">{t('drops.create.summary')}</p>
                 <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                  <span>Type</span>
+                  <span>{t('drops.create.type')}</span>
                   <span className="font-medium capitalize">{contentType}</span>
                 </div>
                 <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                  <span>Recipients</span>
+                  <span>{t('drops.create.recipients')}</span>
                   <span className="font-medium">{recipients.filter(r => r.trim()).length} user(s)</span>
                 </div>
                 <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                  <span>Expires</span>
+                  <span>{t('drops.create.expires')}</span>
                   <span className="font-medium">{TTL_OPTIONS.find(o => o.value === ttl)?.label}</span>
                 </div>
                 <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                  <span>View Once</span>
-                  <span className="font-medium">{viewOnce ? 'Yes' : 'No'}</span>
+                  <span>{t('drops.create.viewOnce')}</span>
+                  <span className="font-medium">{viewOnce ? t('common.yes') : t('common.no')}</span>
                 </div>
                 {contentType !== 'text' && selectedFile && (
                   <div className="flex justify-between text-gray-600 dark:text-gray-400">
@@ -622,7 +621,7 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
             disabled={isCreating}
             className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
           >
-            {step === 1 ? 'Cancel' : 'Back'}
+            {step === 1 ? t('common.cancel') : t('common.back')}
           </button>
 
           {step < 3 ? (
@@ -631,7 +630,7 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
               onClick={nextStep}
               className="px-6 py-2 text-sm font-bold bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors"
             >
-              Next
+              {t('common.next')}
             </button>
           ) : (
             <button
@@ -643,7 +642,7 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
               {isCreating ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Encrypting...
+                  {t('drops.create.encrypting')}
                 </>
               ) : (
                 <>

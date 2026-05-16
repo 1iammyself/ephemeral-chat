@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   ArrowLeft, Package, Trash2, RefreshCw, Clock, Eye, EyeOff,
   Users, Shield, Type, Image, Mic, FileUp, Loader2, AlertTriangle, Plus
@@ -11,6 +12,7 @@ import { formatTimeRemaining } from '../utils/eph-file';
 // ─── Component ────────────────────────────────────────────
 
 const MyDrops = () => {
+  const { t } = useTranslation();
   const [drops, setDrops] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -70,15 +72,15 @@ const MyDrops = () => {
   const getStatusStyle = (drop) => {
     const now = Date.now();
     if (drop.expiresAt <= now) {
-      return { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-600 dark:text-red-400', label: 'Expired' };
+      return { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-600 dark:text-red-400', label: t('myDrops.status.expired') };
     }
     if (drop.claimedCount >= drop.recipientCount) {
-      return { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-600 dark:text-green-400', label: 'Fully Claimed' };
+      return { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-600 dark:text-green-400', label: t('myDrops.status.fullyClaimed') };
     }
     if (drop.claimedCount > 0) {
-      return { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-600 dark:text-blue-400', label: 'Partially Claimed' };
+      return { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-600 dark:text-blue-400', label: t('myDrops.status.partiallyClaimed') };
     }
-    return { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-600 dark:text-amber-400', label: 'Waiting' };
+    return { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-600 dark:text-amber-400', label: t('myDrops.status.waiting') };
   };
 
   // ─── Render ─────────────────────────────────────────────
@@ -97,7 +99,7 @@ const MyDrops = () => {
             </button>
             <div className="flex items-center gap-2">
               <Package className="w-5 h-5 text-purple-500" />
-              <h1 className="text-lg font-bold text-gray-900 dark:text-white">My Drops</h1>
+              <h1 className="text-lg font-bold text-gray-900 dark:text-white">{t('myDrops.title')}</h1>
             </div>
           </div>
           <button
@@ -116,7 +118,7 @@ const MyDrops = () => {
         {loading && drops.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 space-y-3">
             <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
-            <p className="text-sm text-gray-500 dark:text-gray-400">Loading your drops...</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{t('myDrops.loading')}</p>
           </div>
         )}
 
@@ -125,13 +127,13 @@ const MyDrops = () => {
           <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800/50 flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-red-700 dark:text-red-400">Failed to load drops</p>
+              <p className="text-sm font-medium text-red-700 dark:text-red-400">{t('myDrops.failed')}</p>
               <p className="text-xs text-red-600 dark:text-red-400 mt-1">{error}</p>
               <button
                 onClick={fetchDrops}
                 className="mt-2 text-xs font-medium text-red-600 dark:text-red-400 hover:text-red-700 underline"
               >
-                Try again
+                {t('common.retry')}
               </button>
             </div>
           </div>
@@ -143,16 +145,16 @@ const MyDrops = () => {
             <div className="w-20 h-20 mx-auto bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
               <Package className="w-10 h-10 text-gray-400" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">No drops yet</h3>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">{t('myDrops.noDrops')}</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs mx-auto">
-              Create an encrypted drop to securely share messages, images, audio, or files.
+              {t('myDrops.noDropsHint')}
             </p>
             <button
               onClick={() => navigate('/?action=create-drop')}
               className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-xl transition-colors text-sm"
             >
               <Plus className="w-4 h-4" />
-              Create Your First Drop
+              {t('myDrops.createFirst')}
             </button>
           </div>
         )}
@@ -214,21 +216,21 @@ const MyDrops = () => {
                     <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 flex-wrap">
                       <span className="flex items-center gap-1">
                         <Users className="w-3 h-3" />
-                        {drop.claimedCount || 0}/{drop.recipientCount} claimed
+                        {drop.claimedCount || 0}/{drop.recipientCount} {t('myDrops.claimed')}
                       </span>
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        {isExpired ? 'Expired' : formatTimeRemaining(drop.expiresAt)}
+                        {isExpired ? t('myDrops.status.expired') : formatTimeRemaining(drop.expiresAt)}
                       </span>
                       {drop.viewOnce && (
                         <span className="flex items-center gap-1">
                           <EyeOff className="w-3 h-3" />
-                          View once
+                          {t('myDrops.viewOnce')}
                         </span>
                       )}
                       <span className="flex items-center gap-1">
                         <Shield className="w-3 h-3" />
-                        E2E encrypted
+                        {t('myDrops.encrypted')}
                       </span>
                     </div>
 

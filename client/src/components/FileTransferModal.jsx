@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, ExternalLink, Loader2 } from 'lucide-react';
 import socketManager from '../socket';
 import { downloadFileOnDevice } from '../utils/downloadHelper';
 
 const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNickname = '' }) => {
+    const { t } = useTranslation();
     const [isLoading, setIsLoading] = useState(true);
 
     // Construct the e2ecp URL with query parameters
@@ -159,10 +161,10 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNick
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
                     <div className="flex items-center space-x-2">
-                        <span className="text-lg font-bold text-gray-900 dark:text-white">File Transfer</span>
+                        <span className="text-lg font-bold text-gray-900 dark:text-white">{t('fileTransfer.title')}</span>
                         {recipients.length > 0 && (
                             <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full font-medium">
-                                Targeting {recipients.length} user{recipients.length !== 1 ? 's' : ''}
+                                {t('fileTransfer.targeting', { count: recipients.length })}
                             </span>
                         )}
                     </div>
@@ -172,7 +174,7 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNick
                             target="_blank"
                             rel="noopener noreferrer"
                             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-                            title="Open in new tab"
+                            title={t('fileTransfer.openTab')}
                         >
                             <ExternalLink className="w-5 h-5" />
                         </a>
@@ -196,7 +198,7 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNick
                         ref={iframeRef}
                         src={url}
                         className="w-full h-full border-0"
-                        title="Encrypted File Transfer"
+                        title={t('fileTransfer.encrypted')}
                         onLoad={() => url && setIsLoading(false)}
                         allow="camera; microphone; clipboard-read; clipboard-write; display-capture"
                     />
@@ -205,7 +207,7 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNick
                 {/* Footer */}
                 <div className="px-4 py-2 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-800 text-center">
                     <p className="text-xs text-gray-500 dark:text-gray-500">
-                        End-to-End Encrypted via e2ecp (Zero Knowledge)
+                        {t('fileTransfer.zeroKnowledge')}
                     </p>
                 </div>
             </div>

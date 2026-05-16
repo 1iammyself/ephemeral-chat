@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Download, Smartphone, Shield, Zap, Monitor, Laptop, Globe, ExternalLink } from 'lucide-react';
 
 const APK_DOWNLOAD_URL = 'https://github.com/cLLeB/ephemeral-chat/releases/download/chapter/app-release.apk';
@@ -13,6 +14,7 @@ const DESKTOP_DOWNLOADS = {
 };
 
 const AppRestrictionBanner = () => {
+    const { t } = useTranslation();
     const [isVisible, setIsVisible] = useState(false);
     const [platform, setPlatform] = useState(null); // 'android' | 'desktop' | null
 
@@ -119,9 +121,9 @@ const AppRestrictionBanner = () => {
                             )}
                         </div>
                         <div>
-                            <h3 className="text-xl font-black text-white tracking-tight text-center">App Required</h3>
+                            <h3 className="text-xl font-black text-white tracking-tight text-center">{t('appBanner.appRequired')}</h3>
                             <p className="text-blue-100/90 text-[10px] font-bold uppercase tracking-[0.2em] text-center">
-                                {isAndroid ? 'Android Security' : isIOS ? 'Coming Soon' : 'Desktop Security'}
+                                {isAndroid ? t('appBanner.androidSecurity') : isIOS ? t('appBanner.comingSoon') : t('appBanner.desktopSecurity')}
                             </p>
                         </div>
                     </div>
@@ -134,8 +136,8 @@ const AppRestrictionBanner = () => {
                             <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                             <p className="text-blue-900 dark:text-blue-200 text-xs leading-relaxed">
                                 {isIOS
-                                    ? "The iOS application is currently in development. To ensure privacy and security, access is currently available via the Android and Desktop apps."
-                                    : <>To protect your <strong>privacy</strong>, rooms can only be accessed via the official {isAndroid ? 'Android' : 'Desktop'} app.</>
+                                    ? t('appBanner.iosMessage')
+                                    : `${t('appBanner.privacyMessage')} ${isAndroid ? t('appBanner.android') : t('appBanner.desktop')} ${t('appBanner.app')}`
                                 }
                             </p>
                         </div>
@@ -145,11 +147,11 @@ const AppRestrictionBanner = () => {
                     <div className="flex flex-col gap-3 mb-6">
                         <div className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-left">
                             <Globe className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                            <span className="font-bold text-xs text-gray-900 dark:text-white">Hardened Privacy</span>
+                            <span className="font-bold text-xs text-gray-900 dark:text-white">{t('appBanner.hardenedPrivacy')}</span>
                         </div>
                         <div className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-left">
                             <Zap className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                            <span className="font-bold text-xs text-gray-900 dark:text-white">Seamless Entry</span>
+                            <span className="font-bold text-xs text-gray-900 dark:text-white">{t('appBanner.seamlessEntry')}</span>
                         </div>
                     </div>
 
@@ -161,7 +163,7 @@ const AppRestrictionBanner = () => {
                                 className="w-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-5 py-3.5 rounded-xl text-sm font-bold transition-all border-2 border-blue-500/20 flex items-center justify-center gap-2 active:scale-[0.98]"
                             >
                                 <ExternalLink size={18} className="text-blue-500" />
-                                Open in App
+                                {t('appBanner.openInApp')}
                             </button>
                         )}
 
@@ -171,13 +173,13 @@ const AppRestrictionBanner = () => {
                                 className="w-full bg-blue-600 hover:bg-blue-700 text-white px-5 py-3.5 rounded-xl text-sm font-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-[0.98]"
                             >
                                 <Download size={18} />
-                                Download {isAndroid ? 'APK' : 'Desktop App'}
+                                {isAndroid ? t('appBanner.downloadApk') : t('appBanner.desktopApp')}
                             </button>
                         )}
 
                         {isIOS && (
                             <div className="w-full bg-gray-100 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 px-5 py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 cursor-default border border-gray-200 dark:border-gray-700">
-                                <span>iOS App Coming Soon</span>
+                                <span>{t('appBanner.iosComingSoon')}</span>
                             </div>
                         )}
                     </div>

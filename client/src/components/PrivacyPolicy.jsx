@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Shield, Lock, Eye, Trash2, Smartphone, Globe, Github } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
 
 const PrivacyPolicy = () => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
 
     // Carousel state tracking
@@ -32,11 +34,11 @@ const PrivacyPolicy = () => {
                         className="p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors flex items-center gap-2 group"
                     >
                         <ArrowLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
-                        <span className="hidden sm:inline font-medium">Back</span>
+                        <span className="hidden sm:inline font-medium">{t('privacy.back')}</span>
                     </button>
                     <div className="flex items-center gap-2">
                         <Shield className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-                        <h1 className="text-lg sm:text-xl font-bold tracking-tight">Privacy Policy</h1>
+                        <h1 className="text-lg sm:text-xl font-bold tracking-tight">{t('privacy.title')}</h1>
                     </div>
                     <div className="flex items-center gap-2">
                         <ThemeToggle />

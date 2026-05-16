@@ -1,8 +1,10 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Clock } from 'lucide-react';
 import { getVibeById } from '../utils/vibes';
 
 const PollDetailsModal = ({ isOpen, onClose, pollData, currentUser, roomVibe }) => {
+    const { t } = useTranslation();
     if (!isOpen || !pollData) return null;
 
     const { question, options } = pollData;
@@ -15,7 +17,7 @@ const PollDetailsModal = ({ isOpen, onClose, pollData, currentUser, roomVibe }) 
         const isToday = date.toDateString() === now.toDateString();
 
         if (isToday) {
-            return `Today at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+            return t('poll.details.today', { time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
         }
         return date.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     };
@@ -41,7 +43,7 @@ const PollDetailsModal = ({ isOpen, onClose, pollData, currentUser, roomVibe }) 
                         >
                             <X className="w-5 h-5" />
                         </button>
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Poll details</h2>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t('poll.details.title')}</h2>
                     </div>
                 </div>
 
@@ -85,11 +87,11 @@ const PollDetailsModal = ({ isOpen, onClose, pollData, currentUser, roomVibe }) 
                                                         <div className="flex items-center space-x-2">
                                                             <span className={`font-bold transition-colors ${isMe ? nicknameClass : 'text-gray-900 dark:text-white'
                                                                 }`}>
-                                                                {isMe ? 'You' : vote.nickname}
+                                                                {isMe ? t('poll.details.you') : vote.nickname}
                                                             </span>
                                                             {isMe && (
                                                                 <span className={`text-[10px] px-1.5 py-0.5 rounded ${youBadgeClass} font-bold border`}>
-                                                                    You
+                                                                    {t('poll.details.you')}
                                                                 </span>
                                                             )}
                                                         </div>
@@ -104,7 +106,7 @@ const PollDetailsModal = ({ isOpen, onClose, pollData, currentUser, roomVibe }) 
                                     </div>
                                 ) : (
                                     <div className="pl-2 italic text-sm text-gray-400 dark:text-gray-500 py-2 border-l-2 border-gray-100 dark:border-gray-800 ml-1">
-                                        No votes yet
+                                        {t('poll.details.noVotes')}
                                     </div>
                                 )}
 
@@ -137,7 +139,7 @@ const PollDetailsModal = ({ isOpen, onClose, pollData, currentUser, roomVibe }) 
                                                                         {vote.nickname?.charAt(0).toUpperCase() || '?'}
                                                                     </div>
                                                                     <span className={`text-sm font-medium ${isMe ? nicknameClass : 'text-gray-700 dark:text-gray-300'}`}>
-                                                                        {isMe ? 'You' : vote.nickname}
+                                                                        {isMe ? t('poll.details.you') : vote.nickname}
                                                                     </span>
                                                                 </div>
                                                             );

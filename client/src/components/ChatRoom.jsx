@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { generateInviteLink } from '../utils/api'; // Import API utility
 import {
   Send,
@@ -114,23 +115,23 @@ import { Keyboard } from '@capacitor/keyboard';
 import { useGeofence } from '../hooks/useGeofence';
 
 const SLASH_COMMANDS = [
-  { icon: Camera, label: 'Camera', value: '/camera', desc: 'Take a photo' },
-  { icon: BarChart2, label: 'Poll', value: '/poll', desc: 'Create a new poll' },
-  { icon: Phone, label: 'Voice Call', value: '/call', desc: 'Start a voice call' },
-  { icon: ImageIcon, label: 'Photo', value: '/photo', desc: 'Upload an image' },
-  { icon: Mic, label: 'Voice Note', value: '/voice', desc: 'Record a voice note' },
-  { icon: Snowflake, label: 'Icebreaker', value: '/ice', desc: 'Send a random question' },
-  { icon: Zap, label: 'Pulse', value: '/pulse', desc: 'Shake the room' },
-  { icon: Sparkles, label: 'Confetti', value: '/confetti', desc: 'Launch a confetti bomb!' },
-  { icon: Edit2, label: 'Topic', value: '/topic', desc: 'Set room topic', adminOnly: true },
-  { icon: Clock, label: 'Timer', value: '/timer', desc: 'Start a countdown', adminOnly: true },
-  { icon: Activity, label: 'Vibe', value: '/vibe', desc: 'Change room vibe', adminOnly: true },
-  { icon: Sparkles, label: 'Hot Seat', value: '/hotSeat', desc: 'Put someone in the hot seat', adminOnly: true },
-  { icon: Activity, label: 'Watch Party', value: '/media', desc: 'Share YouTube' },
-  { icon: FileText, label: 'Stego', value: '/stego', desc: 'Hide a secret in a photo' },
-  { icon: Code2, label: 'Code Share', value: '/code', desc: 'Collaborative code editor' },
-  { icon: Trophy, label: 'Chess', value: '/chess', desc: 'Start a chess match' },
-  { icon: Gamepad2, label: 'Tetris', value: '/tetris', desc: 'Start a Tetris battle' },
+  { icon: Camera, label: 'Camera', value: '/camera', cmdKey: 'camera' },
+  { icon: BarChart2, label: 'Poll', value: '/poll', cmdKey: 'poll' },
+  { icon: Phone, label: 'Voice Call', value: '/call', cmdKey: 'call' },
+  { icon: ImageIcon, label: 'Photo', value: '/photo', cmdKey: 'photo' },
+  { icon: Mic, label: 'Voice Note', value: '/voice', cmdKey: 'voice' },
+  { icon: Snowflake, label: 'Icebreaker', value: '/ice', cmdKey: 'icebreaker' },
+  { icon: Zap, label: 'Pulse', value: '/pulse', cmdKey: 'pulse' },
+  { icon: Sparkles, label: 'Confetti', value: '/confetti', cmdKey: 'confetti' },
+  { icon: Edit2, label: 'Topic', value: '/topic', cmdKey: 'topic', adminOnly: true },
+  { icon: Clock, label: 'Timer', value: '/timer', cmdKey: 'timer', adminOnly: true },
+  { icon: Activity, label: 'Vibe', value: '/vibe', cmdKey: 'vibe', adminOnly: true },
+  { icon: Sparkles, label: 'Hot Seat', value: '/hotSeat', cmdKey: 'hotSeat', adminOnly: true },
+  { icon: Activity, label: 'Watch Party', value: '/media', cmdKey: 'watchParty' },
+  { icon: FileText, label: 'Stego', value: '/stego', cmdKey: 'stego' },
+  { icon: Code2, label: 'Code Share', value: '/code', cmdKey: 'codeShare' },
+  { icon: Trophy, label: 'Chess', value: '/chess', cmdKey: 'chess' },
+  { icon: Gamepad2, label: 'Tetris', value: '/tetris', cmdKey: 'tetris' },
 ];
 
 const CONFETTI_COLORS = [
@@ -399,6 +400,7 @@ const ChatRoom = () => {
   const { roomCode } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
   const [isConnected, setIsConnected] = useState(socketManager.isConnected);
   const [isJoined, setIsJoined] = useState(false);
   const [roomOpensAt, setRoomOpensAt] = useState(null); // ms timestamp — non-null = show countdown
@@ -2948,9 +2950,9 @@ const ChatRoom = () => {
       <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-black">
         <div className="text-center">
           <div className="bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded mb-4">
-            <p className="font-bold">Error</p><p>{error}</p>
+            <p className="font-bold">{t('chatRoom.error')}</p><p>{error}</p>
           </div>
-          <button onClick={() => navigate('/')} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Go Back to Home</button>
+          <button onClick={() => navigate('/')} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">{t('common.goHome')}</button>
         </div>
       </div>
     );
@@ -2971,7 +2973,7 @@ const ChatRoom = () => {
         <div className="absolute inset-0 z-[100] bg-black/20 backdrop-blur-[2px] flex items-center justify-center">
           <div className="bg-white dark:bg-gray-800 px-4 py-2 rounded-full shadow-lg flex items-center space-x-2">
             <Loader2 className={`w-4 h-4 text-${vibeAccent}-500 animate-spin`} />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Reconnecting...</span>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{t('chatRoom.reconnecting')}</span>
           </div>
         </div>
       )}
@@ -2980,7 +2982,7 @@ const ChatRoom = () => {
           <div className="flex items-center space-x-2 sm:space-x-4">
             <button onClick={() => navigate('/')} className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
             <div className="min-w-0">
-              <h1 className="text-base sm:text-lg font-bold truncate text-gray-900 dark:text-white leading-tight">{/^[A-Z0-9]{10}$/.test(roomCode) ? 'Chatroom' : roomCode}</h1>
+              <h1 className="text-base sm:text-lg font-bold truncate text-gray-900 dark:text-white leading-tight">{/^[A-Z0-9]{10}$/.test(roomCode) ? t('chatRoom.chatroom') : roomCode}</h1>
               <div className="flex items-center space-x-3 sm:space-x-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
                 {latency !== null && (
                   <div className="flex items-end space-x-0.5 h-4 pb-1" title={`Latency: ${latency}ms`}>
@@ -3007,7 +3009,7 @@ const ChatRoom = () => {
                     }
                   }}
                   className="flex items-center space-x-1 hover:bg-black/5 dark:hover:bg-white/5 px-1.5 py-0.5 rounded cursor-pointer transition-colors"
-                  title="Show participants"
+                  title={t('chatRoom.participants')}
                 >
                   <Users className="w-4 h-4" />
                   <span>{users.length}</span>
@@ -3015,7 +3017,7 @@ const ChatRoom = () => {
                 {getTTLDisplay() && (
                   <div className="flex items-center space-x-1">
                     <Clock className="w-4 h-4" />
-                    <span><span className="hidden sm:inline">TTL: </span>{getTTLDisplay()}</span>
+                    <span><span className="hidden sm:inline">{t('chatRoom.ttl')}: </span>{getTTLDisplay()}</span>
                   </div>
                 )}
               </div>
@@ -3033,7 +3035,7 @@ const ChatRoom = () => {
                 }
               }}
               className={`p-2 rounded-lg transition-colors relative ${showDesktopSidebar ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
-              title="People & Tools"
+              title={t('chatRoom.peopleTools')}
             >
               <LayoutGrid className="w-5 h-5" />
               {isHost && pendingGuests.length > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-gray-800" />}
@@ -3060,7 +3062,7 @@ const ChatRoom = () => {
               {/* Topic Pill */}
               {roomTopic && (
                 <div className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full bg-${vibeAccent}-100/30 dark:bg-${vibeAccent}-900/20`}>
-                  <span className={`text-[10px] font-bold text-${vibeAccent}-600 dark:text-${vibeAccent}-400 uppercase tracking-wider`}>Topic</span>
+                  <span className={`text-[10px] font-bold text-${vibeAccent}-600 dark:text-${vibeAccent}-400 uppercase tracking-wider`}>{t('chatRoom.topic')}</span>
                   <span className="text-xs font-medium text-gray-700 dark:text-gray-200 truncate max-w-[120px] sm:max-w-[200px]">{roomTopic}</span>
                   {canManageRoom(currentUserRole) && (
                     <button onClick={() => setShowTopicEditor(true)} className={`p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 hover:text-${vibeAccent}-500 transition-colors`}>
@@ -3080,7 +3082,7 @@ const ChatRoom = () => {
                   <Clock className={`w-3 h-3 ${timeLeft === '00:00' ? 'animate-bounce text-red-500 dark:text-red-300' : 'animate-pulse'}`} style={timeLeft !== '00:00' ? { color: themeEffective === 'dark' ? '#ffffff' : vibeHex } : undefined} />
                   <span className={`font-mono text-xs font-bold tracking-wider ${timeLeft === '00:00' ? 'text-red-600 dark:text-red-100' : ''}`} style={timeLeft !== '00:00' ? { color: themeEffective === 'dark' ? '#ffffff' : vibeHex } : undefined}>{timeLeft || '00:00'}</span>
                   {canManageRoom(currentUserRole) && (
-                    <button onClick={handleStopTimer} className="p-0.5 rounded-full transition-colors hover:bg-black/5 dark:hover:bg-white/20" title="Stop Timer">
+                    <button onClick={handleStopTimer} className="p-0.5 rounded-full transition-colors hover:bg-black/5 dark:hover:bg-white/20" title={t('chatRoom.stopTimer')}>
                       <X className={`w-3 h-3 ${timeLeft === '00:00' ? 'text-red-500 dark:text-red-300' : 'text-red-300'}`} />
                     </button>
                   )}
@@ -3128,7 +3130,7 @@ const ChatRoom = () => {
               <button
                 onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })}
                 className={`fixed sm:absolute bottom-20 sm:bottom-6 right-4 sm:right-6 z-[55] p-2.5 sm:p-3 rounded-full shadow-2xl transition-all duration-300 transform hover:scale-110 active:scale-95 animate-in fade-in zoom-in slide-in-from-bottom-4 ${getVibeById(roomVibe).accentClass} text-white group`}
-                title="Scroll to bottom"
+                title={t('chatRoom.scrollToBottom')}
               >
                 <ArrowDown className="w-4 h-4 sm:w-5 sm:h-5 group-hover:animate-bounce" />
               </button>
@@ -3182,7 +3184,7 @@ const ChatRoom = () => {
                 {isStealthMode && (
                   <div className="flex items-center gap-1.5 text-[10px] font-black tracking-tighter text-gray-600 dark:text-gray-400 bg-gray-100/80 dark:bg-gray-800/80 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-gray-200/50 dark:border-white/10 shadow-sm shrink-0">
                     <EyeOff className="w-3 h-3" />
-                    GHOST MODE
+                    {t('chatRoom.stealthMode').toUpperCase()}
                   </div>
                 )}
                 {overrideTtl !== null && (
@@ -3198,7 +3200,7 @@ const ChatRoom = () => {
                 {isAnonymousMode && (
                   <div className="flex items-center gap-1.5 text-[10px] font-black tracking-tighter text-purple-600 dark:text-purple-400 bg-purple-50/80 dark:bg-purple-950/40 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-purple-100/50 dark:border-purple-500/20 shadow-sm shrink-0">
                     <Ghost className="w-3 h-3" />
-                    ANONYMOUS
+                    {t('chatRoom.anonMode').toUpperCase()}
                   </div>
                 )}
               </div>
@@ -3207,7 +3209,7 @@ const ChatRoom = () => {
             {!isStealthMode && <TypingPreview />}
             {typingUsers.size > 0 && !isStealthMode && (
               <div className="px-4 py-1 text-xs text-gray-600 dark:text-gray-400 italic animate-pulse bg-black/5 dark:bg-white/5">
-                {Array.from(typingUsers.values()).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
+                {t('chatRoom.typing', { count: typingUsers.size, names: Array.from(typingUsers.values()).join(', ') })}
               </div>
             )}
             {replyingTo && (
@@ -3215,9 +3217,9 @@ const ChatRoom = () => {
                 <div className="flex items-center space-x-2 overflow-hidden">
                   <Reply className={`w-4 h-4 text-${vibeAccent}-500`} />
                   <div className={`flex flex-col text-xs border-l-2 border-${vibeAccent}-500 pl-2`}>
-                    <span className={`font-semibold text-${vibeAccent}-500`}>Replying to {replyingTo.sender.nickname}</span>
+                    <span className={`font-semibold text-${vibeAccent}-500`}>{t('chatRoom.replyingTo')} {replyingTo.sender.nickname}</span>
                     <span className="text-gray-600 dark:text-gray-400 truncate max-w-[200px]">
-                      {replyingTo.messageType === 'image' ? 'Image' : replyingTo.messageType === 'audio' ? 'Voice Note' : replyingTo.content}
+                      {replyingTo.messageType === 'image' ? t('chatRoom.image') : replyingTo.messageType === 'audio' ? t('chatRoom.voiceNote') : replyingTo.content}
                     </span>
                   </div>
                 </div>
@@ -3228,8 +3230,8 @@ const ChatRoom = () => {
             )}
             {selectedRecipients.length > 0 && (
               <div className={`px-4 py-2 bg-${vibeAccent}-50/50 dark:bg-${vibeAccent}-900/20 flex items-center justify-between`}>
-                <span className={`text-xs text-${vibeAccent}-600 dark:text-${vibeAccent}-300 font-medium flex items-center`}><Users className="w-3 h-3 mr-1.5" />Sending to {selectedRecipients.length} specific user{selectedRecipients.length !== 1 ? 's' : ''}</span>
-                <button onClick={() => setSelectedRecipients([])} className={`text-xs text-${vibeAccent}-500 hover:text-${vibeAccent}-700 dark:hover:text-${vibeAccent}-200 underline`}>Clear selection</button>
+                <span className={`text-xs text-${vibeAccent}-600 dark:text-${vibeAccent}-300 font-medium flex items-center`}><Users className="w-3 h-3 mr-1.5" />{t('chatRoom.sendingTo', { count: selectedRecipients.length })}</span>
+                <button onClick={() => setSelectedRecipients([])} className={`text-xs text-${vibeAccent}-500 hover:text-${vibeAccent}-700 dark:hover:text-${vibeAccent}-200 underline`}>{t('chatRoom.clearSelection')}</button>
               </div>
             )}
             <div className="px-0 pt-2 sm:px-4 sm:pt-4 pb-0 sm:pb-4 w-full relative z-10 bg-transparent">
@@ -3279,7 +3281,7 @@ const ChatRoom = () => {
                         onClick={() => setShowFeatureMenu(!showFeatureMenu)}
                         disabled={!isConnected}
                         className={`p-1.5 sm:p-2.5 rounded-full transition-all duration-200 border-none outline-none focus:outline-none focus:ring-0 ${showFeatureMenu ? `bg-transparent hover:bg-transparent dark:bg-transparent dark:hover:bg-transparent text-${vibeAccent}-500 shadow-none` : `hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400`}`}
-                        title="Features"
+                        title={t('chatRoom.features')}
                       >
                         <Plus className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300 ${showFeatureMenu ? 'rotate-45' : ''}`} />
                       </button>
@@ -3329,39 +3331,39 @@ const ChatRoom = () => {
                               <div className={`sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/10 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm`}>
                                 <FileText className={`w-4 h-4 text-${vibeAccent}-500`} />
                               </div>
-                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Files</span>
+                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">{t('chatRoom.files')}</span>
                             </button>
-                            <button type="button" onClick={() => { setShowCameraModal(true); setShowFeatureMenu(false); }} disabled={!isConnected} className={`flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`} title="Camera">
+                            <button type="button" onClick={() => { setShowCameraModal(true); setShowFeatureMenu(false); }} disabled={!isConnected} className={`flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`} title={t('chatRoom.camera')}>
                               <div className={`sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/10 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm`}>
                                 <Camera className={`w-4 h-4 text-${vibeAccent}-500`} />
                               </div>
-                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Camera</span>
+                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">{t('chatRoom.camera')}</span>
                             </button>
                             <button type="button" onClick={() => { if (users.length > 7) { setError('Voice calls are limited to 7 users.'); } else { handleStartCall(); setShowFeatureMenu(false); } }} disabled={!isConnected || users.length < 2 || users.length > 7} className={`flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl transition-all border border-white/10 group ${users.length > 7 ? 'bg-white/5 opacity-40 cursor-not-allowed' : 'bg-white/5 dark:bg-white/5 hover:bg-white/20 sm:shadow-sm'}`} title={users.length > 7 ? "Disabled: Max 7 users" : "Voice Call"}>
                               <div className={`sm:w-8 sm:h-8 sm:rounded-lg flex items-center justify-center sm:mb-1 transition-transform sm:shadow-sm ${users.length > 7 ? 'sm:bg-white/5' : 'sm:bg-white/10 dark:sm:bg-white/10 group-hover:scale-110'}`}>
                                 <Phone className={`w-4 h-4 ${users.length > 7 ? 'text-gray-400' : 'text-green-500'}`} />
                               </div>
-                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">{users.length > 7 ? 'Disabled' : 'Call'}</span>
+                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">{users.length > 7 ? t('chatRoom.callDisabled') : t('chatRoom.call')}</span>
                             </button>
                             <button type="button" onClick={() => { setShowPollModal(true); setShowFeatureMenu(false); }} disabled={!isConnected} className={`flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`} title="Poll">
                               <div className={`sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/10 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm`}>
                                 <BarChart2 className={`w-4 h-4 text-${vibeAccent}-500`} />
                               </div>
-                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Poll</span>
+                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">{t('chatRoom.poll')}</span>
                             </button>
-                            <button type="button" onClick={() => { startRecording(); setShowFeatureMenu(false); }} disabled={!isConnected} className="flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group" title="Voice Note">
+                            <button type="button" onClick={() => { startRecording(); setShowFeatureMenu(false); }} disabled={!isConnected} className="flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group" title={t('chatRoom.voiceNote')}>
                               <div className="sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/10 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm">
                                 <Mic className="w-4 h-4 text-red-500" />
                               </div>
-                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Voice Note</span>
+                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">{t('chatRoom.voiceNote')}</span>
                             </button>
-                            <button type="button" onClick={handleSendIcebreaker} disabled={!isConnected} className="flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group" title="Icebreaker">
+                            <button type="button" onClick={handleSendIcebreaker} disabled={!isConnected} className="flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group" title={t('chatRoom.icebreaker')}>
                               <div className="sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/10 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm">
                                 <Snowflake className="w-4 h-4 text-cyan-500" />
                               </div>
-                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Icebreaker</span>
+                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">{t('chatRoom.icebreaker')}</span>
                             </button>
-                            <button type="button" onClick={() => { setShowWatchPartyModal(true); setShowFeatureMenu(false); }} disabled={!isConnected} className="flex sm:hidden items-center justify-center p-1.5 rounded-lg bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group" title="Watch Party">
+                            <button type="button" onClick={() => { setShowWatchPartyModal(true); setShowFeatureMenu(false); }} disabled={!isConnected} className="flex sm:hidden items-center justify-center p-1.5 rounded-lg bg-white/5 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 group" title={t('chatRoom.watchParty')}>
                               <div className="flex items-center justify-center group-hover:scale-110 transition-transform">
                                 <Activity className="w-4 h-4 text-purple-400" />
                               </div>
@@ -3403,7 +3405,7 @@ const ChatRoom = () => {
                               {/* Desktop: full admin section with labels */}
                               <div className="hidden sm:block space-y-2">
                                 <div className="flex items-center justify-between px-1">
-                                  <p className="text-[10px] font-bold text-gray-800 dark:text-gray-400 uppercase tracking-widest flex-shrink-0 mr-4">Admin</p>
+                                  <p className="text-[10px] font-bold text-gray-800 dark:text-gray-400 uppercase tracking-widest flex-shrink-0 mr-4">{t('chatRoom.admin').toUpperCase()}</p>
                                   <div className="w-[146px] overflow-x-auto scrollbar-none no-scrollbar flex-shrink-0 ml-auto bg-black/10 dark:bg-black/20 rounded-full px-1 border border-white/5 shadow-inner group/vibes">
                                     <div className="flex gap-1.5 py-1">
                                       {getAllVibes().map(vibe => (
@@ -3428,7 +3430,7 @@ const ChatRoom = () => {
                                     <div className="w-7 h-7 rounded-lg bg-white/10 dark:bg-white/5 flex items-center justify-center flex-shrink-0">
                                       <Edit2 className="w-3.5 h-3.5 text-orange-500" />
                                     </div>
-                                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Topic</span>
+                                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{t('chatRoom.topic')}</span>
                                   </button>
                                   <button
                                     type="button"
@@ -3443,7 +3445,7 @@ const ChatRoom = () => {
                                       {activeTimer ? <X className="w-3.5 h-3.5 text-red-500" /> : <Clock className={`w-3.5 h-3.5 text-${vibeAccent}-500`} />}
                                     </div>
                                     <span className={`text-xs font-medium ${activeTimer ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                                      {activeTimer ? 'Stop' : 'Timer'}
+                                      {activeTimer ? t('chatRoom.stop') : t('chatRoom.timer')}
                                     </span>
                                   </button>
                                 </div>
@@ -3561,7 +3563,7 @@ const ChatRoom = () => {
                         onCopy={(e) => e.preventDefault()}
                         onCut={(e) => e.preventDefault()}
                         onPaste={(e) => e.preventDefault()}
-                        placeholder={isAnonymousMode ? "Confess anonymously..." : "Type message..."}
+                        placeholder={isAnonymousMode ? t('chatRoom.sendAnon') : t('chatRoom.sendMessage')}
                         className={`w-full bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white text-[15px] sm:text-base py-2.5 min-w-0 placeholder:text-gray-500 dark:placeholder:text-gray-400 ${newMessage.startsWith('🧊 ') ? 'pl-2 pr-10' : 'px-2'}`}
                         disabled={!isConnected}
                         maxLength={500}
@@ -3592,7 +3594,7 @@ const ChatRoom = () => {
                       </button>
                       {showTtlPicker && (
                         <div className="absolute bottom-full mb-2 right-0 z-[70] bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 p-2 flex flex-col gap-1 min-w-[130px] animate-in slide-in-from-bottom-2 duration-200">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 px-1 pb-0.5">Self-destruct</p>
+                          <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 px-1 pb-0.5">{t('chatRoom.selfDestructLabel').toUpperCase()}</p>
                           {[5, 30, 60, 300].map(secs => (
                             <button
                               key={secs}
@@ -3610,7 +3612,7 @@ const ChatRoom = () => {
                               onClick={() => { setOverrideTtl(null); setShowTtlPicker(false); }}
                               className="mt-1 px-3 py-1.5 rounded-xl text-xs font-bold text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 text-center transition-all"
                             >
-                              Turn off
+                              {t('chatRoom.turnOff')}
                             </button>
                           )}
                         </div>
@@ -3652,7 +3654,7 @@ const ChatRoom = () => {
                           : 'text-gray-400 hover:text-primary-500 hover:bg-black/5 dark:hover:bg-white/5'
                       }`}
                       style={{ WebkitTapHighlightColor: 'transparent' }}
-                      title={isAnonymousMode ? 'Anonymous mode ON' : 'Tap to send anonymously'}
+                      title={isAnonymousMode ? t('chatRoom.anonMode') : t('chatRoom.sendAnon')}
                     >
                       👻
                     </button>
@@ -3677,7 +3679,7 @@ const ChatRoom = () => {
                         onClick={startRecording}
                         disabled={!isConnected}
                         className={`flex-shrink-0 ml-1 sm:ml-2 ${getVibeById(roomVibe).accentClass} h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
-                        title="Voice Note"
+                        title={t('chatRoom.voiceNote')}
                       >
                         <Mic className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
@@ -3722,7 +3724,7 @@ const ChatRoom = () => {
                   type="button"
                   onClick={(e) => { e.preventDefault(); setShowEmojiPicker(false); setTimeout(() => messageInputRef.current?.focus(), 50); }}
                   className="p-1.5 active:scale-95 hover:bg-black/5 dark:hover:bg-white/5 rounded-full text-gray-500 dark:text-gray-400 transition-all flex items-center justify-center pointer-events-auto"
-                  title="Keyboard"
+                  title={t('chatRoom.keyboard')}
                 >
                   <KeyboardIcon className="w-5 h-5" />
                 </button>
@@ -3731,7 +3733,7 @@ const ChatRoom = () => {
                   onClick={(e) => { e.preventDefault(); setShowEmojiPicker(false); setTimeout(() => setShowWatchPartyModal(true), 50); }}
                   className={`p-1.5 active:scale-95 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-all flex items-center justify-center pointer-events-auto`}
                   style={{ color: vibeHex }}
-                  title="Watch Party"
+                  title={t('chatRoom.watchParty')}
                 >
                   <Activity className="w-5 h-5" />
                 </button>
@@ -3761,13 +3763,13 @@ const ChatRoom = () => {
                 onClick={() => setSidebarTab('people')}
                 className={`flex-1 py-2.5 text-xs font-bold transition-colors ${sidebarTab === 'people' ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500 dark:border-indigo-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
               >
-                People
+                {t('chatRoom.people')}
               </button>
               <button
                 onClick={() => setSidebarTab('tools')}
                 className={`flex-1 py-2.5 text-xs font-bold transition-colors ${sidebarTab === 'tools' ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500 dark:border-indigo-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
               >
-                Tools
+                {t('chatRoom.tools')}
               </button>
             </div>
 
@@ -3834,13 +3836,13 @@ const ChatRoom = () => {
                   onClick={() => setSidebarTab('people')}
                   className={`flex-1 py-3 text-xs font-bold transition-colors ${sidebarTab === 'people' ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 dark:text-gray-400'}`}
                 >
-                  People
+                  {t('chatRoom.people')}
                 </button>
                 <button
                   onClick={() => setSidebarTab('tools')}
                   className={`flex-1 py-3 text-xs font-bold transition-colors ${sidebarTab === 'tools' ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 dark:text-gray-400'}`}
                 >
-                  Tools
+                  {t('chatRoom.tools')}
                 </button>
                 <button onClick={() => setShowMobileMenu(false)} className="px-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                   <X className="w-5 h-5" />
@@ -3961,7 +3963,7 @@ const ChatRoom = () => {
       />
       {/* ── Floating feature panels ─────────────────────────────────── */}
       {isPanelOpen('secrets') && (
-        <FloatingPanel title="Secrets" icon={Lock} iconColor="text-violet-400"
+        <FloatingPanel title={t('chatRoom.panels.secrets')} icon={Lock} iconColor="text-violet-400"
           onClose={() => closePanel('secrets')} onFocus={() => focusPanel('secrets')} zIndex={getZ('secrets')}
           defaultWidth={560} defaultHeight={520} defaultX={160} defaultY={90}>
           <SecretsPanel
@@ -3972,7 +3974,7 @@ const ChatRoom = () => {
         </FloatingPanel>
       )}
       {isPanelOpen('code') && (
-        <FloatingPanel title="Code Studio" icon={Code2} iconColor="text-blue-400"
+        <FloatingPanel title={t('chatRoom.panels.codeStudio')} icon={Code2} iconColor="text-blue-400"
           onClose={() => closePanel('code')} onFocus={() => focusPanel('code')} zIndex={getZ('code')}
           defaultWidth={820} defaultHeight={580} defaultX={80} defaultY={70}>
           <CodeShareModal embedded onClose={() => closePanel('code')} roomCode={roomCode} currentUser={currentUser}
@@ -3980,7 +3982,7 @@ const ChatRoom = () => {
         </FloatingPanel>
       )}
       {isPanelOpen('watch') && (
-        <FloatingPanel title="Watch Party" icon={Activity} iconColor="text-red-400"
+        <FloatingPanel title={t('chatRoom.panels.watchParty')} icon={Activity} iconColor="text-red-400"
           onClose={() => closePanel('watch')} onFocus={() => focusPanel('watch')} zIndex={getZ('watch')}
           defaultWidth={700} defaultHeight={520} defaultX={140} defaultY={85}>
           <WatchPartyModal embedded onClose={() => closePanel('watch')} roomVibe={roomVibe}
@@ -3996,7 +3998,7 @@ const ChatRoom = () => {
       {/* ── Chess FloatingPanel ──────────────────────────────────────── */}
       {isPanelOpen('chess') && (
         <FloatingPanel
-          title="Chess Match"
+          title={t('chatRoom.panels.chess')}
           icon={Trophy}
           iconColor="text-amber-400"
           onClose={closeChessPanel}
@@ -4021,7 +4023,7 @@ const ChatRoom = () => {
       {/* ── Tetris FloatingPanel ─────────────────────────────────────── */}
       {isPanelOpen('tetris') && (
         <FloatingPanel
-          title="Tetris Battle"
+          title={t('chatRoom.panels.tetris')}
           icon={Gamepad2}
           iconColor="text-cyan-400"
           onClose={() => closePanel('tetris')}
@@ -4049,28 +4051,28 @@ const ChatRoom = () => {
           />
           <div className={`relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-sm w-full border-2 border-${getVibeById(roomVibe).accent || 'indigo'}-500/40 animate-in zoom-in-95 fade-in duration-200`}>
             <h3 className="text-base font-black text-gray-900 dark:text-white mb-2">
-              {chessApprovalRequest.type === 'swap' ? '♟ Swap Request' : '♟ Replace Request'}
+              {chessApprovalRequest.type === 'swap' ? t('chatRoom.chess.swapRequest') : t('chatRoom.chess.replaceRequest')}
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-5">
               {chessApprovalRequest.type === 'swap'
-                ? `${chessApprovalRequest.requestedBy} wants to swap White and Black sides. Do you approve?`
-                : `${chessApprovalRequest.requestedBy} wants to replace you with ${chessApprovalRequest.newPlayerName}. Do you approve?`}
+                ? t('chatRoom.chess.swapDesc', { name: chessApprovalRequest.requestedBy })
+                : t('chatRoom.chess.replaceDesc', { requestedBy: chessApprovalRequest.requestedBy, newPlayer: chessApprovalRequest.newPlayerName })}
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => handleChessApproval(true)}
                 className={`flex-1 py-2.5 ${getVibeById(roomVibe).accentClass} rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02] active:scale-95`}
               >
-                Approve
+                {t('chatRoom.chess.approve')}
               </button>
               <button
                 onClick={() => handleChessApproval(false)}
                 className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-red-500 hover:text-white text-gray-600 dark:text-gray-400 rounded-xl text-sm font-bold transition-all"
               >
-                Decline
+                {t('chatRoom.chess.decline')}
               </button>
             </div>
-            <p className="text-center text-[9px] text-gray-400 mt-3 font-bold uppercase tracking-widest">Auto-declines in 30s</p>
+            <p className="text-center text-[9px] text-gray-400 mt-3 font-bold uppercase tracking-widest">{t('chatRoom.chess.autoDecline').toUpperCase()}</p>
           </div>
         </div>
       )}

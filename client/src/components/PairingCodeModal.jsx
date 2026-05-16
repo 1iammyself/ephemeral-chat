@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Shield, CheckCircle2, XCircle } from 'lucide-react';
 
 /**
@@ -9,7 +10,7 @@ import { Shield, CheckCircle2, XCircle } from 'lucide-react';
  * The code is derived from: SHA-256(local_cert_fingerprint + remote_cert_fingerprint)[:6]
  */
 const PairingCodeModal = ({ code, peerName, onConfirm, onReject }) => {
-  // Split code into individual digits for display
+  const { t } = useTranslation();
   const digits = (code || '------').split('');
 
   return (
@@ -22,9 +23,9 @@ const PairingCodeModal = ({ code, peerName, onConfirm, onReject }) => {
               <Shield className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="text-white font-bold">Verify Connection</h3>
+              <h3 className="text-white font-bold">{t('pairing.title')}</h3>
               <p className="text-white/80 text-xs">
-                Confirm this code matches on both devices
+                {t('pairing.subtitle')}
               </p>
             </div>
           </div>
@@ -48,11 +49,10 @@ const PairingCodeModal = ({ code, peerName, onConfirm, onReject }) => {
           </div>
 
           <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">
-            Connecting to <span className="font-semibold">{peerName || 'peer'}</span>
+            {t('pairing.connecting', { peer: peerName || 'peer' })}
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Ask the other person to confirm this code matches on their screen.
-            If it doesn't match, tap Reject — someone may be intercepting the connection.
+            {t('pairing.instruction')}
           </p>
         </div>
 
@@ -63,14 +63,14 @@ const PairingCodeModal = ({ code, peerName, onConfirm, onReject }) => {
             className="flex-1 py-3 rounded-xl font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors border border-red-200 dark:border-red-800 flex items-center justify-center gap-2"
           >
             <XCircle className="w-4 h-4" />
-            Reject
+            {t('pairing.reject')}
           </button>
           <button
             onClick={onConfirm}
             className="flex-1 py-3 rounded-xl font-semibold text-white bg-green-500 hover:bg-green-600 transition-colors shadow-lg shadow-green-500/20 flex items-center justify-center gap-2"
           >
             <CheckCircle2 className="w-4 h-4" />
-            Codes Match
+            {t('pairing.codesMatch')}
           </button>
         </div>
       </div>

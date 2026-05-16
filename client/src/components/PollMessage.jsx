@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CheckCircle2, Circle, Users, PenLine, Send as SendIcon, ChevronDown, ChevronUp, Plus, MessageSquarePlus } from 'lucide-react';
 import PollDetailsModal from './PollDetailsModal';
 import { getVibeById } from '../utils/vibes';
@@ -6,6 +7,7 @@ import socketManager from '../socket';
 
 // ─── Inline Sub-Poll Component ──────────────────────────────────
 const SubPollInline = ({ subPoll, parentOptionId, messageId, currentUserId, accentColor, hasVotedParent }) => {
+    const { t } = useTranslation();
     const [expanded, setExpanded] = useState(false);
     const subTotalVoters = useMemo(() => {
         const s = new Set();
@@ -28,7 +30,7 @@ const SubPollInline = ({ subPoll, parentOptionId, messageId, currentUserId, acce
                 <div className="mt-1 space-y-1">
                     {!hasVotedParent && (
                         <p className="text-[10px] text-gray-500 dark:text-gray-500 italic px-2 py-0.5">
-                            Vote for this option first to unlock follow-up choices
+                            {t('poll.vote.followUpLocked')}
                         </p>
                     )}
                     {subPoll.options.map(so => {
@@ -57,6 +59,7 @@ const SubPollInline = ({ subPoll, parentOptionId, messageId, currentUserId, acce
 
 // ─── Sub-Poll Creation Mini-Form ────────────────────────────────
 const SubPollCreator = ({ messageId, optionId, accentColor, vibeBtnColor, onDone }) => {
+    const { t } = useTranslation();
     const [question, setQuestion] = useState('');
     const [opts, setOpts] = useState(['', '']);
 
@@ -75,28 +78,28 @@ const SubPollCreator = ({ messageId, optionId, accentColor, vibeBtnColor, onDone
     return (
         <div className="mt-1.5 ml-5 pl-2.5 border-l-2 border-gray-200 dark:border-gray-600 space-y-1">
             <input type="text" value={question} onChange={e => setQuestion(e.target.value)}
-                placeholder="Follow-up question..."
+                placeholder={t('poll.vote.followUpPlaceholder')}
                 className="w-full text-xs px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 dark:text-white outline-none"
                 maxLength={200} autoFocus />
             {opts.map((o, i) => (
                 <input key={i} type="text" value={o} onChange={e => { const n = [...opts]; n[i] = e.target.value; setOpts(n); }}
-                    placeholder={`Option ${i + 1}`}
+                    placeholder={t('poll.vote.optionPlaceholder', { n: i + 1 })}
                     className="w-full text-xs px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 dark:text-white outline-none"
                     maxLength={100} />
             ))}
             <div className="flex items-center space-x-2">
                 {opts.length < 5 && (
                     <button onClick={handleAdd} className={`text-[10px] text-${accentColor}-500 flex items-center`}>
-                        <Plus className="w-3 h-3 mr-0.5" /> Add
+                        <Plus className="w-3 h-3 mr-0.5" /> {t('common.add')}
                     </button>
                 )}
                 <button onClick={handleSubmit}
                     disabled={!question.trim() || opts.filter(o => o.trim()).length < 2}
                     style={vibeBtnColor ? { backgroundColor: vibeBtnColor } : undefined}
                     className={`text-[10px] px-2 py-0.5 rounded text-white disabled:opacity-40`}>
-                    Create
+                    {t('common.create')}
                 </button>
-                <button onClick={onDone} className="text-[10px] text-gray-400 hover:text-gray-600">Cancel</button>
+                <button onClick={onDone} className="text-[10px] text-gray-400 hover:text-gray-600">{t('common.cancel')}</button>
             </div>
         </div>
     );
@@ -105,6 +108,7 @@ const SubPollCreator = ({ messageId, optionId, accentColor, vibeBtnColor, onDone
 // ─── Main PollMessage Component ─────────────────────────────────
 
 const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
+    const { t } = useTranslation();
     const { pollData } = message;
     if (!pollData) return null; // Safety guard if pollData is missing
     const { question, options, allowMultiple, allowCustomAnswers } = pollData;
@@ -163,8 +167,8 @@ const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
                     <h3 className="text-white font-bold leading-tight text-sm sm:text-base">{question}</h3>
                     <p className="text-white/80 text-[10px] sm:text-xs mt-1 flex items-center">
                         <CheckCircle2 className="w-3 h-3 mr-1" />
-                        {allowMultiple ? 'Select one or more' : 'Select one'}
-                        {allowCustomAnswers && ' · Custom answers allowed'}
+                        {allowMultiple ? t('poll.vote.selectMultiple') : t('poll.vote.selectOne')}
+                        {allowCustomAnswers && ` · ${t('poll.vote.customAllowed')}`}
                     </p>
                 </div>
 
@@ -194,7 +198,7 @@ const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
                                             {option.text}
                                             {option.isCustom && (
                                                 <span className="ml-1.5 text-[10px] text-gray-500 dark:text-gray-500 italic">
-                                                    (by {option.addedByNickname || 'someone'})
+                                                    {t('poll.vote.addedBy', { nickname: option.addedByNickname || 'someone' })}
                                                 </span>
                                             )}
                                         </span>
@@ -237,7 +241,7 @@ const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
                                         className="ml-5 mt-0.5 flex items-center text-[10px] text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors opacity-0 group-hover:opacity-100"
                                     >
                                         <MessageSquarePlus className="w-3 h-3 mr-0.5" />
-                                        Add follow-up
+                                        {t('poll.vote.addFollowUp')}
                                     </button>
                                 )}
                             </div>
@@ -254,7 +258,7 @@ const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
                                         value={customText}
                                         onChange={(e) => setCustomText(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && handleCustomAnswer()}
-                                        placeholder="Type your answer..."
+                                        placeholder={t('poll.vote.typeAnswer')}
                                         className={`flex-1 text-xs sm:text-sm text-gray-900 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 dark:text-white focus:ring-1 focus:ring-${accentColor}-500 focus:border-${accentColor}-500 outline-none`}
                                         maxLength={100}
                                         autoFocus
@@ -274,7 +278,7 @@ const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
                                     className={`flex items-center text-xs sm:text-sm text-${accentColor}-600 dark:text-${accentColor}-400 font-medium hover:underline p-1`}
                                 >
                                     <PenLine className="w-3.5 h-3.5 mr-1" />
-                                    Add your own answer
+                                    {t('poll.vote.addOwnAnswer')}
                                 </button>
                             )}
                         </div>
@@ -284,13 +288,13 @@ const PollMessage = ({ message, currentUser, onVote, roomVibe }) => {
                 <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border-t border-black/5 dark:border-white/5 flex items-center justify-between">
                     <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
                         <Users className="w-3.5 h-3.5 mr-1" />
-                        <span>{totalVotes} vote{totalVotes !== 1 ? 's' : ''}</span>
+                        <span>{t('poll.vote.votes', { count: totalVotes })}</span>
                     </div>
                     <button
                         className={`text-xs font-medium ${footerLinkClass} hover:underline`}
                         onClick={() => setShowDetails(true)}
                     >
-                        View results
+                        {t('poll.vote.viewResults')}
                     </button>
                 </div>
             </div>

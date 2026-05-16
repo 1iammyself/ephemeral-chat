@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Mic, X, ChevronRight, Send, Minimize2, Maximize2, CheckCircle2 } from 'lucide-react';
 import socketManager from '../socket';
 
@@ -10,6 +11,7 @@ import socketManager from '../socket';
  *  !isHotSeat && !isHost → audience: sees current Q, anonymous submit form, can dismiss
  */
 export default function HotSeat({ hotSeatTarget, isHotSeat, isHost, onEnd }) {
+  const { t } = useTranslation();
   const [question, setQuestion] = useState('');
   const [queueCount, setQueueCount] = useState(0);
   const [current, setCurrent] = useState(null);
@@ -65,7 +67,7 @@ export default function HotSeat({ hotSeatTarget, isHotSeat, isHost, onEnd }) {
           className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-red-500 to-orange-500 text-white text-xs font-bold shadow-lg shadow-red-500/30"
         >
           <Mic className="w-3.5 h-3.5" />
-          Hot Seat: {hotSeatTarget}
+          {t('hotSeat.label')}: {hotSeatTarget}
           <Maximize2 className="w-3 h-3 opacity-70" />
         </button>
       </div>
@@ -80,7 +82,7 @@ export default function HotSeat({ hotSeatTarget, isHotSeat, isHost, onEnd }) {
         <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-red-500 to-orange-500">
           <Mic className="w-5 h-5 text-white" />
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-red-100 font-medium uppercase tracking-wider">Hot Seat</p>
+            <p className="text-xs text-red-100 font-medium uppercase tracking-wider">{t('hotSeat.label')}</p>
             <p className="text-white font-black text-sm truncate">{hotSeatTarget}</p>
           </div>
           <div className="flex items-center gap-1">
@@ -88,7 +90,7 @@ export default function HotSeat({ hotSeatTarget, isHotSeat, isHost, onEnd }) {
               <button
                 onClick={() => setDismissed(true)}
                 className="p-1.5 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
-                title="Minimize"
+                title={t('hotSeat.minimize')}
               >
                 <Minimize2 className="w-4 h-4 text-white" />
               </button>
@@ -97,7 +99,7 @@ export default function HotSeat({ hotSeatTarget, isHotSeat, isHost, onEnd }) {
               <button
                 onClick={onEnd}
                 className="p-1.5 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
-                title="End Hot Seat"
+                title={t('hotSeat.endHotSeat')}
               >
                 <X className="w-4 h-4 text-white" />
               </button>
@@ -112,7 +114,7 @@ export default function HotSeat({ hotSeatTarget, isHotSeat, isHost, onEnd }) {
               <p className="text-center text-gray-900 dark:text-white font-medium leading-snug">{current}</p>
             ) : (
               <p className="text-center text-gray-400 text-sm">
-                {isHotSeat ? 'Waiting for a question…' : `Waiting for ${hotSeatTarget} to start…`}
+                {isHotSeat ? t('hotSeat.waitingForQuestion') : t('hotSeat.waitingForStart', { name: hotSeatTarget })}
               </p>
             )}
           </div>
@@ -121,14 +123,14 @@ export default function HotSeat({ hotSeatTarget, isHotSeat, isHost, onEnd }) {
           {isHotSeat && (
             <div className="flex items-center justify-between">
               <span className="text-xs text-gray-400">
-                {queueCount} question{queueCount !== 1 ? 's' : ''} waiting
+                {t('hotSeat.questionsWaiting', { count: queueCount })}
               </span>
               <button
                 onClick={nextQuestion}
                 disabled={queueCount === 0}
                 className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-orange-500 text-white text-xs font-bold disabled:opacity-40 hover:bg-orange-600 transition-colors active:scale-95"
               >
-                Next <ChevronRight className="w-3.5 h-3.5" />
+                {t('hotSeat.next')} <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
           )}
@@ -137,7 +139,7 @@ export default function HotSeat({ hotSeatTarget, isHotSeat, isHost, onEnd }) {
           {isHost && !isHotSeat && (
             <div className="flex items-center justify-between">
               <span className="text-xs text-gray-400">
-                {queueCount} question{queueCount !== 1 ? 's' : ''} in queue
+                {t('hotSeat.questionsInQueue', { count: queueCount })}
               </span>
               <button
                 onClick={nextQuestion}
@@ -145,7 +147,7 @@ export default function HotSeat({ hotSeatTarget, isHotSeat, isHost, onEnd }) {
                 className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-orange-500/80 text-white text-xs font-bold disabled:opacity-40 hover:bg-orange-600 transition-colors active:scale-95"
                 title="Skip to next question"
               >
-                Skip <ChevronRight className="w-3.5 h-3.5" />
+                {t('hotSeat.skip')} <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
           )}
@@ -154,12 +156,12 @@ export default function HotSeat({ hotSeatTarget, isHotSeat, isHost, onEnd }) {
           {!isHotSeat && !isHost && (
             <div className="space-y-3">
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Ask <span className="font-bold text-gray-700 dark:text-gray-200">{hotSeatTarget}</span> something:
+                {t('hotSeat.askSomething', { name: hotSeatTarget })}
               </p>
               {submitted ? (
                 <div className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-sm font-bold">
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Submitted anonymously</span>
+                  <span>{t('hotSeat.submittedAnonymously')}</span>
                 </div>
               ) : (
                 <div className="flex gap-2">
@@ -168,7 +170,7 @@ export default function HotSeat({ hotSeatTarget, isHotSeat, isHost, onEnd }) {
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && submitQuestion()}
-                    placeholder="Your anonymous question…"
+                    placeholder={t('hotSeat.anonymousPlaceholder')}
                     maxLength={200}
                     className="flex-1 px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-400/50"
                   />
@@ -183,7 +185,7 @@ export default function HotSeat({ hotSeatTarget, isHotSeat, isHost, onEnd }) {
               )}
               {queueCount > 0 && (
                 <p className="text-[10px] text-center text-gray-400">
-                  {queueCount} question{queueCount !== 1 ? 's' : ''} waiting in queue
+                  {t('hotSeat.questionsWaitingQueue', { count: queueCount })}
                 </p>
               )}
             </div>

@@ -1,9 +1,11 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Camera, RefreshCw, Check, AlertCircle, Image as ImageIcon, Wand2, Lock, Eye, EyeOff } from 'lucide-react';
 import { FILTERS } from '../utils/cameraFilters';
 import { embed } from '../crypto/steganography';
 
 const CameraModal = ({ isOpen, onClose, onCapture }) => {
+    const { t } = useTranslation();
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const galleryInputRef = useRef(null);
@@ -50,7 +52,7 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
             setIsReady(true);
         } catch (err) {
             console.error('Camera Error:', err);
-            setError(err.name === 'NotAllowedError' ? 'Camera permission denied' : 'Could not access camera');
+            setError(err.name === 'NotAllowedError' ? t('camera.permissionDenied') : t('camera.couldNotAccess'));
         }
     }, [facingMode]);
 
@@ -207,7 +209,7 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
                                 onClick={startCamera}
                                 className="px-8 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-sm font-bold transition-all active:scale-95"
                             >
-                                Try Again
+                                {t('camera.tryAgain')}
                             </button>
                         </div>
                     ) : (
@@ -282,7 +284,7 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
                             className={`flex items-center space-x-2 px-4 py-1.5 rounded-full backdrop-blur-md border transition-all ${showFilters ? 'bg-blue-500/20 border-blue-500 text-blue-400' : 'bg-white/10 border-white/10 text-white hover:bg-white/20'}`}
                         >
                             <Wand2 className="w-3.5 h-3.5" />
-                            <span className="text-xs font-bold uppercase tracking-wide">Filters</span>
+                            <span className="text-xs font-bold uppercase tracking-wide">{t('camera.filters')}</span>
                         </button>
                     </div>
                 </div>
@@ -291,11 +293,11 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
             {/* Stego Panel */}
             {previewImage && showStegoPanel && (
                 <div className="w-full bg-black/90 border-t border-white/10 px-6 py-4 space-y-3 animate-in slide-in-from-bottom duration-200">
-                    <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Hide a secret message in this photo</p>
+                    <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">{t('camera.hideSecret')}</p>
                     <textarea
                         value={stegoText}
                         onChange={e => setStegoText(e.target.value)}
-                        placeholder="Secret message…"
+                        placeholder={t('camera.secretPlaceholder')}
                         rows={2}
                         className="w-full rounded-xl bg-white/10 text-white text-sm placeholder-white/30 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/40 resize-none"
                     />
@@ -304,7 +306,7 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
                             type={showStegoPass ? 'text' : 'password'}
                             value={stegoPassphrase}
                             onChange={e => setStegoPassphrase(e.target.value)}
-                            placeholder="Passphrase (share out-of-band)"
+                            placeholder={t('camera.passphrasePlaceholder')}
                             className="flex-1 bg-transparent text-white text-sm placeholder-white/30 outline-none"
                         />
                         <button type="button" onClick={() => setShowStegoPass(p => !p)} className="text-white/40 hover:text-white transition-colors">
@@ -326,7 +328,7 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
                                 <div className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all active:scale-90">
                                     <RefreshCw className="w-6 h-6" />
                                 </div>
-                                <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Clear</span>
+                                <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest">{t('camera.clear')}</span>
                             </button>
 
                             <button
@@ -340,7 +342,7 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
                                     </div>
                                 </div>
                                 <span className={`text-[10px] font-bold uppercase tracking-widest ${isViewOnce ? 'text-blue-400' : 'text-white/40'}`}>
-                                    {isViewOnce ? 'View Once' : 'Keep'}
+                                    {isViewOnce ? t('camera.viewOnce') : t('camera.keep')}
                                 </span>
                             </button>
 
@@ -352,7 +354,7 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
                                     <Lock className="w-5 h-5" />
                                 </div>
                                 <span className={`text-[10px] font-bold uppercase tracking-widest ${showStegoPanel ? 'text-indigo-400' : 'text-white/40'}`}>
-                                    Stego
+                                    {t('camera.stego')}
                                 </span>
                             </button>
 
@@ -393,7 +395,7 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
                                 >
                                     <RefreshCw className="w-6 h-6" />
                                 </div>
-                                <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Flip</span>
+                                <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest">{t('camera.flip')}</span>
                             </button>
                         </>
                     )}

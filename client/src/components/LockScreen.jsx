@@ -1,6 +1,8 @@
 import { Lock } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export default function LockScreen({ onUnlock }) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-[99999] bg-gray-950/98 backdrop-blur-2xl flex flex-col items-center justify-center select-none">
       <div className="flex flex-col items-center gap-6 animate-in fade-in zoom-in-95 duration-300">
@@ -17,14 +19,14 @@ export default function LockScreen({ onUnlock }) {
 
         <div className="text-center space-y-1">
           <h1 className="text-xl font-bold text-white tracking-tight">Ephemeral Chat</h1>
-          <p className="text-sm text-gray-400">App is locked</p>
+          <p className="text-sm text-gray-400">{t('lockScreen.appLocked')}</p>
         </div>
 
         <button
           onClick={onUnlock}
           className="mt-2 px-10 py-3 bg-teal-600 hover:bg-teal-500 active:scale-95 text-white font-semibold rounded-xl shadow-lg shadow-teal-900/40 transition-all"
         >
-          Unlock
+          {t('lockScreen.unlock')}
         </button>
       </div>
     </div>
