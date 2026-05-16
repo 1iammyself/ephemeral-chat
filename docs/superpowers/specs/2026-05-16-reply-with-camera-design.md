@@ -47,7 +47,14 @@ Send → Idle
   ↓ full teardown after 15s idle
 ```
 
-**Intent threshold:** hold < 120ms → ignored (accidental tap). hold ≥ 120ms → recording locked.
+**Intent hysteresis (full lock condition):**
+```
+intentLock = true only if:
+  pressDuration >= 120ms
+  AND pointer has not moved beyond drift threshold (≥ 8px)
+  AND no scroll gesture detected
+```
+Without hysteresis, borderline taps cause accidental intent locks and the experience feels inconsistent across devices.
 
 **Micro-feedback fires once per intent-lock cycle**, not per pointer event. Prevents audio spam during scrolling.
 
@@ -62,12 +69,17 @@ Send → Idle
 navigator.mediaDevices.getUserMedia({ video: { facingMode }, audio: true })
 ```
 
-**Stage B — Stream stabilization (reliable cross-browser):**
-- `videoTrack.readyState === 'live'`
-- `videoElement.onloadedmetadata` fired
-- `requestVideoFrameCallback` confirms first frame (fallback: `requestAnimationFrame` poll)
-
-All three conditions must be satisfied before READY state is signaled.
+**Stage B — Stream stabilization (deterministic fallback chain):**
+```
+READY =
+  videoTrack.readyState === 'live'
+  AND (
+    requestVideoFrameCallback confirms first frame   [modern browsers]
+    OR first rAF tick where videoElement.videoWidth > 0  [Safari fallback]
+    OR 800ms soft-ready timeout                          [low-end / permission-delay fallback]
+  )
+```
+Safari may never fire `requestVideoFrameCallback` reliably. The fallback chain ensures no device can deadlock the READY gate.
 
 ### 3.2 API
 
@@ -83,7 +95,15 @@ release()               // full teardown; called after 15s idle or explicit dism
 
 ### 3.3 Ownership Lock
 
-Only one `QuickVideoCapture` instance may control recording lifecycle at a time. If `startRecording()` is called while `isRecording || !hasOwnerLock`, it returns a no-op. Prevents race conditions from rapid repeated long-presses.
+Only one `QuickVideoCapture` instance may control recording lifecycle at a time.
+
+**Re-entrancy guard (rapid gesture spam across different messages):**
+```
+if (activeInstance && activeInstance !== currentInstance):
+  → release previous instance safely, then grant lock to current
+  OR → reject current (ignore) if previous is mid-send
+```
+Without this, rapid long-press on different messages creates ghost recording sessions and orphaned MediaRecorder instances. `startRecording()` is a no-op if `isRecording || !hasOwnerLock`.
 
 ### 3.4 Lazy Suspension
 
@@ -102,6 +122,7 @@ Recording must stop and discard on any of:
 - `videoTrack.onended`
 - `stream 'inactive'` event
 - `window.beforeunload`
+- `navigator.mediaDevices.ondevicechange` — OS-level camera reallocation can silently invalidate streams without triggering any other hook
 - `focus` loss (optional safety net)
 - `navigator.connection` change to `type: 'none'`
 
@@ -160,7 +181,10 @@ Disabled when:
 
 ### 5.4 replyTo Context
 
-Message context is **frozen at intent-start** (when `onIntent()` fires), not when the sheet mounts. This prevents the reply context becoming stale if the message is deleted or the thread changes between intent and mount.
+Message context is **frozen at intent-start** (when `onIntent()` fires). Final confirmation metadata (camera state, stream ID) is attached at READY signal. This two-stage approach ensures:
+- Logical reply context captured immediately (before any async camera work)
+- Actual recorded media is correctly associated with the confirmed capture session
+- No mismatch if permission prompts cause delay between intent and READY
 
 ---
 
@@ -199,13 +223,21 @@ Same E2EE path as images and voice notes (MLS/AES-GCM). No special handling requ
 
 On `pointerup` or auto-stop:
 1. `stopRecording()` → Blob
-2. Blob → base64 data URL
-3. Encrypt
-4. Emit socket event
-5. `emitSound('send')`
-6. Sheet dismisses, stream suspends
+2. **Backpressure guard:** if `blob.size > 4MB` → encode async off main thread (Web Worker or chunked `FileReader`) to avoid UI stutter
+3. Blob → base64 data URL (or chunked for large blobs)
+4. Encrypt
+5. Emit socket event
+6. `emitSound('send')`
+7. Sheet dismisses, stream suspends
 
 No preview. No confirmation. One flow.
+
+### 6.5 Camera Readiness Opacity (Perceptual Optimization)
+
+If warmup exceeds 400ms, the viewfinder enters a "semi-ready" state:
+- Dim viewfinder (40% opacity) appears immediately
+- Sharpens to full opacity when READY is signaled
+- Prevents blank-wait feeling on first use or slow hardware
 
 ---
 
