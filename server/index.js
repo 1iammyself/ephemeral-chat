@@ -4250,7 +4250,7 @@ io.on('connection', (socket) => {
     } catch (err) { logger.error('anagram-guess err:', err); }
   });
 
-  socket.on('anagram-solo', async ({ messageId }) => {
+  socket.on('anagram-solo', async ({ messageId, userId }) => {
     try {
       if (!socket.roomCode || !messageId) return;
       const room = await roomManager.getRoom(socket.roomCode);
@@ -4259,7 +4259,7 @@ io.on('connection', (socket) => {
       if (!message || message.gameData?.gameType !== 'anagram') return;
       const gd = message.gameData;
       if (gd.status !== 'waiting') return;
-      const hostId = socket.persistentUserId || socket.id;
+      const hostId = userId || socket.persistentUserId || socket.id;
       if (gd.host.id !== hostId && gd.host.name !== socket.nickname) return;
       gd.isSolo = true;
       gd.challenger = { id: 'bot', name: 'Bot', isBot: true };
@@ -4279,7 +4279,7 @@ io.on('connection', (socket) => {
   // ─── Hangman Game Handlers ──────────────────────────────────────────────────
   const HANGMAN_WORDS = ['algorithm','blueprint','cognition','democracy','evolution','fantastic','geography','hibernate','illusion','journalism','keyboard','lightning','magazine','nitrogen','obsidian','photograph','question','rhythmic','symmetry','technology','umbrella','vibration','wavelength','xenolith','yesterday','zodiac'];
 
-  socket.on('hangman-solo', async ({ messageId }) => {
+  socket.on('hangman-solo', async ({ messageId, userId }) => {
     try {
       if (!socket.roomCode || !messageId) return;
       const room = await roomManager.getRoom(socket.roomCode);
@@ -4288,7 +4288,7 @@ io.on('connection', (socket) => {
       if (!message || message.gameData?.gameType !== 'hangman') return;
       const gd = message.gameData;
       if (gd.status !== 'waiting') return;
-      const hostId = socket.persistentUserId || socket.id;
+      const hostId = userId || socket.persistentUserId || socket.id;
       if (gd.wordmaster.id !== hostId && gd.wordmaster.name !== socket.nickname) return;
       // Computer picks a random word, player guesses
       const word = HANGMAN_WORDS[Math.floor(Math.random() * HANGMAN_WORDS.length)];
@@ -4390,7 +4390,7 @@ io.on('connection', (socket) => {
 
   // ─── Type Sprint Game Handlers ──────────────────────────────────────────────
 
-  socket.on('typesprint-solo', async ({ messageId }) => {
+  socket.on('typesprint-solo', async ({ messageId, userId }) => {
     try {
       if (!socket.roomCode || !messageId) return;
       const room = await roomManager.getRoom(socket.roomCode);
@@ -4399,7 +4399,7 @@ io.on('connection', (socket) => {
       if (!message || message.gameData?.gameType !== 'typesprint') return;
       const gd = message.gameData;
       if (gd.status !== 'waiting') return;
-      const p1Id = socket.persistentUserId || socket.id;
+      const p1Id = userId || socket.persistentUserId || socket.id;
       if (gd.player1.id !== p1Id && gd.player1.name !== socket.nickname) return;
       gd.isSolo = true;
       gd.player2 = { id: 'bot', name: 'Bot', isBot: true };

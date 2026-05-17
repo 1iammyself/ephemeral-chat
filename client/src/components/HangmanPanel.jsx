@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import HangmanGame from './games/HangmanGame';
 import { getVibeById } from '../utils/vibes';
 import socketManager from '../socket';
@@ -8,12 +8,15 @@ const HangmanPanel = ({ message, currentUser, roomVibe }) => {
   const vibe = getVibeById(roomVibe);
   const currentUserId = currentUser?.id || currentUser?.socketId;
   const currentNickname = currentUser?.nickname;
-  const [localWord, setLocalWord] = useState(null); // wordmaster's secret
+  const [localWord, setLocalWord] = useState(null); // wordmaster's secret word for reveal
 
-  socketManager.off && socketManager.off('hangman-your-word');
-  socketManager.on?.('hangman-your-word', ({ messageId, word }) => {
-    if (messageId === message.id) setLocalWord(word);
-  });
+  useEffect(() => {
+    const handler = ({ messageId, word }) => {
+      if (messageId === message.id) setLocalWord(word);
+    };
+    socketManager.on?.('hangman-your-word', handler);
+    return () => { socketManager.off?.('hangman-your-word', handler); };
+  }, [message.id]);
 
   const handleGuess = (letter) => socketManager.emit('hangman-guess', { messageId: message.id, letter });
   const handleSetWord = (word) => socketManager.emit('hangman-set-word', { messageId: message.id, word });

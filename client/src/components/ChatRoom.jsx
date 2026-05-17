@@ -2803,12 +2803,9 @@ const ChatRoom = () => {
 
   const handleAnagramSolo = (messageId) => {
     if (!isConnected) return;
-    socketManager.emit('anagram-solo', { messageId });
-    setMessages(prev => {
-      const msg = prev.find(m => m.id === messageId);
-      if (msg) { setActiveAnagramMessage(msg); openPanel('anagram'); }
-      return prev;
-    });
+    const msg = messages.find(m => m.id === messageId);
+    if (msg) { setActiveAnagramMessage(msg); openPanel('anagram'); }
+    socketManager.emit('anagram-solo', { messageId, userId: persistentUserId });
   };
 
   const handleAnagramLaunch = (message) => {
@@ -2844,12 +2841,9 @@ const ChatRoom = () => {
 
   const handleHangmanSolo = (messageId) => {
     if (!isConnected) return;
-    socketManager.emit('hangman-solo', { messageId });
-    setMessages(prev => {
-      const msg = prev.find(m => m.id === messageId);
-      if (msg) { setActiveHangmanMessage(msg); openPanel('hangman'); }
-      return prev;
-    });
+    const msg = messages.find(m => m.id === messageId);
+    if (msg) { setActiveHangmanMessage(msg); openPanel('hangman'); }
+    socketManager.emit('hangman-solo', { messageId, userId: persistentUserId });
   };
 
   const handleHangmanLaunch = (message) => {
@@ -2885,12 +2879,9 @@ const ChatRoom = () => {
 
   const handleTypeSprintSolo = (messageId) => {
     if (!isConnected) return;
-    socketManager.emit('typesprint-solo', { messageId });
-    setMessages(prev => {
-      const msg = prev.find(m => m.id === messageId);
-      if (msg) { setActiveTypingMessage(msg); openPanel('typesprint'); }
-      return prev;
-    });
+    const msg = messages.find(m => m.id === messageId);
+    if (msg) { setActiveTypingMessage(msg); openPanel('typesprint'); }
+    socketManager.emit('typesprint-solo', { messageId, userId: persistentUserId });
   };
 
   const handleTypeSprintLaunch = (message) => {
@@ -2905,6 +2896,11 @@ const ChatRoom = () => {
 
   const handleChessJoin = (messageId) => {
     socketManager.emit('chess-join', { messageId, userId: persistentUserId });
+    setMessages(prev => {
+      const msg = prev.find(m => m.id === messageId);
+      if (msg) { setActiveChessMessage(msg); openPanel('chess'); }
+      return prev;
+    });
   };
 
   const handleChessApproval = (approved) => {

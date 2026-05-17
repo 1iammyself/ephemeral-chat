@@ -280,8 +280,11 @@ const ChessGame = ({ gameData, currentUserId, currentNickname, onMove, vibeId })
   const isBlack =
     gameData?.players?.black?.id === currentUserId ||
     (currentNickname && gameData?.players?.black?.name === currentNickname);
-  const isMyTurn =
-    (game.turn() === 'w' && isWhite) || (game.turn() === 'b' && isBlack);
+
+  // In CPU mode the human is always white — skip ID matching so reconnects don't lock the board
+  const isMyTurn = isCPU
+    ? game.turn() === 'w'
+    : (game.turn() === 'w' && isWhite) || (game.turn() === 'b' && isBlack);
 
   // Trigger CPU move when it's black's turn in CPU mode
   const triggerCpuMove = useCallback((fen) => {
