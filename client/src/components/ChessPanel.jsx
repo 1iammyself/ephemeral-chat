@@ -9,6 +9,18 @@ import { getVibeById } from '../utils/vibes';
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 const CPU_DELAY = { easy: 300, medium: 600, hard: 900 };
 
+const PROMO_PIECES = {
+  white: { q: '♕', r: '♖', b: '♗', n: '♘' },
+  black: { q: '♛', r: '♜', b: '♝', n: '♞' },
+};
+
+const DRAW_REASON = {
+  stalemate: 'Stalemate',
+  'threefold-repetition': 'Threefold Repetition',
+  'insufficient-material': 'Insufficient Material',
+  'fifty-move-rule': '50-Move Rule',
+};
+
 function formatMs(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -50,6 +62,11 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
   const [disconnectSecondsLeft, setDisconnectSecondsLeft] = useState(null);
   const [wasDisplacedFromGame, setWasDisplacedFromGame] = useState(false);
+  const [selectedSquare, setSelectedSquare] = useState(null);
+  const [optionSquares, setOptionSquares] = useState({});
+  const [pendingPromotion, setPendingPromotion] = useState(null);
+  const [isInCheck, setIsInCheck] = useState(false);
+  const [myTurnFlash, setMyTurnFlash] = useState(false);
 
   // Refs to avoid stale closures
   const chessRef = useRef(new Chess(message?.gameData?.fen || INITIAL_FEN));
@@ -107,7 +124,6 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
     return () => clearInterval(timerRef.current);
   }, [turnColor, turnStartedAt, isFinished, isWaiting, hasTimer]);
 
-  // Detect timer hitting zero
   useEffect(() => {
     if (!hasTimer || isFinished || isWaiting || timeoutFiredRef.current) return;
     if (whiteTime === 0) { timeoutFiredRef.current = true; socketManager.emit('chess-timeout', { messageId, color: 'white' }); }
@@ -127,6 +143,19 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
     }, 1000);
     return () => clearInterval(disconnectTimerRef.current);
   }, [opponentDisconnected]);
+
+  // ── Check detection ───────────────────────────────────────────────
+  useEffect(() => {
+    setIsInCheck(isLive && !isFinished && chessRef.current.inCheck());
+  }, [fen, isLive, isFinished]);
+
+  // ── "Your turn" flash ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!isMyTurn || isFinished || cpuThinking) return;
+    setMyTurnFlash(true);
+    const t = setTimeout(() => setMyTurnFlash(false), 1200);
+    return () => clearTimeout(t);
+  }, [isMyTurn]);
 
   // ── Socket events ─────────────────────────────────────────────────
   useEffect(() => {
@@ -202,6 +231,9 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
       setWhiteTime(gd.whiteTime ?? 300000);
       setBlackTime(gd.blackTime ?? 300000);
       setTurnStartedAt(gd.turnStartedAt ?? null);
+      setPendingPromotion(null);
+      setSelectedSquare(null);
+      setOptionSquares({});
     };
 
     const onOpponentDisconnected = ({ messageId: mid }) => {
@@ -256,7 +288,7 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
       setMoveHistory(updated);
       setFen(newFen);
       setCpuThinking(false);
-      // Sync FEN for spectators (include promotion so spectator chess.js doesn't throw)
+      // Include promotion so spectator chess.js doesn't throw
       socketManager.emit('chess-sync-fen', { messageId, fen: newFen, move: { from: result.from, to: result.to, ...(result.promotion ? { promotion: result.promotion } : {}) } });
       maybeEndGame(newFen, updated);
     }, delay);
@@ -272,50 +304,126 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
       result = 'checkmate';
     } else if (chess.isStalemate()) {
       winner = 'draw'; result = 'stalemate';
+    } else if (chess.isThreefoldRepetition()) {
+      winner = 'draw'; result = 'threefold-repetition';
+    } else if (chess.isInsufficientMaterial()) {
+      winner = 'draw'; result = 'insufficient-material';
     } else if (chess.isDraw()) {
-      winner = 'draw'; result = 'draw';
+      winner = 'draw'; result = 'fifty-move-rule';
     }
     socketManager.emit('chess-game-end', { messageId, winner, result, fen: currentFen, moves: currentMoves });
   }
 
   function buildResultMsg(gd) {
     if (!gd) return '';
-    if (gd.winner === 'draw') return `½-½ ${gd.result === 'stalemate' ? 'Stalemate' : 'Draw'}`;
+    if (gd.winner === 'draw') return `½-½ ${DRAW_REASON[gd.result] ?? 'Draw'}`;
     if (gd.winner === 'white') return `♔ ${gd.white?.name ?? 'White'} wins!`;
     if (gd.winner === 'black') return `♚ ${isCpu ? 'CPU' : (gd.black?.name ?? 'Black')} wins!`;
     if (gd.result === 'abandoned') return 'Opponent abandoned';
     return 'Game over';
   }
 
-  // ── PvP move handler ──────────────────────────────────────────────
-  const onDrop = useCallback((sourceSquare, targetSquare) => {
-    if (!isMyTurn) return false;
-    const isPromotion = (() => {
-      const piece = chessRef.current.get(sourceSquare);
-      return piece?.type === 'p' && (targetSquare[1] === '8' || targetSquare[1] === '1');
-    })();
+  // ── Move highlighting helpers ─────────────────────────────────────
+  function getMoveOptions(square) {
+    const moves = chessRef.current.moves({ square, verbose: true });
+    if (!moves.length) return {};
+    const squares = {};
+    moves.forEach(move => {
+      squares[move.to] = {
+        background: chessRef.current.get(move.to)
+          ? 'radial-gradient(circle, rgba(0,0,0,.22) 85%, transparent 85%)'
+          : 'radial-gradient(circle, rgba(0,0,0,.15) 28%, transparent 28%)',
+        borderRadius: '50%',
+      };
+    });
+    squares[square] = { background: 'rgba(255,255,0,0.4)' };
+    return squares;
+  }
+
+  // ── Core move executor (shared by drag-drop and click-to-move) ───
+  const commitMove = useCallback((from, to, promotion) => {
     let result;
     try {
-      result = chessRef.current.move({ from: sourceSquare, to: targetSquare, promotion: 'q' });
+      result = chessRef.current.move({ from, to, promotion });
     } catch { return false; }
     if (!result) return false;
-
     const newFen = chessRef.current.fen();
     const updated = [...moveHistoryRef.current, { san: result.san, color: result.color }];
     moveHistoryRef.current = updated;
     setMoveHistory(updated);
     setFen(newFen);
-
+    setSelectedSquare(null);
+    setOptionSquares({});
     if (isCpu) {
-      socketManager.emit('chess-sync-fen', { messageId, fen: newFen, move: { from: sourceSquare, to: targetSquare, promotion: 'q' } });
+      socketManager.emit('chess-sync-fen', { messageId, fen: newFen, move: { from, to, ...(result.promotion ? { promotion: result.promotion } : {}) } });
     } else {
-      socketManager.emit('chess-move', { messageId, move: { from: sourceSquare, to: targetSquare, promotion: 'q' }, fen: newFen });
+      socketManager.emit('chess-move', { messageId, move: { from, to, promotion: result.promotion || 'q' }, fen: newFen });
     }
-
-    // Check if human's move ended the game (e.g., checkmate vs CPU)
     maybeEndGame(newFen, updated);
     return true;
-  }, [isMyTurn, isCpu, messageId]);
+  }, [isCpu, messageId]);
+
+  // ── Drag-drop handler ────────────────────────────────────────────
+  const onDrop = useCallback((sourceSquare, targetSquare) => {
+    if (!isMyTurn) return false;
+    const piece = chessRef.current.get(sourceSquare);
+    const isPromo = piece?.type === 'p' && (targetSquare[1] === '8' || targetSquare[1] === '1');
+    if (isPromo) {
+      // Snap piece back; show picker overlay
+      setPendingPromotion({ from: sourceSquare, to: targetSquare });
+      setSelectedSquare(null);
+      setOptionSquares({});
+      return false;
+    }
+    return commitMove(sourceSquare, targetSquare, 'q');
+  }, [isMyTurn, commitMove]);
+
+  // ── Promotion confirmation ────────────────────────────────────────
+  const handlePromotion = useCallback((piece) => {
+    if (!pendingPromotion) return;
+    commitMove(pendingPromotion.from, pendingPromotion.to, piece);
+    setPendingPromotion(null);
+  }, [pendingPromotion, commitMove]);
+
+  // ── Click-to-move ─────────────────────────────────────────────────
+  const onSquareClick = useCallback((square) => {
+    if (!isMyTurn) return;
+    // Clicked a valid destination square — execute move
+    if (selectedSquare && optionSquares[square]) {
+      const piece = chessRef.current.get(selectedSquare);
+      const isPromo = piece?.type === 'p' && (square[1] === '8' || square[1] === '1');
+      if (isPromo) {
+        setPendingPromotion({ from: selectedSquare, to: square });
+        setSelectedSquare(null);
+        setOptionSquares({});
+        return;
+      }
+      commitMove(selectedSquare, square, 'q');
+      return;
+    }
+    // Select a piece
+    const piece = chessRef.current.get(square);
+    const myPieceColor = myColor === 'white' ? 'w' : 'b';
+    if (piece && piece.color === myPieceColor) {
+      setSelectedSquare(square);
+      setOptionSquares(getMoveOptions(square));
+    } else {
+      setSelectedSquare(null);
+      setOptionSquares({});
+    }
+  }, [isMyTurn, selectedSquare, optionSquares, myColor, commitMove]);
+
+  // ── Drag highlight ────────────────────────────────────────────────
+  const onPieceDragBegin = useCallback((_piece, square) => {
+    if (!isMyTurn) return;
+    setSelectedSquare(square);
+    setOptionSquares(getMoveOptions(square));
+  }, [isMyTurn]);
+
+  const onPieceDragEnd = useCallback(() => {
+    setSelectedSquare(null);
+    setOptionSquares({});
+  }, []);
 
   const queueLocked = !!gameData?.queueLocked;
   const maxQueue = gameData?.maxQueue ?? Infinity;
@@ -367,7 +475,7 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
     );
   }
 
-  // ── Spectator/queue: waiting for game to start ───────────────────
+  // ── Spectator: waiting for game to start ─────────────────────────
   if (isWaiting && !myColor) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 p-6 bg-white dark:bg-gray-900">
@@ -380,6 +488,8 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
     );
   }
 
+  const showCheckStrip = isInCheck && isLive && !isFinished;
+
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900 overflow-hidden select-none">
       {/* Timers */}
@@ -391,15 +501,22 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
       )}
 
       {/* Status strip */}
-      {((statusMsg && !isFinished) || cpuThinking || opponentDisconnected) && (
-        <div className={`text-center text-xs font-semibold py-1 ${
+      {((statusMsg && !isFinished) || cpuThinking || opponentDisconnected || showCheckStrip || myTurnFlash) && (
+        <div className={`text-center text-xs font-semibold py-1 transition-colors ${
           opponentDisconnected
             ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-300'
-            : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
+            : showCheckStrip
+              ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300'
+            : myTurnFlash
+              ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
+              : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
         }`}>
           {opponentDisconnected
             ? `⚠️ Opponent disconnected — forfeit in ${disconnectSecondsLeft ?? 60}s`
-            : cpuThinking ? '🤖 CPU thinking...' : statusMsg}
+            : cpuThinking ? '🤖 CPU thinking...'
+            : showCheckStrip ? '⚠️ Check!'
+            : myTurnFlash ? '✓ Your turn'
+            : statusMsg}
         </div>
       )}
 
@@ -416,17 +533,39 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
 
       {/* Board */}
       <div className="flex-1 flex items-center justify-center p-2 min-h-0 overflow-hidden">
-        <div className="w-full max-w-[380px] aspect-square">
+        <div className="w-full max-w-[380px] aspect-square relative">
           <Chessboard
             id={`chess-${messageId}`}
             position={fen}
             onPieceDrop={onDrop}
+            onSquareClick={isMyTurn ? onSquareClick : undefined}
+            onPieceDragBegin={isMyTurn ? onPieceDragBegin : undefined}
+            onPieceDragEnd={onPieceDragEnd}
             boardOrientation={boardOrientation}
             arePiecesDraggable={isMyTurn && !isFinished}
+            customSquareStyles={optionSquares}
+            showBoardNotation={true}
+            animationDuration={200}
             customBoardStyle={{ borderRadius: '6px', boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}
             customDarkSquareStyle={{ backgroundColor: '#b58863' }}
             customLightSquareStyle={{ backgroundColor: '#f0d9b5' }}
           />
+          {/* Promotion picker overlay */}
+          {pendingPromotion && myColor && (
+            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20 rounded-md">
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-xl flex flex-col items-center gap-2">
+                <p className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-wide">Promote pawn</p>
+                <div className="flex gap-2">
+                  {Object.entries(PROMO_PIECES[myColor]).map(([piece, symbol]) => (
+                    <button key={piece} onClick={() => handlePromotion(piece)}
+                      className="w-12 h-12 flex items-center justify-center text-3xl rounded-lg bg-amber-50 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-700 transition-colors">
+                      {symbol}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -453,7 +592,11 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
           <div className="py-2 px-3 flex items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="text-sm font-black text-amber-700 dark:text-amber-300">{buildResultMsg(gameData)}</p>
-              {gameData?.result && <p className="text-[10px] text-gray-500 dark:text-gray-400 capitalize">{gameData.result.replace('-', ' ')}</p>}
+              {gameData?.result && (
+                <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                  {DRAW_REASON[gameData.result] ?? gameData.result.replace(/-/g, ' ')}
+                </p>
+              )}
             </div>
             {/* Non-CPU rematch or CPU with queued players: simple button */}
             {isCreator && (!isCpu || queueCount > 0) && (
