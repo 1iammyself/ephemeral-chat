@@ -134,8 +134,13 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
 
     const onMoveMade = ({ messageId: mid, move, fen: newFen, whiteTime: wt, blackTime: bt, turnStartedAt: tsa }) => {
       if (mid !== messageId) return;
-      try { chessRef.current.move(move); } catch { return; }
-      setFen(newFen);
+      try {
+        chessRef.current.move(move);
+      } catch {
+        // Local instance out of sync (e.g. promotion flag missing) — resync from FEN
+        if (newFen) chessRef.current = new Chess(newFen);
+      }
+      if (newFen) setFen(newFen);
       if (wt != null) setWhiteTime(wt);
       if (bt != null) setBlackTime(bt);
       if (tsa != null) setTurnStartedAt(tsa);
@@ -251,8 +256,8 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
       setMoveHistory(updated);
       setFen(newFen);
       setCpuThinking(false);
-      // Sync FEN for spectators
-      socketManager.emit('chess-sync-fen', { messageId, fen: newFen, move: { from: result.from, to: result.to } });
+      // Sync FEN for spectators (include promotion so spectator chess.js doesn't throw)
+      socketManager.emit('chess-sync-fen', { messageId, fen: newFen, move: { from: result.from, to: result.to, ...(result.promotion ? { promotion: result.promotion } : {}) } });
       maybeEndGame(newFen, updated);
     }, delay);
     return () => clearTimeout(t);
@@ -302,7 +307,7 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
     setFen(newFen);
 
     if (isCpu) {
-      socketManager.emit('chess-sync-fen', { messageId, fen: newFen, move: { from: sourceSquare, to: targetSquare } });
+      socketManager.emit('chess-sync-fen', { messageId, fen: newFen, move: { from: sourceSquare, to: targetSquare, promotion: 'q' } });
     } else {
       socketManager.emit('chess-move', { messageId, move: { from: sourceSquare, to: targetSquare, promotion: 'q' }, fen: newFen });
     }
