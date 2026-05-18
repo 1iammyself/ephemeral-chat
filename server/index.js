@@ -3445,7 +3445,7 @@ io.on('connection', (socket) => {
     } catch (err) { logger.error('chess-game-end err:', err); }
   });
 
-  socket.on('chess-rematch', async ({ messageId }) => {
+  socket.on('chess-rematch', async ({ messageId, difficulty }) => {
     try {
       if (!socket.roomCode || !messageId) return;
       const room = await roomManager.getRoom(socket.roomCode);
@@ -3467,11 +3467,12 @@ io.on('connection', (socket) => {
       gameData.blackTime = (gameData.timeControl?.initial ?? 300) * 1000;
 
       if (gameData.challengeQueue.length > 0) {
-        // Queued player takes priority — creator stays white, challenger takes black
-        // Reuse chessStartNewRound: winner='white' keeps creator, loserColor='black' replaces black seat
         chessStartNewRound(gameData, 'white', 'black');
-        // chessStartNewRound already sets status, timers, etc.
       } else if (gameData.cpu?.enabled) {
+        // Optional difficulty switch
+        const newDiff = ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : gameData.cpu.difficulty;
+        gameData.cpu = { enabled: true, difficulty: newDiff };
+        gameData.black = { id: 'cpu', socketId: null, name: `CPU (${newDiff})` };
         gameData.status = 'playing';
         gameData.turnStartedAt = Date.now();
         gameData.startedAt = Date.now();

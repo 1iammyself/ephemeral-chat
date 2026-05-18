@@ -327,7 +327,7 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
   };
   const handleDrawAccept = () => { socketManager.emit('chess-draw-accept', { messageId }); setDrawOffered(false); };
   const handleDrawDecline = () => { socketManager.emit('chess-draw-decline', { messageId }); setDrawOffered(false); };
-  const handleRematch = () => socketManager.emit('chess-rematch', { messageId });
+  const handleRematch = (difficulty) => socketManager.emit('chess-rematch', { messageId, ...(difficulty ? { difficulty } : {}) });
   const handleTagOut = () => socketManager.emit('chess-tag-out', { messageId });
   const handleQueueAgain = () => { socketManager.emit('chess-queue-again', { messageId }); setWasDisplacedFromGame(false); };
   const handleAddSlot = () => socketManager.emit('chess-set-max-queue', { messageId, maxQueue: (gameData?.maxQueue ?? queueCount) + 1 });
@@ -386,7 +386,7 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
       )}
 
       {/* Status strip */}
-      {(statusMsg || cpuThinking || opponentDisconnected) && (
+      {((statusMsg && !isFinished) || cpuThinking || opponentDisconnected) && (
         <div className={`text-center text-xs font-semibold py-1 ${
           opponentDisconnected
             ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-300'
@@ -444,15 +444,32 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
 
       {/* Result banner */}
       {isFinished && (
-        <div className="mx-3 mb-2 py-2 px-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-sm font-black text-amber-700 dark:text-amber-300">{buildResultMsg(gameData)}</p>
-            {gameData?.result && <p className="text-[10px] text-gray-500 dark:text-gray-400 capitalize">{gameData.result.replace('-', ' ')}</p>}
+        <div className="mx-3 mb-2 rounded-xl bg-amber-50 dark:bg-amber-900/20 overflow-hidden">
+          <div className="py-2 px-3 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-black text-amber-700 dark:text-amber-300">{buildResultMsg(gameData)}</p>
+              {gameData?.result && <p className="text-[10px] text-gray-500 dark:text-gray-400 capitalize">{gameData.result.replace('-', ' ')}</p>}
+            </div>
+            {/* Non-CPU rematch or CPU with queued players: simple button */}
+            {isCreator && (!isCpu || queueCount > 0) && (
+              <button onClick={() => handleRematch()} className={`px-3 py-1.5 text-xs font-black rounded-lg text-white ${vibe.accentClass} hover:opacity-90 shrink-0`}>
+                ↺ Rematch
+              </button>
+            )}
           </div>
-          {isCreator && (
-            <button onClick={handleRematch} className={`px-3 py-1.5 text-xs font-black rounded-lg text-white ${vibe.accentClass} hover:opacity-90 shrink-0`}>
-              ↺ Rematch
-            </button>
+          {/* Solo CPU: difficulty quick-select */}
+          {isCreator && isCpu && queueCount === 0 && (
+            <div className="border-t border-amber-100 dark:border-amber-800/40 px-3 py-2 flex gap-1.5">
+              {['easy', 'medium', 'hard'].map(d => {
+                const isCurrent = d === gameData?.cpu?.difficulty;
+                return (
+                  <button key={d} onClick={() => handleRematch(d)}
+                    className={`flex-1 py-1.5 text-xs font-black rounded-lg capitalize transition-opacity hover:opacity-90 ${isCurrent ? `text-white ${vibe.accentClass}` : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200'}`}>
+                    {isCurrent ? `↺ ${d}` : d}
+                  </button>
+                );
+              })}
+            </div>
           )}
         </div>
       )}
