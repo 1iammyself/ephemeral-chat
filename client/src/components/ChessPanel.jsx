@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
 import { Flag, RotateCcw, Clock, Users } from 'lucide-react';
@@ -7,7 +7,8 @@ import { getCpuMove } from './games/ChessEngine';
 import { getVibeById } from '../utils/vibes';
 
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
-const CPU_DELAY = { easy: 300, medium: 600, hard: 900 };
+// Human-feeling delays — easy plays randomly but should still pause like a person thinks
+const CPU_DELAY = { easy: 1000, medium: 2000, hard: 3500 };
 
 const PROMO_PIECES = {
   white: { q: '♕', r: '♖', b: '♗', n: '♘' },
@@ -21,27 +22,78 @@ const DRAW_REASON = {
   'fifty-move-rule': '50-Move Rule',
 };
 
+// Piece values for material advantage display
+const PIECE_VAL = { q: 9, r: 5, b: 3, n: 3, p: 1 };
+const PIECE_ORDER = ['q', 'r', 'b', 'n', 'p'];
+// Unicode for pieces captured by each side
+const CAP_UNICODE_BY_WHITE = { q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' }; // black pieces taken by white
+const CAP_UNICODE_BY_BLACK = { q: '♕', r: '♖', b: '♗', n: '♘', p: '♙' }; // white pieces taken by black
+
+function sortedCaps(arr) {
+  return [...arr].sort((a, b) => (PIECE_VAL[b] || 0) - (PIECE_VAL[a] || 0));
+}
+
+function computeCaptures(moves) {
+  const chess = new Chess();
+  const byWhite = [];
+  const byBlack = [];
+  for (const m of moves) {
+    try {
+      const r = chess.move(m.san || m);
+      if (r?.captured) {
+        if (r.color === 'w') byWhite.push(r.captured);
+        else byBlack.push(r.captured);
+      }
+    } catch {}
+  }
+  return { byWhite, byBlack };
+}
+
 function formatMs(ms) {
+  if (ms == null) return '—';
   const s = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-function TimerBar({ timeMs, isActive, color, name }) {
-  const pct = Math.min(100, Math.max(0, (timeMs / 300000) * 100));
-  const urgent = timeMs < 30000 && timeMs > 0;
+function CapturedRow({ captured, unicode, advantage }) {
+  if (!captured.length && !advantage) return null;
+  const sorted = sortedCaps(captured);
   return (
-    <div className={`flex items-center gap-2 px-2 py-1 transition-opacity ${isActive ? 'opacity-100' : 'opacity-40'}`}>
-      <span className="text-sm leading-none shrink-0">{color === 'white' ? '♔' : '♚'}</span>
-      <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 truncate flex-1">{name}</span>
-      <div className="w-16 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden shrink-0">
-        <div
-          className={`h-full rounded-full ${urgent ? 'bg-red-500' : color === 'white' ? 'bg-gray-600 dark:bg-gray-200' : 'bg-gray-900 dark:bg-gray-400'}`}
-          style={{ width: `${pct}%`, transition: 'width 1s linear' }}
-        />
-      </div>
-      <span className={`text-xs font-black tabular-nums w-9 text-right shrink-0 ${urgent && isActive ? 'text-red-500 animate-pulse' : 'text-gray-700 dark:text-gray-300'}`}>
-        {formatMs(timeMs)}
+    <div className="flex items-center gap-0.5 ml-6 min-h-[12px]">
+      <span className="text-[10px] leading-none tracking-tight">
+        {sorted.map((p, i) => <span key={i}>{unicode[p] || ''}</span>)}
       </span>
+      {advantage > 0 && (
+        <span className="text-[9px] font-bold text-gray-500 dark:text-gray-400 ml-0.5">+{advantage}</span>
+      )}
+    </div>
+  );
+}
+
+function TimerBar({ timeMs, maxMs, isActive, color, name, captured, unicode, advantage }) {
+  const pct = maxMs ? Math.min(100, Math.max(0, (timeMs / maxMs) * 100)) : 100;
+  const urgent = timeMs != null && timeMs < 30000 && timeMs > 0;
+  const showTime = timeMs != null;
+  return (
+    <div className={`flex flex-col px-2 pt-1 pb-0.5 transition-opacity ${isActive ? 'opacity-100' : 'opacity-50'}`}>
+      <div className="flex items-center gap-2">
+        <span className="text-sm leading-none shrink-0">{color === 'white' ? '♔' : '♚'}</span>
+        <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 truncate flex-1">{name}</span>
+        {showTime && (
+          <>
+            <div className="w-14 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden shrink-0">
+              <div
+                className={`h-full rounded-full ${urgent ? 'bg-red-500' : color === 'white' ? 'bg-gray-600 dark:bg-gray-200' : 'bg-gray-900 dark:bg-gray-400'}`}
+                style={{ width: `${pct}%`, transition: 'width 1s linear' }}
+              />
+            </div>
+            <span className={`text-xs font-black tabular-nums w-9 text-right shrink-0 ${urgent && isActive ? 'text-red-500 animate-pulse' : 'text-gray-700 dark:text-gray-300'}`}>
+              {formatMs(timeMs)}
+            </span>
+          </>
+        )}
+      </div>
+      <CapturedRow captured={captured} unicode={unicode} advantage={advantage} />
     </div>
   );
 }
@@ -53,8 +105,8 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
   const [moveHistory, setMoveHistory] = useState(message?.gameData?.moves || []);
   const [drawOffered, setDrawOffered] = useState(false);
   const [drawOfferFrom, setDrawOfferFrom] = useState(null);
-  const [whiteTime, setWhiteTime] = useState(message?.gameData?.whiteTime ?? 300000);
-  const [blackTime, setBlackTime] = useState(message?.gameData?.blackTime ?? 300000);
+  const [whiteTime, setWhiteTime] = useState(message?.gameData?.whiteTime ?? null);
+  const [blackTime, setBlackTime] = useState(message?.gameData?.blackTime ?? null);
   const [turnStartedAt, setTurnStartedAt] = useState(message?.gameData?.turnStartedAt ?? null);
   const [cpuThinking, setCpuThinking] = useState(false);
   const [flipped, setFlipped] = useState(false);
@@ -75,6 +127,7 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
   const timeoutFiredRef = useRef(false);
   const disconnectTimerRef = useRef(null);
   const cpuThinkingRef = useRef(false);
+  const gameEndedRef = useRef(false); // prevents duplicate chess-game-end emits
 
   const currentUserId = currentUser?.id || currentUser?.socketId;
   const currentNickname = currentUser?.nickname;
@@ -108,10 +161,13 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
     const moves = gd.moves || [];
     moveHistoryRef.current = moves;
     setMoveHistory(moves);
-    if (gd.whiteTime != null) setWhiteTime(gd.whiteTime);
-    if (gd.blackTime != null) setBlackTime(gd.blackTime);
+    setWhiteTime(gd.whiteTime ?? null);
+    setBlackTime(gd.blackTime ?? null);
     if (gd.turnStartedAt != null) setTurnStartedAt(gd.turnStartedAt);
-    if (gd.status === 'finished') timeoutFiredRef.current = false;
+    if (gd.status === 'finished') {
+      timeoutFiredRef.current = false;
+      gameEndedRef.current = false;
+    }
   }, [message?.gameData]);
 
   // ── Timer countdown ───────────────────────────────────────────────
@@ -119,20 +175,31 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
     clearInterval(timerRef.current);
     if (!hasTimer || isFinished || isWaiting || !turnStartedAt) return;
     timerRef.current = setInterval(() => {
-      if (turnColor === 'white') setWhiteTime(prev => Math.max(0, prev - 1000));
-      else setBlackTime(prev => Math.max(0, prev - 1000));
+      if (turnColor === 'white') setWhiteTime(prev => (prev == null ? null : Math.max(0, prev - 1000)));
+      else setBlackTime(prev => (prev == null ? null : Math.max(0, prev - 1000)));
     }, 1000);
     return () => clearInterval(timerRef.current);
   }, [turnColor, turnStartedAt, isFinished, isWaiting, hasTimer]);
 
+  // ── Timer timeout enforcement (fires immediately locally, no roundtrip wait) ──
   useEffect(() => {
     if (!hasTimer || isFinished || isWaiting || timeoutFiredRef.current) return;
-    if (whiteTime === 0) { timeoutFiredRef.current = true; socketManager.emit('chess-timeout', { messageId, color: 'white' }); }
+    if (whiteTime !== 0) return;
+    timeoutFiredRef.current = true;
+    clearInterval(timerRef.current);
+    socketManager.emit('chess-timeout', { messageId, color: 'white' });
+    // Apply locally without waiting for server
+    setGameData(prev => prev ? { ...prev, status: 'finished', winner: 'black', result: 'timeout' } : prev);
   }, [whiteTime, hasTimer, isFinished, isWaiting, messageId]);
 
   useEffect(() => {
     if (!hasTimer || isFinished || isWaiting || timeoutFiredRef.current) return;
-    if (blackTime === 0) { timeoutFiredRef.current = true; socketManager.emit('chess-timeout', { messageId, color: 'black' }); }
+    if (blackTime !== 0) return;
+    timeoutFiredRef.current = true;
+    clearInterval(timerRef.current);
+    socketManager.emit('chess-timeout', { messageId, color: 'black' });
+    // Apply locally without waiting for server
+    setGameData(prev => prev ? { ...prev, status: 'finished', winner: 'white', result: 'timeout' } : prev);
   }, [blackTime, hasTimer, isFinished, isWaiting, messageId]);
 
   // ── Disconnect countdown ──────────────────────────────────────────
@@ -204,11 +271,12 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
       chessRef.current = new Chess(gd.fen || INITIAL_FEN);
       moveHistoryRef.current = [];
       setMoveHistory([]);
-      setWhiteTime(gd.whiteTime ?? 300000);
-      setBlackTime(gd.blackTime ?? 300000);
+      setWhiteTime(gd.whiteTime ?? null);
+      setBlackTime(gd.blackTime ?? null);
       setTurnStartedAt(gd.turnStartedAt ?? null);
       setOpponentDisconnected(false);
       timeoutFiredRef.current = false;
+      gameEndedRef.current = false;
     };
 
     const onNewRound = ({ messageId: mid, gameData: gd }) => {
@@ -229,8 +297,10 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
       setOpponentDisconnected(false);
       setDisconnectSecondsLeft(null);
       timeoutFiredRef.current = false;
-      setWhiteTime(gd.whiteTime ?? 300000);
-      setBlackTime(gd.blackTime ?? 300000);
+      gameEndedRef.current = false;
+      cpuThinkingRef.current = false;
+      setWhiteTime(gd.whiteTime ?? null);
+      setBlackTime(gd.blackTime ?? null);
       setTurnStartedAt(gd.turnStartedAt ?? null);
       setPendingPromotion(null);
       setSelectedSquare(null);
@@ -302,8 +372,10 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
   }, [fen, isCpu, isLive, isFinished]);
 
   function maybeEndGame(currentFen, currentMoves) {
+    if (gameEndedRef.current) return;
     const chess = chessRef.current;
     if (!chess.isGameOver()) return;
+    gameEndedRef.current = true;
     let winner = null, result = null;
     if (chess.isCheckmate()) {
       winner = chess.turn() === 'w' ? 'black' : 'white';
@@ -318,14 +390,22 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
       winner = 'draw'; result = 'fifty-move-rule';
     }
     socketManager.emit('chess-game-end', { messageId, winner, result, fen: currentFen, moves: currentMoves });
+    // Apply locally without waiting for server roundtrip — prevents "nothing happened" on checkmate
+    clearInterval(timerRef.current);
+    setGameData(prev => prev ? { ...prev, status: 'finished', winner, result } : prev);
   }
 
   function buildResultMsg(gd) {
     if (!gd) return '';
+    const gdCpu = !!gd.cpu?.enabled;
     if (gd.winner === 'draw') return `½-½ ${DRAW_REASON[gd.result] ?? 'Draw'}`;
     if (gd.winner === 'white') return `♔ ${gd.white?.name ?? 'White'} wins!`;
-    if (gd.winner === 'black') return `♚ ${isCpu ? 'CPU' : (gd.black?.name ?? 'Black')} wins!`;
+    if (gd.winner === 'black') return `♚ ${gdCpu ? `CPU (${gd.cpu.difficulty})` : (gd.black?.name ?? 'Black')} wins!`;
     if (gd.result === 'abandoned') return 'Opponent abandoned';
+    if (gd.result === 'timeout') {
+      const loser = gd.winner === 'white' ? 'black' : 'white';
+      return `⏱ ${loser === 'white' ? (gd.white?.name ?? 'White') : (gdCpu ? 'CPU' : (gd.black?.name ?? 'Black'))} ran out of time`;
+    }
     return 'Game over';
   }
 
@@ -452,6 +532,15 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
   const handleAddSlot = () => socketManager.emit('chess-set-max-queue', { messageId, maxQueue: (gameData?.maxQueue ?? queueCount) + 1 });
   const handleToggleLock = () => socketManager.emit('chess-lock-queue', { messageId, locked: !queueLocked });
 
+  // ── Captured pieces (derived from move history) ──────────────────
+  const { byWhite: whiteCaptured, byBlack: blackCaptured } = useMemo(
+    () => computeCaptures(moveHistory),
+    [moveHistory]
+  );
+  const whiteMat = whiteCaptured.reduce((s, p) => s + (PIECE_VAL[p] || 0), 0);
+  const blackMat = blackCaptured.reduce((s, p) => s + (PIECE_VAL[p] || 0), 0);
+  const initialTime = gameData?.timeControl ? gameData.timeControl.initial * 1000 : null;
+
   const boardOrientation = flipped
     ? (myColor === 'black' ? 'white' : 'black')
     : (myColor ?? 'white');
@@ -476,11 +565,21 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900 overflow-hidden select-none">
-      {/* Timers */}
-      {hasTimer && isLive && (
-        <div className="border-b border-gray-100 dark:border-gray-800 pt-1 pb-0.5">
-          <TimerBar timeMs={blackTime} isActive={turnColor === 'black'} color="black" name={blackName} />
-          <TimerBar timeMs={whiteTime} isActive={turnColor === 'white'} color="white" name={whiteName} />
+      {/* Player info + timers (shown when live or finished) */}
+      {(isLive || isFinished) && (
+        <div className="border-b border-gray-100 dark:border-gray-800 pt-0.5 pb-0.5">
+          <TimerBar
+            timeMs={blackTime} maxMs={initialTime} isActive={turnColor === 'black'}
+            color="black" name={blackName}
+            captured={blackCaptured} unicode={CAP_UNICODE_BY_BLACK}
+            advantage={blackMat > whiteMat ? blackMat - whiteMat : 0}
+          />
+          <TimerBar
+            timeMs={whiteTime} maxMs={initialTime} isActive={turnColor === 'white'}
+            color="white" name={whiteName}
+            captured={whiteCaptured} unicode={CAP_UNICODE_BY_WHITE}
+            advantage={whiteMat > blackMat ? whiteMat - blackMat : 0}
+          />
         </div>
       )}
 

@@ -2660,6 +2660,14 @@ io.on('connection', (socket) => {
           const cpuDiff = ['easy', 'medium', 'hard'].includes(gameData.cpuDifficulty) ? gameData.cpuDifficulty : null;
           const withCpu = !!cpuDiff;
           const now = Date.now();
+          // Accept time control from client; null = no timer
+          const rawTc = gameData.timeControl;
+          const timeControl = (rawTc === null || rawTc === undefined)
+            ? null
+            : (typeof rawTc.initial === 'number' && rawTc.initial >= 30 && rawTc.initial <= 7200)
+              ? { initial: Math.floor(rawTc.initial), increment: Math.max(0, Math.floor(rawTc.increment ?? 0)) }
+              : { initial: 300, increment: 0 };
+          const hasTimer = timeControl != null;
           data.gameData = {
             gameType: 'chess',
             gameId,
@@ -2675,9 +2683,9 @@ io.on('connection', (socket) => {
             challengeQueue: [],
             maxQueue: defaultMaxQueue,
             queueLocked: false,
-            timeControl: { initial: 300, increment: 0 },
-            whiteTime: 300000,
-            blackTime: 300000,
+            timeControl,
+            whiteTime: hasTimer ? timeControl.initial * 1000 : null,
+            blackTime: hasTimer ? timeControl.initial * 1000 : null,
             turnStartedAt: withCpu ? now : null,
             startedAt: withCpu ? now : null,
             endedAt: null,
@@ -3287,11 +3295,40 @@ io.on('connection', (socket) => {
       if (!message) return;
       const { gameData } = message;
       if (!gameData.cpu?.enabled) return;
+      if (gameData.status === 'finished') return;
+
+      const now = Date.now();
+
+      // Deduct elapsed time from whoever just moved, then enforce timeout server-side
+      if (gameData.timeControl && gameData.turnStartedAt) {
+        const elapsed = now - gameData.turnStartedAt;
+        const prevTurn = gameData.fen.split(' ')[1]; // turn color BEFORE applying the new fen
+        if (prevTurn === 'w') {
+          gameData.whiteTime = Math.max(0, (gameData.whiteTime ?? 0) - elapsed);
+        } else {
+          gameData.blackTime = Math.max(0, (gameData.blackTime ?? 0) - elapsed);
+        }
+        const timedOutColor = prevTurn === 'w' ? 'white' : 'black';
+        const timedOutMs = prevTurn === 'w' ? gameData.whiteTime : gameData.blackTime;
+        if (timedOutMs <= 0) {
+          const winner = prevTurn === 'w' ? 'black' : 'white';
+          gameData.status = 'finished';
+          gameData.winner = winner;
+          gameData.result = 'timeout';
+          gameData.endedAt = now;
+          await roomManager.saveRoom(socket.roomCode, room);
+          io.to(socket.roomCode).emit('message-updated', message);
+          io.to(socket.roomCode).emit('chess-game-over', { messageId, winner, result: 'timeout', gameData });
+          return;
+        }
+      }
+
       gameData.fen = fen;
+      gameData.turnStartedAt = now;
       if (move) gameData.moves = [...(gameData.moves || []), move];
       await roomManager.saveRoom(socket.roomCode, room);
-      // Relay to spectators
-      socket.to(socket.roomCode).emit('chess-move-made', { messageId, move, fen, whiteTime: gameData.whiteTime, blackTime: gameData.blackTime, turnStartedAt: gameData.turnStartedAt });
+      // Relay to spectators (not sender)
+      socket.to(socket.roomCode).emit('chess-move-made', { messageId, move, fen, whiteTime: gameData.whiteTime, blackTime: gameData.blackTime, turnStartedAt: now });
     } catch (err) { logger.error('chess-sync-fen err:', err); }
   });
 

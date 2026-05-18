@@ -2662,11 +2662,13 @@ const ChatRoom = () => {
     if (!activeTetrisMessage && isPanelOpen('tetris')) closePanel('tetris');
   }, [activeTetrisMessage]);
 
+  const [chessTimeControl, setChessTimeControl] = useState(null); // null = no timer
+
   const handleSendChess = (cpuDifficulty = null) => {
     if (!isConnected) return;
     socketManager.emit('send-message', {
       messageType: 'game',
-      gameData: { gameType: 'chess', ...(cpuDifficulty ? { cpuDifficulty } : {}) },
+      gameData: { gameType: 'chess', ...(cpuDifficulty ? { cpuDifficulty } : {}), timeControl: chessTimeControl },
       userId: persistentUserId,
       isAnonymous: false,
     });
@@ -4105,7 +4107,29 @@ const ChatRoom = () => {
           onClick={() => setShowChessConfig(false)}>
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 w-full max-w-xs"
             onClick={e => e.stopPropagation()}>
-            <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-4 text-center">♟ Chess — Choose Mode</p>
+            <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-4 text-center">♟ Chess — New Game</p>
+
+            {/* Time control picker */}
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">Time Control</p>
+            <div className="grid grid-cols-3 gap-1.5 mb-4">
+              {[
+                { label: 'No Timer', value: null },
+                { label: '1 min', value: { initial: 60, increment: 0 } },
+                { label: '3+2', value: { initial: 180, increment: 2 } },
+                { label: '5 min', value: { initial: 300, increment: 0 } },
+                { label: '10+5', value: { initial: 600, increment: 5 } },
+                { label: '15+10', value: { initial: 900, increment: 10 } },
+              ].map(tc => {
+                const isSelected = JSON.stringify(chessTimeControl) === JSON.stringify(tc.value);
+                return (
+                  <button key={tc.label} onClick={() => setChessTimeControl(tc.value)}
+                    className={`py-1.5 rounded-lg text-[11px] font-black transition-colors ${isSelected ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'}`}>
+                    {tc.label}
+                  </button>
+                );
+              })}
+            </div>
+
             <button onClick={() => handleSendChess(null)}
               className="w-full mb-3 py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-black text-sm transition-colors">
               ⚔️ vs Player
