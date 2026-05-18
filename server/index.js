@@ -2946,7 +2946,9 @@ io.on('connection', (socket) => {
       const isCpuMove = !!data.isCpuMove && gameData.isCPU && gameData.turn === 'b';
       const isBlack = gameData.players.black?.id === playerId || gameData.players.black?.name === socket.nickname || isCpuMove;
 
-      if ((gameData.turn === 'w' && !isWhite) || (gameData.turn === 'b' && !isBlack)) return;
+      // CPU games are single-player — skip identity check so reconnects / new sessions don't block the human
+      // For multiplayer, enforce identity to prevent unauthorized moves
+      if (!gameData.isCPU && ((gameData.turn === 'w' && !isWhite) || (gameData.turn === 'b' && !isBlack))) return;
 
       const chess = new Chess(gameData.fen);
       const moveResult = chess.move(move);

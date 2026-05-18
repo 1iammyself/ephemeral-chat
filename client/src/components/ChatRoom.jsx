@@ -2713,7 +2713,8 @@ const ChatRoom = () => {
   };
 
   const handleChessAction = (messageId, action, payload) => {
-    if (!isConnected) return;
+    // Use the live socketManager flag — not the React state which can be stale during rapid reconnects
+    if (!socketManager.isConnected) return;
     if (action === 'chess-move') {
       const { isCpuMove, ...cleanMove } = payload;
       socketManager.emit('chess-move', { messageId, move: cleanMove, userId: persistentUserId, isCpuMove: !!isCpuMove });

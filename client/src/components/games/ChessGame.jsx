@@ -282,9 +282,16 @@ const ChessGame = ({ gameData, currentUserId, currentNickname, onMove, vibeId })
     (currentNickname && gameData?.players?.black?.name === currentNickname);
 
   // In CPU mode the human is always white — skip ID matching so reconnects don't lock the board
+  // In multiplayer, allow move if either ID or nickname matches (handles reconnect/new session)
   const isMyTurn = isCPU
     ? game.turn() === 'w'
-    : (game.turn() === 'w' && isWhite) || (game.turn() === 'b' && isBlack);
+    : (game.turn() === 'w' && (isWhite || (!gameData?.players?.black?.id && !isCPU))) || (game.turn() === 'b' && isBlack);
+
+  // Refs always reflect current state — prevents stale-closure issues in click handlers
+  const selectedSquareRef = useRef(null);
+  const validMovesRef = useRef([]);
+  selectedSquareRef.current = selectedSquare;
+  validMovesRef.current = validMoves;
 
   // Trigger CPU move when it's black's turn in CPU mode
   const triggerCpuMove = useCallback((fen) => {
@@ -316,10 +323,14 @@ const ChessGame = ({ gameData, currentUserId, currentNickname, onMove, vibeId })
     return () => { if (cpuTimerRef.current) clearTimeout(cpuTimerRef.current); };
   }, [gameData?.fen]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSquareClick = (square) => {
+  const handleSquareClick = useCallback((square) => {
     if (!isMyTurn || game.isGameOver()) return;
 
-    if (selectedSquare === square) {
+    // Read from refs to always get current state, avoiding any stale-closure issues
+    const currentSelected = selectedSquareRef.current;
+    const currentValidMoves = validMovesRef.current;
+
+    if (currentSelected === square) {
       setSelectedSquare(null);
       setValidMoves([]);
       return;
@@ -329,17 +340,17 @@ const ChessGame = ({ gameData, currentUserId, currentNickname, onMove, vibeId })
     if (piece && piece.color === game.turn()) {
       setSelectedSquare(square);
       setValidMoves(game.moves({ square, verbose: true }).map(m => m.to));
-    } else if (selectedSquare && validMoves.includes(square)) {
-      const movingPiece = game.get(selectedSquare);
+    } else if (currentSelected && currentValidMoves.includes(square)) {
+      const movingPiece = game.get(currentSelected);
       const isPromotion =
         movingPiece?.type === 'p' &&
         ((movingPiece.color === 'w' && square[1] === '8') ||
           (movingPiece.color === 'b' && square[1] === '1'));
 
       if (isPromotion) {
-        setPendingPromotion({ from: selectedSquare, to: square });
+        setPendingPromotion({ from: currentSelected, to: square });
       } else {
-        onMove({ from: selectedSquare, to: square });
+        onMove({ from: currentSelected, to: square });
         setSelectedSquare(null);
         setValidMoves([]);
       }
@@ -347,7 +358,7 @@ const ChessGame = ({ gameData, currentUserId, currentNickname, onMove, vibeId })
       setSelectedSquare(null);
       setValidMoves([]);
     }
-  };
+  }, [isMyTurn, game, onMove]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleConfirmPromotion = (piece) => {
     if (!pendingPromotion) return;
