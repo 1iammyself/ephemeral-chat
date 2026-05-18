@@ -678,6 +678,7 @@ const ChatRoom = () => {
   const [stegoExtractImage, setStegoExtractImage] = useState(null);
   const [activeTetrisMessage, setActiveTetrisMessage] = useState(null);
   const [activeChessMessage, setActiveChessMessage] = useState(null);
+  const [showChessConfig, setShowChessConfig] = useState(false);
   const setShowStegoModal = (v) => { if (!v) setStegoExtractImage(null); v ? openPanel('secrets') : closePanel('secrets'); };
   const setShowCodeShare    = (v) => v ? openPanel('code')    : closePanel('code');
   const [activeTimer, setActiveTimer] = useState(null);
@@ -2108,7 +2109,7 @@ const ChatRoom = () => {
           handleSendTetris();
           break;
         case '/chess':
-          handleSendChess();
+          setShowChessConfig(true);
           break;
         default: break;
       }
@@ -2661,14 +2662,15 @@ const ChatRoom = () => {
     if (!activeTetrisMessage && isPanelOpen('tetris')) closePanel('tetris');
   }, [activeTetrisMessage]);
 
-  const handleSendChess = () => {
+  const handleSendChess = (cpuDifficulty = null) => {
     if (!isConnected) return;
     socketManager.emit('send-message', {
       messageType: 'game',
-      gameData: { gameType: 'chess' },
+      gameData: { gameType: 'chess', ...(cpuDifficulty ? { cpuDifficulty } : {}) },
       userId: persistentUserId,
       isAnonymous: false,
     });
+    setShowChessConfig(false);
   };
 
   const handleChessJoin = (messageId) => {
@@ -4095,6 +4097,30 @@ const ChatRoom = () => {
             roomVibe={roomVibe}
           />
         </FloatingPanel>
+      )}
+
+      {/* ── Chess config picker ──────────────────────────────────────── */}
+      {showChessConfig && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={() => setShowChessConfig(false)}>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 w-full max-w-xs"
+            onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-4 text-center">♟ Chess — Choose Mode</p>
+            <button onClick={() => handleSendChess(null)}
+              className="w-full mb-3 py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-black text-sm transition-colors">
+              ⚔️ vs Player
+            </button>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">vs CPU</p>
+            <div className="flex gap-2">
+              {['easy', 'medium', 'hard'].map(d => (
+                <button key={d} onClick={() => handleSendChess(d)}
+                  className={`flex-1 py-2.5 rounded-xl text-white font-black text-xs capitalize ${currentVibe.accentClass} hover:opacity-90 transition-opacity`}>
+                  🤖 {d}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       <EditMessageModal

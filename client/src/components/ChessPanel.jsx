@@ -453,28 +453,6 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
   const whiteName = gameData?.white?.name ?? 'White';
   const blackName = isCpu ? `CPU (${gameData?.cpu?.difficulty ?? '?'})` : (gameData?.black?.name ?? 'Black');
 
-  // ── Waiting for opponent (creator) ───────────────────────────────
-  if (isWaiting && myColor === 'white' && !isCpu) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-6 bg-white dark:bg-gray-900">
-        <div className="text-6xl">♟</div>
-        <div className="text-center">
-          <p className="font-bold text-gray-800 dark:text-gray-100">Waiting for a challenger...</p>
-          <p className="text-xs text-gray-400 mt-1">Share the room so someone can join</p>
-        </div>
-        <div className="w-full max-w-[220px] space-y-2 pt-2">
-          <p className="text-xs text-gray-400 text-center">Or play vs the CPU right now:</p>
-          {['easy', 'medium', 'hard'].map(d => (
-            <button key={d} onClick={() => handleStartCpu(d)}
-              className={`w-full py-2 text-sm font-black rounded-xl text-white ${vibe.accentClass} hover:opacity-90 transition-opacity capitalize`}>
-              🤖 {d}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   // ── Spectator: waiting for game to start ─────────────────────────
   if (isWaiting && !myColor) {
     return (
@@ -517,6 +495,24 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
             : showCheckStrip ? '⚠️ Check!'
             : myTurnFlash ? '✓ Your turn'
             : statusMsg}
+        </div>
+      )}
+
+      {/* Waiting for challenger banner */}
+      {isWaiting && myColor === 'white' && (
+        <div className="mx-3 mt-2 mb-1 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse shrink-0" />
+            <span className="text-xs font-semibold text-blue-700 dark:text-blue-300 truncate">Waiting for challenger...</span>
+          </div>
+          <div className="flex gap-1 shrink-0">
+            {['easy', 'medium', 'hard'].map(d => (
+              <button key={d} onClick={() => handleStartCpu(d)}
+                className={`py-1 px-2 text-[10px] font-black rounded-lg text-white ${vibe.accentClass} hover:opacity-90 transition-opacity capitalize`}>
+                🤖 {d}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

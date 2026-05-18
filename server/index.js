@@ -2655,19 +2655,21 @@ io.on('connection', (socket) => {
         } else if (gameData.gameType === 'chess') {
           const senderId = socket.persistentUserId || data.userId || socket.id;
           const gameId = `chess_${Date.now()}_${nodeCrypto.randomBytes(4).toString('hex')}`;
-          // Default queue capacity = all other current room members
           const roomSocketCount = io.sockets.adapter.rooms.get(socket.roomCode)?.size ?? 1;
           const defaultMaxQueue = Math.max(1, roomSocketCount - 1);
+          const cpuDiff = ['easy', 'medium', 'hard'].includes(gameData.cpuDifficulty) ? gameData.cpuDifficulty : null;
+          const withCpu = !!cpuDiff;
+          const now = Date.now();
           data.gameData = {
             gameType: 'chess',
             gameId,
             creatorId: senderId,
             white: { id: senderId, socketId: socket.id, name: socket.nickname },
-            black: null,
-            cpu: null,
+            black: withCpu ? { id: 'cpu', socketId: null, name: `CPU (${cpuDiff})` } : null,
+            cpu: withCpu ? { enabled: true, difficulty: cpuDiff } : null,
             fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
             moves: [],
-            status: 'waiting',
+            status: withCpu ? 'playing' : 'waiting',
             winner: null,
             result: null,
             challengeQueue: [],
@@ -2676,12 +2678,12 @@ io.on('connection', (socket) => {
             timeControl: { initial: 300, increment: 0 },
             whiteTime: 300000,
             blackTime: 300000,
-            turnStartedAt: null,
-            startedAt: null,
+            turnStartedAt: withCpu ? now : null,
+            startedAt: withCpu ? now : null,
             endedAt: null,
           };
           overrideTtl = 0;
-          messageContent = 'Chess';
+          messageContent = withCpu ? `Chess vs CPU (${cpuDiff})` : 'Chess';
         } else {
           socket.emit('error', { message: 'Unknown game type' });
           return;
@@ -3213,7 +3215,8 @@ io.on('connection', (socket) => {
       const { gameData } = message;
       // Only creator can set CPU, only when waiting and no black
       const senderId = socket.persistentUserId || socket.id;
-      if (gameData.creatorId !== senderId) return;
+      const isCreatorSetCpu = gameData.creatorId === senderId || gameData.white?.socketId === socket.id;
+      if (!isCreatorSetCpu) return;
       if (gameData.black || gameData.status !== 'waiting') return;
       const diff = ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium';
       gameData.cpu = { enabled: true, difficulty: diff };
@@ -3455,7 +3458,8 @@ io.on('connection', (socket) => {
       const { gameData } = message;
       if (gameData.status !== 'finished') return;
       const senderId = socket.persistentUserId || socket.id;
-      if (gameData.creatorId !== senderId) return;
+      const isCreatorRematch = gameData.creatorId === senderId || gameData.white?.socketId === socket.id;
+      if (!isCreatorRematch) return;
 
       const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
       gameData.fen = INITIAL_FEN;
@@ -3498,7 +3502,8 @@ io.on('connection', (socket) => {
       if (!message) return;
       const { gameData } = message;
       const senderId = socket.persistentUserId || socket.id;
-      if (gameData.creatorId !== senderId) return;
+      const isCreatorMaxQ = gameData.creatorId === senderId || gameData.white?.socketId === socket.id;
+      if (!isCreatorMaxQ) return;
       if (typeof maxQueue !== 'number') return;
       const clamped = Math.max(gameData.challengeQueue.length, Math.min(50, maxQueue));
       gameData.maxQueue = clamped;
@@ -3516,7 +3521,8 @@ io.on('connection', (socket) => {
       if (!message) return;
       const { gameData } = message;
       const senderId = socket.persistentUserId || socket.id;
-      if (gameData.creatorId !== senderId) return;
+      const isCreatorLock = gameData.creatorId === senderId || gameData.white?.socketId === socket.id;
+      if (!isCreatorLock) return;
       gameData.queueLocked = !!locked;
       await roomManager.saveRoom(socket.roomCode, room);
       io.to(socket.roomCode).emit('message-updated', message);
