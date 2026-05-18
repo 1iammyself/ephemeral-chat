@@ -16,3 +16,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
 // Signal that the app is ready to hide the splash screen
 window.dispatchEvent(new Event('app-ready'));
+
+// Register service worker for offline support (web + Capacitor)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}

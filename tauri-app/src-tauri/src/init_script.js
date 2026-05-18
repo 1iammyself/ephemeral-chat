@@ -266,6 +266,139 @@
     }
   }).catch(function () {});
 
+  // ── Offline overlay (Tauri / Electron) ───────────────────────────────────
+  // Shows a styled overlay when the device has no internet connection.
+  // Hides automatically when connectivity is restored.
+  (function () {
+    var OVERLAY_ID = '__ephchat_offline__';
+
+    function isDark() {
+      try {
+        var t = localStorage.getItem('theme');
+        return t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      } catch (_) { return false; }
+    }
+
+    function buildOverlay() {
+      var el = document.createElement('div');
+      el.id = OVERLAY_ID;
+      var dark = isDark();
+
+      var bg      = dark ? '#030712'  : '#e8edf2';
+      var surface = dark ? '#0f172a'  : '#ffffff';
+      var text    = dark ? '#f8fafc'  : '#0f172a';
+      var subtext = dark ? '#94a3b8'  : '#64748b';
+      var border  = dark ? 'rgba(248,250,252,0.07)' : 'rgba(15,23,42,0.08)';
+      var accent  = dark ? '#6366f1'  : '#4f46e5';
+      var accentD = dark ? 'rgba(99,102,241,0.15)'  : 'rgba(79,70,229,0.12)';
+      var accentG = dark ? 'rgba(99,102,241,0.30)'  : 'rgba(79,70,229,0.25)';
+
+      el.style.cssText = [
+        'position:fixed', 'inset:0', 'z-index:2147483647',
+        'display:flex', 'align-items:center', 'justify-content:center',
+        'background:' + bg,
+        'font-family:Inter,system-ui,-apple-system,sans-serif',
+        '-webkit-font-smoothing:antialiased',
+        'color:' + text,
+        'padding:24px',
+      ].join(';');
+
+      el.innerHTML = '<div style="' + [
+        'background:' + surface,
+        'border:1px solid ' + border,
+        'border-radius:24px',
+        'padding:44px 40px 40px',
+        'max-width:440px',
+        'width:100%',
+        'text-align:center',
+        'box-shadow:0 20px 60px rgba(0,0,0,' + (dark ? '0.5' : '0.08') + ')',
+      ].join(';') + '">' +
+
+        // brand
+        '<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:36px">' +
+        '<svg width="28" height="28" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">' +
+          '<rect width="512" height="512" rx="100" fill="#4F46E5"/>' +
+          '<path d="M128 102 L384 102 C394 102 402 110 402 120 L402 310 C402 320 394 328 384 328 L280 328 L230 400 L200 328 L128 328 C118 328 110 320 110 310 L110 120 C110 110 118 102 128 102 Z" fill="white"/>' +
+        '</svg>' +
+        '<span style="font-size:0.875rem;font-weight:600;color:' + subtext + ';letter-spacing:-0.01em">Ephemeral Chat</span>' +
+        '</div>' +
+
+        // animated wifi SVG
+        '<div style="position:relative;width:120px;height:96px;margin:0 auto 28px">' +
+        '<svg viewBox="0 0 120 96" style="width:100%;height:100%;overflow:visible">' +
+          '<style>' +
+            '.oa{fill:none;stroke-linecap:round;stroke:' + accent + ';stroke-width:7}' +
+            '@keyframes af{0%,25%{opacity:1}60%,85%{opacity:.12}100%{opacity:1}}' +
+            '.a1{animation:af 2.4s ease-in-out infinite}' +
+            '.a2{animation:af 2.4s ease-in-out .3s infinite}' +
+            '.a3{animation:af 2.4s ease-in-out .6s infinite}' +
+            '.a4{fill:' + accent + ';animation:af 2.4s ease-in-out .9s infinite}' +
+          '</style>' +
+          '<path class="oa a1" d="M8 52 Q30 10 60 10 Q90 10 112 52"/>' +
+          '<path class="oa a2" d="M22 64 Q38 38 60 38 Q82 38 98 64"/>' +
+          '<path class="oa a3" d="M37 76 Q46 62 60 62 Q74 62 83 76"/>' +
+          '<circle class="a4" cx="60" cy="88" r="6"/>' +
+        '</svg>' +
+        '<svg style="position:absolute;top:-6px;right:-4px" width="32" height="32" viewBox="0 0 32 32" fill="none">' +
+          '<circle cx="16" cy="16" r="14" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>' +
+          '<path d="M11 11L21 21M21 11L11 21" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"/>' +
+        '</svg>' +
+        '</div>' +
+
+        // status pill
+        '<div style="display:inline-flex;align-items:center;gap:7px;background:' + accentD + ';border:1px solid rgba(99,102,241,.25);border-radius:100px;padding:5px 14px;font-size:.75rem;font-weight:600;color:' + accent + ';margin-bottom:20px">' +
+        '<style>@keyframes dp{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.65)}}</style>' +
+        '<span style="width:6px;height:6px;border-radius:50%;background:' + accent + ';animation:dp 1.6s ease-in-out infinite"></span>' +
+        'Looking for connection…' +
+        '</div>' +
+
+        '<h2 style="font-size:1.75rem;font-weight:800;letter-spacing:-.04em;color:' + text + ';margin-bottom:10px;line-height:1.15">You\'re Offline</h2>' +
+        '<p style="font-size:.9375rem;color:' + subtext + ';line-height:1.65;margin-bottom:32px">' +
+          'No internet connection. Reconnect to start<br>chatting on Ephemeral Chat.' +
+        '</p>' +
+
+        '<style>' +
+          '.ecbtn{display:inline-flex;align-items:center;gap:8px;background:' + accent + ';color:#fff;border:none;border-radius:12px;padding:13px 28px;font-size:.9375rem;font-weight:600;cursor:pointer;box-shadow:0 4px 18px ' + accentG + ';outline:none;-webkit-tap-highlight-color:transparent;transition:background .2s,transform .15s}' +
+          '.ecbtn:hover{background:#4338ca;transform:translateY(-1px)}' +
+          '.ecbtn:active{transform:translateY(0)}' +
+        '</style>' +
+        '<button class="ecbtn" onclick="window.location.reload()" aria-label="Retry">' +
+          '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M14 2v4h-4" stroke="white" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 6C13.2 3.7 11 2 8 2 4.7 2 2 4.7 2 8s2.7 6 6 6c2.6 0 4.9-1.7 5.7-4" stroke="white" stroke-width="1.75" stroke-linecap="round" fill="none"/></svg>' +
+          'Try Again' +
+        '</button>' +
+
+      '</div>';
+
+      return el;
+    }
+
+    function showOffline() {
+      if (document.getElementById(OVERLAY_ID)) return;
+      document.body.appendChild(buildOverlay());
+    }
+
+    function hideOffline() {
+      var el = document.getElementById(OVERLAY_ID);
+      if (el) el.parentNode.removeChild(el);
+    }
+
+    function syncOfflineState() {
+      if (!navigator.onLine) showOffline();
+      else hideOffline();
+    }
+
+    // Attach listeners immediately (before DOMContentLoaded so we never miss it)
+    window.addEventListener('offline', showOffline);
+    window.addEventListener('online', hideOffline);
+
+    // Initial check after DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', syncOfflineState);
+    } else {
+      syncOfflineState();
+    }
+  }());
+
   // Compatibility: add electron-app CSS class and fire electron-ready event
   document.addEventListener('DOMContentLoaded', function () {
     document.body.classList.add('electron-app');
