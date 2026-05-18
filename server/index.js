@@ -1213,6 +1213,7 @@ function cleanupRoomChaff(roomCode) {
 }
 
 const tetrisDisconnectTimeouts = new Map(); // persistentUserId → timeout handle
+const chessDisconnectTimeouts = new Map();  // persistentUserId → timeout handle
 
 // ─── Tetris FFA Helpers ───────────────────────────────────────────────────────
 
@@ -2280,6 +2281,24 @@ io.on('connection', (socket) => {
                     gd.players
                       .filter(p => p.status === 'active' && p.socketId && p.socketId !== socket.id)
                       .forEach(p => io.to(p.socketId).emit('tetris-opponent-reconnected', { messageId: msg.id, playerId: found.id }));
+                  }
+                }
+              }
+
+              if (gd.gameType === 'chess' && gd.status !== 'finished') {
+                const pid = userId || socket.id;
+                const isWhite = gd.white && (gd.white.id === pid || gd.white.name === userNickname);
+                const isBlack = gd.black && !gd.cpu?.enabled && (gd.black.id === pid || gd.black.name === userNickname);
+                if (isWhite || isBlack) {
+                  const seat = isWhite ? gd.white : gd.black;
+                  const prevTimeout = chessDisconnectTimeouts.get(seat.id);
+                  if (prevTimeout) { clearTimeout(prevTimeout); chessDisconnectTimeouts.delete(seat.id); }
+                  seat.socketId = socket.id;
+                  if (userId) seat.id = userId;
+                  gamesUpdated = true;
+                  const opponentSeat = isWhite ? gd.black : gd.white;
+                  if (opponentSeat?.socketId) {
+                    io.to(opponentSeat.socketId).emit('chess-opponent-reconnected', { messageId: msg.id });
                   }
                 }
               }
@@ -3417,6 +3436,44 @@ io.on('connection', (socket) => {
     } catch (err) { logger.error('chess-game-end err:', err); }
   });
 
+  socket.on('chess-rematch', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = chessGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'finished') return;
+      const senderId = socket.persistentUserId || socket.id;
+      if (gameData.creatorId !== senderId) return;
+
+      const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+      gameData.fen = INITIAL_FEN;
+      gameData.moves = [];
+      gameData.winner = null;
+      gameData.result = null;
+      gameData.endedAt = null;
+      gameData.whiteTime = (gameData.timeControl?.initial ?? 300) * 1000;
+      gameData.blackTime = (gameData.timeControl?.initial ?? 300) * 1000;
+
+      if (gameData.cpu?.enabled) {
+        gameData.status = 'playing';
+        gameData.turnStartedAt = Date.now();
+        gameData.startedAt = Date.now();
+      } else {
+        gameData.black = null;
+        gameData.status = 'waiting';
+        gameData.turnStartedAt = null;
+        gameData.startedAt = null;
+      }
+
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+      io.to(socket.roomCode).emit('chess-new-round', { messageId, gameData });
+    } catch (err) { logger.error('chess-rematch err:', err); }
+  });
+
   // Handle ephemeral view token requests
   socket.on('request-view-token', async ({ messageId }, callback) => {
     try {
@@ -4387,6 +4444,60 @@ io.on('connection', (socket) => {
           }
         }
       } catch (e) { logger.error('tetris disconnect handler err:', e); }
+    }
+
+    // Notify chess opponent of disconnect and schedule auto-forfeit after 30s
+    if (socket.roomCode) {
+      try {
+        const room = await roomManager.getRoom(socket.roomCode);
+        if (room && room.messages) {
+          for (const msg of room.messages) {
+            if (msg.messageType !== 'game' || msg.gameData?.gameType !== 'chess') continue;
+            const gd = msg.gameData;
+            if (gd.status !== 'playing' || gd.cpu?.enabled) continue;
+
+            const playerId = socket.persistentUserId || socket.id;
+            const isWhite = gd.white?.id === playerId || gd.white?.socketId === socket.id;
+            const isBlack = gd.black?.id === playerId || gd.black?.socketId === socket.id;
+            if (!isWhite && !isBlack) continue;
+
+            const opponentSeat = isWhite ? gd.black : gd.white;
+            if (opponentSeat?.socketId) {
+              io.to(opponentSeat.socketId).emit('chess-opponent-disconnected', { messageId: msg.id });
+            }
+
+            const existing = chessDisconnectTimeouts.get(playerId);
+            if (existing) clearTimeout(existing);
+            const loserColor = isWhite ? 'white' : 'black';
+            const winnerColor = isWhite ? 'black' : 'white';
+            const handle = setTimeout(async () => {
+              chessDisconnectTimeouts.delete(playerId);
+              try {
+                const freshRoom = await roomManager.getRoom(socket.roomCode);
+                if (!freshRoom) return;
+                const freshMsg = (freshRoom.messages || []).find(m => m.id === msg.id);
+                if (!freshMsg || freshMsg.gameData?.status === 'finished') return;
+                const freshGd = freshMsg.gameData;
+                if (freshGd.challengeQueue.length > 0) {
+                  chessStartNewRound(freshGd, winnerColor, loserColor);
+                  await roomManager.saveRoom(socket.roomCode, freshRoom);
+                  io.to(socket.roomCode).emit('message-updated', freshMsg);
+                  io.to(socket.roomCode).emit('chess-new-round', { messageId: msg.id, gameData: freshGd });
+                } else {
+                  freshGd.status = 'finished';
+                  freshGd.winner = winnerColor;
+                  freshGd.result = 'abandoned';
+                  freshGd.endedAt = Date.now();
+                  await roomManager.saveRoom(socket.roomCode, freshRoom);
+                  io.to(socket.roomCode).emit('message-updated', freshMsg);
+                  io.to(socket.roomCode).emit('chess-game-over', { messageId: msg.id, winner: winnerColor, result: 'abandoned', gameData: freshGd });
+                }
+              } catch (e) { logger.error('chess auto-forfeit err:', e); }
+            }, 30000);
+            chessDisconnectTimeouts.set(playerId, handle);
+          }
+        }
+      } catch (e) { logger.error('chess disconnect handler err:', e); }
     }
 
     // Note: Media watcher cleanup is handled inside handleUserDeparture
