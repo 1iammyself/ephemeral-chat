@@ -74,6 +74,7 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
   const timerRef = useRef(null);
   const timeoutFiredRef = useRef(false);
   const disconnectTimerRef = useRef(null);
+  const cpuThinkingRef = useRef(false);
 
   const currentUserId = currentUser?.id || currentUser?.socketId;
   const currentNickname = currentUser?.nickname;
@@ -271,29 +272,34 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
 
   // ── CPU move trigger ──────────────────────────────────────────────
   useEffect(() => {
-    if (!isCpu || !isLive || isFinished || chessRef.current.turn() !== 'b' || cpuThinking) return;
-    if (chessRef.current.isGameOver()) return;
+    if (!isCpu || !isLive || isFinished || chessRef.current.turn() !== 'b') return;
+    if (cpuThinkingRef.current || chessRef.current.isGameOver()) return;
     const diff = gameData?.cpu?.difficulty || 'medium';
+    cpuThinkingRef.current = true;
     setCpuThinking(true);
     const delay = CPU_DELAY[diff] ?? 600;
     const t = setTimeout(() => {
       const move = getCpuMove(chessRef.current.fen(), diff);
-      if (!move) { setCpuThinking(false); return; }
+      if (!move) { cpuThinkingRef.current = false; setCpuThinking(false); return; }
       let result;
-      try { result = chessRef.current.move(move); } catch { setCpuThinking(false); return; }
-      if (!result) { setCpuThinking(false); return; }
+      try { result = chessRef.current.move(move); } catch { cpuThinkingRef.current = false; setCpuThinking(false); return; }
+      if (!result) { cpuThinkingRef.current = false; setCpuThinking(false); return; }
       const newFen = chessRef.current.fen();
       const updated = [...moveHistoryRef.current, { san: result.san, color: 'b' }];
       moveHistoryRef.current = updated;
       setMoveHistory(updated);
       setFen(newFen);
+      cpuThinkingRef.current = false;
       setCpuThinking(false);
       // Include promotion so spectator chess.js doesn't throw
       socketManager.emit('chess-sync-fen', { messageId, fen: newFen, move: { from: result.from, to: result.to, ...(result.promotion ? { promotion: result.promotion } : {}) } });
       maybeEndGame(newFen, updated);
     }, delay);
-    return () => clearTimeout(t);
-  }, [fen, isCpu, isLive, isFinished, cpuThinking]);
+    return () => {
+      clearTimeout(t);
+      cpuThinkingRef.current = false;
+    };
+  }, [fen, isCpu, isLive, isFinished]);
 
   function maybeEndGame(currentFen, currentMoves) {
     const chess = chessRef.current;
