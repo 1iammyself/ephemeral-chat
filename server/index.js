@@ -2655,6 +2655,9 @@ io.on('connection', (socket) => {
         } else if (gameData.gameType === 'chess') {
           const senderId = socket.persistentUserId || data.userId || socket.id;
           const gameId = `chess_${Date.now()}_${nodeCrypto.randomBytes(4).toString('hex')}`;
+          // Default queue capacity = all other current room members
+          const roomSocketCount = io.sockets.adapter.rooms.get(socket.roomCode)?.size ?? 1;
+          const defaultMaxQueue = Math.max(1, roomSocketCount - 1);
           data.gameData = {
             gameType: 'chess',
             gameId,
@@ -2668,6 +2671,8 @@ io.on('connection', (socket) => {
             winner: null,
             result: null,
             challengeQueue: [],
+            maxQueue: defaultMaxQueue,
+            queueLocked: false,
             timeControl: { initial: 300, increment: 0 },
             whiteTime: 300000,
             blackTime: 300000,
@@ -3179,7 +3184,7 @@ io.on('connection', (socket) => {
       if (gameData.challengeQueue.some(p => p.id === joinerId)) return;
 
       if (!gameData.black && gameData.status === 'waiting' && !gameData.cpu?.enabled) {
-        // Take the black seat
+        // Take the black seat (lock doesn't apply to direct join when seat is open)
         gameData.black = { id: joinerId, socketId: socket.id, name: joinerName };
         gameData.status = 'playing';
         gameData.startedAt = Date.now();
@@ -3188,7 +3193,9 @@ io.on('connection', (socket) => {
         io.to(socket.roomCode).emit('message-updated', message);
         io.to(socket.roomCode).emit('chess-opponent-joined', { messageId, gameData });
       } else if (gameData.status === 'playing') {
-        // Queue up
+        // Queue — respect lock and capacity
+        if (gameData.queueLocked) return;
+        if (gameData.challengeQueue.length >= (gameData.maxQueue ?? Infinity)) return;
         gameData.challengeQueue.push({ id: joinerId, socketId: socket.id, name: joinerName });
         await roomManager.saveRoom(socket.roomCode, room);
         io.to(socket.roomCode).emit('message-updated', message);
@@ -3479,6 +3486,108 @@ io.on('connection', (socket) => {
       io.to(socket.roomCode).emit('message-updated', message);
       io.to(socket.roomCode).emit('chess-new-round', { messageId, gameData });
     } catch (err) { logger.error('chess-rematch err:', err); }
+  });
+
+  socket.on('chess-set-max-queue', async ({ messageId, maxQueue }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = chessGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      const senderId = socket.persistentUserId || socket.id;
+      if (gameData.creatorId !== senderId) return;
+      if (typeof maxQueue !== 'number') return;
+      const clamped = Math.max(gameData.challengeQueue.length, Math.min(50, maxQueue));
+      gameData.maxQueue = clamped;
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('chess-set-max-queue err:', err); }
+  });
+
+  socket.on('chess-lock-queue', async ({ messageId, locked }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = chessGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      const senderId = socket.persistentUserId || socket.id;
+      if (gameData.creatorId !== senderId) return;
+      gameData.queueLocked = !!locked;
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('chess-lock-queue err:', err); }
+  });
+
+  socket.on('chess-tag-out', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = chessGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'playing' || gameData.challengeQueue.length === 0) return;
+
+      const senderId = socket.persistentUserId || socket.id;
+      const isWhite = gameData.white?.id === senderId;
+      const isBlack = gameData.black?.id === senderId && !gameData.cpu?.enabled;
+      if (!isWhite && !isBlack) return;
+
+      const taggingOutSeat = isWhite ? gameData.white : gameData.black;
+      const taggingOutColor = isWhite ? 'white' : 'black';
+      const challenger = gameData.challengeQueue.shift();
+
+      // Tagging-out player goes to back of queue
+      gameData.challengeQueue.push({ id: taggingOutSeat.id, socketId: taggingOutSeat.socketId, name: taggingOutSeat.name });
+
+      if (taggingOutColor === 'white') {
+        gameData.white = { id: challenger.id, socketId: challenger.socketId, name: challenger.name };
+      } else {
+        gameData.black = { id: challenger.id, socketId: challenger.socketId, name: challenger.name };
+      }
+
+      const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+      gameData.fen = INITIAL_FEN;
+      gameData.moves = [];
+      gameData.winner = null;
+      gameData.result = null;
+      gameData.whiteTime = (gameData.timeControl?.initial ?? 300) * 1000;
+      gameData.blackTime = (gameData.timeControl?.initial ?? 300) * 1000;
+      gameData.turnStartedAt = Date.now();
+      gameData.startedAt = Date.now();
+      gameData.endedAt = null;
+
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+      io.to(socket.roomCode).emit('chess-new-round', { messageId, gameData });
+    } catch (err) { logger.error('chess-tag-out err:', err); }
+  });
+
+  socket.on('chess-queue-again', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = chessGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'playing') return;
+
+      const joinerId = socket.persistentUserId || socket.id;
+      const joinerName = socket.nickname;
+      if (gameData.white?.id === joinerId || gameData.black?.id === joinerId) return;
+      if (gameData.challengeQueue.some(p => p.id === joinerId)) return;
+      if (gameData.queueLocked) return;
+      if (gameData.challengeQueue.length >= (gameData.maxQueue ?? Infinity)) return;
+
+      gameData.challengeQueue.push({ id: joinerId, socketId: socket.id, name: joinerName });
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('chess-queue-again err:', err); }
   });
 
   // Handle ephemeral view token requests
@@ -4500,7 +4609,7 @@ io.on('connection', (socket) => {
                   io.to(socket.roomCode).emit('chess-game-over', { messageId: msg.id, winner: winnerColor, result: 'abandoned', gameData: freshGd });
                 }
               } catch (e) { logger.error('chess auto-forfeit err:', e); }
-            }, 30000);
+            }, 60000);
             chessDisconnectTimeouts.set(playerId, handle);
           }
         }

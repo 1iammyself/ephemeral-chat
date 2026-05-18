@@ -62,8 +62,12 @@ const ChessMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, onVs
   const isLive = gameData.status === 'playing';
   const isWaiting = gameData.status === 'waiting';
 
+  const queueLocked = !!gameData.queueLocked;
+  const maxQueue = gameData.maxQueue ?? Infinity;
+  const queueFull = gameData.challengeQueue?.length >= maxQueue;
+
   const canJoin = !isPlaying && !inQueue && !gameData.black && isWaiting && !isCpu;
-  const canQueue = !isPlaying && !inQueue && !!gameData.black && !isFinished;
+  const canQueue = !isPlaying && !inQueue && !!gameData.black && !isFinished && !queueLocked && !queueFull;
   const creatorWaiting = isWhite && isWaiting && !gameData.black && !isCpu;
   const turnColor = gameData.fen?.split(' ')[1];
 
@@ -149,14 +153,20 @@ const ChessMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, onVs
       </div>
 
       {/* Queue */}
-      {gameData.challengeQueue?.length > 0 && (
+      {(gameData.challengeQueue?.length > 0 || (isLive && maxQueue !== Infinity)) && (
         <div className="bg-white dark:bg-gray-900 px-3 pb-2 border-t border-gray-100 dark:border-gray-800 flex items-center gap-1.5">
           <Clock className="w-3 h-3 text-yellow-500 shrink-0" />
-          <span className="text-[10px] text-yellow-600 dark:text-yellow-400">
-            {gameData.challengeQueue.length === 1
-              ? `${gameData.challengeQueue[0].name} is next`
-              : `${gameData.challengeQueue.length} in queue`}
+          <span className="text-[10px] text-yellow-600 dark:text-yellow-400 flex-1">
+            {gameData.challengeQueue?.length === 0
+              ? 'Queue empty'
+              : gameData.challengeQueue?.length === 1
+                ? `${gameData.challengeQueue[0].name} is next`
+                : `${gameData.challengeQueue.length} in queue`}
           </span>
+          {maxQueue !== Infinity && (
+            <span className="text-[9px] text-gray-400 tabular-nums">{gameData.challengeQueue?.length ?? 0}/{maxQueue}</span>
+          )}
+          {queueLocked && <span className="text-[9px]">🔒</span>}
         </div>
       )}
 

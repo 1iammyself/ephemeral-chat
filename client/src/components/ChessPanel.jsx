@@ -48,12 +48,15 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
   const [flipped, setFlipped] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
+  const [disconnectSecondsLeft, setDisconnectSecondsLeft] = useState(null);
+  const [wasDisplacedFromGame, setWasDisplacedFromGame] = useState(false);
 
   // Refs to avoid stale closures
   const chessRef = useRef(new Chess(message?.gameData?.fen || INITIAL_FEN));
   const moveHistoryRef = useRef(message?.gameData?.moves || []);
   const timerRef = useRef(null);
   const timeoutFiredRef = useRef(false);
+  const disconnectTimerRef = useRef(null);
 
   const currentUserId = currentUser?.id || currentUser?.socketId;
   const currentNickname = currentUser?.nickname;
@@ -115,6 +118,16 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
     if (blackTime === 0) { timeoutFiredRef.current = true; socketManager.emit('chess-timeout', { messageId, color: 'black' }); }
   }, [blackTime, hasTimer, isFinished, isWaiting, messageId]);
 
+  // ── Disconnect countdown ──────────────────────────────────────────
+  useEffect(() => {
+    clearInterval(disconnectTimerRef.current);
+    if (!opponentDisconnected) { setDisconnectSecondsLeft(null); return; }
+    disconnectTimerRef.current = setInterval(() => {
+      setDisconnectSecondsLeft(prev => (prev == null || prev <= 0) ? 0 : prev - 1);
+    }, 1000);
+    return () => clearInterval(disconnectTimerRef.current);
+  }, [opponentDisconnected]);
+
   // ── Socket events ─────────────────────────────────────────────────
   useEffect(() => {
     if (!messageId) return;
@@ -165,6 +178,11 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
 
     const onNewRound = ({ messageId: mid, gameData: gd }) => {
       if (mid !== messageId) return;
+      // myColor from closure = pre-round value; detect if user was displaced
+      const nowWhite = gd.white?.id === currentUserId || (currentNickname && gd.white?.name === currentNickname);
+      const nowBlack = gd.black?.id === currentUserId || (currentNickname && gd.black?.name === currentNickname);
+      if (myColor !== null && !nowWhite && !nowBlack) setWasDisplacedFromGame(true);
+      if (nowWhite || nowBlack) setWasDisplacedFromGame(false);
       setGameData(gd);
       setFen(INITIAL_FEN);
       chessRef.current = new Chess(INITIAL_FEN);
@@ -174,6 +192,7 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
       setDrawOfferFrom(null);
       setStatusMsg('');
       setOpponentDisconnected(false);
+      setDisconnectSecondsLeft(null);
       timeoutFiredRef.current = false;
       setWhiteTime(gd.whiteTime ?? 300000);
       setBlackTime(gd.blackTime ?? 300000);
@@ -183,11 +202,13 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
     const onOpponentDisconnected = ({ messageId: mid }) => {
       if (mid !== messageId) return;
       setOpponentDisconnected(true);
+      setDisconnectSecondsLeft(60);
     };
 
     const onOpponentReconnected = ({ messageId: mid }) => {
       if (mid !== messageId) return;
       setOpponentDisconnected(false);
+      setDisconnectSecondsLeft(null);
     };
 
     socketManager.on('chess-move-made', onMoveMade);
@@ -291,6 +312,13 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
     return true;
   }, [isMyTurn, isCpu, messageId]);
 
+  const queueLocked = !!gameData?.queueLocked;
+  const maxQueue = gameData?.maxQueue ?? Infinity;
+  const queueCount = gameData?.challengeQueue?.length ?? 0;
+  const queueFull = queueCount >= maxQueue;
+  const inQueue = gameData?.challengeQueue?.some(p => p.id === currentUserId || (currentNickname && p.name === currentNickname));
+  const canJoinQueue = !isPlaying && !inQueue && isLive && !queueLocked && !queueFull;
+
   const handleStartCpu = (diff) => socketManager.emit('chess-set-cpu', { messageId, difficulty: diff });
   const handleResign = () => socketManager.emit('chess-resign', { messageId });
   const handleDrawOffer = () => {
@@ -300,6 +328,10 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
   const handleDrawAccept = () => { socketManager.emit('chess-draw-accept', { messageId }); setDrawOffered(false); };
   const handleDrawDecline = () => { socketManager.emit('chess-draw-decline', { messageId }); setDrawOffered(false); };
   const handleRematch = () => socketManager.emit('chess-rematch', { messageId });
+  const handleTagOut = () => socketManager.emit('chess-tag-out', { messageId });
+  const handleQueueAgain = () => { socketManager.emit('chess-queue-again', { messageId }); setWasDisplacedFromGame(false); };
+  const handleAddSlot = () => socketManager.emit('chess-set-max-queue', { messageId, maxQueue: (gameData?.maxQueue ?? queueCount) + 1 });
+  const handleToggleLock = () => socketManager.emit('chess-lock-queue', { messageId, locked: !queueLocked });
 
   const boardOrientation = flipped
     ? (myColor === 'black' ? 'white' : 'black')
@@ -360,7 +392,9 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
             ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-300'
             : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
         }`}>
-          {opponentDisconnected ? '⚠️ Opponent disconnected (30s forfeit)' : cpuThinking ? '🤖 CPU thinking...' : statusMsg}
+          {opponentDisconnected
+            ? `⚠️ Opponent disconnected — forfeit in ${disconnectSecondsLeft ?? 60}s`
+            : cpuThinking ? '🤖 CPU thinking...' : statusMsg}
         </div>
       )}
 
@@ -410,8 +444,8 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
 
       {/* Result banner */}
       {isFinished && (
-        <div className="mx-3 mb-2 py-2 px-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-between">
-          <div>
+        <div className="mx-3 mb-2 py-2 px-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-between gap-2">
+          <div className="min-w-0">
             <p className="text-sm font-black text-amber-700 dark:text-amber-300">{buildResultMsg(gameData)}</p>
             {gameData?.result && <p className="text-[10px] text-gray-500 dark:text-gray-400 capitalize">{gameData.result.replace('-', ' ')}</p>}
           </div>
@@ -423,6 +457,22 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
         </div>
       )}
 
+      {/* Creator queue controls */}
+      {isLive && isCreator && (
+        <div className="px-3 pb-1 flex gap-1.5 items-center">
+          <span className="text-[9px] text-gray-400 uppercase tracking-wide">Queue</span>
+          <span className="text-[10px] text-gray-500 tabular-nums">{queueCount}{maxQueue !== Infinity ? `/${maxQueue}` : ''}</span>
+          <button onClick={handleAddSlot}
+            className="ml-1 px-2 py-0.5 text-[10px] font-black rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:opacity-80 transition-opacity">
+            +1 Slot
+          </button>
+          <button onClick={handleToggleLock}
+            className={`px-2 py-0.5 text-[10px] font-black rounded-md transition-opacity hover:opacity-80 ${queueLocked ? 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'}`}>
+            {queueLocked ? '🔒 Locked' : '🔓 Open'}
+          </button>
+        </div>
+      )}
+
       {/* Controls */}
       {isLive && isPlaying && (
         <div className="px-3 pb-3 flex gap-2">
@@ -430,6 +480,12 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
             className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:opacity-80 transition-opacity shrink-0">
             <RotateCcw className="w-4 h-4" />
           </button>
+          {!isCpu && queueCount > 0 && (
+            <button onClick={handleTagOut}
+              className="py-1.5 px-2.5 text-xs font-black rounded-lg bg-purple-500/80 text-purple-100 hover:opacity-90 transition-opacity">
+              ⇄ Tag Out
+            </button>
+          )}
           {!isCpu && (
             <button onClick={handleDrawOffer}
               className="flex-1 py-1.5 text-xs font-black rounded-lg bg-blue-500/80 text-blue-100 hover:opacity-90 transition-opacity">
@@ -451,8 +507,15 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
             <RotateCcw className="w-4 h-4" />
           </button>
           <span className="flex-1 flex items-center gap-1.5 text-xs text-gray-400 justify-center">
-            <Users className="w-3.5 h-3.5" />Spectating · {isMyTurn ? '' : (turnColor === 'white' ? `♔ ${whiteName}` : `♚ ${blackName}`)}'s turn
+            <Users className="w-3.5 h-3.5" />
+            {inQueue ? `In queue · #${(gameData?.challengeQueue?.findIndex(p => p.id === currentUserId || (currentNickname && p.name === currentNickname)) ?? -1) + 1}` : `Spectating · ${turnColor === 'white' ? `♔ ${whiteName}` : `♚ ${blackName}`}'s turn`}
           </span>
+          {canJoinQueue && (
+            <button onClick={handleQueueAgain}
+              className={`py-1.5 px-2.5 text-xs font-black rounded-lg text-white ${vibe.accentClass} hover:opacity-90 transition-opacity shrink-0`}>
+              {wasDisplacedFromGame ? '↩ Re-queue' : '+ Queue'}
+            </button>
+          )}
         </div>
       )}
 
