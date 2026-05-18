@@ -38,7 +38,6 @@ import {
   Code2,
   Lock,
   LayoutGrid,
-  Trophy,
   Gamepad2,
   Video,
 } from 'lucide-react';
@@ -90,16 +89,8 @@ import DragDropOverlay from './DragDropOverlay';
 import ActivityLog from './ActivityLog';
 import CameraModal from './CameraModal';
 import StegoModal from './StegoModal';
-import ChessMessage from './ChessMessage';
-import ChessPanel from './ChessPanel';
 import TetrisMessage from './TetrisMessage';
 import TetrisPanel from './TetrisPanel';
-import AnagramMessage from './AnagramMessage';
-import AnagramPanel from './AnagramPanel';
-import HangmanMessage from './HangmanMessage';
-import HangmanPanel from './HangmanPanel';
-import TypingMessage from './TypingMessage';
-import TypingPanel from './TypingPanel';
 import { getVibeById, getAllVibes } from '../utils/vibes';
 import SharedMediaPlayer, { detectMediaUrl } from './SharedMediaPlayer';
 import WatchPartyModal from './WatchPartyModal';
@@ -140,14 +131,7 @@ const SLASH_COMMANDS = [
   { icon: Activity, label: 'Watch Party', value: '/media', cmdKey: 'watchParty' },
   { icon: FileText, label: 'Stego', value: '/stego', cmdKey: 'stego' },
   { icon: Code2, label: 'Code Share', value: '/code', cmdKey: 'codeShare' },
-  { icon: Trophy, label: 'Chess', value: '/chess', cmdKey: 'chess' },
-  { icon: Trophy, label: 'Chess vs CPU (Easy)', value: '/chess-cpu easy', cmdKey: 'chess-cpu' },
-  { icon: Trophy, label: 'Chess vs CPU (Medium)', value: '/chess-cpu medium', cmdKey: 'chess-cpu' },
-  { icon: Trophy, label: 'Chess vs CPU (Hard)', value: '/chess-cpu hard', cmdKey: 'chess-cpu' },
   { icon: Gamepad2, label: 'Tetris', value: '/tetris', cmdKey: 'tetris' },
-  { icon: Gamepad2, label: 'Word Duel', value: '/anagram', cmdKey: 'anagram' },
-  { icon: Gamepad2, label: 'Word Trap', value: '/hangman', cmdKey: 'hangman' },
-  { icon: Gamepad2, label: 'Type Sprint', value: '/typesprint', cmdKey: 'typesprint' },
 ];
 
 const CONFETTI_COLORS = [
@@ -690,16 +674,9 @@ const ChatRoom = () => {
   // Feature floating panels
   const { openPanel, closePanel, focusPanel, isOpen: isPanelOpen, getZ } = usePanelManager();
   const [stegoExtractImage, setStegoExtractImage] = useState(null);
-  const [activeChessMessage, setActiveChessMessage] = useState(null);
-  const [chessApprovalRequest, setChessApprovalRequest] = useState(null);
   const [activeTetrisMessage, setActiveTetrisMessage] = useState(null);
-  const [activeAnagramMessage, setActiveAnagramMessage] = useState(null);
-  const [activeHangmanMessage, setActiveHangmanMessage] = useState(null);
-  const [activeTypingMessage, setActiveTypingMessage] = useState(null);
   const setShowStegoModal = (v) => { if (!v) setStegoExtractImage(null); v ? openPanel('secrets') : closePanel('secrets'); };
   const setShowCodeShare    = (v) => v ? openPanel('code')    : closePanel('code');
-  const openChessPanel = (message) => { setActiveChessMessage(message); openPanel('chess'); };
-  const closeChessPanel = () => { closePanel('chess'); };
   const [activeTimer, setActiveTimer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
@@ -1365,10 +1342,6 @@ const ChatRoom = () => {
     const handleMessageDeleted = ({ messageId }) => {
       setMessages(prev => prev.filter(m => m.id !== messageId));
       setActiveTetrisMessage(prev => prev?.id === messageId ? null : prev);
-      setActiveChessMessage(prev => prev?.id === messageId ? null : prev);
-      setActiveAnagramMessage(prev => prev?.id === messageId ? null : prev);
-      setActiveHangmanMessage(prev => prev?.id === messageId ? null : prev);
-      setActiveTypingMessage(prev => prev?.id === messageId ? null : prev);
     };
 
     const handleUserJoined = ({ user, roomUsers }) => {
@@ -1455,11 +1428,7 @@ const ChatRoom = () => {
       }
       setMessages(prev => prev.map(m => m.id === finalMessage.id ? finalMessage : m));
       // Keep open game panels in sync
-      setActiveChessMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
       setActiveTetrisMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
-      setActiveAnagramMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
-      setActiveHangmanMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
-      setActiveTypingMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
     };
 
     // Role and moderation event handlers
@@ -1708,27 +1677,6 @@ const ChatRoom = () => {
     };
     socketManager.on('link-preview-update', handleLinkPreviewUpdate);
 
-    // ─── Chess approval handlers ─────────────────────────────
-    const handleChessSwapApproval = ({ messageId, requestedBy }) =>
-      setChessApprovalRequest({ type: 'swap', messageId, requestedBy });
-    const handleChessReplaceApproval = ({ messageId, role, newPlayerName, requestedBy }) =>
-      setChessApprovalRequest({ type: 'replace', messageId, role, newPlayerName, requestedBy });
-    const handleChessSwapDeclined = ({ declinedBy }) => {
-      setActivityLogs(prev => [{
-        id: `log_chess_${Date.now()}`, type: 'system',
-        content: `${declinedBy} declined the swap request`, timestamp: new Date().toISOString()
-      }, ...prev].slice(0, 50));
-    };
-    const handleChessReplaceDeclined = ({ declinedBy }) => {
-      setActivityLogs(prev => [{
-        id: `log_chess_${Date.now()}`, type: 'system',
-        content: `${declinedBy} declined the replacement request`, timestamp: new Date().toISOString()
-      }, ...prev].slice(0, 50));
-    };
-    socketManager.on('chess-swap-approval-needed', handleChessSwapApproval);
-    socketManager.on('chess-replace-approval-needed', handleChessReplaceApproval);
-    socketManager.on('chess-swap-declined', handleChessSwapDeclined);
-    socketManager.on('chess-replace-declined', handleChessReplaceDeclined);
 
     return () => {
       socketManager.off('connect', handleConnect);
@@ -1777,10 +1725,6 @@ const ChatRoom = () => {
       socketManager.off('pre-approved-list-updated', handlePreApprovedListUpdated);
       socketManager.off('messages-cleared');
       socketManager.off('link-preview-update', handleLinkPreviewUpdate);
-      socketManager.off('chess-swap-approval-needed', handleChessSwapApproval);
-      socketManager.off('chess-replace-approval-needed', handleChessReplaceApproval);
-      socketManager.off('chess-swap-declined', handleChessSwapDeclined);
-      socketManager.off('chess-replace-declined', handleChessReplaceDeclined);
 
       // ─── MLS Security: Clean up session + padding ───
       destroyMLSSession(roomCode);
@@ -1810,13 +1754,6 @@ const ChatRoom = () => {
     }, 5000);
     return () => clearInterval(interval);
   }, [isConnected]);
-
-  // Auto-decline chess approval after 30s of inactivity
-  useEffect(() => {
-    if (!chessApprovalRequest) return;
-    const t = setTimeout(() => handleChessApproval(false), 30_000);
-    return () => clearTimeout(t);
-  }, [chessApprovalRequest]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // High-Assurance Quick Actions (Electron only, Option C)
   useEffect(() => {
@@ -2162,26 +2099,8 @@ const ChatRoom = () => {
         case '/code':
           setShowCodeShare(true);
           break;
-        case '/chess':
-          handleSendChess();
-          break;
-        case '/chess-cpu': {
-          const diff = parts[1]?.toLowerCase();
-          const validDiff = ['easy', 'medium', 'hard'].includes(diff) ? diff : 'medium';
-          handleSendChessCPU(validDiff);
-          break;
-        }
         case '/tetris':
           handleSendTetris();
-          break;
-        case '/anagram':
-          handleSendAnagram();
-          break;
-        case '/hangman':
-          handleSendHangman();
-          break;
-        case '/typesprint':
-          handleSendTypeSprint();
           break;
         default: break;
       }
@@ -2696,42 +2615,6 @@ const ChatRoom = () => {
     openPanel('secrets');
   };
 
-  // ─── Chess handlers ──────────────────────────────────────────
-  const handleSendChess = () => {
-    if (!isConnected) return;
-    if (selectedRecipients.length > 1) {
-      setError('Chess can only be sent to one person at a time.');
-      return;
-    }
-    socketManager.emit('send-message', {
-      messageType: 'game',
-      gameData: { gameType: 'chess' },
-      recipients: selectedRecipients,
-      userId: persistentUserId,
-      isAnonymous: false,
-    });
-  };
-
-  const handleChessAction = (messageId, action, payload) => {
-    // Use the live socketManager flag — not the React state which can be stale during rapid reconnects
-    if (!socketManager.isConnected) return;
-    if (action === 'chess-move') {
-      const { isCpuMove, ...cleanMove } = payload;
-      socketManager.emit('chess-move', { messageId, move: cleanMove, userId: persistentUserId, isCpuMove: !!isCpuMove });
-    } else if (action === 'chess-join') {
-      socketManager.emit('chess-join', { messageId, userId: persistentUserId });
-    } else if (action === 'chess-swap') {
-      socketManager.emit('chess-swap-request', { messageId });
-    } else if (action === 'chess-replace') {
-      const { targetUserId, role } = payload;
-      socketManager.emit('chess-replace-request', { messageId, role, targetUserId });
-    }
-  };
-
-  const handleLaunchChess = (message) => {
-    openChessPanel(message);
-    hapticLight();
-  };
 
   const handleSendTetris = () => {
     if (!isConnected) return;
@@ -2770,146 +2653,6 @@ const ChatRoom = () => {
     if (!activeTetrisMessage && isPanelOpen('tetris')) closePanel('tetris');
   }, [activeTetrisMessage]);
 
-  // ─── Chess vs CPU ─────────────────────────────────────────────────
-  const handleSendChessCPU = (difficulty = 'medium') => {
-    if (!isConnected) return;
-    socketManager.emit('send-message', {
-      messageType: 'game',
-      gameData: { gameType: 'chess', isCPU: true, cpuDifficulty: difficulty },
-      userId: persistentUserId,
-      isAnonymous: false,
-    });
-  };
-
-  // ─── Anagram game handlers ─────────────────────────────────────────
-  const handleSendAnagram = () => {
-    if (!isConnected) return;
-    socketManager.emit('send-message', {
-      messageType: 'game',
-      gameData: { gameType: 'anagram' },
-      userId: persistentUserId,
-      isAnonymous: false,
-    });
-  };
-
-  const handleAnagramJoin = (messageId) => {
-    if (!isConnected) return;
-    socketManager.emit('anagram-join', { messageId });
-    setMessages(prev => {
-      const msg = prev.find(m => m.id === messageId);
-      if (msg) { setActiveAnagramMessage(msg); openPanel('anagram'); }
-      return prev;
-    });
-  };
-
-  const handleAnagramSolo = (messageId) => {
-    if (!isConnected) return;
-    const msg = messages.find(m => m.id === messageId);
-    if (msg) { setActiveAnagramMessage(msg); openPanel('anagram'); }
-    socketManager.emit('anagram-solo', { messageId, userId: persistentUserId });
-  };
-
-  const handleAnagramLaunch = (message) => {
-    setActiveAnagramMessage(message);
-    openPanel('anagram');
-    hapticLight();
-  };
-
-  useEffect(() => {
-    if (!activeAnagramMessage && isPanelOpen('anagram')) closePanel('anagram');
-  }, [activeAnagramMessage]);
-
-  // ─── Hangman game handlers ─────────────────────────────────────────
-  const handleSendHangman = () => {
-    if (!isConnected) return;
-    socketManager.emit('send-message', {
-      messageType: 'game',
-      gameData: { gameType: 'hangman' },
-      userId: persistentUserId,
-      isAnonymous: false,
-    });
-  };
-
-  const handleHangmanJoin = (messageId) => {
-    if (!isConnected) return;
-    socketManager.emit('hangman-join', { messageId });
-    setMessages(prev => {
-      const msg = prev.find(m => m.id === messageId);
-      if (msg) { setActiveHangmanMessage(msg); openPanel('hangman'); }
-      return prev;
-    });
-  };
-
-  const handleHangmanSolo = (messageId) => {
-    if (!isConnected) return;
-    const msg = messages.find(m => m.id === messageId);
-    if (msg) { setActiveHangmanMessage(msg); openPanel('hangman'); }
-    socketManager.emit('hangman-solo', { messageId, userId: persistentUserId });
-  };
-
-  const handleHangmanLaunch = (message) => {
-    setActiveHangmanMessage(message);
-    openPanel('hangman');
-    hapticLight();
-  };
-
-  useEffect(() => {
-    if (!activeHangmanMessage && isPanelOpen('hangman')) closePanel('hangman');
-  }, [activeHangmanMessage]);
-
-  // ─── Typing Sprint handlers ────────────────────────────────────────
-  const handleSendTypeSprint = () => {
-    if (!isConnected) return;
-    socketManager.emit('send-message', {
-      messageType: 'game',
-      gameData: { gameType: 'typesprint' },
-      userId: persistentUserId,
-      isAnonymous: false,
-    });
-  };
-
-  const handleTypeSprintJoin = (messageId) => {
-    if (!isConnected) return;
-    socketManager.emit('typesprint-join', { messageId });
-    setMessages(prev => {
-      const msg = prev.find(m => m.id === messageId);
-      if (msg) { setActiveTypingMessage(msg); openPanel('typesprint'); }
-      return prev;
-    });
-  };
-
-  const handleTypeSprintSolo = (messageId) => {
-    if (!isConnected) return;
-    const msg = messages.find(m => m.id === messageId);
-    if (msg) { setActiveTypingMessage(msg); openPanel('typesprint'); }
-    socketManager.emit('typesprint-solo', { messageId, userId: persistentUserId });
-  };
-
-  const handleTypeSprintLaunch = (message) => {
-    setActiveTypingMessage(message);
-    openPanel('typesprint');
-    hapticLight();
-  };
-
-  useEffect(() => {
-    if (!activeTypingMessage && isPanelOpen('typesprint')) closePanel('typesprint');
-  }, [activeTypingMessage]);
-
-  const handleChessJoin = (messageId) => {
-    socketManager.emit('chess-join', { messageId, userId: persistentUserId });
-    setMessages(prev => {
-      const msg = prev.find(m => m.id === messageId);
-      if (msg) { setActiveChessMessage(msg); openPanel('chess'); }
-      return prev;
-    });
-  };
-
-  const handleChessApproval = (approved) => {
-    if (!chessApprovalRequest) return;
-    const event = chessApprovalRequest.type === 'swap' ? 'chess-swap-response' : 'chess-replace-response';
-    socketManager.emit(event, { messageId: chessApprovalRequest.messageId, approved });
-    setChessApprovalRequest(null);
-  };
 
   const handleEditMessage = (message) => {
     setEditingMessage(message);
@@ -3411,20 +3154,9 @@ const ChatRoom = () => {
               roomVibe={roomVibe}
               onShareResult={handleShareResult}
               onStegoExtract={handleStegoExtract}
-              onChessJoin={handleChessJoin}
-              onChessLaunch={handleLaunchChess}
               onTetrisJoin={handleTetrisJoin}
               onTetrisSpectate={handleTetrisSpectate}
               onTetrisLaunch={handleTetrisLaunch}
-              onAnagramJoin={handleAnagramJoin}
-              onAnagramSolo={handleAnagramSolo}
-              onAnagramLaunch={handleAnagramLaunch}
-              onHangmanJoin={handleHangmanJoin}
-              onHangmanSolo={handleHangmanSolo}
-              onHangmanLaunch={handleHangmanLaunch}
-              onTypeSprintJoin={handleTypeSprintJoin}
-              onTypeSprintSolo={handleTypeSprintSolo}
-              onTypeSprintLaunch={handleTypeSprintLaunch}
               linkPreviews={linkPreviews}
               onOpenEmojiPicker={(messageId) => {
                 setReactionTargetId(messageId);
@@ -4268,31 +4000,6 @@ const ChatRoom = () => {
             }} />
         </FloatingPanel>
       )}
-      {/* ── Chess FloatingPanel ──────────────────────────────────────── */}
-      {isPanelOpen('chess') && (
-        <FloatingPanel
-          title={t('chatRoom.panels.chess')}
-          icon={Trophy}
-          iconColor="text-amber-400"
-          onClose={closeChessPanel}
-          onFocus={() => focusPanel('chess')}
-          zIndex={getZ('chess')}
-          defaultWidth={720}
-          defaultHeight={560}
-          defaultX={80}
-          defaultY={60}
-        >
-          <ChessPanel
-            message={activeChessMessage}
-            currentUserId={currentUser?.id || currentUser?.socketId}
-            currentNickname={currentUser?.nickname}
-            users={users}
-            onMove={handleChessAction}
-            roomVibe={roomVibe}
-          />
-        </FloatingPanel>
-      )}
-
       {/* ── Tetris FloatingPanel ─────────────────────────────────────── */}
       {isPanelOpen('tetris') && (
         <FloatingPanel
@@ -4313,95 +4020,6 @@ const ChatRoom = () => {
             roomVibe={roomVibe}
           />
         </FloatingPanel>
-      )}
-
-      {/* ── Anagram FloatingPanel ─────────────────────────────────────── */}
-      {isPanelOpen('anagram') && activeAnagramMessage && (
-        <FloatingPanel
-          title="Word Duel"
-          icon={Gamepad2}
-          iconColor="text-purple-400"
-          onClose={() => closePanel('anagram')}
-          onFocus={() => focusPanel('anagram')}
-          zIndex={getZ('anagram')}
-          defaultWidth={480}
-          defaultHeight={520}
-          defaultX={120}
-          defaultY={80}
-        >
-          <AnagramPanel message={activeAnagramMessage} currentUser={currentUser} roomVibe={roomVibe} />
-        </FloatingPanel>
-      )}
-
-      {/* ── Hangman FloatingPanel ─────────────────────────────────────── */}
-      {isPanelOpen('hangman') && activeHangmanMessage && (
-        <FloatingPanel
-          title="Word Trap"
-          icon={Gamepad2}
-          iconColor="text-red-400"
-          onClose={() => closePanel('hangman')}
-          onFocus={() => focusPanel('hangman')}
-          zIndex={getZ('hangman')}
-          defaultWidth={480}
-          defaultHeight={540}
-          defaultX={140}
-          defaultY={80}
-        >
-          <HangmanPanel message={activeHangmanMessage} currentUser={currentUser} roomVibe={roomVibe} />
-        </FloatingPanel>
-      )}
-
-      {/* ── Type Sprint FloatingPanel ──────────────────────────────────── */}
-      {isPanelOpen('typesprint') && activeTypingMessage && (
-        <FloatingPanel
-          title="Type Sprint"
-          icon={Gamepad2}
-          iconColor="text-green-400"
-          onClose={() => closePanel('typesprint')}
-          onFocus={() => focusPanel('typesprint')}
-          zIndex={getZ('typesprint')}
-          defaultWidth={520}
-          defaultHeight={520}
-          defaultX={160}
-          defaultY={80}
-        >
-          <TypingPanel message={activeTypingMessage} currentUser={currentUser} roomVibe={roomVibe} />
-        </FloatingPanel>
-      )}
-
-      {/* ── Chess swap/replace approval dialog ───────────────────────── */}
-      {chessApprovalRequest && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => handleChessApproval(false)}
-          />
-          <div className={`relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-sm w-full border-2 border-${getVibeById(roomVibe).accent || 'indigo'}-500/40 animate-in zoom-in-95 fade-in duration-200`}>
-            <h3 className="text-base font-black text-gray-900 dark:text-white mb-2">
-              {chessApprovalRequest.type === 'swap' ? t('chatRoom.chess.swapRequest') : t('chatRoom.chess.replaceRequest')}
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-5">
-              {chessApprovalRequest.type === 'swap'
-                ? t('chatRoom.chess.swapDesc', { name: chessApprovalRequest.requestedBy })
-                : t('chatRoom.chess.replaceDesc', { requestedBy: chessApprovalRequest.requestedBy, newPlayer: chessApprovalRequest.newPlayerName })}
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => handleChessApproval(true)}
-                className={`flex-1 py-2.5 ${getVibeById(roomVibe).accentClass} rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02] active:scale-95`}
-              >
-                {t('chatRoom.chess.approve')}
-              </button>
-              <button
-                onClick={() => handleChessApproval(false)}
-                className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-red-500 hover:text-white text-gray-600 dark:text-gray-400 rounded-xl text-sm font-bold transition-all"
-              >
-                {t('chatRoom.chess.decline')}
-              </button>
-            </div>
-            <p className="text-center text-[9px] text-gray-400 mt-3 font-bold uppercase tracking-widest">{t('chatRoom.chess.autoDecline').toUpperCase()}</p>
-          </div>
-        </div>
       )}
 
       <EditMessageModal

@@ -446,12 +446,9 @@ class RoomManager {
       const messageKey = `message:${roomCode}:${message.id}`;
 
       if (neverExpire) {
-        // Persist without TTL — active chess and overrideTtl=0 messages never expire
+        // Persist without TTL — overrideTtl=0 messages never expire
         await this.redis.set(messageKey, JSON.stringify(message));
       } else {
-        // Calculate TTL:
-        // 1. If message has positive override (e.g. 120s for finished chess), use it
-        // 2. Otherwise use room default
         let ttl = (message.overrideTtl && message.overrideTtl > 0) ? message.overrideTtl : room.settings.messageTTL;
         await this.redis.setEx(messageKey, ttl, JSON.stringify(message));
       }

@@ -7,11 +7,7 @@ import { useTheme } from '../context/ThemeContext';
 import ImageViewer from './ImageViewer';
 import AudioPlayer from './AudioPlayer';
 import PollMessage from './PollMessage';
-import ChessMessage from './ChessMessage';
 import TetrisMessage from './TetrisMessage';
-import AnagramMessage from './AnagramMessage';
-import HangmanMessage from './HangmanMessage';
-import TypingMessage from './TypingMessage';
 import socketManager from '../socket';
 import { getVibeById } from '../utils/vibes';
 import LinkPreviewModal, { isDomainTrusted } from './LinkPreviewModal';
@@ -23,7 +19,7 @@ import { FileOpener } from '@capacitor-community/file-opener';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀', '🍕', '🍔', '🍦', '🍩', '🍺', '🎸', '🎮', '🚀', '🌈', '🍄'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onPin, onViewThread, isHost, pinnedMessageId, roomVibe, linkPreviews = {}, onOpenEmojiPicker, highlightMap = {}, focusedMessageId = null, onStegoExtract, onChessJoin, onChessLaunch, onTetrisJoin, onTetrisSpectate, onTetrisLaunch, onAnagramJoin, onAnagramSolo, onAnagramLaunch, onHangmanJoin, onHangmanSolo, onHangmanLaunch, onTypeSprintJoin, onTypeSprintSolo, onTypeSprintLaunch, onVideoReply = null }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onPin, onViewThread, isHost, pinnedMessageId, roomVibe, linkPreviews = {}, onOpenEmojiPicker, highlightMap = {}, focusedMessageId = null, onStegoExtract, onTetrisJoin, onTetrisSpectate, onTetrisLaunch, onVideoReply = null }) => {
   const { t } = useTranslation();
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
@@ -100,7 +96,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
     messages.forEach(message => {
       const ttl = message.overrideTtl || messageTTL;
       if (!ttl || ttl <= 0 || message.type === 'system') return;
-      if (message.messageType === 'game' && (message.gameData?.gameType === 'chess' || message.gameData?.gameType === 'tetris' || message.gameData?.gameType === 'anagram' || message.gameData?.gameType === 'hangman' || message.gameData?.gameType === 'typesprint')) return;
+      if (message.messageType === 'game' && message.gameData?.gameType === 'tetris') return;
       if (messageTimers.has(message.id)) return;
       if (ttlTimerIdsRef.current[message.id]) return;
 
@@ -170,7 +166,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   const getTimeLeft = (message) => {
   const ttl = message.overrideTtl || messageTTL;
     if (!ttl || ttl === 0 || message.type === 'system') return null;
-    if (message.messageType === 'game' && (message.gameData?.gameType === 'chess' || message.gameData?.gameType === 'tetris' || message.gameData?.gameType === 'anagram' || message.gameData?.gameType === 'hangman' || message.gameData?.gameType === 'typesprint')) return null;
+    if (message.messageType === 'game' && message.gameData?.gameType === 'tetris') return null;
     const messageTime = new Date(message.timestamp).getTime();
     const expiryTime = messageTime + (ttl * 1000);
     const timeLeft = Math.max(0, expiryTime - Date.now());
@@ -444,7 +440,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
             <div className={`flex items-center w-full ${isOwnMessage ? 'justify-end pl-8 sm:pl-12' : 'justify-start pr-8 sm:pr-12'}`}>
               <div className="relative group/bubble w-fit max-w-[80%] sm:max-w-lg md:max-w-xl">
                 <div
-                  className={`relative z-10 w-fit rounded-2xl transition-all duration-300 ${(message.messageType === 'poll' || (message.messageType === 'game' && (message.gameData?.gameType === 'chess' || message.gameData?.gameType === 'tetris' || message.gameData?.gameType === 'anagram' || message.gameData?.gameType === 'hangman' || message.gameData?.gameType === 'typesprint'))) ? 'shadow-sm' :
+                  className={`relative z-10 w-fit rounded-2xl transition-all duration-300 ${(message.messageType === 'poll' || (message.messageType === 'game' && message.gameData?.gameType === 'tetris')) ? 'shadow-sm' :
                     'shadow-sm px-2.5 py-1.5 sm:px-3 sm:py-2 box-border'
                     } ${isOwnMessage
                       ? currentVibe.messageClass
@@ -523,16 +519,6 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                           <AudioPlayer src={fixAudioContentForPlayback(message.content)} isOwnMessage={isOwnMessage} autoPlay={playingAudioId === message.id} onEnded={() => handleAudioEnded(message)} />
                         )}
                       </div>
-                    ) : message.messageType === 'game' && message.gameData?.gameType === 'chess' ? (
-                      <ChessMessage
-                        message={message}
-                        currentUser={currentUser}
-                        onJoin={onChessJoin}
-                        onLaunch={onChessLaunch}
-                        onDelete={onDelete}
-                        roomVibe={roomVibe}
-                        isHost={isHost}
-                      />
                     ) : message.messageType === 'game' && message.gameData?.gameType === 'tetris' ? (
                       <TetrisMessage
                         message={message}
@@ -540,33 +526,6 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         onJoin={onTetrisJoin}
                         onSpectate={onTetrisSpectate}
                         onLaunch={onTetrisLaunch}
-                        roomVibe={roomVibe}
-                      />
-                    ) : message.messageType === 'game' && message.gameData?.gameType === 'anagram' ? (
-                      <AnagramMessage
-                        message={message}
-                        currentUser={currentUser}
-                        onJoin={onAnagramJoin}
-                        onSolo={onAnagramSolo}
-                        onLaunch={onAnagramLaunch}
-                        roomVibe={roomVibe}
-                      />
-                    ) : message.messageType === 'game' && message.gameData?.gameType === 'hangman' ? (
-                      <HangmanMessage
-                        message={message}
-                        currentUser={currentUser}
-                        onJoin={onHangmanJoin}
-                        onSolo={onHangmanSolo}
-                        onLaunch={onHangmanLaunch}
-                        roomVibe={roomVibe}
-                      />
-                    ) : message.messageType === 'game' && message.gameData?.gameType === 'typesprint' ? (
-                      <TypingMessage
-                        message={message}
-                        currentUser={currentUser}
-                        onJoin={onTypeSprintJoin}
-                        onSolo={onTypeSprintSolo}
-                        onLaunch={onTypeSprintLaunch}
                         roomVibe={roomVibe}
                       />
                     ) : message.messageType === 'poll' ? (

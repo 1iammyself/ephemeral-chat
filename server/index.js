@@ -28,7 +28,6 @@ const {
   logger
 } = require('./utils');
 const { convertAudioToAAC } = require('./utils/audio-converter');
-const { Chess } = require('./utils/chess');
 
 const helmet = require('helmet');
 const { RtcTokenBuilder, RtcRole } = require('agora-token');
@@ -164,10 +163,6 @@ app.use('/games', (req, res, next) => {
 // Serve react-tetris game as an embedded activity
 app.use('/games/tetris', express.static(path.join(__dirname, '../react-tetris/docs')));
 
-// Serve standalone HTML games
-app.use('/games/anagram', express.static(path.join(__dirname, '../games/anagram-game')));
-app.use('/games/hangman', express.static(path.join(__dirname, '../games/hangman-game')));
-app.use('/games/typing', express.static(path.join(__dirname, '../games/typing-game')));
 
 // Serve static files from the client dist directory in production
 if (process.env.NODE_ENV === 'production') {
@@ -2204,7 +2199,7 @@ io.on('connection', (socket) => {
         socket.nickname = userNickname;
         socket.persistentUserId = userId || socket.id; // Store persistent ID on socket
 
-        // Re-sync chess (and other game) player socketIds for this returning user
+        // Re-sync tetris player socketIds for this returning user
         try {
           const freshRoom = await roomManager.getRoom(roomCode);
           if (freshRoom && freshRoom.messages) {
@@ -2212,23 +2207,6 @@ io.on('connection', (socket) => {
             for (const msg of freshRoom.messages) {
               if (msg.messageType !== 'game' || !msg.gameData) continue;
               const gd = msg.gameData;
-
-              if (gd.gameType === 'chess' && !gd.winner) {
-                if (gd.players.white && (gd.players.white.id === userId || gd.players.white.name === userNickname)) {
-                  gd.players.white.socketId = socket.id;
-                  gd.players.white.name = userNickname;
-                  if (gd.players.white.id !== userId && userId) gd.players.white.id = userId;
-                  gamesUpdated = true;
-                  logger.info(`♟️ Re-synced chess white player socketId for ${userNickname} to ${socket.id}`);
-                }
-                if (gd.players.black && (gd.players.black.id === userId || gd.players.black.name === userNickname)) {
-                  gd.players.black.socketId = socket.id;
-                  gd.players.black.name = userNickname;
-                  if (gd.players.black.id !== userId && userId) gd.players.black.id = userId;
-                  gamesUpdated = true;
-                  logger.info(`♟️ Re-synced chess black player socketId for ${userNickname} to ${socket.id}`);
-                }
-              }
 
               if (gd.gameType === 'tetris' && gd.status !== 'finished') {
                 const pid = userId || socket.id;
@@ -2251,54 +2229,6 @@ io.on('connection', (socket) => {
                 }
               }
 
-              if (gd.gameType === 'anagram' && !gd.winner) {
-                const pid = userId || socket.id;
-                if (gd.host && (gd.host.id === pid || gd.host.name === userNickname)) {
-                  gd.host.socketId = socket.id;
-                  if (userId) gd.host.id = userId;
-                  gamesUpdated = true;
-                  if (gd.challenger?.socketId) io.to(gd.challenger.socketId).emit('anagram-opponent-reconnected', { messageId: msg.id });
-                }
-                if (gd.challenger && (gd.challenger.id === pid || gd.challenger.name === userNickname)) {
-                  gd.challenger.socketId = socket.id;
-                  if (userId) gd.challenger.id = userId;
-                  gamesUpdated = true;
-                  if (gd.host?.socketId) io.to(gd.host.socketId).emit('anagram-opponent-reconnected', { messageId: msg.id });
-                }
-              }
-
-              if (gd.gameType === 'hangman' && !gd.winner) {
-                const pid = userId || socket.id;
-                if (gd.wordmaster && (gd.wordmaster.id === pid || gd.wordmaster.name === userNickname)) {
-                  gd.wordmaster.socketId = socket.id;
-                  if (userId) gd.wordmaster.id = userId;
-                  gamesUpdated = true;
-                  if (gd.guesser?.socketId) io.to(gd.guesser.socketId).emit('hangman-opponent-reconnected', { messageId: msg.id });
-                }
-                if (gd.guesser && (gd.guesser.id === pid || gd.guesser.name === userNickname)) {
-                  gd.guesser.socketId = socket.id;
-                  if (userId) gd.guesser.id = userId;
-                  gamesUpdated = true;
-                  if (gd.wordmaster?.socketId) io.to(gd.wordmaster.socketId).emit('hangman-opponent-reconnected', { messageId: msg.id });
-                }
-              }
-
-              if (gd.gameType === 'typesprint' && !gd.winner) {
-                const pid = userId || socket.id;
-                if (gd.player1 && (gd.player1.id === pid || gd.player1.name === userNickname)) {
-                  gd.player1.socketId = socket.id;
-                  if (userId) gd.player1.id = userId;
-                  gamesUpdated = true;
-                  if (gd.player2?.socketId) io.to(gd.player2.socketId).emit('typesprint-opponent-reconnected', { messageId: msg.id });
-                }
-                if (gd.player2 && (gd.player2.id === pid || gd.player2.name === userNickname)) {
-                  gd.player2.socketId = socket.id;
-                  if (userId) gd.player2.id = userId;
-                  gamesUpdated = true;
-                  if (gd.player1?.socketId) io.to(gd.player1.socketId).emit('typesprint-opponent-reconnected', { messageId: msg.id });
-                }
-              }
-
               if (msg.sender && msg.sender.nickname === userNickname && msg.sender.id !== userId && userId) {
                 msg.sender.id = userId;
                 msg.sender.socketId = socket.id;
@@ -2315,7 +2245,7 @@ io.on('connection', (socket) => {
             }
           }
         } catch (syncErr) {
-          logger.error('Error re-syncing chess games on join:', syncErr);
+          logger.error('Error re-syncing game player socketIds on join:', syncErr);
         }
 
         // Register user activity and start inactivity timer
@@ -2630,42 +2560,7 @@ io.on('connection', (socket) => {
           socket.emit('error', { message: 'Invalid game data' });
           return;
         }
-        // Chess only allows at most 1 targeted recipient
-        if (recipients && recipients.length > 1 && gameData.gameType === 'chess') {
-          socket.emit('error', { message: 'Chess can only target one player' });
-          return;
-        }
-        if (gameData.gameType === 'chess') {
-          const senderId = socket.persistentUserId || data.userId || socket.id;
-          const isCPU = !!gameData.isCPU;
-          const cpuDifficulty = isCPU ? (gameData.cpuDifficulty || 'medium') : undefined;
-          const isTargeted = !isCPU && recipients && recipients.length === 1;
-          let invitedNickname = null;
-          if (isTargeted) {
-            const chessRoom = await roomManager.getRoom(socket.roomCode);
-            if (chessRoom && chessRoom.users) {
-              const targetUser = chessRoom.users.find(u => u.socketId === recipients[0] || u.id === recipients[0]);
-              invitedNickname = targetUser ? targetUser.nickname : null;
-            }
-          }
-          data.gameData = {
-            gameType: 'chess',
-            fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
-            players: {
-              white: { id: senderId, socketId: socket.id, name: socket.nickname },
-              black: isCPU ? { id: 'cpu', name: `CPU (${cpuDifficulty})`, isCPU: true } : null,
-            },
-            invitedNickname: isCPU ? null : invitedNickname,
-            isCPU,
-            cpuDifficulty,
-            turn: 'w',
-            history: [],
-            winner: null,
-            lastActivity: Date.now()
-          };
-          // Chess games must never expire while active; overrideTtl=0 signals "never expire"
-          overrideTtl = 0;
-        } else if (gameData.gameType === 'tetris') {
+        if (gameData.gameType === 'tetris') {
           const senderId = socket.persistentUserId || data.userId || socket.id;
           const gameId = `tetris_${Date.now()}_${nodeCrypto.randomBytes(4).toString('hex')}`;
           data.gameData = {
@@ -2681,63 +2576,10 @@ io.on('connection', (socket) => {
           };
           overrideTtl = 0;
           messageContent = 'Tetris Battle';
-        } else if (gameData.gameType === 'anagram') {
-          const senderId = socket.persistentUserId || data.userId || socket.id;
-          data.gameData = {
-            gameType: 'anagram',
-            status: 'waiting',
-            host: { id: senderId, socketId: socket.id, name: socket.nickname },
-            challenger: null,
-            scores: { host: 0, challenger: 0 },
-            round: 0,
-            totalRounds: 3,
-            currentScrambled: null,
-            currentWord: null,
-            roundWinner: null,
-            winner: null,
-            startedAt: null,
-            isSolo: !!gameData.isSolo,
-          };
-          overrideTtl = 0;
-          messageContent = 'Word Duel';
-        } else if (gameData.gameType === 'hangman') {
-          const senderId = socket.persistentUserId || data.userId || socket.id;
-          data.gameData = {
-            gameType: 'hangman',
-            status: 'waiting',
-            wordmaster: { id: senderId, socketId: socket.id, name: socket.nickname },
-            guesser: null,
-            wordLength: 0,
-            revealedLetters: [],
-            wrongGuesses: [],
-            maxWrong: 6,
-            winner: null,
-            startedAt: null,
-            spectators: [],
-          };
-          overrideTtl = 0;
-          messageContent = 'Word Trap';
-        } else if (gameData.gameType === 'typesprint') {
-          const senderId = socket.persistentUserId || data.userId || socket.id;
-          data.gameData = {
-            gameType: 'typesprint',
-            status: 'waiting',
-            player1: { id: senderId, socketId: socket.id, name: socket.nickname },
-            player2: null,
-            passage: null,
-            progress: { player1: 0, player2: 0 },
-            wpm: { player1: 0, player2: 0 },
-            finished: { player1: false, player2: false },
-            winner: null,
-            startedAt: null,
-          };
-          overrideTtl = 0;
-          messageContent = 'Type Sprint';
         } else {
           socket.emit('error', { message: 'Unknown game type' });
           return;
         }
-        if (gameData.gameType === 'chess') messageContent = gameData.isCPU ? `Chess vs CPU` : 'Chess';
       } else if (messageType === 'videoReply') {
         // Always encrypted; content holds the ciphertext forwarded from v4/v5 payload
         messageContent = content;
@@ -2824,19 +2666,13 @@ io.on('connection', (socket) => {
 
       // Broadcast logic
       if (recipients && recipients.length > 0) {
-        // Chess games always broadcast to the whole room (anyone can spectate)
-        const isChessGame = message.messageType === 'game' && message.gameData?.gameType === 'chess';
-        if (isChessGame) {
-          io.to(socket.roomCode).emit('new-message', message);
-        } else {
-          // 1. Send to sender (so they see their own message)
-          socket.emit('new-message', message);
+        // 1. Send to sender (so they see their own message)
+        socket.emit('new-message', message);
 
-          // 2. Send to each recipient
-          recipients.forEach(recipientId => {
-            io.to(recipientId).emit('new-message', message);
-          });
-        }
+        // 2. Send to each recipient
+        recipients.forEach(recipientId => {
+          io.to(recipientId).emit('new-message', message);
+        });
       } else {
         // Broadcast to all users in room (default)
         io.to(socket.roomCode).emit('new-message', message);
@@ -2871,281 +2707,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ─── Chess Handlers ────────────────────────────────────────────────────────
-
-  socket.on('chess-join', async (data) => {
-    try {
-      const { messageId, userId } = data;
-      if (!socket.roomCode || !messageId) return;
-
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-
-      const message = (room.messages || []).find(m => m.id === messageId);
-      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
-
-      const { gameData } = message;
-      if (gameData.winner) return;
-
-      const joinerId = userId || socket.persistentUserId || socket.id;
-
-      if (!gameData.players.white?.id) {
-        gameData.players.white = { id: joinerId, socketId: socket.id, name: socket.nickname };
-      } else if (!gameData.players.black?.id) {
-        if (gameData.players.white?.id === joinerId || gameData.players.white?.name === socket.nickname) return;
-
-        const isTargeted = message.recipients && message.recipients.length > 0;
-        if (isTargeted) {
-          const isIntendedRecipient = message.recipients.includes(joinerId) ||
-            message.recipients.includes(socket.id) ||
-            (gameData.invitedNickname && gameData.invitedNickname === socket.nickname);
-          if (!isIntendedRecipient) return;
-        }
-
-        gameData.players.black = { id: joinerId, socketId: socket.id, name: socket.nickname };
-      } else {
-        // Re-sync socketId if existing player rejoins
-        if (gameData.players.white.id === joinerId || gameData.players.white.name === socket.nickname) {
-          gameData.players.white.id = joinerId;
-          gameData.players.white.socketId = socket.id;
-          gameData.players.white.name = socket.nickname;
-        } else if (gameData.players.black.id === joinerId || gameData.players.black.name === socket.nickname) {
-          gameData.players.black.id = joinerId;
-          gameData.players.black.socketId = socket.id;
-          gameData.players.black.name = socket.nickname;
-        } else {
-          return; // Game full
-        }
-      }
-
-      gameData.lastActivity = Date.now();
-      await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('message-updated', message);
-    } catch (error) {
-      logger.error('Error handling chess join:', error);
-    }
-  });
-
-  socket.on('chess-move', async (data) => {
-    try {
-      const { messageId, move, userId } = data;
-      if (!socket.roomCode || !messageId || !move) return;
-
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-
-      const message = (room.messages || []).find(m => m.id === messageId);
-      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
-
-      const { gameData } = message;
-      if (gameData.winner) return;
-
-      const playerId = socket.persistentUserId || userId || socket.id;
-      const isWhite = gameData.players.white?.id === playerId || gameData.players.white?.name === socket.nickname;
-      // CPU move: client sends isCpuMove=true when submitting AI-computed black move
-      const isCpuMove = !!data.isCpuMove && gameData.isCPU && gameData.turn === 'b';
-      const isBlack = gameData.players.black?.id === playerId || gameData.players.black?.name === socket.nickname || isCpuMove;
-
-      // CPU games are single-player — skip identity check so reconnects / new sessions don't block the human
-      // For multiplayer, enforce identity to prevent unauthorized moves
-      if (!gameData.isCPU && ((gameData.turn === 'w' && !isWhite) || (gameData.turn === 'b' && !isBlack))) return;
-
-      const chess = new Chess(gameData.fen);
-      const moveResult = chess.move(move);
-
-      if (moveResult) {
-        gameData.fen = chess.fen();
-        gameData.turn = chess.turn();
-
-        if (chess.isCheckmate() || chess.isDraw()) {
-          const winner = chess.isDraw() ? 'draw' : (chess.turn() === 'w' ? 'black' : 'white');
-          gameData.winner = winner;
-          if (winner !== 'draw') {
-            gameData.winnerId = winner === 'white' ? gameData.players.white.id : gameData.players.black.id;
-          }
-          gameData.endedAt = Date.now();
-          // Completed games get a 2-min grace period before expiry
-          message.overrideTtl = 120;
-          message.expiresAt = new Date(Date.now() + 120 * 1000).toISOString();
-        }
-
-        gameData.history = gameData.history || [];
-        gameData.history.push(moveResult.san);
-        gameData.lastRawMove = { from: moveResult.from, to: moveResult.to };
-        gameData.lastActivity = Date.now();
-
-        await roomManager.saveRoom(socket.roomCode, room);
-        io.to(socket.roomCode).emit('message-updated', message);
-      }
-    } catch (error) {
-      logger.error('Error handling chess move:', error);
-    }
-  });
-
-  socket.on('chess-swap-request', async ({ messageId }) => {
-    try {
-      if (!socket.roomCode || !messageId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = (room.messages || []).find(m => m.id === messageId);
-      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
-
-      const requesterId = socket.persistentUserId || socket.id;
-      const isHost = message.sender.id === requesterId || message.sender.socketId === socket.id || message.sender.nickname === socket.nickname;
-      if (!isHost) return;
-
-      const { gameData } = message;
-
-      if (!gameData.players.white || !gameData.players.black) {
-        const temp = gameData.players.white;
-        gameData.players.white = gameData.players.black;
-        gameData.players.black = temp;
-        await roomManager.saveRoom(socket.roomCode, room);
-        io.to(socket.roomCode).emit('message-updated', message);
-        return;
-      }
-
-      const whiteOnline = io.sockets.sockets.has(gameData.players.white.socketId);
-      const blackOnline = io.sockets.sockets.has(gameData.players.black.socketId);
-
-      if (!whiteOnline && !blackOnline) {
-        const temp = gameData.players.white;
-        gameData.players.white = gameData.players.black;
-        gameData.players.black = temp;
-        await roomManager.saveRoom(socket.roomCode, room);
-        io.to(socket.roomCode).emit('message-updated', message);
-        return;
-      }
-
-      const onlinePlayers = [];
-      if (whiteOnline && gameData.players.white.id !== requesterId) onlinePlayers.push(gameData.players.white);
-      if (blackOnline && gameData.players.black.id !== requesterId) onlinePlayers.push(gameData.players.black);
-
-      if (onlinePlayers.length === 0) {
-        const temp = gameData.players.white;
-        gameData.players.white = gameData.players.black;
-        gameData.players.black = temp;
-        await roomManager.saveRoom(socket.roomCode, room);
-        io.to(socket.roomCode).emit('message-updated', message);
-        return;
-      }
-
-      gameData._pendingSwap = {
-        requestedBy: requesterId,
-        requesterName: socket.nickname,
-        responses: {},
-        needed: onlinePlayers.length
-      };
-      await roomManager.saveRoom(socket.roomCode, room);
-
-      onlinePlayers.forEach(player => {
-        io.to(player.socketId).emit('chess-swap-approval-needed', { messageId, requestedBy: socket.nickname });
-      });
-      socket.emit('chess-swap-pending', { messageId, waitingFor: onlinePlayers.map(p => p.name) });
-    } catch (err) { logger.error('chess-swap-request err:', err); }
-  });
-
-  socket.on('chess-swap-response', async ({ messageId, approved }) => {
-    try {
-      if (!socket.roomCode || !messageId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = (room.messages || []).find(m => m.id === messageId);
-      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
-
-      const { gameData } = message;
-      if (!gameData._pendingSwap) return;
-
-      const responderId = socket.persistentUserId || socket.id;
-      gameData._pendingSwap.responses[responderId] = approved;
-
-      if (!approved) {
-        io.to(message.sender.socketId).emit('chess-swap-declined', { messageId, declinedBy: socket.nickname });
-        delete gameData._pendingSwap;
-        await roomManager.saveRoom(socket.roomCode, room);
-        return;
-      }
-
-      const approvalCount = Object.values(gameData._pendingSwap.responses).filter(v => v === true).length;
-      if (approvalCount >= gameData._pendingSwap.needed) {
-        const temp = gameData.players.white;
-        gameData.players.white = gameData.players.black;
-        gameData.players.black = temp;
-        delete gameData._pendingSwap;
-        await roomManager.saveRoom(socket.roomCode, room);
-        io.to(socket.roomCode).emit('message-updated', message);
-      } else {
-        await roomManager.saveRoom(socket.roomCode, room);
-      }
-    } catch (err) { logger.error('chess-swap-response err:', err); }
-  });
-
-  socket.on('chess-replace-request', async ({ messageId, role, targetUserId }) => {
-    try {
-      if (!socket.roomCode || !messageId || !role || !targetUserId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = (room.messages || []).find(m => m.id === messageId);
-      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
-
-      const requesterId = socket.persistentUserId || socket.id;
-      const isHost = message.sender.id === requesterId || message.sender.socketId === socket.id || message.sender.nickname === socket.nickname;
-      if (!isHost) return;
-
-      const targetUser = (room.users || []).find(u => u.socketId === targetUserId);
-      const targetId = targetUser?.id || targetUser?.userId || targetUserId;
-      const targetNick = targetUser?.nickname || 'New Player';
-
-      const { gameData } = message;
-      const currentPlayer = gameData.players[role];
-      const isCurrentPlayerOnline = currentPlayer && currentPlayer.socketId && io.sockets.sockets.has(currentPlayer.socketId);
-
-      if (!isCurrentPlayerOnline || !currentPlayer?.id) {
-        gameData.players[role] = { id: targetId, socketId: targetUserId, name: targetNick };
-        await roomManager.saveRoom(socket.roomCode, room);
-        io.to(socket.roomCode).emit('message-updated', message);
-        return;
-      }
-
-      gameData._pendingReplace = {
-        role,
-        newPlayer: { id: targetId, socketId: targetUserId, name: targetNick },
-        requestedBy: requesterId,
-        requesterName: socket.nickname
-      };
-      await roomManager.saveRoom(socket.roomCode, room);
-
-      io.to(currentPlayer.socketId).emit('chess-replace-approval-needed', {
-        messageId, role, newPlayerName: targetNick, requestedBy: socket.nickname
-      });
-      socket.emit('chess-replace-pending', { messageId, role, waitingFor: currentPlayer.name });
-    } catch (err) { logger.error('chess-replace-request err:', err); }
-  });
-
-  socket.on('chess-replace-response', async ({ messageId, approved }) => {
-    try {
-      if (!socket.roomCode || !messageId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = (room.messages || []).find(m => m.id === messageId);
-      if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return;
-
-      const { gameData } = message;
-      if (!gameData._pendingReplace) return;
-
-      if (approved) {
-        const { role, newPlayer } = gameData._pendingReplace;
-        gameData.players[role] = newPlayer;
-        delete gameData._pendingReplace;
-        await roomManager.saveRoom(socket.roomCode, room);
-        io.to(socket.roomCode).emit('message-updated', message);
-      } else {
-        io.to(message.sender.socketId).emit('chess-replace-declined', { messageId, declinedBy: socket.nickname });
-        delete gameData._pendingReplace;
-        await roomManager.saveRoom(socket.roomCode, room);
-      }
-    } catch (err) { logger.error('chess-replace-response err:', err); }
-  });
 
   // ─── Tetris Handlers ──────────────────────────────────────────────────────
 
@@ -4174,302 +3735,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ─── Anagram Game Handlers ─────────────────────────────────────────────────
-  const WORD_LISTS = {
-    easy: ['apple','brave','chess','dance','eagle','flame','grape','house','image','joker','knife','lemon','mango','night','ocean','piano','queen','river','solar','tiger','uncle','vivid','witch','xerox','yacht','zebra'],
-    medium: ['bridge','castle','dancer','engine','forest','garden','hunter','island','jungle','knight','ladder','marble','needle','orange','puzzle','quartz','rabbit','shadow','tunnel','unique','violet','walnut','xyster','yellow','zipper'],
-    hard: ['abolish','bracket','cabinet','diamond','exhibit','fantasy','granite','harmony','integer','jackpot','kingdom','leopard','machine','network','obscure','pyramid','quantum','railway','science','torpedo','unusual','vortex','walruse','xylohem','zephyrs'],
-  };
-
-  function scramble(word) {
-    const a = word.split('');
-    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
-    const s = a.join('');
-    return s === word ? scramble(word) : s;
-  }
-
-  socket.on('anagram-join', async ({ messageId }) => {
-    try {
-      if (!socket.roomCode || !messageId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = (room.messages || []).find(m => m.id === messageId);
-      if (!message || message.gameData?.gameType !== 'anagram') return;
-      const gd = message.gameData;
-      if (gd.challenger || gd.status !== 'waiting') return;
-      const joinerId = socket.persistentUserId || socket.id;
-      if (joinerId === gd.host.id) return;
-      gd.challenger = { id: joinerId, socketId: socket.id, name: socket.nickname };
-      // Start round 1
-      const difficulty = 'medium';
-      const words = WORD_LISTS[difficulty];
-      const word = words[Math.floor(Math.random() * words.length)];
-      gd.currentWord = word;
-      gd.currentScrambled = scramble(word);
-      gd.round = 1;
-      gd.status = 'playing';
-      gd.startedAt = Date.now();
-      gd.roundDeadline = Date.now() + 30000;
-      await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('message-updated', message);
-    } catch (err) { logger.error('anagram-join err:', err); }
-  });
-
-  socket.on('anagram-guess', async ({ messageId, guess }) => {
-    try {
-      if (!socket.roomCode || !messageId || !guess) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = (room.messages || []).find(m => m.id === messageId);
-      if (!message || message.gameData?.gameType !== 'anagram') return;
-      const gd = message.gameData;
-      if (gd.winner || gd.status !== 'playing') return;
-      const guesser = socket.persistentUserId || socket.id;
-      const isHost = gd.host.id === guesser || gd.host.name === socket.nickname;
-      const isChallenger = gd.challenger?.id === guesser || gd.challenger?.name === socket.nickname;
-      if (!isHost && !isChallenger) return;
-      if (guess.toLowerCase().trim() !== gd.currentWord) return;
-      // Correct!
-      const role = isHost ? 'host' : 'challenger';
-      gd.scores[role]++;
-      gd.roundWinner = role;
-      if (gd.round >= gd.totalRounds || gd.scores[role] >= Math.ceil(gd.totalRounds / 2) + (gd.totalRounds % 2 === 0 ? 1 : 0)) {
-        gd.winner = role;
-        gd.status = 'finished';
-      } else {
-        // Next round
-        gd.round++;
-        const difficulty = 'medium';
-        const words = WORD_LISTS[difficulty];
-        const word = words[Math.floor(Math.random() * words.length)];
-        gd.currentWord = word;
-        gd.currentScrambled = scramble(word);
-        gd.roundDeadline = Date.now() + 30000;
-        gd.roundWinner = null;
-      }
-      await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('message-updated', message);
-    } catch (err) { logger.error('anagram-guess err:', err); }
-  });
-
-  socket.on('anagram-solo', async ({ messageId, userId }) => {
-    try {
-      if (!socket.roomCode || !messageId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = (room.messages || []).find(m => m.id === messageId);
-      if (!message || message.gameData?.gameType !== 'anagram') return;
-      const gd = message.gameData;
-      if (gd.status !== 'waiting') return;
-      const hostId = userId || socket.persistentUserId || socket.id;
-      if (gd.host.id !== hostId && gd.host.name !== socket.nickname) return;
-      gd.isSolo = true;
-      gd.challenger = { id: 'bot', name: 'Bot', isBot: true };
-      const words = WORD_LISTS['medium'];
-      const word = words[Math.floor(Math.random() * words.length)];
-      gd.currentWord = word;
-      gd.currentScrambled = scramble(word);
-      gd.round = 1;
-      gd.status = 'playing';
-      gd.startedAt = Date.now();
-      gd.roundDeadline = Date.now() + 30000;
-      await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('message-updated', message);
-    } catch (err) { logger.error('anagram-solo err:', err); }
-  });
-
-  // ─── Hangman Game Handlers ──────────────────────────────────────────────────
-  const HANGMAN_WORDS = ['algorithm','blueprint','cognition','democracy','evolution','fantastic','geography','hibernate','illusion','journalism','keyboard','lightning','magazine','nitrogen','obsidian','photograph','question','rhythmic','symmetry','technology','umbrella','vibration','wavelength','xenolith','yesterday','zodiac'];
-
-  socket.on('hangman-solo', async ({ messageId, userId }) => {
-    try {
-      if (!socket.roomCode || !messageId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = (room.messages || []).find(m => m.id === messageId);
-      if (!message || message.gameData?.gameType !== 'hangman') return;
-      const gd = message.gameData;
-      if (gd.status !== 'waiting') return;
-      const hostId = userId || socket.persistentUserId || socket.id;
-      if (gd.wordmaster.id !== hostId && gd.wordmaster.name !== socket.nickname) return;
-      // Computer picks a random word, player guesses
-      const word = HANGMAN_WORDS[Math.floor(Math.random() * HANGMAN_WORDS.length)];
-      gd.isSolo = true;
-      gd.guesser = { id: hostId, socketId: socket.id, name: socket.nickname };
-      gd.wordmaster = { id: 'computer', name: 'Computer', isBot: true };
-      gd.currentWord = word;
-      gd.wordLength = word.length;
-      gd.revealedLetters = Array(word.length).fill(null);
-      gd.wrongGuesses = [];
-      gd.status = 'playing';
-      gd.startedAt = Date.now();
-      await roomManager.saveRoom(socket.roomCode, room);
-      // Only send word to guesser (same user here, but keep pattern)
-      const maskedMessage = { ...message, gameData: { ...gd, currentWord: null } };
-      io.to(socket.roomCode).emit('message-updated', maskedMessage);
-      io.to(socket.id).emit('hangman-your-word', { messageId, word });
-    } catch (err) { logger.error('hangman-solo err:', err); }
-  });
-
-  socket.on('hangman-join', async ({ messageId }) => {
-    try {
-      if (!socket.roomCode || !messageId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = (room.messages || []).find(m => m.id === messageId);
-      if (!message || message.gameData?.gameType !== 'hangman') return;
-      const gd = message.gameData;
-      if (gd.guesser || gd.status !== 'waiting') return;
-      const joinerId = socket.persistentUserId || socket.id;
-      if (joinerId === gd.wordmaster.id) return;
-      gd.guesser = { id: joinerId, socketId: socket.id, name: socket.nickname };
-      gd.status = 'picking'; // wordmaster picks word
-      await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('message-updated', message);
-    } catch (err) { logger.error('hangman-join err:', err); }
-  });
-
-  socket.on('hangman-set-word', async ({ messageId, word }) => {
-    try {
-      if (!socket.roomCode || !messageId || !word) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = (room.messages || []).find(m => m.id === messageId);
-      if (!message || message.gameData?.gameType !== 'hangman') return;
-      const gd = message.gameData;
-      const masterId = socket.persistentUserId || socket.id;
-      if (gd.wordmaster.id !== masterId && gd.wordmaster.name !== socket.nickname) return;
-      if (gd.status !== 'picking' && gd.status !== 'waiting') return;
-      const clean = word.toLowerCase().replace(/[^a-z]/g, '');
-      if (clean.length < 3 || clean.length > 20) return;
-      gd.currentWord = clean;
-      gd.wordLength = clean.length;
-      gd.revealedLetters = Array(clean.length).fill(null);
-      gd.wrongGuesses = [];
-      gd.status = 'playing';
-      gd.startedAt = Date.now();
-      gd.wordForMaster = clean; // only wordmaster sees this
-      await roomManager.saveRoom(socket.roomCode, room);
-      // Send full state to wordmaster, masked state to others
-      const maskedMessage = { ...message, gameData: { ...gd, currentWord: null } };
-      io.to(socket.roomCode).emit('message-updated', maskedMessage);
-      // Send actual word to wordmaster
-      if (gd.wordmaster.socketId) io.to(gd.wordmaster.socketId).emit('hangman-your-word', { messageId, word: clean });
-    } catch (err) { logger.error('hangman-set-word err:', err); }
-  });
-
-  socket.on('hangman-guess', async ({ messageId, letter }) => {
-    try {
-      if (!socket.roomCode || !messageId || !letter) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = (room.messages || []).find(m => m.id === messageId);
-      if (!message || message.gameData?.gameType !== 'hangman') return;
-      const gd = message.gameData;
-      if (gd.winner || gd.status !== 'playing') return;
-      const guesserId = socket.persistentUserId || socket.id;
-      const isGuesser = gd.guesser?.id === guesserId || gd.guesser?.name === socket.nickname;
-      // In solo mode wordmaster is 'computer' — only the guesser can guess; otherwise allow spectators too
-      const isSpectator = !gd.isSolo && !isGuesser && gd.wordmaster.id !== guesserId;
-      if (!isGuesser && !isSpectator) return;
-      const l = letter.toLowerCase();
-      if (gd.revealedLetters.includes(l) || gd.wrongGuesses.includes(l)) return;
-      const word = gd.wordForMaster || gd.currentWord;
-      if (!word) return;
-      if (word.includes(l)) {
-        gd.revealedLetters = word.split('').map((c, i) => c === l ? l : (gd.revealedLetters[i] || null));
-        if (!gd.revealedLetters.includes(null)) {
-          gd.winner = 'guesser'; gd.status = 'finished';
-        }
-      } else {
-        gd.wrongGuesses.push(l);
-        if (gd.wrongGuesses.length >= gd.maxWrong) { gd.winner = 'wordmaster'; gd.status = 'finished'; }
-      }
-      await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('message-updated', { ...message, gameData: { ...gd, currentWord: null } });
-    } catch (err) { logger.error('hangman-guess err:', err); }
-  });
-
-  // ─── Type Sprint Game Handlers ──────────────────────────────────────────────
-
-  socket.on('typesprint-solo', async ({ messageId, userId }) => {
-    try {
-      if (!socket.roomCode || !messageId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = (room.messages || []).find(m => m.id === messageId);
-      if (!message || message.gameData?.gameType !== 'typesprint') return;
-      const gd = message.gameData;
-      if (gd.status !== 'waiting') return;
-      const p1Id = userId || socket.persistentUserId || socket.id;
-      if (gd.player1.id !== p1Id && gd.player1.name !== socket.nickname) return;
-      gd.isSolo = true;
-      gd.player2 = { id: 'bot', name: 'Bot', isBot: true };
-      gd.passage = PASSAGES[Math.floor(Math.random() * PASSAGES.length)];
-      gd.status = 'countdown';
-      gd.startedAt = Date.now() + 3000;
-      gd.progress = { player1: 0, player2: 0 };
-      gd.wpm = { player1: 0, player2: 0 };
-      await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('message-updated', message);
-    } catch (err) { logger.error('typesprint-solo err:', err); }
-  });
-
-  const PASSAGES = [
-    "The quick brown fox jumps over the lazy dog and runs away into the sunset.",
-    "Programming is the art of telling another human being what one wants the computer to do.",
-    "To be or not to be that is the question whether tis nobler in the mind to suffer.",
-    "All that glitters is not gold often have you heard that told many a man his life hath sold.",
-    "The only way to do great work is to love what you do if you have not found it yet keep looking.",
-  ];
-
-  socket.on('typesprint-join', async ({ messageId }) => {
-    try {
-      if (!socket.roomCode || !messageId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = (room.messages || []).find(m => m.id === messageId);
-      if (!message || message.gameData?.gameType !== 'typesprint') return;
-      const gd = message.gameData;
-      if (gd.player2 || gd.status !== 'waiting') return;
-      const joinerId = socket.persistentUserId || socket.id;
-      if (joinerId === gd.player1.id) return;
-      gd.player2 = { id: joinerId, socketId: socket.id, name: socket.nickname };
-      gd.passage = PASSAGES[Math.floor(Math.random() * PASSAGES.length)];
-      gd.status = 'countdown';
-      gd.startedAt = Date.now() + 3000; // 3s countdown
-      gd.progress = { player1: 0, player2: 0 };
-      gd.wpm = { player1: 0, player2: 0 };
-      await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('message-updated', message);
-    } catch (err) { logger.error('typesprint-join err:', err); }
-  });
-
-  socket.on('typesprint-progress', async ({ messageId, progress, wpm }) => {
-    try {
-      if (!socket.roomCode || !messageId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = (room.messages || []).find(m => m.id === messageId);
-      if (!message || message.gameData?.gameType !== 'typesprint') return;
-      const gd = message.gameData;
-      if (gd.winner) return;
-      const playerId = socket.persistentUserId || socket.id;
-      const isP1 = gd.player1?.id === playerId || gd.player1?.name === socket.nickname;
-      const isP2 = gd.player2?.id === playerId || gd.player2?.name === socket.nickname;
-      if (!isP1 && !isP2) return;
-      const role = isP1 ? 'player1' : 'player2';
-      gd.progress[role] = Math.min(100, Math.max(0, progress));
-      gd.wpm[role] = wpm || 0;
-      if (gd.status === 'countdown' && Date.now() >= gd.startedAt) gd.status = 'playing';
-      if (gd.progress[role] >= 100 && !gd.finished[role]) {
-        gd.finished[role] = true;
-        if (!gd.winner) { gd.winner = role; gd.status = 'finished'; }
-      }
-      await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('message-updated', message);
-    } catch (err) { logger.error('typesprint-progress err:', err); }
-  });
 
   socket.on('disconnect', async (reason) => {
     keyRegistry.removeKeyBundle(socket.id);
