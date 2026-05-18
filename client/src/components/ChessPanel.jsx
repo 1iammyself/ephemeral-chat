@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
-import { Flag, RotateCcw, Clock, Users } from 'lucide-react';
+import { Flag, RotateCcw, Clock, Users, Trash2 } from 'lucide-react';
 import socketManager from '../socket';
 import { getCpuMove } from './games/ChessEngine';
 import { getVibeById } from '../utils/vibes';
@@ -98,7 +98,7 @@ function TimerBar({ timeMs, maxMs, isActive, color, name, captured, unicode, adv
   );
 }
 
-export default function ChessPanel({ message, currentUser, roomVibe }) {
+export default function ChessPanel({ message, currentUser, roomVibe, onDelete }) {
   const vibe = getVibeById(roomVibe);
   const [gameData, setGameData] = useState(message?.gameData ?? null);
   const [fen, setFen] = useState(message?.gameData?.fen || INITIAL_FEN);
@@ -119,6 +119,22 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
   const [pendingPromotion, setPendingPromotion] = useState(null);
   const [isInCheck, setIsInCheck] = useState(false);
   const [myTurnFlash, setMyTurnFlash] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Board sizing — tracks the flex container and fits the largest square that fits
+  const boardContainerRef = useRef(null);
+  const [boardSize, setBoardSize] = useState(360);
+
+  useEffect(() => {
+    const el = boardContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setBoardSize(Math.max(120, Math.floor(Math.min(width, height)) - 8));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Refs to avoid stale closures
   const chessRef = useRef(new Chess(message?.gameData?.fen || INITIAL_FEN));
@@ -633,11 +649,12 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
       )}
 
       {/* Board */}
-      <div className="flex-1 flex items-center justify-center p-2 min-h-0 overflow-hidden">
-        <div className="w-full max-w-[380px] aspect-square relative">
+      <div ref={boardContainerRef} className="flex-1 flex items-center justify-center p-2 min-h-0 overflow-hidden">
+        <div style={{ width: boardSize, height: boardSize }} className="relative flex-shrink-0">
           <Chessboard
             id={`chess-${messageId}`}
             position={fen}
+            boardWidth={boardSize}
             onPieceDrop={onDrop}
             onSquareClick={isMyTurn ? onSquareClick : undefined}
             onPieceDragBegin={isMyTurn ? onPieceDragBegin : undefined}
@@ -792,6 +809,35 @@ export default function ChessPanel({ message, currentUser, roomVibe }) {
             className="w-full py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:opacity-80 flex items-center justify-center gap-1.5">
             <RotateCcw className="w-3.5 h-3.5" />Flip Board
           </button>
+        </div>
+      )}
+
+      {/* Creator delete game */}
+      {isCreator && onDelete && (
+        <div className="px-3 pb-3 border-t border-gray-100 dark:border-gray-800 pt-2">
+          {confirmDelete ? (
+            <div className="flex gap-2">
+              <button
+                onClick={() => { onDelete(messageId); setConfirmDelete(false); }}
+                className="flex-1 py-1.5 text-xs font-black rounded-lg bg-red-600 text-white hover:opacity-90 transition-opacity"
+              >
+                Delete for everyone
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="py-1.5 px-3 text-xs font-black rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:opacity-80 transition-opacity"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="w-full py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center justify-center gap-1.5"
+            >
+              <Trash2 className="w-3.5 h-3.5" />Delete Game
+            </button>
+          )}
         </div>
       )}
     </div>

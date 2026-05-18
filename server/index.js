@@ -3327,7 +3327,9 @@ io.on('connection', (socket) => {
       gameData.turnStartedAt = now;
       if (move) gameData.moves = [...(gameData.moves || []), move];
       await roomManager.saveRoom(socket.roomCode, room);
-      // Relay to spectators (not sender)
+      // Persist updated FEN to all clients so panel reopens at correct position
+      io.to(socket.roomCode).emit('message-updated', message);
+      // Relay move details to spectators
       socket.to(socket.roomCode).emit('chess-move-made', { messageId, move, fen, whiteTime: gameData.whiteTime, blackTime: gameData.blackTime, turnStartedAt: now });
     } catch (err) { logger.error('chess-sync-fen err:', err); }
   });
@@ -3343,8 +3345,8 @@ io.on('connection', (socket) => {
       if (gameData.status !== 'playing') return;
 
       const resignerId = socket.persistentUserId || socket.id;
-      const isWhite = gameData.white?.id === resignerId;
-      const isBlack = gameData.black?.id === resignerId && !gameData.cpu?.enabled;
+      const isWhite = gameData.white?.id === resignerId || (socket.nickname && gameData.white?.name === socket.nickname);
+      const isBlack = (gameData.black?.id === resignerId || (socket.nickname && gameData.black?.name === socket.nickname)) && !gameData.cpu?.enabled;
       if (!isWhite && !isBlack) return;
 
       const loserColor = isWhite ? 'white' : 'black';

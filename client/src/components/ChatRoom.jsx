@@ -4097,6 +4097,7 @@ const ChatRoom = () => {
             message={activeChessMessage}
             currentUser={currentUser}
             roomVibe={roomVibe}
+            onDelete={handleDeleteMessage}
           />
         </FloatingPanel>
       )}

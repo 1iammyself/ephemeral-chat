@@ -537,6 +537,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         onSpectate={onChessSpectate}
                         onLaunch={onChessLaunch}
                         onVsCpu={onChessVsCpu}
+                        onDelete={onDelete}
                         roomVibe={roomVibe}
                       />
                     ) : message.messageType === 'poll' ? (
