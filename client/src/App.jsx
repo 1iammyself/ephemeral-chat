@@ -17,6 +17,7 @@ import NearbyTransfer from './components/NearbyTransfer';
 import AppRestrictionBanner from './components/AppRestrictionBanner';
 import DesktopSecurityGuard from './components/DesktopSecurityGuard';
 import DeepLinkHandler from './components/DeepLinkHandler';
+import OfflineOverlay from './components/OfflineOverlay';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -145,6 +146,7 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 transition-colors duration-200 no-scrollbar">
+        <OfflineOverlay />
         <DesktopSecurityGuard />
         <DeepLinkHandler />
         <AppRestrictionBanner />
