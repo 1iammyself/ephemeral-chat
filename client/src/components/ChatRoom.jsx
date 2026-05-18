@@ -91,6 +91,7 @@ import CameraModal from './CameraModal';
 import StegoModal from './StegoModal';
 import TetrisMessage from './TetrisMessage';
 import TetrisPanel from './TetrisPanel';
+import ChessPanel from './ChessPanel';
 import { getVibeById, getAllVibes } from '../utils/vibes';
 import SharedMediaPlayer, { detectMediaUrl } from './SharedMediaPlayer';
 import WatchPartyModal from './WatchPartyModal';
@@ -132,6 +133,7 @@ const SLASH_COMMANDS = [
   { icon: FileText, label: 'Stego', value: '/stego', cmdKey: 'stego' },
   { icon: Code2, label: 'Code Share', value: '/code', cmdKey: 'codeShare' },
   { icon: Gamepad2, label: 'Tetris', value: '/tetris', cmdKey: 'tetris' },
+  { icon: Gamepad2, label: 'Chess', value: '/chess', cmdKey: 'chess' },
 ];
 
 const CONFETTI_COLORS = [
@@ -675,6 +677,7 @@ const ChatRoom = () => {
   const { openPanel, closePanel, focusPanel, isOpen: isPanelOpen, getZ } = usePanelManager();
   const [stegoExtractImage, setStegoExtractImage] = useState(null);
   const [activeTetrisMessage, setActiveTetrisMessage] = useState(null);
+  const [activeChessMessage, setActiveChessMessage] = useState(null);
   const setShowStegoModal = (v) => { if (!v) setStegoExtractImage(null); v ? openPanel('secrets') : closePanel('secrets'); };
   const setShowCodeShare    = (v) => v ? openPanel('code')    : closePanel('code');
   const [activeTimer, setActiveTimer] = useState(null);
@@ -1342,6 +1345,7 @@ const ChatRoom = () => {
     const handleMessageDeleted = ({ messageId }) => {
       setMessages(prev => prev.filter(m => m.id !== messageId));
       setActiveTetrisMessage(prev => prev?.id === messageId ? null : prev);
+      setActiveChessMessage(prev => prev?.id === messageId ? null : prev);
     };
 
     const handleUserJoined = ({ user, roomUsers }) => {
@@ -1429,6 +1433,7 @@ const ChatRoom = () => {
       setMessages(prev => prev.map(m => m.id === finalMessage.id ? finalMessage : m));
       // Keep open game panels in sync
       setActiveTetrisMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
+      setActiveChessMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
     };
 
     // Role and moderation event handlers
@@ -2102,6 +2107,9 @@ const ChatRoom = () => {
         case '/tetris':
           handleSendTetris();
           break;
+        case '/chess':
+          handleSendChess();
+          break;
         default: break;
       }
       if (cmd.startsWith('/')) {
@@ -2653,6 +2661,47 @@ const ChatRoom = () => {
     if (!activeTetrisMessage && isPanelOpen('tetris')) closePanel('tetris');
   }, [activeTetrisMessage]);
 
+  const handleSendChess = () => {
+    if (!isConnected) return;
+    socketManager.emit('send-message', {
+      messageType: 'game',
+      gameData: { gameType: 'chess' },
+      userId: persistentUserId,
+      isAnonymous: false,
+    });
+  };
+
+  const handleChessJoin = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('chess-join', { messageId });
+    setMessages(prev => {
+      const msg = prev.find(m => m.id === messageId);
+      if (msg) { setActiveChessMessage(msg); openPanel('chess'); }
+      return prev;
+    });
+  };
+
+  const handleChessLaunch = (message) => {
+    setActiveChessMessage(message);
+    openPanel('chess');
+    hapticLight();
+  };
+
+  const handleChessSpectate = (message) => {
+    setActiveChessMessage(message);
+    openPanel('chess');
+  };
+
+  const handleChessVsCpu = (message) => {
+    setActiveChessMessage(message);
+    openPanel('chess');
+    hapticLight();
+  };
+
+  useEffect(() => {
+    if (!activeChessMessage && isPanelOpen('chess')) closePanel('chess');
+  }, [activeChessMessage]);
+
 
   const handleEditMessage = (message) => {
     setEditingMessage(message);
@@ -3157,6 +3206,10 @@ const ChatRoom = () => {
               onTetrisJoin={handleTetrisJoin}
               onTetrisSpectate={handleTetrisSpectate}
               onTetrisLaunch={handleTetrisLaunch}
+              onChessJoin={handleChessJoin}
+              onChessSpectate={handleChessSpectate}
+              onChessLaunch={handleChessLaunch}
+              onChessVsCpu={handleChessVsCpu}
               linkPreviews={linkPreviews}
               onOpenEmojiPicker={(messageId) => {
                 setReactionTargetId(messageId);
@@ -4016,6 +4069,28 @@ const ChatRoom = () => {
         >
           <TetrisPanel
             message={activeTetrisMessage}
+            currentUser={currentUser}
+            roomVibe={roomVibe}
+          />
+        </FloatingPanel>
+      )}
+
+      {/* ── Chess FloatingPanel ───────────────────────────────────────── */}
+      {isPanelOpen('chess') && (
+        <FloatingPanel
+          title="Chess"
+          icon={Gamepad2}
+          iconColor="text-amber-400"
+          onClose={() => closePanel('chess')}
+          onFocus={() => focusPanel('chess')}
+          zIndex={getZ('chess')}
+          defaultWidth={480}
+          defaultHeight={600}
+          defaultX={120}
+          defaultY={50}
+        >
+          <ChessPanel
+            message={activeChessMessage}
             currentUser={currentUser}
             roomVibe={roomVibe}
           />

@@ -2633,6 +2633,31 @@ io.on('connection', (socket) => {
           };
           overrideTtl = 0;
           messageContent = 'Tetris Battle';
+        } else if (gameData.gameType === 'chess') {
+          const senderId = socket.persistentUserId || data.userId || socket.id;
+          const gameId = `chess_${Date.now()}_${nodeCrypto.randomBytes(4).toString('hex')}`;
+          data.gameData = {
+            gameType: 'chess',
+            gameId,
+            creatorId: senderId,
+            white: { id: senderId, socketId: socket.id, name: socket.nickname },
+            black: null,
+            cpu: null,
+            fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+            moves: [],
+            status: 'waiting',
+            winner: null,
+            result: null,
+            challengeQueue: [],
+            timeControl: { initial: 300, increment: 0 },
+            whiteTime: 300000,
+            blackTime: 300000,
+            turnStartedAt: null,
+            startedAt: null,
+            endedAt: null,
+          };
+          overrideTtl = 0;
+          messageContent = 'Chess';
         } else {
           socket.emit('error', { message: 'Unknown game type' });
           return;
@@ -3082,6 +3107,314 @@ io.on('connection', (socket) => {
       await roomManager.saveRoom(socket.roomCode, room);
       io.to(socket.roomCode).emit('message-updated', message);
     } catch (err) { logger.error('tetris-solo-reset err:', err); }
+  });
+
+
+  // ─── Chess Handlers ───────────────────────────────────────────────────────
+
+  function chessGetMsg(room, messageId) {
+    const message = (room.messages || []).find(m => m.id === messageId);
+    if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return null;
+    return message;
+  }
+
+  function chessStartNewRound(gameData, winner, loserColor) {
+    const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+    // Pop first challenger
+    const challenger = gameData.challengeQueue.shift();
+    // Winner keeps seat; loser is replaced by challenger
+    if (loserColor === 'white') {
+      gameData.white = { id: challenger.id, socketId: challenger.socketId, name: challenger.name };
+    } else {
+      gameData.black = { id: challenger.id, socketId: challenger.socketId, name: challenger.name };
+    }
+    gameData.fen = INITIAL_FEN;
+    gameData.moves = [];
+    gameData.status = 'playing';
+    gameData.winner = null;
+    gameData.result = null;
+    gameData.whiteTime = (gameData.timeControl?.initial ?? 300) * 1000;
+    gameData.blackTime = (gameData.timeControl?.initial ?? 300) * 1000;
+    gameData.turnStartedAt = Date.now();
+    gameData.startedAt = Date.now();
+    gameData.endedAt = null;
+  }
+
+  socket.on('chess-join', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = chessGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status === 'finished') return;
+
+      const joinerId = socket.persistentUserId || socket.id;
+      const joinerName = socket.nickname;
+      // Don't join if already playing
+      if (gameData.white?.id === joinerId || gameData.black?.id === joinerId) return;
+      // Don't join if already in queue
+      if (gameData.challengeQueue.some(p => p.id === joinerId)) return;
+
+      if (!gameData.black && gameData.status === 'waiting' && !gameData.cpu?.enabled) {
+        // Take the black seat
+        gameData.black = { id: joinerId, socketId: socket.id, name: joinerName };
+        gameData.status = 'playing';
+        gameData.startedAt = Date.now();
+        gameData.turnStartedAt = Date.now();
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        io.to(socket.roomCode).emit('chess-opponent-joined', { messageId, gameData });
+      } else if (gameData.status === 'playing') {
+        // Queue up
+        gameData.challengeQueue.push({ id: joinerId, socketId: socket.id, name: joinerName });
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+      }
+    } catch (err) { logger.error('chess-join err:', err); }
+  });
+
+  socket.on('chess-set-cpu', async ({ messageId, difficulty }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = chessGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      // Only creator can set CPU, only when waiting and no black
+      const senderId = socket.persistentUserId || socket.id;
+      if (gameData.creatorId !== senderId) return;
+      if (gameData.black || gameData.status !== 'waiting') return;
+      const diff = ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium';
+      gameData.cpu = { enabled: true, difficulty: diff };
+      gameData.black = { id: 'cpu', socketId: null, name: `CPU (${diff})` };
+      gameData.status = 'playing';
+      gameData.startedAt = Date.now();
+      gameData.turnStartedAt = Date.now();
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+      io.to(socket.roomCode).emit('chess-opponent-joined', { messageId, gameData });
+    } catch (err) { logger.error('chess-set-cpu err:', err); }
+  });
+
+  socket.on('chess-move', async ({ messageId, move, fen }) => {
+    try {
+      if (!socket.roomCode || !messageId || !move || !fen) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = chessGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'playing' || gameData.cpu?.enabled) return;
+
+      const moverId = socket.persistentUserId || socket.id;
+      const isWhiteTurn = gameData.fen.split(' ')[1] === 'w';
+      const isWhite = gameData.white?.id === moverId;
+      const isBlack = gameData.black?.id === moverId;
+      if (!isWhite && !isBlack) return;
+      if (isWhite && !isWhiteTurn) return;
+      if (isBlack && isWhiteTurn) return;
+
+      // Deduct time for the mover
+      const now = Date.now();
+      if (gameData.turnStartedAt) {
+        const elapsed = now - gameData.turnStartedAt;
+        if (isWhite) {
+          gameData.whiteTime = Math.max(0, (gameData.whiteTime ?? 300000) - elapsed);
+        } else {
+          gameData.blackTime = Math.max(0, (gameData.blackTime ?? 300000) - elapsed);
+        }
+      }
+
+      gameData.fen = fen;
+      gameData.moves = [...(gameData.moves || []), move];
+      gameData.turnStartedAt = now;
+
+      await roomManager.saveRoom(socket.roomCode, room);
+      // Relay to room (opponent + spectators get the move)
+      io.to(socket.roomCode).emit('chess-move-made', {
+        messageId,
+        move,
+        fen,
+        whiteTime: gameData.whiteTime,
+        blackTime: gameData.blackTime,
+        turnStartedAt: now,
+      });
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('chess-move err:', err); }
+  });
+
+  socket.on('chess-sync-fen', async ({ messageId, fen, move }) => {
+    // CPU game FEN sync — no validation needed (only sender is human)
+    try {
+      if (!socket.roomCode || !messageId || !fen) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = chessGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (!gameData.cpu?.enabled) return;
+      gameData.fen = fen;
+      if (move) gameData.moves = [...(gameData.moves || []), move];
+      await roomManager.saveRoom(socket.roomCode, room);
+      // Relay to spectators
+      socket.to(socket.roomCode).emit('chess-move-made', { messageId, move, fen, whiteTime: gameData.whiteTime, blackTime: gameData.blackTime, turnStartedAt: gameData.turnStartedAt });
+    } catch (err) { logger.error('chess-sync-fen err:', err); }
+  });
+
+  socket.on('chess-resign', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = chessGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'playing') return;
+
+      const resignerId = socket.persistentUserId || socket.id;
+      const isWhite = gameData.white?.id === resignerId;
+      const isBlack = gameData.black?.id === resignerId && !gameData.cpu?.enabled;
+      if (!isWhite && !isBlack) return;
+
+      const loserColor = isWhite ? 'white' : 'black';
+      const winnerColor = isWhite ? 'black' : 'white';
+
+      if (gameData.challengeQueue.length > 0) {
+        chessStartNewRound(gameData, winnerColor, loserColor);
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        io.to(socket.roomCode).emit('chess-new-round', { messageId, gameData });
+      } else {
+        gameData.status = 'finished';
+        gameData.winner = winnerColor;
+        gameData.result = 'resign';
+        gameData.endedAt = Date.now();
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        io.to(socket.roomCode).emit('chess-game-over', { messageId, winner: winnerColor, result: 'resign', gameData });
+      }
+    } catch (err) { logger.error('chess-resign err:', err); }
+  });
+
+  socket.on('chess-draw-offer', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = chessGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'playing' || gameData.cpu?.enabled) return;
+
+      const offererId = socket.persistentUserId || socket.id;
+      const isWhite = gameData.white?.id === offererId;
+      const isBlack = gameData.black?.id === offererId;
+      if (!isWhite && !isBlack) return;
+      const byColor = isWhite ? 'white' : 'black';
+      io.to(socket.roomCode).emit('chess-draw-offered', { messageId, byColor });
+    } catch (err) { logger.error('chess-draw-offer err:', err); }
+  });
+
+  socket.on('chess-draw-accept', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = chessGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'playing') return;
+
+      if (gameData.challengeQueue.length > 0) {
+        // Draw = both lose their seat? Keep creator as white, challenger comes in as black
+        const loserColor = gameData.white?.id === (socket.persistentUserId || socket.id) ? 'black' : 'white';
+        chessStartNewRound(gameData, null, loserColor);
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        io.to(socket.roomCode).emit('chess-new-round', { messageId, gameData });
+      } else {
+        gameData.status = 'finished';
+        gameData.winner = 'draw';
+        gameData.result = 'draw-agreed';
+        gameData.endedAt = Date.now();
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        io.to(socket.roomCode).emit('chess-game-over', { messageId, winner: 'draw', result: 'draw-agreed', gameData });
+      }
+    } catch (err) { logger.error('chess-draw-accept err:', err); }
+  });
+
+  socket.on('chess-draw-decline', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = chessGetMsg(room, messageId);
+      if (!message) return;
+      io.to(socket.roomCode).emit('chess-draw-declined', { messageId });
+    } catch (err) { logger.error('chess-draw-decline err:', err); }
+  });
+
+  socket.on('chess-timeout', async ({ messageId, color }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = chessGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'playing') return;
+      const loserColor = color === 'white' ? 'white' : 'black';
+      const winnerColor = loserColor === 'white' ? 'black' : 'white';
+
+      if (gameData.challengeQueue.length > 0) {
+        chessStartNewRound(gameData, winnerColor, loserColor);
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        io.to(socket.roomCode).emit('chess-new-round', { messageId, gameData });
+      } else {
+        gameData.status = 'finished';
+        gameData.winner = winnerColor;
+        gameData.result = 'timeout';
+        gameData.endedAt = Date.now();
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        io.to(socket.roomCode).emit('chess-game-over', { messageId, winner: winnerColor, result: 'timeout', gameData });
+      }
+    } catch (err) { logger.error('chess-timeout err:', err); }
+  });
+
+  socket.on('chess-game-end', async ({ messageId, winner, result, fen, moves }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = chessGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status === 'finished') return;
+
+      if (gameData.challengeQueue.length > 0) {
+        const loserColor = winner === 'white' ? 'black' : winner === 'black' ? 'white' : 'black';
+        chessStartNewRound(gameData, winner, loserColor);
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        io.to(socket.roomCode).emit('chess-new-round', { messageId, gameData });
+      } else {
+        gameData.status = 'finished';
+        gameData.winner = winner;
+        gameData.result = result || 'unknown';
+        if (fen) gameData.fen = fen;
+        if (moves) gameData.moves = moves;
+        gameData.endedAt = Date.now();
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        io.to(socket.roomCode).emit('chess-game-over', { messageId, winner, result, gameData });
+      }
+    } catch (err) { logger.error('chess-game-end err:', err); }
   });
 
   // Handle ephemeral view token requests
