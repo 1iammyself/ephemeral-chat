@@ -3146,6 +3146,8 @@ io.on('connection', (socket) => {
       gameData.white = { id: challenger.id, socketId: challenger.socketId, name: challenger.name };
     } else {
       gameData.black = { id: challenger.id, socketId: challenger.socketId, name: challenger.name };
+      // CPU was in the black seat — challenger is a real person, clear CPU mode
+      if (gameData.cpu?.enabled) gameData.cpu = null;
     }
     gameData.fen = INITIAL_FEN;
     gameData.moves = [];
@@ -3457,7 +3459,12 @@ io.on('connection', (socket) => {
       gameData.whiteTime = (gameData.timeControl?.initial ?? 300) * 1000;
       gameData.blackTime = (gameData.timeControl?.initial ?? 300) * 1000;
 
-      if (gameData.cpu?.enabled) {
+      if (gameData.challengeQueue.length > 0) {
+        // Queued player takes priority — creator stays white, challenger takes black
+        // Reuse chessStartNewRound: winner='white' keeps creator, loserColor='black' replaces black seat
+        chessStartNewRound(gameData, 'white', 'black');
+        // chessStartNewRound already sets status, timers, etc.
+      } else if (gameData.cpu?.enabled) {
         gameData.status = 'playing';
         gameData.turnStartedAt = Date.now();
         gameData.startedAt = Date.now();
