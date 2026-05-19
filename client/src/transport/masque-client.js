@@ -204,15 +204,12 @@ export class MASQUEClient {
 
     // ─ WebTransport path (browser / Electron Chromium) ─
     if (!isWebTransportSupported()) {
-      console.info('[MASQUE] WebTransport unavailable — falling back to WebSocket relay path');
       return this._connectWebSocket();
     }
     if (!this.config.proxyUrl) {
-      console.warn('[MASQUE] No proxy URL configured');
       return false;
     }
     if (!this.config.targetHost) {
-      console.warn('[MASQUE] No target host configured');
       return false;
     }
 
@@ -235,7 +232,6 @@ export class MASQUEClient {
       });
 
       await this._transport.ready;
-      console.log('[MASQUE] WebTransport session established with proxy');
 
       // ─ Prefer unreliable DATAGRAM frames (lowest latency) ─
       if (this._transport.datagrams &&
@@ -243,13 +239,11 @@ export class MASQUEClient {
           this._transport.datagrams.readable) {
         this._dgWriter = this._transport.datagrams.writable.getWriter();
         this._dgReader = this._transport.datagrams.readable.getReader();
-        console.log('[MASQUE] Using DATAGRAM channel (unreliable, fast)');
       } else {
         // ─ Fallback: reliable bidirectional stream with capsule framing ─
         const bidi = await this._transport.createBidirectionalStream();
         this._streamWriter = bidi.writable.getWriter();
         this._streamReader = bidi.readable.getReader();
-        console.log('[MASQUE] Using stream-based capsule channel (reliable)');
       }
 
       this.connected = true;
@@ -265,7 +259,6 @@ export class MASQUEClient {
       return true;
 
     } catch (e) {
-      console.error('[MASQUE] Tunnel setup failed:', e);
       this.connected = false;
       return false;
     }
@@ -279,7 +272,6 @@ export class MASQUEClient {
    */
   async _connectWebSocket() {
     if (!this.config.proxyUrl || !this.config.targetHost) {
-      console.warn('[MASQUE] WS fallback: no proxy URL or target host configured');
       return false;
     }
 
@@ -301,7 +293,6 @@ export class MASQUEClient {
         ws.onopen = () => {
           this._ws = ws;
           this.connected = true;
-          console.log('[MASQUE] WebSocket tunnel active (fallback path)');
           resolve(true);
         };
 
@@ -314,7 +305,6 @@ export class MASQUEClient {
         };
 
         ws.onerror = (err) => {
-          console.warn('[MASQUE] WS error:', err);
           this.connected = false;
           reject(new Error('WS connect failed'));
         };
@@ -322,14 +312,12 @@ export class MASQUEClient {
         ws.onclose = () => {
           this.connected = false;
           this._ws = null;
-          console.info('[MASQUE] WS tunnel closed');
         };
       });
 
       if (this.config.enablePadding) this._startPadding();
       return true;
     } catch (e) {
-      console.error('[MASQUE] WS fallback connect failed:', e);
       this.connected = false;
       return false;
     }
@@ -354,12 +342,10 @@ export class MASQUEClient {
         if (this._onDatagram) this._onDatagram(data);
       });
       this.connected = true;
-      console.log('[MASQUE] Native quinn bridge tunnel active');
 
       if (this.config.enablePadding) this._startPadding();
       return true;
     } catch (e) {
-      console.error('[MASQUE] Native bridge connect failed:', e);
       return false;
     }
   }
@@ -409,7 +395,6 @@ export class MASQUEClient {
       this._stats.sent++;
       return true;
     } catch (e) {
-      console.error('[MASQUE] send error:', e);
       return false;
     }
   }
@@ -455,7 +440,6 @@ export class MASQUEClient {
         }
       } catch (e) {
         if (this.connected) {
-          console.error('[MASQUE] receive loop error:', e);
         }
       }
     };

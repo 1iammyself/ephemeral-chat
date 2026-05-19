@@ -100,33 +100,11 @@ function getTTLOptions() {
   };
 }
 
-/**
- * Logger that only outputs in development mode or when DEBUG is set
- */
 const logger = {
-  info: (...args) => {
-    // Zero Log Policy: Only log in development or if DEBUG is explicitly enabled
-    if (process.env.NODE_ENV !== 'production' || process.env.DEBUG) {
-      console.log(...args);
-    }
-  },
-  error: (...args) => {
-    // Suppress errors in production unless debugging is required
-    if (process.env.NODE_ENV !== 'production' || process.env.DEBUG) {
-      console.error('[ERROR]', ...args);
-    }
-  },
-  warn: (...args) => {
-    // Suppress warnings in production
-    if (process.env.NODE_ENV !== 'production' || process.env.DEBUG) {
-      console.warn('[WARN]', ...args);
-    }
-  },
-  debug: (...args) => {
-    if (process.env.DEBUG) {
-      console.log('[DEBUG]', ...args);
-    }
-  }
+  info: () => {},
+  error: () => {},
+  warn: () => {},
+  debug: () => {},
 };
 
 /**

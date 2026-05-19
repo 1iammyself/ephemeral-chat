@@ -237,7 +237,6 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
         recipientCount: recipients.filter(r => r.trim()).length,
       });
     } catch (err) {
-      console.error('Failed to create drop:', err);
       setError(err.message || 'Failed to create drop. Please try again.');
       hapticError();
     } finally {

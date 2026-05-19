@@ -51,7 +51,6 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
             }
             setIsReady(true);
         } catch (err) {
-            console.error('Camera Error:', err);
             setError(err.name === 'NotAllowedError' ? t('camera.permissionDenied') : t('camera.couldNotAccess'));
         }
     }, [facingMode]);
@@ -153,7 +152,6 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
                 };
                 reader.readAsDataURL(stegoBlob);
             } catch (err) {
-                console.error('Stego embed failed:', err);
                 onCapture(previewImage, isViewOnce);
                 onClose();
             } finally {

@@ -83,7 +83,6 @@ export async function initServerSigning() {
     }
   } catch (e) {
     // Server doesn't support signing (older version) — skip silently
-    console.warn('[ServerSigning] /api/server-key unavailable, signature verification disabled:', e.message);
     return;
   }
 

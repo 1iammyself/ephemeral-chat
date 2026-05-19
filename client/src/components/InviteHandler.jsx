@@ -80,11 +80,9 @@ function InviteHandler() {
       setStatus('Validating invite link...');
 
       try {
-        console.log('[InviteHandler] Validating token:', token.substring(0, 8) + '...');
         const data = await validateInviteToken(token);
         if (cancelled) return;
 
-        console.log('[InviteHandler] Success, room:', data.roomCode);
         navigate('/room/' + data.roomCode, {
           replace: true,
           state: {
@@ -94,7 +92,6 @@ function InviteHandler() {
         });
       } catch (err) {
         if (cancelled) return;
-        console.error('[InviteHandler] Failed:', err);
         const message = typeof err === 'string' ? err : (err?.message || 'Something went wrong');
         setError(message);
         setStatus('');

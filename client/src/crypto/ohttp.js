@@ -55,7 +55,6 @@ export function initOHTTP(config) {
       const relayOrigin = new URL(ohttpConfig.relayUrl).origin;
       const gatewayOrigin = new URL(ohttpConfig.gatewayUrl).origin;
       if (relayOrigin === gatewayOrigin) {
-        console.error(
           '[OHTTP] ❌ Relay and Gateway have the same origin (' + relayOrigin + '). ' +
           'OHTTP provides no privacy benefit when relay === gateway. ' +
           'Set VITE_OHTTP_RELAY_URL to a distinct origin (Cloudflare Worker, Fastly relay, etc.). ' +
@@ -70,13 +69,9 @@ export function initOHTTP(config) {
       return;
     }
 
-    console.log('🔒 OHTTP enabled');
-    console.log(`   Relay: ${ohttpConfig.relayUrl}`);
-    console.log(`   Gateway: ${ohttpConfig.gatewayUrl}`);
 
     // Fetch gateway key asynchronously
     fetchGatewayConfig().catch(e => {
-      console.warn('Failed to fetch OHTTP gateway config:', e.message);
     });
   }
 }
@@ -122,7 +117,6 @@ async function fetchGatewayConfig() {
   gatewayKeyId = parsed.keyId;
   gatewayPublicKey = parsed.publicKey;
   
-  console.log(`🔑 OHTTP Gateway key fetched (ID: ${gatewayKeyId})`);
 }
 
 /**

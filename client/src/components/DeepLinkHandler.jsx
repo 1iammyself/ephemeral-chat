@@ -14,7 +14,6 @@ const DeepLinkHandler = () => {
 
         // 1. Handle runtime deep links (Warm/Hot start)
         const urlListener = CapApp.addListener('appUrlOpen', (data) => {
-            console.log('App opened with URL (runtime):', data.url);
             handleUrl(data.url);
         });
 
@@ -24,7 +23,6 @@ const DeepLinkHandler = () => {
 
             const result = await CapApp.getLaunchUrl();
             if (result && result.url) {
-                console.log('App launched with URL (cold start):', result.url);
                 hasHandledInitialUrl.current = true;
                 handleUrl(result.url);
             }
@@ -54,11 +52,9 @@ const DeepLinkHandler = () => {
                 slug = slug.replace(/\/\//g, '/');
 
                 if (slug && slug !== '/') {
-                    console.log('[DeepLink] Navigating to:', slug);
                     navigate(slug, { replace: true });
                 }
             } catch (e) {
-                console.error('[DeepLink] Error parsing URL:', e);
             }
         };
 

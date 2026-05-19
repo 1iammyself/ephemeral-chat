@@ -30,7 +30,6 @@ export class Mp3Recorder {
         } 
       });
     } catch (err) {
-      console.error("Error accessing microphone:", err);
       throw err;
     }
 

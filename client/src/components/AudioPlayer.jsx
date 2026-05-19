@@ -64,7 +64,6 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
           mimeTypeRef.current = null;
         }
       } catch (err) {
-        console.error("Audio reconstruction failed:", err);
         setAudioUrl(src);
       }
     };
@@ -82,7 +81,6 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
           if (playPromise !== undefined) {
             playPromise
               .then(() => setIsPlaying(true))
-              .catch(e => console.error("Auto-play failed:", e));
           }
         }
       }, 100);
@@ -172,7 +170,6 @@ const AudioPlayer = ({ src, onEnded, isOwnMessage, autoPlay = false }) => {
     if (!audio) return;
 
     if (audio.paused) {
-      audio.play().catch(err => console.error("Play failed:", err));
     } else {
       audio.pause();
     }

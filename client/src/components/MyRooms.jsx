@@ -31,7 +31,6 @@ const MyRooms = () => {
             setRooms(data);
             setError(null);
         } catch (err) {
-            console.error('Error fetching rooms:', err);
             setError(err.message);
         } finally {
             setLoading(false);
@@ -55,7 +54,6 @@ const MyRooms = () => {
             // Remove room from local state
             setRooms(rooms.filter(r => r.roomCode !== roomCode));
         } catch (err) {
-            console.error('Error deleting room:', err);
             alert('Failed to delete room: ' + err.message);
         }
     };

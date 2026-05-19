@@ -68,7 +68,6 @@ const ImageReveal = ({ imageData }) => {
                 }
             } catch (err) {
                 if (process.env.NODE_ENV !== 'production') {
-                    console.error('Reveal load error:', err);
                 }
             } finally {
                 if (active) setIsLoading(false);

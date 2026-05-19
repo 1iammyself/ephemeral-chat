@@ -784,7 +784,6 @@ const ChatRoom = () => {
     // Pre-derive the room key so the first encrypt/decrypt is instant.
     // This is a no-op if the key is already cached.
     initRoomEncryption(roomCode).catch(e => {
-      console.error('[ChatRoom] AES key init failed:', e);
     });
   }, [roomCode]);
 
@@ -988,9 +987,7 @@ const ChatRoom = () => {
         try {
           await initRoomEncryption(roomCode);
           setMlsReady(true);
-          console.log('[ChatRoom] 🔐 AES-GCM room key ready');
         } catch (e) {
-          console.warn('[ChatRoom] AES key setup failed:', e.message);
         }
 
         // ─── PQXDH + Double Ratchet E2EE Setup ───────────
@@ -998,9 +995,7 @@ const ChatRoom = () => {
         // Falls back to v4 AES-GCM during key exchange (~200ms).
         try {
           await initE2EE(roomCode, socketManager);
-          console.log('[ChatRoom] 🔐 PQXDH E2EE initialized (v5)');
         } catch (e) {
-          console.warn('[ChatRoom] E2EE v5 setup failed (v4 fallback active):', e.message);
         }
 
         // ─── Fetch runtime config (works on Electron + Capacitor) ─
@@ -1021,10 +1016,8 @@ const ChatRoom = () => {
           const configUrl = `${serverBase}/ohttp/config`;
           if (relayUrl) {
             await initOHTTP({ relayUrl, gatewayUrl, configUrl, enabled: true });
-            console.log('[ChatRoom] OHTTP initialized');
           }
         } catch (e) {
-          console.warn('[ChatRoom] OHTTP init failed (non-fatal):', e.message);
         }
 
         // ─── Privacy Pass — anonymous auth tokens ─────────────────
@@ -1032,9 +1025,7 @@ const ChatRoom = () => {
           const issuerUrl = _runtimeCfg?.privacyPassIssuerUrl ||
             `${socketManager.getServerUrl().replace(/\/$/, '')}/privacy-pass`;
           await initPrivacyPass(issuerUrl);
-          console.log('[ChatRoom] 🎫 Privacy Pass initialized');
         } catch (e) {
-          console.warn('[ChatRoom] Privacy Pass init failed (non-fatal):', e.message);
         }
 
         // ─── Traffic Padding — defeat traffic analysis ─────────────
@@ -1046,9 +1037,7 @@ const ChatRoom = () => {
               _chaffSocket.emit('chaff', null);
             }
           });
-          console.log('[ChatRoom] 🔀 Traffic padding active');
         } catch (e) {
-          console.warn('[ChatRoom] Traffic padding init failed (non-fatal):', e.message);
         }
 
         // TransportManager init
@@ -1064,11 +1053,9 @@ const ChatRoom = () => {
             }
           });
           tm.onTransportSelected = (peerId, type) => {
-            console.log(`🔗 P2P transport for ${peerId}: ${type}`);
           };
           transportManagerRef.current = tm;
         } catch (tmErr) {
-          console.warn('⚠️ TransportManager init failed (socket fallback):', tmErr.message);
         }
         return;
       }
@@ -1185,7 +1172,6 @@ const ChatRoom = () => {
 
     // CRITICAL: Ignore if this is from ourselves (sender should never see their own invite)
     if (!myId || fromId === myId) {
-      console.log('[FileTransfer] Ignoring invite from self or no socket id', { fromId, myId });
       return;
     }
 
@@ -1313,22 +1299,17 @@ const ChatRoom = () => {
     const handleMLSKeyPackage = ({ keyPackage, from }) => {
       // Complete the PQXDH responder step when a joiner's key bundle arrives
       if (!roomCode) return;
-      console.log('[ChatRoom] Key bundle received from:', from);
       handleIncomingKeyBundle({ socketId: from, bundle: keyPackage }, roomCode).catch(e => {
-        console.warn('[ChatRoom] Key bundle handling failed:', e.message);
       });
     };
 
     const handleMLSWelcome = ({ welcome, commit }) => {
       // Joiner receives welcome message — join the group
       if (!roomCode || isMLSReady(roomCode)) return;
-      console.log('[ChatRoom] MLS welcome received');
       try {
         joinMLSGroup(roomCode, welcome, null, null);
         setMlsReady(true);
-        console.log('[ChatRoom] 🔐 MLS session ready (joined via welcome)');
       } catch (e) {
-        console.warn('[ChatRoom] MLS join failed:', e.message);
       }
     };
 
@@ -1346,7 +1327,6 @@ const ChatRoom = () => {
             try { message.pollData = JSON.parse(decrypted); } catch { }
           }
         } catch (e) {
-          console.warn('[ChatRoom] Decrypt error:', e.message);
           message.content = '⚠️ Decryption failed';
         }
         if (!isOwnMessage) {
@@ -1409,7 +1389,6 @@ const ChatRoom = () => {
     const handleKnockApproved = async (data) => {
       if (isServerSigningReady() && data._sig) {
         const valid = await verifyServerSignature(data);
-        if (!valid) console.warn('[Security] knock-approved signature invalid — possible relay tampering');
       }
       const { isHost } = data;
       // Keep the waiting/processing state active — do NOT clear isWaitingForHost
@@ -1433,7 +1412,6 @@ const ChatRoom = () => {
     const handlePromotedToHost = async (data = {}) => {
       if (isServerSigningReady() && data._sig) {
         const valid = await verifyServerSignature(data);
-        if (!valid) console.warn('[Security] promoted-to-host signature invalid — possible relay tampering');
       }
       setIsHost(true);
       setCurrentUserRole('host');
@@ -1455,7 +1433,6 @@ const ChatRoom = () => {
             try { finalMessage.pollData = JSON.parse(decrypted); } catch { }
           }
         } catch (e) {
-          console.warn('[ChatRoom] Update decrypt error:', e.message);
           finalMessage.content = '⚠️ Decryption failed';
         }
       }
@@ -1469,7 +1446,6 @@ const ChatRoom = () => {
     const handleRoleUpdated = async (data) => {
       if (isServerSigningReady() && data._sig) {
         const valid = await verifyServerSignature(data);
-        if (!valid) console.warn('[Security] role-updated signature invalid — possible relay tampering');
       }
       const { userId, role, updatedBy } = data;
       if (userId === socketManager.socket?.id) {
@@ -1502,7 +1478,6 @@ const ChatRoom = () => {
     const handleGuestApproved = async (data) => {
       if (isServerSigningReady() && data._sig) {
         const valid = await verifyServerSignature(data);
-        if (!valid) console.warn('[Security] guest-approved signature invalid — possible relay tampering');
       }
       const { guestId } = data;
       setPendingGuests(prev => prev.filter(g => g.socketId !== guestId));
@@ -2239,7 +2214,6 @@ const ChatRoom = () => {
       try {
         v2Payload = await encryptMLSMessage(content, roomCode);
       } catch (e) {
-        console.error('AES encrypt failed — message NOT sent:', e.message);
         setError('Encryption failed. Please rejoin the room.');
         return;
       }
@@ -2433,7 +2407,6 @@ const ChatRoom = () => {
         isAnonymous: isAnonymousMode,
       });
     } catch (e) {
-      console.error('Thread reply encryption failed:', e.message);
     }
   }, [isConnected, roomCode, isAnonymousMode]);
 
@@ -2576,7 +2549,6 @@ const ChatRoom = () => {
         try {
           voPayload = await encryptMLSMessage(content, roomCode);
         } catch (encErr) {
-          console.error('View-once encrypt failed:', encErr.message);
           setError('Encryption failed. Please rejoin the room.');
           setIsUploading(false);
           return;
@@ -2605,7 +2577,6 @@ const ChatRoom = () => {
       try {
         v2Payload = await encryptMLSMessage(content, roomCode);
       } catch (e) {
-        console.error('AES file encrypt failed — file NOT sent:', e.message);
         setError('File encryption failed. Please rejoin the room.');
         setIsUploading(false);
         return;
@@ -2632,10 +2603,8 @@ const ChatRoom = () => {
           );
           sentViaP2P = results.every(r => r.success);
           if (sentViaP2P) {
-            console.log(`📡 File sent via P2P to ${selectedRecipients.length} peer(s)`);
           }
         } catch (p2pErr) {
-          console.warn('P2P file transfer failed, using socket fallback:', p2pErr.message);
         }
       }
 
@@ -2681,7 +2650,6 @@ const ChatRoom = () => {
         uploadFile(file, { isViewOnce }); // Use the flag from camera modal
       })
       .catch(err => {
-        console.error('Failed to process captured image:', err);
         setError('Failed to process captured image');
       });
   };
@@ -2797,7 +2765,6 @@ const ChatRoom = () => {
           isEncrypted: true
         });
       } catch (e) {
-        console.error('Edit encryption failed:', e.message);
         setError('Failed to encrypt edit.');
       }
       setEditingMessage(null);
@@ -2825,7 +2792,6 @@ const ChatRoom = () => {
       await webRTCService.startCall(roomCode, recipientList);
       setShowCallModal(true);
     } catch (err) {
-      console.error('Call failed:', err);
       setError(`Failed to start call: ${err.message || 'Check microphone permissions'}`);
     }
   }, [users, currentUser, roomCode, selectedRecipients]);
@@ -2868,7 +2834,6 @@ const ChatRoom = () => {
         });
       }, 1000);
     } catch (err) {
-      console.error('Error starting recording:', err);
       setError(`Microphone access failed: ${err.message || 'Check permissions'}`);
     }
   };
@@ -2942,7 +2907,6 @@ const ChatRoom = () => {
         });
         setReplyingTo(null);
       } catch (e) {
-        console.error('Audio encryption failed:', e.message);
         setError('Failed to encrypt audio.');
       }
     };
@@ -2985,7 +2949,6 @@ const ChatRoom = () => {
         });
         emitSound('send');
       } catch (e) {
-        console.error('Video reply encryption failed:', e.message);
         setError('Failed to encrypt video reply.');
       }
     };
@@ -3061,7 +3024,6 @@ const ChatRoom = () => {
           setVerbalCode(data.verbalCode);
         }
       }).catch(err => {
-        console.error('Failed to fetch verbal code:', err);
       });
     }
   }, [isJoined, isHost, roomCode, verbalCode]);

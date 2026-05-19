@@ -53,7 +53,6 @@ class WebRTCService {
                 configuredIceServers = JSON.parse(import.meta.env.VITE_ICE_SERVERS);
             }
         } catch (e) {
-            console.warn('Failed to parse VITE_ICE_SERVERS', e);
         }
 
         // TURN credentials must be provided via VITE_ICE_SERVERS env var.
@@ -75,7 +74,6 @@ class WebRTCService {
         const setupHandlers = () => {
             if (!socketManager.socket) {
                 if (retries++ >= MAX_RETRIES) {
-                    console.warn('WebRTC: Socket not available after max retries');
                     return;
                 }
                 setTimeout(setupHandlers, 100);
@@ -127,7 +125,6 @@ class WebRTCService {
      */
     async startCall(roomCode, recipients) {
         try {
-            console.log('📞 Starting call to:', recipients.map(r => r.nickname));
             this.currentRoomCode = roomCode;
             const callId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -178,7 +175,6 @@ class WebRTCService {
             }
 
         } catch (error) {
-            console.error('Failed to start call:', error);
             this.endCall();
             throw error;
         }
@@ -232,7 +228,6 @@ class WebRTCService {
             });
 
         } catch (error) {
-            console.error('Failed to accept call:', error);
             this.rejectCall(callId);
             throw error;
         }
@@ -323,7 +318,6 @@ class WebRTCService {
         if (pcData) pcData.pendingCandidates = [];
 
         pc.ontrack = (event) => {
-            console.log(`\uD83D\uDCDE Remote track received from ${socketId}`);
             const stream = event.streams[0];
 
             const peer = this.peers.get(socketId);
@@ -342,7 +336,6 @@ class WebRTCService {
 
         pc.onconnectionstatechange = () => {
             const state = pc.connectionState;
-            console.log(`Connection state for ${socketId}: ${state}`);
             if (state === 'failed' || state === 'closed') {
                 this.peers.delete(socketId);
 
@@ -359,13 +352,10 @@ class WebRTCService {
         // ICE restart on failure — retries with TURN servers before giving up
         pc.oniceconnectionstatechange = () => {
             const iceState = pc.iceConnectionState;
-            console.log(`ICE state for ${socketId}: ${iceState}`);
             if (iceState === 'failed') {
-                console.warn(`ICE failed for ${socketId} — attempting ICE restart`);
                 try {
                     pc.restartIce();
                 } catch (e) {
-                    console.warn('ICE restart not supported, falling back to connection close:', e.message);
                 }
             }
         };
@@ -402,12 +392,10 @@ class WebRTCService {
             if (peer && peer.pendingCandidates) {
                 while (peer.pendingCandidates.length > 0) {
                     const candidate = peer.pendingCandidates.shift();
-                    await pc.addIceCandidate(candidate).catch(e => console.warn('Delayed ICE candidate failed:', e));
                 }
             }
 
         } catch (error) {
-            console.error('Failed to handle call offer:', error);
             this.rejectCall(data.callId);
         }
     }
@@ -422,7 +410,6 @@ class WebRTCService {
                 if (peer.pendingCandidates) {
                     while (peer.pendingCandidates.length > 0) {
                         const candidate = peer.pendingCandidates.shift();
-                        await peer.connection.addIceCandidate(candidate).catch(e => console.warn('Delayed ICE candidate failed:', e));
                     }
                 }
 
@@ -435,7 +422,6 @@ class WebRTCService {
                 }
             }
         } catch (error) {
-            console.error('Failed to handle call answer:', error);
         }
     }
 
@@ -448,16 +434,13 @@ class WebRTCService {
                 } else {
                     // Buffer candidate until remote description is set
                     peer.pendingCandidates.push(data.candidate);
-                    console.log(`⏳ Buffered ICE candidate for ${data.fromSocketId}`);
                 }
             }
         } catch (error) {
-            console.error('Failed to handle ICE candidate:', error);
         }
     }
 
     handleCallRejected(data) {
-        console.log(`Call rejected by ${data.fromSocketId}. Reason: ${data.reason || 'unknown'}`);
 
         const peer = this.peers.get(data.fromSocketId);
         if (peer) {
@@ -544,16 +527,13 @@ class WebRTCService {
                 const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
                 if (audioSender) {
                     audioSender.replaceTrack(scrambledTrack).catch(e =>
-                        console.warn('Failed to replace track for scrambler:', e)
                     );
                 }
             });
 
             this._scramblerEnabled = true;
             this.updateCallState({ isVoiceScramblerOn: true });
-            console.log('🔊 Voice scrambler enabled');
         } catch (error) {
-            console.error('Failed to enable voice scrambler:', error);
         }
     }
 
@@ -571,7 +551,6 @@ class WebRTCService {
                     const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
                     if (audioSender) {
                         audioSender.replaceTrack(this._originalAudioTrack).catch(e =>
-                            console.warn('Failed to restore original track:', e)
                         );
                     }
                 });
@@ -595,9 +574,7 @@ class WebRTCService {
             this._scramblerEnabled = false;
 
             this.updateCallState({ isVoiceScramblerOn: false });
-            console.log('🔇 Voice scrambler disabled');
         } catch (error) {
-            console.error('Failed to disable voice scrambler:', error);
         }
     }
 

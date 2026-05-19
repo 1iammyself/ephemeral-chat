@@ -841,10 +841,8 @@ async function downloadFile(base64Content, mimeType, fileName) {
         if (capErr?.message?.toLowerCase().includes('cancel')) return;
         if (capErr?.message?.toLowerCase().includes('no activity')) {
           // No app installed to open this file type — still saved successfully
-          console.warn('[downloadFile] File saved but no viewer app for this type');
           return;
         }
-        console.warn('[downloadFile] Capacitor path failed:', capErr.message);
         // fall through to web methods
       }
     }
@@ -866,7 +864,6 @@ async function downloadFile(base64Content, mimeType, fileName) {
     setTimeout(() => URL.revokeObjectURL(url), 5000);
 
   } catch (err) {
-    console.error('[downloadFile] All methods failed:', err);
     try {
       window.open(`data:${safeType};base64,${base64Content}`, '_blank');
     } catch (_) { /* silent */ }

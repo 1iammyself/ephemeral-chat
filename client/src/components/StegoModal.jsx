@@ -81,7 +81,6 @@ export default function StegoModal({ isOpen, onClose, onSendStego, embedded = fa
       const stegoBlob = await embed(carrierFile, secretText.trim(), hidePassphrase.trim());
       setEmbedResult(stegoBlob);
     } catch (err) {
-      console.error('Embed failed:', err);
     }
     setIsEmbedding(false);
   };

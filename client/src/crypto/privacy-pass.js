@@ -64,13 +64,10 @@ async function loadRistretto() {
       BASE: RistrettoPoint.BASE,
     };
 
-    console.log('🎫 Privacy Pass: Ristretto255 loaded (production blind VOPRF)');
     return true;
   } catch {
     // Fallback: NOT blind — development only
     ristretto = buildFallback();
-    console.warn('🎫 Privacy Pass: ⚠️ @noble/curves not available — using DEV fallback (NOT blind)');
-    console.warn('   Run: npm install @noble/curves  for real anonymity');
     return false;
   }
 }
@@ -88,7 +85,6 @@ function modPow(base, exp, mod) {
 }
 
 function buildFallback() {
-  console.error('[Privacy Pass] WARNING: Using non-blind fallback — tokens are NOT unlinkable. Install @noble/curves for production.');
   return {
     _fallback: true,
     ORDER: 2n ** 252n + 27742317777372353535851937790883648493n,
@@ -169,10 +165,8 @@ export async function initPrivacyPass(issuerUrl) {
     const pubBytes = base64ToBytes(data.publicKey);
     issuerPublicPoint = ristretto.bytesToPoint(pubBytes);
 
-    console.log(`🎫 Privacy Pass initialized (group: ${data.groupId || 'ristretto255'})`);
     await prefetchTokens(issuerUrl, 5);
   } catch (e) {
-    console.warn('⚠️ Privacy Pass not available:', e.message);
   }
 }
 
@@ -271,7 +265,6 @@ async function requestTokens(issuerUrl, count) {
       };
       const valid = await verifyDLEQProof(proof, B, Z, issuerPublicPoint);
       if (!valid) {
-        console.warn(`🎫 DLEQ proof invalid for token ${i} — skipping`);
         continue; // reject this token
       }
     }
@@ -324,7 +317,6 @@ async function verifyDLEQProof(proof, B, Z, Y) {
 
     return c === cExpected;
   } catch (e) {
-    console.warn('DLEQ verify error:', e.message);
     return false;
   }
 }
@@ -336,9 +328,7 @@ async function prefetchTokens(issuerUrl, count) {
     if (tokenStore.length > MAX_STORED_TOKENS) {
       tokenStore = tokenStore.slice(-MAX_STORED_TOKENS);
     }
-    console.log(`🎫 Pre-fetched ${tokens.length} tokens (${tokenStore.length} stored)`);
   } catch (e) {
-    console.warn('Failed to pre-fetch tokens:', e.message);
   }
 }
 

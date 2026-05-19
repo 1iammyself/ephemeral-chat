@@ -111,7 +111,6 @@ export async function secureFetch(url, options = {}) {
       const raw = await ohttpFetch(method, url, mergedOptions);
       return unpadResponse(raw);
     } catch (e) {
-      console.warn('⚠️ OHTTP fetch failed, falling back to direct:', e.message);
     }
   }
 

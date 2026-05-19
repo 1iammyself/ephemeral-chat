@@ -64,9 +64,7 @@ export async function initMLS() {
       // We just verify it loaded by testing a constructor.
       new Provider().free();
       wasmReady = true;
-      console.log('[MLS] ✅ OpenMLS WASM initialized');
     } catch (e) {
-      console.error('[MLS] ❌ Failed to initialize WASM:', e);
       wasmInitPromise = null;
       throw e;
     }
@@ -102,7 +100,6 @@ export function createMLSIdentity(roomCode, nickname) {
     ready: false
   });
 
-  console.log('[MLS] Identity created for room:', roomCode);
   return { provider, identity, keyPackage };
 }
 
@@ -121,7 +118,6 @@ export function createMLSGroup(roomCode, nickname) {
   session.isCreator = true;
   session.ready = true; // Creator is always ready (group of 1)
 
-  console.log('[MLS] ✅ Group created for room:', roomCode);
   return {
     ratchetTree: uint8ToBase64(group.export_ratchet_tree().serialize
       ? group.export_ratchet_tree()
@@ -160,7 +156,6 @@ export function addMemberToGroup(roomCode, keyPackageBytes) {
   // Merge the pending commit on our side
   session.group.merge_pending_commit(session.provider);
 
-  console.log('[MLS] ✅ Member added to group in room:', roomCode);
   return {
     welcome: uint8ToBase64(addMsgs.welcome),
     commit: uint8ToBase64(addMsgs.commit),
@@ -187,7 +182,6 @@ export function joinMLSGroup(roomCode, welcomeB64, ratchetTree, nickname) {
   session.group = group;
   session.ready = true;
 
-  console.log('[MLS] ✅ Joined group for room:', roomCode);
 }
 
 /**
@@ -260,7 +254,6 @@ export function decryptMLSMessage(payload, roomCode) {
   const session = mlsSessions.get(roomCode);
 
   if (!session || !session.group || !session.ready) {
-    console.warn('[MLS] Cannot decrypt — session not ready for room:', roomCode);
     return '⚠️ MLS session not ready — cannot decrypt';
   }
 
@@ -282,7 +275,6 @@ export function decryptMLSMessage(payload, roomCode) {
     const plaintext = session.group.process_message(session.provider, ciphertext);
     return new TextDecoder().decode(plaintext);
   } catch (e) {
-    console.error('[MLS] Decrypt error:', e.message);
     return '⚠️ Decryption failed';
   }
 }
@@ -303,7 +295,6 @@ export function destroyMLSSession(roomCode) {
     mlsSessions.delete(roomCode);
     // Clear sent-plaintext cache
     sentPlaintextCache.clear();
-    console.log('[MLS] Session destroyed for room:', roomCode);
   }
 }
 

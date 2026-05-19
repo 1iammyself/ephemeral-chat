@@ -96,7 +96,6 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
         throw new Error(data.error || 'Failed to generate invite link');
       }
     } catch (error) {
-      console.error('Error generating invite link:', error);
       alert('Failed to generate invite link. You can still share the room code and password.');
       return null;
     } finally {
@@ -202,7 +201,6 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
         throw new Error(data.error || 'Failed to create room');
       }
     } catch (error) {
-      console.error('Error creating room:', error);
       alert(`Failed to create room: ${error.message}`);
       setIsCreating(false);
     }

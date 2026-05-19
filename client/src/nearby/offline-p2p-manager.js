@@ -76,7 +76,6 @@ class OfflineP2PManager extends EventTarget {
     }
 
     this._running = true;
-    console.log('[OfflineP2P] Started —', this._myInfo);
     return this._myInfo;
   }
 
@@ -95,7 +94,6 @@ class OfflineP2PManager extends EventTarget {
     }
 
     this._peers.clear();
-    console.log('[OfflineP2P] Stopped');
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -182,25 +180,20 @@ class OfflineP2PManager extends EventTarget {
 
     // 3. Start NSD (mDNS) on LAN
     await native.startNsd({ nickname, port }).catch((e) => {
-      console.warn('[OfflineP2P] NSD start failed:', e.message);
     });
 
     // 4. Start BLE advertising + scanning (works when offline)
     await native.startBleAdvertising().catch((e) => {
-      console.warn('[OfflineP2P] BLE advertising failed:', e.message);
     });
     await native.startBleScanning().catch((e) => {
-      console.warn('[OfflineP2P] BLE scanning failed:', e.message);
     });
 
     // 5. Start GATT server for BLE SDP exchange
     await native.startGattServer().catch((e) => {
-      console.warn('[OfflineP2P] GATT server failed:', e.message);
     });
 
     // 6. Start Wi-Fi Direct discovery
     await native.startP2pDiscovery().catch((e) => {
-      console.warn('[OfflineP2P] Wi-Fi Direct discovery failed:', e.message);
     });
 
     // 7. Register event listeners
@@ -257,7 +250,6 @@ class OfflineP2PManager extends EventTarget {
 
   async _startWeb() {
     if (!navigator.bluetooth) {
-      console.warn('[OfflineP2P] Web Bluetooth not available on this browser.');
       this._myInfo = { deviceId: crypto.randomUUID().substring(0, 16), platform: 'web' };
       return;
     }
@@ -265,7 +257,6 @@ class OfflineP2PManager extends EventTarget {
     // Web Bluetooth is request-only (user must tap a button each time).
     // We expose a scanOnce() method for the UI to call on user gesture.
     this._myInfo = { deviceId: crypto.randomUUID().substring(0, 16), platform: 'web' };
-    console.log('[OfflineP2P] Web platform — use scanOnce() for BLE discovery on user gesture.');
   }
 
   /**

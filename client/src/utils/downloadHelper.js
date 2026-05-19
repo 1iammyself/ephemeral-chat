@@ -56,10 +56,8 @@ export async function downloadFileOnDevice(blob, fileName, mimeType) {
     } catch (capErr) {
       if (capErr?.message?.toLowerCase().includes('cancel')) return true;
       if (capErr?.message?.toLowerCase().includes('no activity')) {
-        console.warn('[downloadHelper] File saved but no viewer app for this type');
         return true;
       }
-      console.warn('[downloadHelper] Capacitor path failed:', capErr.message);
       // Fall through to navigator.share or <a> fallback
     }
   }
@@ -74,7 +72,6 @@ export async function downloadFileOnDevice(blob, fileName, mimeType) {
       }
     } catch (shareError) {
       if (shareError.name === 'AbortError') return false; // user cancelled
-      console.warn('[downloadHelper] navigator.share failed:', shareError.message);
       // Fall through to <a> fallback
     }
   }

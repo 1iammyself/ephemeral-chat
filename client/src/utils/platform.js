@@ -46,11 +46,9 @@ export async function requestWakeLock() {
             wakeLock.addEventListener('release', () => {
                 wakeLock = null;
             });
-            console.log('🔆 Screen wake lock acquired');
             return true;
         }
     } catch (err) {
-        console.warn('Wake lock request failed:', err);
     }
     return false;
 }
@@ -63,9 +61,7 @@ export async function releaseWakeLock() {
         try {
             await wakeLock.release();
             wakeLock = null;
-            console.log('🌙 Screen wake lock released');
         } catch (err) {
-            console.warn('Wake lock release failed:', err);
         }
     }
 }

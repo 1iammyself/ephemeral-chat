@@ -72,7 +72,6 @@ const NowPlaying = {
     try {
       return await NativeNowPlaying.getStatus();
     } catch (e) {
-      console.warn('[NowPlaying] getStatus error:', e);
       return { nowPlaying: null, permissionNeeded: false };
     }
   },
@@ -86,7 +85,6 @@ const NowPlaying = {
     try {
       return await NativeNowPlaying.requestPermission();
     } catch (e) {
-      console.warn('[NowPlaying] requestPermission error:', e);
       return { opened: false };
     }
   },

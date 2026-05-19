@@ -163,9 +163,7 @@ export async function pqxdhInitiator(ourBundle, peerPublicBundle) {
     combinedSecret = concatArrays(combinedSecret, pqSharedSecret);
     pqCiphertext = mlkemCiphertextToBase64(ciphertext);
     
-    console.log('🔐 Post-quantum ML-KEM-768 encapsulation successful');
   } else {
-    console.log('⚠️ Classical-only key exchange (ML-KEM not available on both sides)');
   }
   
   // Derive final shared secret via HKDF
@@ -237,7 +235,6 @@ export async function pqxdhResponder(ourBundle, peerPublicBundle, pqCiphertext) 
     
     combinedSecret = concatArrays(combinedSecret, pqSharedSecret);
     
-    console.log('🔐 Post-quantum ML-KEM-768 decapsulation successful');
   }
   
   // Derive final shared secret via HKDF

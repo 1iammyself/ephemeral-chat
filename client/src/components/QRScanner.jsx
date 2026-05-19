@@ -90,7 +90,6 @@ export default function QRScanner({ onScan, onClose, isOpen }) {
       
       setIsStarting(false);
     } catch (err) {
-      console.error('Camera error:', err);
       setError(err.name === 'NotAllowedError' 
         ? 'Camera permission denied. Please allow camera access.'
         : 'Failed to start camera. Try entering the code manually.');

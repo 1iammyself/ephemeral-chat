@@ -31,7 +31,6 @@ export default function QRGenerator({
       },
       errorCorrectionLevel: 'L',
     }).catch(err => {
-      console.error('[QRGenerator] Failed to render QR code:', err);
     });
   }, [data, size, fgColor, bgColor]);
 

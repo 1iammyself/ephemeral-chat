@@ -98,7 +98,6 @@ const Home = ({ children }) => {
         alert(t('home.joinCode.error.notFound'));
       }
     } catch (error) {
-      console.error('Error checking room:', error);
       alert(t('home.joinCode.error.failed'));
     } finally {
       setIsJoining(false);

@@ -76,7 +76,6 @@ export class ICETransport {
   async connectToPeer(peerId, roomCode) {
     return new Promise(async (resolve, reject) => {
       const timeout = setTimeout(() => {
-        console.log(`⏰ ICE timeout for peer ${peerId}, falling back to relay`);
         this._cleanup(peerId);
         reject(new Error('ICE connection timeout'));
       }, ICE_TIMEOUT_MS);
@@ -95,7 +94,6 @@ export class ICETransport {
         
         dc.onopen = () => {
           clearTimeout(timeout);
-          console.log(`✅ P2P data channel open with ${peerId}`);
           this.dataChannels.set(peerId, dc);
           if (this.onConnectionEstablished) {
             this.onConnectionEstablished(peerId, this._getConnectionType(pc));
@@ -104,11 +102,9 @@ export class ICETransport {
         };
         
         dc.onerror = (e) => {
-          console.error(`Data channel error with ${peerId}:`, e);
         };
         
         dc.onclose = () => {
-          console.log(`Data channel closed with ${peerId}`);
           this.dataChannels.delete(peerId);
         };
         
@@ -125,7 +121,6 @@ export class ICETransport {
         
         pc.oniceconnectionstatechange = () => {
           const state = pc.iceConnectionState;
-          console.log(`ICE state for ${peerId}: ${state}`);
           
           if (state === 'failed') {
             clearTimeout(timeout);
@@ -171,7 +166,6 @@ export class ICETransport {
         dc.binaryType = 'arraybuffer';
         
         dc.onopen = () => {
-          console.log(`✅ P2P data channel accepted from ${peerId}`);
           this.dataChannels.set(peerId, dc);
           if (this.onConnectionEstablished) {
             this.onConnectionEstablished(peerId, this._getConnectionType(pc));
@@ -210,7 +204,6 @@ export class ICETransport {
       });
       
     } catch (e) {
-      console.error('Failed to handle ICE offer:', e);
     }
   }
   

@@ -65,7 +65,6 @@ const InviteLinkModal = ({ isOpen, onClose, roomCode }) => {
         throw new Error(result.error || 'Failed to generate invite link');
       }
     } catch (error) {
-      console.error('Error generating invite link:', error);
       setError(error.message || 'Failed to generate invite link. Please try again.');
     } finally {
       setIsGenerating(false);

@@ -29,7 +29,6 @@ const MyDrops = () => {
       setDrops(data.drops || []);
       setError(null);
     } catch (err) {
-      console.error('Error fetching drops:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -51,7 +50,6 @@ const MyDrops = () => {
       await deleteDropAPI(dropId, creatorId);
       setDrops(prev => prev.filter(d => d.id !== dropId));
     } catch (err) {
-      console.error('Error deleting drop:', err);
       alert('Failed to delete drop: ' + err.message);
     } finally {
       setDeletingId(null);

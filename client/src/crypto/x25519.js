@@ -36,7 +36,6 @@ export async function generateX25519Keypair() {
   } catch (e) {
     // Fallback: use ECDH P-256 if X25519 not available
     // This is still secure, just not the curve we prefer
-    console.warn('X25519 not available, falling back to ECDH P-256:', e.message);
     return generateECDHP256Keypair();
   }
 }
@@ -71,7 +70,6 @@ export async function x25519DH(privateKey, peerPublicKeyRaw, isNative = true) {
       return ecdhP256DH(privateKey, peerPublicKeyRaw);
     }
   } catch (e) {
-    console.error('DH key agreement failed:', e);
     throw new Error('Key agreement failed: ' + e.message);
   }
 }

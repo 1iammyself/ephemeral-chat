@@ -29,10 +29,8 @@ export async function initMLKEM() {
     // Dynamic import — Vite will bundle this; tree-shakeable
     const { MlKem768 } = await import('mlkem');
     kyberInstance = new MlKem768();
-    console.log('🔐 ML-KEM-768 initialized (NIST FIPS 203 — production grade)');
     return true;
   } catch (e) {
-    console.warn('⚠️ ML-KEM not available, using classical-only key exchange:', e.message);
     return false;
   }
 }

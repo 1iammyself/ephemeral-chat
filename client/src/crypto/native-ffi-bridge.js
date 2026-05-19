@@ -54,7 +54,6 @@ export async function loadNativeCrypto() {
 
     return _wasmModule;
   } catch (err) {
-    console.error('[NativeCrypto] WASM load failed, falling back to pure JS crypto:', err.message);
     throw new Error(`Native crypto unavailable: ${err.message}`);
   }
 }

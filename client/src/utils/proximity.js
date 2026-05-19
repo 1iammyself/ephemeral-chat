@@ -39,7 +39,6 @@ function getIceServers() {
       if (Array.isArray(parsed) && parsed.length) return parsed;
     }
   } catch (_e) {
-    console.warn('[Proximity] Bad VITE_ICE_SERVERS, using defaults');
   }
   return defaults;
 }
@@ -214,7 +213,6 @@ export class ProximityService {
 
   emit(event, data) {
     this.listeners.get(event)?.forEach(cb => {
-      try { cb(data); } catch (e) { console.error('[Proximity] event handler error:', e); }
     });
   }
 
@@ -283,7 +281,6 @@ export class ProximityService {
             }
           }
         } catch (err) {
-          console.warn('[Proximity] offline SDP handling error:', err.message);
         }
       };
 
@@ -295,9 +292,7 @@ export class ProximityService {
         () => offlineP2P.removeEventListener('peer-lost', onLost),
         () => offlineP2P.removeEventListener('sdp-received', onSdp),
       ];
-      console.log('[Proximity] Offline P2P started (mDNS + BLE)');
     } catch (e) {
-      console.warn('[Proximity] Offline P2P unavailable:', e.message);
     }
 
     // ── 2. Socket.IO signaling (online / server fallback) ──────────────────
@@ -305,7 +300,6 @@ export class ProximityService {
       const { io } = await import('socket.io-client');
       const serverUrl = API_BASE || window.location.origin;
 
-      console.log('[Proximity] Connecting to signaling server:', serverUrl);
 
       this.discoverySocket = io(serverUrl + '/nearby', {
         transports: ['websocket'],
@@ -341,7 +335,6 @@ export class ProximityService {
         }
       }, PEER_TIMEOUT / 2);
     } catch (e) {
-      console.warn('[Proximity] Socket.IO signaling unavailable (offline mode active):', e.message);
     }
 
     this.emit('discovery-started');
@@ -376,7 +369,6 @@ export class ProximityService {
     if (!s) return;
 
     s.on('connect', () => {
-      console.log('[Proximity] Signaling connected');
       s.emit('announce', {
         deviceId: this.deviceId,
         nickname: this.nickname,
@@ -387,7 +379,6 @@ export class ProximityService {
     });
 
     s.on('reconnect', () => {
-      console.log('[Proximity] Signaling reconnected — re-announcing');
       s.emit('announce', {
         deviceId: this.deviceId,
         nickname: this.nickname,
@@ -397,7 +388,6 @@ export class ProximityService {
     });
 
     s.on('disconnect', (reason) => {
-      console.log('[Proximity] Signaling disconnected:', reason);
       this.emit('disconnected');
     });
 
@@ -435,7 +425,6 @@ export class ProximityService {
 
     s.on('rtc-offer', async ({ from, offer }) => {
       try { await this._handleOffer(from, offer); }
-      catch (e) { console.error('[Proximity] handleOffer error:', e); }
     });
 
     s.on('rtc-answer', async ({ from, answer }) => {
@@ -444,7 +433,6 @@ export class ProximityService {
         if (!conn?.pc) return;
         await conn.pc.setRemoteDescription(new RTCSessionDescription(answer));
         this._flushIceCandidates(from);
-      } catch (e) { console.error('[Proximity] handleAnswer error:', e); }
     });
 
     s.on('rtc-ice-candidate', async ({ from, candidate }) => {
@@ -457,7 +445,6 @@ export class ProximityService {
         return;
       }
       try { await conn.pc.addIceCandidate(new RTCIceCandidate(candidate)); }
-      catch (e) { console.warn('[Proximity] addIceCandidate err:', e.message); }
     });
 
     // Legacy signaling-path transfer events (not used for actual transfer,
@@ -493,7 +480,6 @@ export class ProximityService {
         await this._offlineP2P.sendSdp(peerId, envelope);
         return;
       } catch (e) {
-        console.warn('[Proximity] Offline signal failed, falling back to Socket.IO:', e.message);
       }
     }
 
@@ -519,7 +505,6 @@ export class ProximityService {
       this._closeConnection(peerId);
     }
 
-    console.log('[Proximity] Connecting to', peerId);
 
     // CRITICAL FIX: Restore STUN servers (but reject ALL TURN servers)
     // Emptying this array completely breaks ICE candidate generation on some Android/Windows networking stacks.
@@ -559,7 +544,6 @@ export class ProximityService {
   }
 
   async _handleOffer(fromPeerId, offer) {
-    console.log('[Proximity] Handling offer from', fromPeerId);
 
     // If we already have a connection to this peer, tear it down
     if (this.connections.has(fromPeerId)) {
@@ -588,7 +572,6 @@ export class ProximityService {
 
     // The answerer receives the data channel via ondatachannel
     pc.ondatachannel = (event) => {
-      console.log('[Proximity] ondatachannel fired for', fromPeerId);
       conn.dataChannel = event.channel;
       this._setupDataChannel(fromPeerId, event.channel);
     };
@@ -604,7 +587,6 @@ export class ProximityService {
   // ─── True Offline Connection (QR Based) ─────────────────
 
   async createOfflineOffer() {
-    console.log('[Proximity] Creating true offline offer...');
 
     // For pure zero-internet Hotspot offline, having ICE servers present
     // actually bloats the SDP and ICE candidates with public internet hops that we cannot reach.
@@ -660,7 +642,6 @@ export class ProximityService {
 
   async acceptOfflineOffer(offerCompressed) {
     const data = await decompressPayload(offerCompressed);
-    console.log('[Proximity] Accepting offline offer from', data.deviceId);
 
     // Empty array ensures it generates small, ultra-dense Host LAN IPs only
     const pc = new RTCPeerConnection({
@@ -712,7 +693,6 @@ export class ProximityService {
     // Resolve pairing code dynamically without blocking JSON generation
     this._waitForConnection(peerId, CONNECT_TIMEOUT).then(code => {
       conn.pairingCode = code;
-    }).catch(e => console.warn('Offline connection failed:', e));
 
     const answerObj = {
       t: 'answer',
@@ -729,7 +709,6 @@ export class ProximityService {
     const conn = this.connections.get(originalPeerId);
     if (!conn) throw new Error('No offline offer was created');
 
-    console.log('[Proximity] Finalizing offline connection for', originalPeerId);
 
     await conn.pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: data.a }));
     for (const c of data.c) {
@@ -758,7 +737,6 @@ export class ProximityService {
 
     pc.onconnectionstatechange = () => {
       const s = pc.connectionState;
-      console.log('[Proximity] PeerConnection', peerId, '->', s);
 
       if (s === 'connected') {
         // Reset restart counter on successful connection
@@ -774,10 +752,8 @@ export class ProximityService {
         iceRestartState.timer = setTimeout(() => {
           if (pc.connectionState === 'disconnected' && iceRestartState.attempts < iceRestartState.maxAttempts) {
             iceRestartState.attempts++;
-            console.log('[Proximity] Attempting ICE restart for', peerId, '(attempt', iceRestartState.attempts + ')');
             this._attemptIceRestart(peerId, pc);
           } else if (pc.connectionState === 'disconnected') {
-            console.log('[Proximity] Max ICE restart attempts reached for', peerId);
             this._closeConnection(peerId);
             this.emit('peer-disconnected', { id: peerId, reason: 'max-restarts' });
           }
@@ -786,7 +762,6 @@ export class ProximityService {
         // "failed" is more serious — try one ICE restart, then give up
         if (iceRestartState.attempts < 1) {
           iceRestartState.attempts++;
-          console.log('[Proximity] Connection failed, attempting ICE restart for', peerId);
           this._attemptIceRestart(peerId, pc);
         } else {
           this._closeConnection(peerId);
@@ -800,36 +775,29 @@ export class ProximityService {
 
     // Diagnostic Analytics Tracker
     pc.oniceconnectionstatechange = () => {
-      console.log('[Proximity] ICE state', peerId, '->', pc.iceConnectionState);
 
       // If we connect, let's aggressively poll to see *how* we connected
       if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
         pc.getStats().then(stats => {
           stats.forEach(report => {
             if (report.type === 'candidate-pair' && report.state === 'succeeded') {
-              console.log('✓ ACTIVE CONNECTION PAIR:', report);
 
               // Find the actual candidates to determine if we are indeed using Local IPs
               stats.forEach(r => {
                 if (r.id === report.localCandidateId) {
-                  console.log('  -> LOCAL ROUTE:', r.candidateType, r.address, r.protocol);
                 }
                 if (r.id === report.remoteCandidateId) {
-                  console.log('  -> REMOTE ROUTE:', r.candidateType, r.address, r.protocol);
                 }
               });
 
               if (report.localCandidateId && report.remoteCandidateId) {
                 const isLocal = Array.from(stats.values()).some(r => r.id === report.localCandidateId && r.candidateType === 'host');
                 if (isLocal) {
-                  console.log('🚀 SUCCESS: True Offline Host Connection Confirmed!');
                 } else {
-                  console.log('⚠️ WARNING: Transfer is being relayed over NAT/STUN!');
                 }
               }
             }
           });
-        }).catch(e => console.warn('Stats diag error:', e));
       }
     };
   }
@@ -842,9 +810,7 @@ export class ProximityService {
       const offer = await pc.createOffer({ iceRestart: true });
       await pc.setLocalDescription(offer);
       await this._sendSignal(peerId, 'offer', pc.localDescription);
-      console.log('[Proximity] ICE restart offer sent to', peerId);
     } catch (e) {
-      console.warn('[Proximity] ICE restart failed for', peerId, ':', e.message);
     }
   }
 
@@ -852,7 +818,6 @@ export class ProximityService {
     channel.binaryType = 'arraybuffer';
 
     channel.onopen = () => {
-      console.log('[Proximity] DataChannel OPEN with', peerId);
       const conn = this.connections.get(peerId);
       if (conn) {
         conn.state = 'connected';
@@ -863,12 +828,10 @@ export class ProximityService {
     };
 
     channel.onclose = () => {
-      console.log('[Proximity] DataChannel CLOSED with', peerId);
       this.emit('channel-closed', { peerId });
     };
 
     channel.onerror = (err) => {
-      console.error('[Proximity] DataChannel ERROR with', peerId, err);
       this.emit('channel-error', { peerId, error: err });
     };
 
@@ -887,18 +850,15 @@ export class ProximityService {
       conn.pairingCode = code;
       this.emit('pairing-code', { peerId, code });
     } catch (_e) {
-      console.warn('[Proximity] pairing code derivation failed, using fallback');
     }
   }
 
   _flushIceCandidates(peerId) {
     const conn = this.connections.get(peerId);
     if (!conn?._pendingCandidates?.length) return;
-    console.log('[Proximity] Flushing', conn._pendingCandidates.length, 'ICE candidates for', peerId);
     const candidates = conn._pendingCandidates.splice(0);
     for (const c of candidates) {
       conn.pc.addIceCandidate(new RTCIceCandidate(c)).catch(e =>
-        console.warn('[Proximity] flush ICE err:', e.message)
       );
     }
   }
@@ -995,7 +955,6 @@ export class ProximityService {
       try {
         this._handleControlMessage(peerId, JSON.parse(data));
       } catch (e) {
-        console.error('[Proximity] bad control msg:', e);
       }
     } else {
       this._handleFileChunk(peerId, data);
@@ -1049,7 +1008,6 @@ export class ProximityService {
         break;
       }
       default:
-        console.warn('[Proximity] Unknown msg type:', msg.type);
     }
   }
 
@@ -1074,7 +1032,6 @@ export class ProximityService {
       }
     }
     if (!transfer) {
-      console.warn('[Proximity] Received chunk but no active transfer for', peerId);
       return;
     }
 
@@ -1146,7 +1103,6 @@ export class ProximityService {
     const conn = this.connections.get(peerId);
     if (conn?.dataChannel?.readyState === 'open') {
       try { conn.dataChannel.send(JSON.stringify(obj)); }
-      catch (e) { console.warn('[Proximity] _sendControl err:', e.message); }
     }
   }
 
@@ -1165,7 +1121,6 @@ export class ProximityService {
     // Wait briefly if the data channel is not yet open (race between
     // connectToPeer resolving and React re-rendering)
     if (!conn.dataChannel || conn.dataChannel.readyState !== 'open') {
-      console.log('[Proximity] sendFile: waiting for data channel to open...');
       await this._waitForDataChannel(peerId, 10000);
     }
 
@@ -1197,7 +1152,6 @@ export class ProximityService {
     // 2. Wait for acceptance (via data channel control message)
     await this._waitForTransferAcceptance(transferId, TRANSFER_ACCEPT_TIMEOUT);
 
-    console.log('[Proximity] Starting streaming transfer:', file.name, formatBytes(file.size));
 
     // 4. Send chunks with back-pressure, streaming directly from the File object
     // DO NOT load the entire file into memory at once!
@@ -1253,7 +1207,6 @@ export class ProximityService {
       } catch (err) {
         // Chromium throws OperationError if `send queue is full` natively
         if (err.name === 'OperationError' || err.message.includes('queue is full') || err.message.includes('Queue full')) {
-          console.warn('[Proximity] Data channel queue full Native Error. Forcing stall.');
           await new Promise(r => setTimeout(r, 200));
           continue; // Retry this exact same offset
         }

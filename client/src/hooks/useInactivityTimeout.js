@@ -69,7 +69,6 @@ export function useInactivityTimeout({
 
     // Set timeout timer
     timeoutRef.current = setTimeout(() => {
-      console.log('⏰ User inactivity timeout reached');
       if (onTimeout) {
         onTimeout();
       }
@@ -143,7 +142,6 @@ export function useInactivityTimeout({
     if (!socket || !enabled) return;
 
     const handleServerTimeout = (data) => {
-      console.log('🔒 Server initiated timeout:', data);
       if (onTimeout) {
         onTimeout(data);
       }

@@ -23,7 +23,6 @@ class SocketManager {
     if (this.socket && this.isConnected) return this.socket;
 
     const SERVER_URL = this.getServerUrl();
-    console.log(`🔌 Connecting to socket server: ${SERVER_URL}`);
 
     // Attach device attestation headers for mobile clients (M5)
     let attestationAuth = {};
@@ -51,12 +50,10 @@ class SocketManager {
     });
 
     this.socket.on('connect', () => {
-      console.log('✅ Socket connected:', this.socket.id);
       this.isConnected = true;
 
       // Pin server's Ed25519 signing key on first connect (TOFU)
       initServerSigning().catch(err => {
-        console.warn('⚠️ Server signing init failed (non-fatal):', err.message);
       });
 
       // Re-apply listeners
@@ -69,12 +66,10 @@ class SocketManager {
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('❌ Socket disconnected:', reason);
       this.isConnected = false;
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('⚠️ Socket connection error:', error);
       this.isConnected = false;
     });
 
@@ -97,13 +92,11 @@ class SocketManager {
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        console.log('📱 Page became visible – checking socket health…');
 
         if (!this.socket) return;
 
         if (this.socket.disconnected || !this.isConnected) {
           // Socket is dead – force an immediate reconnect
-          console.log('🔄 Socket disconnected while backgrounded – reconnecting now');
           this.socket.connect();
           // We rely on Socket.IO's built-in ping/pong interval to detect stale connections
         }
@@ -114,9 +107,7 @@ class SocketManager {
 
     // Also handle the `resume` / `online` events which fire on some mobile browsers
     window.addEventListener('online', () => {
-      console.log('🌐 Network came back online');
       if (this.socket && (this.socket.disconnected || !this.isConnected)) {
-        console.log('🔄 Reconnecting after network restored');
         this.socket.connect();
       }
     });
@@ -124,7 +115,6 @@ class SocketManager {
     // iOS-specific: pageshow with persisted=true means restored from bfcache
     window.addEventListener('pageshow', (event) => {
       if (event.persisted && this.socket && (this.socket.disconnected || !this.isConnected)) {
-        console.log('🔄 Restored from bfcache – reconnecting');
         this.socket.connect();
       }
     });
@@ -163,7 +153,6 @@ class SocketManager {
     if (this.socket) {
       this.socket.emit(event, data, callback);
     } else {
-      console.warn(`⚠️ Cannot emit ${event} - socket not initialized`);
     }
   }
 

@@ -19,7 +19,6 @@
 
 const __DEV__ = import.meta.env?.DEV === true;
 // eslint-disable-next-line no-console
-const dbg = __DEV__ ? (...a) => console.log(...a) : () => {};
 
 import {
   generateKeyBundle,

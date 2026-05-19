@@ -187,7 +187,6 @@ const SingleMediaPlayer = ({
     if (!cardRef.current) return;
     if (!document.fullscreenElement) {
       cardRef.current.requestFullscreen().catch(err => {
-        console.error(`Error attempting to enable fullscreen: ${err.message}`);
       });
     } else {
       document.exitFullscreen();
@@ -290,7 +289,6 @@ const SingleMediaPlayer = ({
         socketManager.emit(event, enc);
         return;
       } catch (e) {
-        console.warn(`${event} encrypt failed, sending cleartext:`, e.message);
       }
     }
     socketManager.emit(event, payload);
@@ -308,10 +306,8 @@ const SingleMediaPlayer = ({
       let parsed;
       if (data.v === 4 && data.ct) {
         try { parsed = JSON.parse(await decryptMLSMessage(data, roomCode)); }
-        catch (e) { console.error('media-sync v4 decrypt failed:', e); return; }
       } else if (data.v === 3 && data.mls) {
         try { parsed = JSON.parse(await decryptMLSMessage(data, roomCode)); }
-        catch (e) { console.error('media-sync v3 decrypt failed:', e); return; }
       } else {
         parsed = data;
       }
@@ -490,7 +486,6 @@ const SingleMediaPlayer = ({
           await withJitter(() => socketManager.emit('now-playing-update', enc));
           return;
         } catch (e) {
-          console.warn('now-playing encrypt failed, sending cleartext:', e.message);
         }
       }
       socketManager.emit('now-playing-update', { nowPlaying });
@@ -799,10 +794,8 @@ const SharedMediaPlayer = ({
 
         if (item.v === 4 && item.ct) {
           try { parsed = JSON.parse(await decryptMLSMessage(item, roomCode)); }
-          catch (e) { console.warn('Could not decrypt v4 media on join:', e); decryptFailed = true; }
         } else if (item.v === 3 && item.mls) {
           try { parsed = JSON.parse(await decryptMLSMessage(item, roomCode)); }
-          catch (e) { console.warn('Could not decrypt v3 media on join:', e); decryptFailed = true; }
         } else if (item.isEncrypted) {
           decryptFailed = true;
         } else {
@@ -813,7 +806,6 @@ const SharedMediaPlayer = ({
 
         if (decryptFailed) {
           // Request peer recovery for this specific media item
-          console.log('[SharedMediaPlayer] Requesting peer recovery for', resolvedMediaId);
           socketManager.emit('media-recover-request', { mediaId: resolvedMediaId || null });
           continue;
         }
@@ -853,10 +845,8 @@ const SharedMediaPlayer = ({
       let parsed;
       if (data.v === 4 && data.ct) {
         try { parsed = JSON.parse(await decryptMLSMessage(data, roomCode)); }
-        catch (e) { console.error('media-share v4 decrypt failed:', e); return; }
       } else if (data.v === 3 && data.mls) {
         try { parsed = JSON.parse(await decryptMLSMessage(data, roomCode)); }
-        catch (e) { console.error('media-share v3 decrypt failed:', e); return; }
       } else {
         parsed = data;
       }

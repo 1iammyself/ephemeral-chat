@@ -34,7 +34,6 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNick
     useEffect(() => {
         // 1. Setup Socket Listeners
         const handleServerReady = ({ url }) => {
-            // console.log("[FileTransfer] Server ready at:", url);
             setFileServerUrl(url);
             // isLoading will be handled by iframe onLoad, but we can also set it here if we want to show loading until server is up
         };
@@ -82,12 +81,10 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNick
         // Only handle our specific message type
         if (!event.data || event.data.type !== 'e2ecp-download-request') return;
 
-        console.log('[FileTransferModal] Received download request from iframe');
 
         const { requestId, fileName, mimeType, base64Data } = event.data;
 
         if (!base64Data || !requestId) {
-            console.warn('[FileTransferModal] Invalid download request from iframe');
             return;
         }
 
@@ -110,7 +107,6 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNick
                 }
             } catch (e) { /* iframe contentWindow may be blocked cross-origin */ }
 
-            console.warn('[FileTransferModal] Could not send response back to iframe');
         };
 
         try {
@@ -126,14 +122,12 @@ const FileTransferModal = ({ onClose, roomCode, recipients = [], currentUserNick
             // Use the working download helper (has Capacitor native bridge access)
             await downloadFileOnDevice(blob, fileName, mimeType);
 
-            console.log('[FileTransferModal] Download succeeded, sending response');
             sendResponse({
                 type: 'e2ecp-download-response',
                 requestId,
                 success: true,
             });
         } catch (err) {
-            console.error('[FileTransferModal] Download bridge error:', err);
             sendResponse({
                 type: 'e2ecp-download-response',
                 requestId,

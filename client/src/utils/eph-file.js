@@ -107,7 +107,6 @@ export async function shareEphFile(ephPacket, title) {
       if (e.name === 'AbortError') {
         return false; // User cancelled, don't fallback
       }
-      console.warn('Web Share failed, falling back to download:', e);
     }
   }
 

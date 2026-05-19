@@ -135,7 +135,6 @@ const NearbyTransfer = () => {
         setShowPairing(true);
       }
     } catch (e) {
-      console.error('Failed to connect:', e);
     } finally {
       setConnectingPeerId(null);
     }
@@ -148,7 +147,6 @@ const NearbyTransfer = () => {
     try {
       await sendFile(connectedPeer.id, file);
     } catch (err) {
-      console.error('Send failed:', err);
     }
     e.target.value = '';
   };
@@ -179,7 +177,6 @@ const NearbyTransfer = () => {
       }
       setBatchFiles([]);
     } catch (err) {
-      console.error('Batch send failed:', err);
     } finally {
       setIsBatchSending(false);
     }
@@ -196,7 +193,6 @@ const NearbyTransfer = () => {
       setOfflinePeerId(peerId);
       setOfflineStep('offer-ready');
     } catch (e) {
-      console.error('Failed to create offline offer:', e);
       setOfflineStep('none');
       setShowQR(false);
     }
@@ -228,7 +224,6 @@ const NearbyTransfer = () => {
               setShowPairing(true);
             }
           } catch (err) {
-            console.error('Offline finalization failed:', err);
           }
           setConnectingPeerId(null);
         }

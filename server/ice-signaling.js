@@ -10,8 +10,8 @@
 
 /**
  * Attach ICE signaling handlers to a Socket.IO namespace/server.
- * 
- * @param {import('socket.io').Server|import('socket.io').Namespace} io 
+ *
+ * @param {import('socket.io').Server|import('socket.io').Namespace} io
  * @param {Object} options
  * @param {Function} options.getRoomMembers - fn(roomCode) → Set<socketId>
  */
@@ -30,7 +30,6 @@ function attachICESignaling(io, options = {}) {
       if (getRoomMembers) {
         const members = getRoomMembers(roomCode);
         if (!members || !members.has(socket.id) || !members.has(to)) {
-          console.log(`[ICE] Rejected offer: peers not in same room`);
           return;
         }
       }
@@ -51,7 +50,6 @@ function attachICESignaling(io, options = {}) {
       if (getRoomMembers) {
         const members = getRoomMembers(roomCode);
         if (!members || !members.has(socket.id) || !members.has(to)) {
-          console.log(`[ICE] Rejected answer: peers not in same room`);
           return;
         }
       }
@@ -84,7 +82,6 @@ function attachICESignaling(io, options = {}) {
     });
   });
   
-  console.log('[ICE Signaling] Attached to Socket.IO');
 }
 
 module.exports = { attachICESignaling };

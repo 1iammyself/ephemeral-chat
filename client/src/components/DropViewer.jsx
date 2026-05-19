@@ -98,7 +98,6 @@ const DropViewer = ({ onClose, claimData }) => {
         }
       } catch (err) {
         if (!cancelled) {
-          console.error('Decryption failed:', err);
           setDecryptionError(
             'Failed to decrypt. This usually means the username is incorrect, ' +
             'or the drop data was corrupted.'
@@ -160,7 +159,6 @@ const DropViewer = ({ onClose, claimData }) => {
         await downloadObjectUrlOnDevice(decryptedContent.data, fileName, mimeType);
       }
     } catch (e) {
-      console.error('[DropViewer] Download failed:', e);
     }
   }, [decryptedContent, contentMeta]);
 

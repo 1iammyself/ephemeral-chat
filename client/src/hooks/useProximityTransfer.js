@@ -228,7 +228,6 @@ export function useProximityTransfer() {
     try {
       await downloadFileOnDevice(transfer.blob, fileName, mimeType);
     } catch (e) {
-      console.error('[useProximityTransfer] Download failed:', e);
     }
   }, []);
 

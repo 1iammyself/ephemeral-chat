@@ -24,7 +24,6 @@ const AudioStream = ({ stream }) => {
     useEffect(() => {
         if (audioRef.current && stream) {
             audioRef.current.srcObject = stream;
-            audioRef.current.play().catch(e => console.error('Error playing audio stream:', e));
         }
     }, [stream]);
     return <audio ref={audioRef} autoPlay />;
@@ -93,7 +92,6 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
             const firstStream = remoteStreams.values().next().value;
             if (firstStream) {
                 remoteVideoRef.current.srcObject = firstStream;
-                remoteVideoRef.current.play().catch(console.error);
             }
         }
     }, [callState]);
@@ -103,7 +101,6 @@ const AudioCallModal = ({ isOpen, onClose, roomCode }) => {
             try {
                 await webRTCService.acceptCall(callState.callId);
             } catch (error) {
-                console.error('Failed to accept call:', error);
             }
         }
     };

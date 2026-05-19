@@ -91,10 +91,6 @@ export function initTrafficPadding(privacyLevel, sendCallback) {
     startChaffGenerator();
   }
   
-  console.log(`🫥 Traffic padding initialized (level: ${privacyLevel})`);
-  console.log(`   Chaff: ${currentConfig.chaffEnabled ? 'ON' : 'OFF'}`);
-  console.log(`   Padding: ${currentConfig.paddingEnabled ? 'ON' : 'OFF'}`);
-  console.log(`   Jitter: ${currentConfig.jitterEnabled ? currentConfig.jitterMin + '-' + currentConfig.jitterMax + 'ms' : 'OFF'}`);
 }
 
 /**

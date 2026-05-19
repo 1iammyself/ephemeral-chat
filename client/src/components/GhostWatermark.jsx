@@ -31,7 +31,6 @@ const GhostWatermark = ({ nickname }) => {
             // Return first 12 characters of the hash in uppercase for readability
             return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 12).toUpperCase();
         } catch (err) {
-            console.error('Failed to hash username:', err);
             return 'UNKNOWN';
         }
     };

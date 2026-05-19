@@ -151,7 +151,6 @@ export default function QuickVideoCapture({ open, replyTo, sendTriggerRef, onSen
         return;
       }
     } catch (err) {
-      console.error('stopRecording failed:', err);
     }
 
     cameraPrewarmService.suspend();

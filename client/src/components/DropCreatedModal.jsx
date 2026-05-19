@@ -56,7 +56,6 @@ const DropCreatedModal = ({ onClose, dropData }) => {
       setEphDownloaded(true);
       hapticSuccess();
     } catch (err) {
-      console.error('Failed to download .eph file:', err);
     } finally {
       setIsDownloadingEph(false);
     }
