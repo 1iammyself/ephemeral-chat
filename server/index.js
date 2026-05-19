@@ -283,7 +283,7 @@ app.use(helmet({
     includeSubDomains: true,
     preload: true,
   },
-  referrerPolicy: { policy: 'no-referrer-when-downgrade' },
+  referrerPolicy: { policy: 'no-referrer' },
   permittedCrossDomainPolicies: { permittedPolicies: 'none' },
 }));
 
