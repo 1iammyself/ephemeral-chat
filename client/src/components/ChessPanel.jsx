@@ -137,7 +137,9 @@ export default function ChessPanel({ message, currentUser, roomVibe, onDelete })
   }, []);
 
   // Refs to avoid stale closures
-  const chessRef = useRef(new Chess(message?.gameData?.fen || INITIAL_FEN));
+  const chessRef = useRef((() => {
+    try { return new Chess(message?.gameData?.fen || INITIAL_FEN); } catch { return new Chess(INITIAL_FEN); }
+  })());
   const moveHistoryRef = useRef(message?.gameData?.moves || []);
   const timerRef = useRef(null);
   const timeoutFiredRef = useRef(false);
@@ -171,8 +173,8 @@ export default function ChessPanel({ message, currentUser, roomVibe, onDelete })
     const gd = message.gameData;
     setGameData(gd);
     if (gd.fen) {
-      setFen(gd.fen);
-      chessRef.current = new Chess(gd.fen);
+      try { chessRef.current = new Chess(gd.fen); setFen(gd.fen); }
+      catch { chessRef.current = new Chess(INITIAL_FEN); setFen(INITIAL_FEN); }
     }
     const moves = gd.moves || [];
     moveHistoryRef.current = moves;
@@ -251,7 +253,7 @@ export default function ChessPanel({ message, currentUser, roomVibe, onDelete })
         chessRef.current.move(move);
       } catch {
         // Local instance out of sync (e.g. promotion flag missing) — resync from FEN
-        if (newFen) chessRef.current = new Chess(newFen);
+        if (newFen) { try { chessRef.current = new Chess(newFen); } catch { chessRef.current = new Chess(INITIAL_FEN); } }
       }
       if (newFen) setFen(newFen);
       if (wt != null) setWhiteTime(wt);
@@ -283,8 +285,9 @@ export default function ChessPanel({ message, currentUser, roomVibe, onDelete })
     const onOpponentJoined = ({ messageId: mid, gameData: gd }) => {
       if (mid !== messageId) return;
       setGameData(gd);
-      setFen(gd.fen || INITIAL_FEN);
-      chessRef.current = new Chess(gd.fen || INITIAL_FEN);
+      const opponentFen = gd.fen || INITIAL_FEN;
+      try { chessRef.current = new Chess(opponentFen); setFen(opponentFen); }
+      catch { chessRef.current = new Chess(INITIAL_FEN); setFen(INITIAL_FEN); }
       moveHistoryRef.current = [];
       setMoveHistory([]);
       setWhiteTime(gd.whiteTime ?? null);
@@ -535,7 +538,14 @@ export default function ChessPanel({ message, currentUser, roomVibe, onDelete })
   const canJoinQueue = !isPlaying && !inQueue && isLive && !queueLocked && !queueFull;
 
   const handleStartCpu = (diff) => socketManager.emit('chess-set-cpu', { messageId, difficulty: diff });
-  const handleResign = () => socketManager.emit('chess-resign', { messageId });
+  const handleResign = () => {
+    socketManager.emit('chess-resign', { messageId });
+    if (isCpu && myColor) {
+      const winnerColor = myColor === 'white' ? 'black' : 'white';
+      clearInterval(timerRef.current);
+      setGameData(prev => prev ? { ...prev, status: 'finished', winner: winnerColor, result: 'resign' } : prev);
+    }
+  };
   const handleDrawOffer = () => {
     socketManager.emit('chess-draw-offer', { messageId });
     setStatusMsg('Draw offered...');
