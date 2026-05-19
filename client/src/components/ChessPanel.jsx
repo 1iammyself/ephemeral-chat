@@ -731,8 +731,8 @@ export default function ChessPanel({ message, currentUser, roomVibe, onDelete })
             showBoardNotation={true}
             animationDuration={200}
             customBoardStyle={{ borderRadius: '6px', boxShadow: '0 4px 24px rgba(0,0,0,0.18)' }}
-            customDarkSquareStyle={{ backgroundColor: '#b58863' }}
-            customLightSquareStyle={{ backgroundColor: '#f0d9b5' }}
+            customDarkSquareStyle={{ backgroundColor: vibe.boardColors?.dark ?? '#b58863' }}
+            customLightSquareStyle={{ backgroundColor: vibe.boardColors?.light ?? '#f0d9b5' }}
           />
           {/* Promotion picker overlay */}
           {pendingPromotion && myColor && (

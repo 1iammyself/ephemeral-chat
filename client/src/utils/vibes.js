@@ -20,7 +20,8 @@ export const VIBES = {
         description: 'Clean and minimal',
         colors: { primary: '#3b82f6' },
         accent: 'primary',
-        moodSound: null
+        moodSound: null,
+        boardColors: { dark: '#4a7fc1', light: '#dce8f5' },
     },
     party: {
         id: 'party',
@@ -36,7 +37,8 @@ export const VIBES = {
         description: 'Festive and fun',
         colors: { primary: '#6366f1' },
         accent: 'indigo',
-        moodSound: 'lofi'
+        moodSound: 'lofi',
+        boardColors: { dark: '#7c4dcc', light: '#e4d6f5' },
     },
     chill: {
         id: 'chill',
@@ -52,7 +54,8 @@ export const VIBES = {
         description: 'Relaxed vibes',
         colors: { primary: '#14b8a6' },
         accent: 'teal',
-        moodSound: 'rain'
+        moodSound: 'rain',
+        boardColors: { dark: '#2a9d8f', light: '#c8ece8' },
     },
     focus: {
         id: 'focus',
@@ -68,7 +71,8 @@ export const VIBES = {
         description: 'Work mode',
         colors: { primary: '#f97316' },
         accent: 'orange',
-        moodSound: 'whitenoise'
+        moodSound: 'whitenoise',
+        boardColors: { dark: '#c47a0e', light: '#f5e6c8' },
     },
     campfire: {
         id: 'campfire',
@@ -84,7 +88,8 @@ export const VIBES = {
         description: 'Warm and crackling',
         colors: { primary: '#e11d48' },
         accent: 'rose',
-        moodSound: 'campfire'
+        moodSound: 'campfire',
+        boardColors: { dark: '#b85070', light: '#f5d8e0' },
     },
     ocean: {
         id: 'ocean',
@@ -100,7 +105,8 @@ export const VIBES = {
         description: 'Deep and weightless',
         colors: { primary: '#0284c7' },
         accent: 'sky',
-        moodSound: 'ocean'
+        moodSound: 'ocean',
+        boardColors: { dark: '#1a6fa8', light: '#c0def5' },
     },
     forest: {
         id: 'forest',
@@ -116,7 +122,8 @@ export const VIBES = {
         description: 'Earthy and ancient',
         colors: { primary: '#10b981' },
         accent: 'emerald',
-        moodSound: 'forest'
+        moodSound: 'forest',
+        boardColors: { dark: '#2e7d52', light: '#c8e8d0' },
     },
     cafe: {
         id: 'cafe',
@@ -132,7 +139,8 @@ export const VIBES = {
         description: 'Roasted and cozy',
         colors: { primary: '#5d4037' },
         accent: 'stone',
-        moodSound: 'cafe'
+        moodSound: 'cafe',
+        boardColors: { dark: '#7b4a2a', light: '#e8c89a' },
     },
     jazz: {
         id: 'jazz',
@@ -148,7 +156,8 @@ export const VIBES = {
         description: 'Smooth and moody',
         colors: { primary: '#ca8a04' },
         accent: 'yellow',
-        moodSound: 'jazz'
+        moodSound: 'jazz',
+        boardColors: { dark: '#2e2e3e', light: '#c4a850' },
     }
 };
 
