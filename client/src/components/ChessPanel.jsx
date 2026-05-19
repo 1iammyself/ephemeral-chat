@@ -546,11 +546,15 @@ export default function ChessPanel({ message, currentUser, roomVibe, onDelete })
 
   const handleStartCpu = (diff) => socketManager.emit('chess-set-cpu', { messageId, difficulty: diff });
   const handleResign = () => {
-    socketManager.emit('chess-resign', { messageId });
     if (isCpu && myColor) {
       const winnerColor = myColor === 'white' ? 'black' : 'white';
       clearInterval(timerRef.current);
       setGameData(prev => prev ? { ...prev, status: 'finished', winner: winnerColor, result: 'resign' } : prev);
+      // chess-game-end has no identity check (unlike chess-resign), so the server
+      // correctly marks the game finished and allows subsequent chess-rematch to work
+      socketManager.emit('chess-game-end', { messageId, winner: winnerColor, result: 'resign', fen: chessRef.current.fen(), moves: moveHistoryRef.current });
+    } else {
+      socketManager.emit('chess-resign', { messageId });
     }
   };
   const handleDrawOffer = () => {
@@ -616,8 +620,8 @@ export default function ChessPanel({ message, currentUser, roomVibe, onDelete })
         </div>
       )}
 
-      {/* Status strip */}
-      {((statusMsg && !isFinished) || cpuThinking || opponentDisconnected || showCheckStrip || myTurnFlash) && (
+      {/* Status strip — always occupies height during live games to prevent board resize flicker */}
+      {isLive && !isFinished ? (
         <div className={`text-center text-xs font-semibold py-1 transition-colors ${
           opponentDisconnected
             ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-300'
@@ -625,16 +629,22 @@ export default function ChessPanel({ message, currentUser, roomVibe, onDelete })
               ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300'
             : myTurnFlash
               ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
-              : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
+            : (cpuThinking || statusMsg)
+              ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
+              : ''
         }`}>
           {opponentDisconnected
             ? `⚠️ Opponent disconnected — forfeit in ${disconnectSecondsLeft ?? 60}s`
             : cpuThinking ? '🤖 CPU thinking...'
             : showCheckStrip ? '⚠️ Check!'
             : myTurnFlash ? '✓ Your turn'
-            : statusMsg}
+            : statusMsg || ' '}
         </div>
-      )}
+      ) : (statusMsg && !isFinished) ? (
+        <div className="text-center text-xs font-semibold py-1 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300">
+          {statusMsg}
+        </div>
+      ) : null}
 
       {/* Waiting for challenger banner */}
       {isWaiting && myColor === 'white' && (
