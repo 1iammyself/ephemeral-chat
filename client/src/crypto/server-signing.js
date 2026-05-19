@@ -5,7 +5,7 @@
  * in IndexedDB (Trust On First Use). On subsequent page loads, verifies
  * the live server key matches the pinned one before accepting it.
  *
- * Verified events: key-bundle-roster, peer-key-bundle
+ * Verified events: key-bundle-roster, peer-key-bundle, knock-approved, promoted-to-host, role-updated, guest-approved
  *
  * If server signing is not available (old server, degraded mode) the
  * verification step is skipped gracefully — callers check isServerSigningReady().

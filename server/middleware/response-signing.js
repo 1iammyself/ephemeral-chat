@@ -9,7 +9,7 @@
  *   - Generate a fresh ephemeral key pair at startup (logged to stdout so
  *     the operator can persist it in SERVER_SIGNING_KEY).
  *
- * Signed events: key-bundle-roster, peer-key-bundle
+ * Signed events: key-bundle-roster, peer-key-bundle, knock-approved, promoted-to-host, role-updated, guest-approved
  * Signature algorithm: Ed25519 (pure Ed25519 — no prehash)
  * Signature encoding: base64, attached as `_sig` field on the payload
  */
