@@ -1849,6 +1849,21 @@ const ChatRoom = () => {
     }
   }, []);
 
+  // Zeroize key material on tab/browser close (beforeunload doesn't trigger React cleanup)
+  useEffect(() => {
+    const wipe = () => {
+      destroyMLSSession(roomCode);
+      destroyE2EESession(roomCode);
+      stopTrafficPadding();
+    };
+    window.addEventListener('beforeunload', wipe);
+    window.addEventListener('pagehide', wipe); // iOS Safari
+    return () => {
+      window.removeEventListener('beforeunload', wipe);
+      window.removeEventListener('pagehide', wipe);
+    };
+  }, [roomCode]);
+
   // Ctrl+Z global panic-burn shortcut (web + desktop, skips text inputs)
   useEffect(() => {
     const handlePanicKey = (e) => {
