@@ -1699,6 +1699,14 @@ const ChatRoom = () => {
     socketManager.on('pre-approved-list-updated', handlePreApprovedListUpdated);
 
     socketManager.on('messages-cleared', () => {
+      // Wipe local session data
+      destroyMLSSession(roomCode);
+      destroyE2EESession(roomCode);
+      try {
+        sessionStorage.removeItem('eph-creator-id');
+        sessionStorage.removeItem('eph-creator-token');
+        sessionStorage.removeItem('ephchat-device-id');
+      } catch (_) {}
       setMessages([]);
       setLinkPreviews({});
       setActivityLogs(prev => [{
@@ -1824,7 +1832,7 @@ const ChatRoom = () => {
     if (window.electronAPI?.onPanicBurn) {
       window.electronAPI.onPanicBurn(() => {
         if (socketManager.socket?.connected) {
-          socketManager.emit('panic-burn');
+          socketManager.emit('panic-burn', { roomCode });
           hapticHeavy();
         }
       });
@@ -1840,6 +1848,21 @@ const ChatRoom = () => {
       });
     }
   }, []);
+
+  // Ctrl+Z global panic-burn shortcut (web + desktop, skips text inputs)
+  useEffect(() => {
+    const handlePanicKey = (e) => {
+      if (!e.ctrlKey || e.shiftKey || e.altKey) return;
+      if (e.key !== 'z' && e.key !== 'Z') return;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      e.preventDefault();
+      if (socketManager.socket?.connected && roomCode) {
+        socketManager.emit('panic-burn', { roomCode });
+      }
+    };
+    window.addEventListener('keydown', handlePanicKey, true);
+    return () => window.removeEventListener('keydown', handlePanicKey, true);
+  }, [roomCode]);
 
   useEffect(() => {
     if (!messagesContainerRef.current) return;
