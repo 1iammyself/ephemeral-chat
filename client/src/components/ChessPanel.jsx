@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useContext } from 'react';
 import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
 import { Flag, RotateCcw, Clock, Users, Trash2 } from 'lucide-react';
 import socketManager from '../socket';
 import { getCpuMove } from './games/ChessEngine';
 import { getVibeById } from '../utils/vibes';
+import { FloatingPanelContext } from './FloatingPanel';
 
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 // Human-feeling delays — easy plays randomly but should still pause like a person thinks
@@ -99,6 +100,7 @@ function TimerBar({ timeMs, maxMs, isActive, color, name, captured, unicode, adv
 }
 
 export default function ChessPanel({ message, currentUser, roomVibe, onDelete }) {
+  const { suspended } = useContext(FloatingPanelContext);
   const vibe = getVibeById(roomVibe);
   const [gameData, setGameData] = useState(message?.gameData ?? null);
   const [fen, setFen] = useState(message?.gameData?.fen || INITIAL_FEN);
@@ -128,12 +130,17 @@ export default function ChessPanel({ message, currentUser, roomVibe, onDelete })
   useEffect(() => {
     const el = boardContainerRef.current;
     if (!el) return;
+    let raf = null;
     const ro = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      setBoardSize(Math.max(120, Math.floor(Math.min(width, height)) - 8));
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const { width, height } = entry.contentRect;
+        const s = Math.max(120, Math.floor(Math.min(width, height)) - 8);
+        setBoardSize(prev => Math.abs(prev - s) > 8 ? s : prev);
+      });
     });
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => { ro.disconnect(); if (raf) cancelAnimationFrame(raf); };
   }, []);
 
   // Refs to avoid stale closures
@@ -191,13 +198,13 @@ export default function ChessPanel({ message, currentUser, roomVibe, onDelete })
   // ── Timer countdown ───────────────────────────────────────────────
   useEffect(() => {
     clearInterval(timerRef.current);
-    if (!hasTimer || isFinished || isWaiting || !turnStartedAt) return;
+    if (!hasTimer || isFinished || isWaiting || !turnStartedAt || suspended) return;
     timerRef.current = setInterval(() => {
       if (turnColor === 'white') setWhiteTime(prev => (prev == null ? null : Math.max(0, prev - 1000)));
       else setBlackTime(prev => (prev == null ? null : Math.max(0, prev - 1000)));
     }, 1000);
     return () => clearInterval(timerRef.current);
-  }, [turnColor, turnStartedAt, isFinished, isWaiting, hasTimer]);
+  }, [turnColor, turnStartedAt, isFinished, isWaiting, hasTimer, suspended]);
 
   // ── Timer timeout enforcement (fires immediately locally, no roundtrip wait) ──
   useEffect(() => {

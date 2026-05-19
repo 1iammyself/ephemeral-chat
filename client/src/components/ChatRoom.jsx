@@ -398,6 +398,24 @@ function SecretsPanel({ handleSendStego, onClose, initialExtractImage }) {
   );
 }
 
+class ChessPanelErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full gap-3 text-center p-6">
+          <span className="text-3xl">♟</span>
+          <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Chess unavailable</p>
+          <button onClick={() => this.setState({ hasError: false })}
+            className="text-xs text-amber-600 dark:text-amber-400 underline">Try again</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const ChatRoom = () => {
   const { roomCode } = useParams();
   const navigate = useNavigate();
@@ -4057,8 +4075,8 @@ const ChatRoom = () => {
             }} />
         </FloatingPanel>
       )}
-      {/* ── Tetris FloatingPanel ─────────────────────────────────────── */}
-      {isPanelOpen('tetris') && (
+      {/* ── Tetris FloatingPanel — always mounted while message exists so game state survives close/minimize ── */}
+      {activeTetrisMessage && (
         <FloatingPanel
           title={t('chatRoom.panels.tetris')}
           icon={Gamepad2}
@@ -4070,6 +4088,7 @@ const ChatRoom = () => {
           defaultHeight={560}
           defaultX={100}
           defaultY={60}
+          visible={isPanelOpen('tetris')}
         >
           <TetrisPanel
             message={activeTetrisMessage}
@@ -4079,8 +4098,8 @@ const ChatRoom = () => {
         </FloatingPanel>
       )}
 
-      {/* ── Chess FloatingPanel ───────────────────────────────────────── */}
-      {isPanelOpen('chess') && (
+      {/* ── Chess FloatingPanel — always mounted while message exists so game state survives close/minimize ── */}
+      {activeChessMessage && (
         <FloatingPanel
           title="Chess"
           icon={Gamepad2}
@@ -4092,13 +4111,16 @@ const ChatRoom = () => {
           defaultHeight={600}
           defaultX={120}
           defaultY={50}
+          visible={isPanelOpen('chess')}
         >
-          <ChessPanel
-            message={activeChessMessage}
-            currentUser={currentUser}
-            roomVibe={roomVibe}
-            onDelete={handleDeleteMessage}
-          />
+          <ChessPanelErrorBoundary>
+            <ChessPanel
+              message={activeChessMessage}
+              currentUser={currentUser}
+              roomVibe={roomVibe}
+              onDelete={handleDeleteMessage}
+            />
+          </ChessPanelErrorBoundary>
         </FloatingPanel>
       )}
 

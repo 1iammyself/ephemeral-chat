@@ -1,4 +1,5 @@
-import React, { useReducer, useEffect, useRef, useState, useCallback } from 'react';
+import React, { useReducer, useEffect, useRef, useState, useCallback, useContext } from 'react';
+import { FloatingPanelContext } from '../FloatingPanel';
 
 const COLS = 10;
 const ROWS = 20;
@@ -201,6 +202,23 @@ const TetrisGame = ({ onStateUpdate, onLinesCleared, onGameOver, onGameRestart, 
   const prevPhaseRef    = useRef('idle');
   const cbRefs = useRef({ onStateUpdate, onLinesCleared, onGameOver, onGameRestart });
   useEffect(() => { cbRefs.current = { onStateUpdate, onLinesCleared, onGameOver, onGameRestart }; });
+
+  // ── Auto-pause when floating panel is minimized or hidden ──────────
+  const { suspended } = useContext(FloatingPanelContext);
+  const phaseRef = useRef(state.phase);
+  phaseRef.current = state.phase;
+  const autoSuspendedRef = useRef(false);
+  useEffect(() => {
+    if (suspended && phaseRef.current === 'playing') {
+      autoSuspendedRef.current = true;
+      dispatch({ type: 'TOGGLE_PAUSE' });
+    } else if (!suspended && autoSuspendedRef.current && phaseRef.current === 'paused') {
+      autoSuspendedRef.current = false;
+      dispatch({ type: 'TOGGLE_PAUSE' });
+    } else if (!suspended) {
+      autoSuspendedRef.current = false;
+    }
+  }, [suspended]);
 
   // ── Audio ─────────────────────────────────────────────────────
   useEffect(() => {

@@ -1,6 +1,8 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, createContext } from 'react';
 import { X, Minus, Maximize2 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+
+export const FloatingPanelContext = createContext({ suspended: false });
 
 const MIN_W = 320;
 const MIN_H = 200;
@@ -28,6 +30,7 @@ export default function FloatingPanel({
   defaultY,
   zIndex  = 220,
   onFocus,
+  visible = true,
 }) {
   const { effective } = useTheme();
   const isDark = effective === 'dark';
@@ -131,7 +134,10 @@ export default function FloatingPanel({
     ? { position: 'fixed', inset: 0, width: '100%', height: '100%', zIndex, borderRadius: 0 }
     : { position: 'fixed', left: pos.x, top: pos.y, width: size.w, height: minimized ? 'auto' : size.h, zIndex, borderRadius: 14 };
 
+  const suspended = minimized || !visible;
+
   return (
+    <FloatingPanelContext.Provider value={{ suspended }}>
     <div
       ref={panelRef}
       onPointerDown={onFocus}
@@ -140,7 +146,7 @@ export default function FloatingPanel({
         background: panelBg,
         boxShadow: shadowStyle,
         border: `1px solid ${borderColor}`,
-        display: 'flex',
+        display: visible ? 'flex' : 'none',
         flexDirection: 'column',
         overflow: 'hidden',
         userSelect: 'none',
@@ -201,12 +207,10 @@ export default function FloatingPanel({
         <div style={{ width: 54, flexShrink: 0 }} />
       </div>
 
-      {/* ── content ───────────────────────────────────────────────────── */}
-      {!minimized && (
-        <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
-          {children}
-        </div>
-      )}
+      {/* ── content — always mounted so game state is preserved on minimize ── */}
+      <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: minimized ? 'none' : undefined }}>
+        {children}
+      </div>
 
       {/* ── resize handles ────────────────────────────────────────────── */}
       {!maximized && !minimized && Object.entries(HANDLES).map(([dir, s]) => (
@@ -217,5 +221,6 @@ export default function FloatingPanel({
         />
       ))}
     </div>
+    </FloatingPanelContext.Provider>
   );
 }
