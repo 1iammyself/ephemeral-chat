@@ -563,7 +563,46 @@ export default function ChessPanel({ message, currentUser, roomVibe, onDelete })
   };
   const handleDrawAccept = () => { socketManager.emit('chess-draw-accept', { messageId }); setDrawOffered(false); };
   const handleDrawDecline = () => { socketManager.emit('chess-draw-decline', { messageId }); setDrawOffered(false); };
-  const handleRematch = (difficulty) => socketManager.emit('chess-rematch', { messageId, ...(difficulty ? { difficulty } : {}) });
+  const handleRematch = (difficulty) => {
+    socketManager.emit('chess-rematch', { messageId, ...(difficulty ? { difficulty } : {}) });
+    if (isCpu) {
+      const diff = ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : (gameData?.cpu?.difficulty || 'medium');
+      const newGd = {
+        ...gameData,
+        status: 'playing',
+        winner: null,
+        result: null,
+        endedAt: null,
+        fen: INITIAL_FEN,
+        moves: [],
+        cpu: { enabled: true, difficulty: diff },
+        black: { id: 'cpu', socketId: null, name: `CPU (${diff})` },
+        whiteTime: gameData?.timeControl ? gameData.timeControl.initial * 1000 : null,
+        blackTime: gameData?.timeControl ? gameData.timeControl.initial * 1000 : null,
+        turnStartedAt: Date.now(),
+        startedAt: Date.now(),
+      };
+      try { chessRef.current = new Chess(INITIAL_FEN); } catch { chessRef.current = new Chess(); }
+      moveHistoryRef.current = [];
+      setMoveHistory([]);
+      setFen(INITIAL_FEN);
+      setDrawOffered(false);
+      setDrawOfferFrom(null);
+      setStatusMsg('');
+      setOpponentDisconnected(false);
+      setDisconnectSecondsLeft(null);
+      timeoutFiredRef.current = false;
+      gameEndedRef.current = false;
+      cpuThinkingRef.current = false;
+      setPendingPromotion(null);
+      setSelectedSquare(null);
+      setOptionSquares({});
+      setWhiteTime(newGd.whiteTime);
+      setBlackTime(newGd.blackTime);
+      setTurnStartedAt(newGd.turnStartedAt);
+      setGameData(newGd);
+    }
+  };
   const handleTagOut = () => socketManager.emit('chess-tag-out', { messageId });
   const handleQueueAgain = () => { socketManager.emit('chess-queue-again', { messageId }); setWasDisplacedFromGame(false); };
   const handleAddSlot = () => socketManager.emit('chess-set-max-queue', { messageId, maxQueue: (gameData?.maxQueue ?? queueCount) + 1 });
