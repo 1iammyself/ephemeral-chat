@@ -1735,6 +1735,21 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Panic burn — host-only: wipe all server-side messages and notify all members
+  socket.on('panic-burn', async ({ roomCode } = {}) => {
+    const room = roomData[roomCode];
+    if (!room) return;
+    if (room.hostId !== socket.id) return;
+
+    try {
+      await roomManager.clearMessages(roomCode);
+      io.to(roomCode).emit('messages-cleared');
+      logger.info(`🔥 Panic burn executed for room ${roomCode} by host ${socket.id}`);
+    } catch (err) {
+      logger.error(`[panic-burn] Failed for room ${roomCode}:`, err.message);
+    }
+  });
+
   // Kick user - host can kick anyone, tier1 can kick tier2 and users
   socket.on('kick-user', async ({ targetUserId, roomCode }) => {
     const room = roomData[roomCode];
