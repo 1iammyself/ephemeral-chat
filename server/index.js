@@ -228,16 +228,15 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: [
-        "'self'", 
-        "'unsafe-inline'",
-        "'unsafe-eval'", 
-        "https://*.youtube.com", 
+        "'self'",
+        "'wasm-unsafe-eval'",   // allows WebAssembly (mlkem, hpke, openmls) without broader unsafe-eval
+        "https://*.youtube.com",
         "https://youtube.com",
         "https://*.ytimg.com",
         "https://*.soundcloud.com",
         "https://w.soundcloud.com"
       ],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"], // unsafe-inline required for React inline styles
       imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
       connectSrc: [
         "'self'",
