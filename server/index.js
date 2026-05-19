@@ -484,7 +484,7 @@ async function initializeRedis() {
               roomData[roomCode].hostId = newHostId;
               if (!roomData[roomCode].userRoles) roomData[roomCode].userRoles = {};
               roomData[roomCode].userRoles[newHostId] = 'host';
-              io.to(newHostId).emit('promoted-to-host');
+              io.to(newHostId).emit('promoted-to-host', signSocketPayload({ roomCode, ts: Date.now() }));
               logger.info(`👑 Periodic cleanup: reassigned host to ${newHostId} in room ${roomCode}`);
             } else if (liveMembers.length === 0) {
               delete roomData[roomCode];
@@ -1454,7 +1454,7 @@ io.on('connection', (socket) => {
       };
 
       logger.info(`👑 Room ${roomCode} is empty, ${nickname} auto-approved as host`);
-      return socket.emit('knock-approved', { isHost: true });
+      return socket.emit('knock-approved', signSocketPayload({ isHost: true, roomCode, ts: Date.now() }));
     }
 
     // 4. If room has users but no metadata, create it
@@ -1488,7 +1488,7 @@ io.on('connection', (socket) => {
         }
       }
       logger.info(`✅ Auto-approve enabled for room ${roomCode}, auto-approving ${nickname}`);
-      return socket.emit('knock-approved', { isHost: false });
+      return socket.emit('knock-approved', signSocketPayload({ isHost: false, roomCode, ts: Date.now() }));
     }
 
     // 4c. Check pre-approved user list — auto-approve if nickname matches
@@ -1516,7 +1516,7 @@ io.on('connection', (socket) => {
           }
 
           logger.info(`✅ Pre-approved user "${nickname}" auto-approved for room ${roomCode} with role: ${matchedEntry.role || 'user'}`);
-          return socket.emit('knock-approved', { isHost: false });
+          return socket.emit('knock-approved', signSocketPayload({ isHost: false, roomCode, ts: Date.now() }));
         }
       }
     }
@@ -1550,7 +1550,7 @@ io.on('connection', (socket) => {
         if (!room.userRoles) room.userRoles = {};
         room.userRoles[newHostId] = 'host';
         logger.info(`👑 Host was stale during knock, reassigned to ${newHostId} in room ${roomCode}`);
-        io.to(newHostId).emit('promoted-to-host');
+        io.to(newHostId).emit('promoted-to-host', signSocketPayload({ roomCode, ts: Date.now() }));
 
         // Now notify the new host about this knock
         io.to(newHostId).emit('user-knocking', {
@@ -1561,7 +1561,7 @@ io.on('connection', (socket) => {
         // No valid members (shouldn't happen since liveUserCount > 0, but safeguard)
         room.hostId = socket.id;
         roomData[roomCode] = room;
-        return socket.emit('knock-approved', { isHost: true });
+        return socket.emit('knock-approved', signSocketPayload({ isHost: true, roomCode, ts: Date.now() }));
       }
     } else {
       // Host is alive — notify all managers (host and tier1)
@@ -1681,11 +1681,11 @@ io.on('connection', (socket) => {
     const guestSocket = io.sockets.sockets.get(guestId);
     if (guestSocket) {
       if (room.lobbyCount > 0) room.lobbyCount--;
-      guestSocket.emit('knock-approved', { isHost: false });
+      guestSocket.emit('knock-approved', signSocketPayload({ isHost: false, roomCode, ts: Date.now() }));
     }
 
     // Notify all admins to update their pending lists
-    io.to(roomCode).emit('guest-approved', { guestId });
+    io.to(roomCode).emit('guest-approved', signSocketPayload({ guestId, roomCode, ts: Date.now() }));
   });
 
   // Role management - only host can change roles
@@ -1712,11 +1712,13 @@ io.on('connection', (socket) => {
     room.userRoles[targetUserId] = role;
 
     // Notify all users in room about role update
-    io.to(roomCode).emit('role-updated', {
+    io.to(roomCode).emit('role-updated', signSocketPayload({
       userId: targetUserId,
       role,
-      updatedBy: socket.nickname
-    });
+      updatedBy: socket.nickname,
+      roomCode,
+      ts: Date.now()
+    }));
 
     // Also send updated users list
     const roomSocket = io.sockets.adapter.rooms.get(roomCode);
@@ -3941,7 +3943,7 @@ io.on('connection', (socket) => {
             if (!room.userRoles) room.userRoles = {};
             room.userRoles[newHostId] = 'host';
             logger.info(`👑 Host reassigned to ${newHostId} in room ${roomCode}`);
-            io.to(newHostId).emit('promoted-to-host');
+            io.to(newHostId).emit('promoted-to-host', signSocketPayload({ roomCode, ts: Date.now() }));
           } else {
             logger.info(`🗑️ Room ${roomCode} is now empty, cleaning up metadata`);
             delete roomData[roomCode];
@@ -3956,7 +3958,7 @@ io.on('connection', (socket) => {
             if (!room.userRoles) room.userRoles = {};
             room.userRoles[newHostId] = 'host';
             logger.info(`👑 Stale host detected, reassigned to ${newHostId} in room ${roomCode}`);
-            io.to(newHostId).emit('promoted-to-host');
+            io.to(newHostId).emit('promoted-to-host', signSocketPayload({ roomCode, ts: Date.now() }));
           }
         }
       }
@@ -4043,7 +4045,7 @@ io.on('connection', (socket) => {
               if (!room.userRoles) room.userRoles = {};
               room.userRoles[newHostId] = 'host';
               logger.info(`👑 Host reassigned to ${newHostId} in room ${roomCode}`);
-              io.to(newHostId).emit('promoted-to-host');
+              io.to(newHostId).emit('promoted-to-host', signSocketPayload({ roomCode, ts: Date.now() }));
             } else {
               logger.info(`🗑️ Room ${roomCode} is now empty, cleaning up metadata`);
               delete roomData[roomCode];
@@ -4058,7 +4060,7 @@ io.on('connection', (socket) => {
               if (!room.userRoles) room.userRoles = {};
               room.userRoles[newHostId] = 'host';
               logger.info(`👑 Stale host detected, reassigned to ${newHostId} in room ${roomCode}`);
-              io.to(newHostId).emit('promoted-to-host');
+              io.to(newHostId).emit('promoted-to-host', signSocketPayload({ roomCode, ts: Date.now() }));
             }
           }
         }

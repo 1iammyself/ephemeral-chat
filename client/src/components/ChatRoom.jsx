@@ -69,6 +69,7 @@ import {
   handleIncomingKeyBundle,
 } from '../utils/security';
 import { initTrafficPadding, stopTrafficPadding, withJitter } from '../crypto/traffic-padding';
+import { verifyServerSignature, isServerSigningReady } from '../crypto/server-signing';
 import { getKeyBundle } from '../crypto/key-store';
 import { initOHTTP } from '../crypto/ohttp';
 import { initPrivacyPass, getAuthToken, refreshTokensIfNeeded, isPrivacyPassReady } from '../crypto/privacy-pass';
@@ -1405,7 +1406,12 @@ const ChatRoom = () => {
       if (message.includes('Invalid') || message.includes('expired')) { setError(message); setShowJoinModal(true); }
     };
 
-    const handleKnockApproved = ({ isHost }) => {
+    const handleKnockApproved = async (data) => {
+      if (isServerSigningReady() && data._sig) {
+        const valid = await verifyServerSignature(data);
+        if (!valid) console.warn('[Security] knock-approved signature invalid — possible relay tampering');
+      }
+      const { isHost } = data;
       // Keep the waiting/processing state active — do NOT clear isWaitingForHost
       // here. Clearing it now would cause JoinRoomModal to revert to form mode
       // between knock-approved and the join-room callback, which produces a blank
@@ -1424,7 +1430,11 @@ const ChatRoom = () => {
 
     const handleUserKnocking = (guest) => setPendingGuests(prev => prev.find(g => g.socketId === guest.socketId) ? prev : [...prev, guest]);
 
-    const handlePromotedToHost = () => {
+    const handlePromotedToHost = async (data = {}) => {
+      if (isServerSigningReady() && data._sig) {
+        const valid = await verifyServerSignature(data);
+        if (!valid) console.warn('[Security] promoted-to-host signature invalid — possible relay tampering');
+      }
       setIsHost(true);
       setCurrentUserRole('host');
       setCurrentUser(prev => prev ? { ...prev, isAdmin: true } : prev);
@@ -1456,7 +1466,12 @@ const ChatRoom = () => {
     };
 
     // Role and moderation event handlers
-    const handleRoleUpdated = ({ userId, role, updatedBy }) => {
+    const handleRoleUpdated = async (data) => {
+      if (isServerSigningReady() && data._sig) {
+        const valid = await verifyServerSignature(data);
+        if (!valid) console.warn('[Security] role-updated signature invalid — possible relay tampering');
+      }
+      const { userId, role, updatedBy } = data;
       if (userId === socketManager.socket?.id) {
         setCurrentUserRole(role);
         const log = { id: `log_${Date.now()}`, type: 'system', content: `Your role has been changed to ${role} by ${updatedBy}`, timestamp: new Date().toISOString() };
@@ -1484,7 +1499,12 @@ const ChatRoom = () => {
       setUsers(prev => prev.filter(u => u.socketId !== userId));
     };
 
-    const handleGuestApproved = ({ guestId }) => {
+    const handleGuestApproved = async (data) => {
+      if (isServerSigningReady() && data._sig) {
+        const valid = await verifyServerSignature(data);
+        if (!valid) console.warn('[Security] guest-approved signature invalid — possible relay tampering');
+      }
+      const { guestId } = data;
       setPendingGuests(prev => prev.filter(g => g.socketId !== guestId));
     };
 
