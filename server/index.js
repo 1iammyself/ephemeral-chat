@@ -287,6 +287,25 @@ app.use(helmet({
   permittedCrossDomainPolicies: { permittedPolicies: 'none' },
 }));
 
+// Restrict browser feature access to same-origin only; block unused APIs
+app.use((_req, res, next) => {
+  res.setHeader('Permissions-Policy', [
+    'camera=(self)',
+    'microphone=(self)',
+    'geolocation=(self)',
+    'display-capture=(self)',
+    'accelerometer=()',
+    'gyroscope=()',
+    'magnetometer=()',
+    'payment=()',
+    'usb=()',
+    'serial=()',
+    'bluetooth=()',
+    'interest-cohort=()',
+  ].join(', '));
+  next();
+});
+
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
