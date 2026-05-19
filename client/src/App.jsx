@@ -157,7 +157,7 @@ function App() {
           <Route path="/my-drops" element={<MyDrops />} />
           <Route path="/drop/:dropId" element={<DropPage />} />
           <Route path="/nearby" element={<NearbyTransfer />} />
-          <Route path="/room/:roomCode" element={<ChatRoom />} />
+          <Route path="/room" element={<ChatRoom />} />
           <Route path="/join" element={<Navigate to="/" replace />} />
           <Route path="/invite/:token" element={<InviteHandler />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />

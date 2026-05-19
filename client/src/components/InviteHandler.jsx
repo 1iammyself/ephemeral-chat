@@ -83,7 +83,7 @@ function InviteHandler() {
         const data = await validateInviteToken(token);
         if (cancelled) return;
 
-        navigate('/room/' + data.roomCode, {
+        navigate('/room#' + data.roomCode, {
           replace: true,
           state: {
             inviteToken: token,

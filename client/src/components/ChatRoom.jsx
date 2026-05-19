@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { generateInviteLink } from '../utils/api'; // Import API utility
 import {
@@ -418,9 +418,9 @@ class ChessPanelErrorBoundary extends React.Component {
 }
 
 const ChatRoom = () => {
-  const { roomCode } = useParams();
-  const navigate = useNavigate();
   const location = useLocation();
+  const roomCode = location.hash.slice(1);
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const [isConnected, setIsConnected] = useState(socketManager.isConnected);
   const [isJoined, setIsJoined] = useState(false);
@@ -903,7 +903,7 @@ const ChatRoom = () => {
         return;
       }
       if (response.redirect) {
-        navigate(`/room/${response.roomCode}`, {
+        navigate(`/room#${response.roomCode}`, {
           state: { fromInvite: true, nickname, inviteToken }
         });
         return;

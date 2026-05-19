@@ -56,7 +56,7 @@ const Home = ({ children }) => {
         joinWithVerbalCode(decodedCode)
           .then(result => {
             if (result.success && result.roomCode) {
-              navigate(`/room/${result.roomCode}`, {
+              navigate(`/room#${result.roomCode}`, {
                 state: {
                   inviteToken: result.token,
                   requiresPassword: !!result.requiresPassword
@@ -93,7 +93,7 @@ const Home = ({ children }) => {
     try {
       const data = await checkRoom(roomCode.toUpperCase());
       if (data.exists) {
-        navigate(`/room/${roomCode.toUpperCase()}`);
+        navigate(`/room#${roomCode.toUpperCase()}`);
       } else {
         alert(t('home.joinCode.error.notFound'));
       }
@@ -127,7 +127,7 @@ const Home = ({ children }) => {
     try {
       const result = await joinWithVerbalCode(trimmedCode);
       if (result.success && result.roomCode) {
-        navigate(`/room/${result.roomCode}`, {
+        navigate(`/room#${result.roomCode}`, {
           state: {
             inviteToken: result.token,
             requiresPassword: result.requiresPassword
@@ -144,7 +144,7 @@ const Home = ({ children }) => {
 
   const handleRoomCreated = (roomCode) => {
     setShowCreateModal(false);
-    navigate(`/room/${roomCode}`);
+    navigate(`/room#${roomCode}`);
   };
 
   const features = [
