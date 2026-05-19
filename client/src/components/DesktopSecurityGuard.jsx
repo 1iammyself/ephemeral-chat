@@ -28,10 +28,9 @@ const DesktopSecurityGuard = () => {
 
   // Emit screenshot-attempt to notify other room members
   const notifyScreenshotAttempt = useCallback(() => {
-    // Extract roomCode from current URL path: /room/:roomCode
-    const match = window.location.pathname.match(/\/room\/([^/]+)/);
-    if (match && match[1] && socketManager.isConnected) {
-      socketManager.emit('screenshot-attempt', { roomCode: match[1] });
+    const roomCode = window.location.hash.slice(1);
+    if (roomCode && socketManager.isConnected) {
+      socketManager.emit('screenshot-attempt', { roomCode });
     }
   }, []);
 

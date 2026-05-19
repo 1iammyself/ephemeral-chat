@@ -162,7 +162,7 @@ const MyRooms = () => {
                 <div className="flex flex-wrap gap-2">
                     {room.status !== 'expired' && (
                         <button
-                            onClick={() => navigate(`/room/${room.roomCode}`)}
+                            onClick={() => navigate(`/room#${room.roomCode}`)}
                             className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
                         >
                             <LogIn className="w-4 h-4 mr-2" />

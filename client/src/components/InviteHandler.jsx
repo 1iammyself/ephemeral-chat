@@ -85,7 +85,7 @@ function InviteHandler() {
         if (cancelled) return;
 
         console.log('[InviteHandler] Success, room:', data.roomCode);
-        navigate('/room/' + data.roomCode, {
+        navigate('/room#' + data.roomCode, {
           replace: true,
           state: {
             inviteToken: token,
