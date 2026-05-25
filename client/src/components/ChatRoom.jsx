@@ -1387,8 +1387,21 @@ const ChatRoom = () => {
       setActiveChessMessage(prev => prev?.id === messageId ? null : prev);
     };
 
-    const handleMessageEdited = ({ message }) => {
-      setMessages(prev => prev.map(m => m.id === message.id ? { ...m, ...message } : m));
+    const handleMessageEdited = async ({ message }) => {
+      let content = message.content;
+      let isEncrypted = message.isEncrypted;
+      if (message.isEncrypted && (message.v === 5 || message.v === 4 || (message.v === 3 && message.mls))) {
+        try {
+          content = await decryptMLSMessage(message, roomCode);
+          isEncrypted = false;
+        } catch {
+          content = '⚠️ Decryption failed';
+          isEncrypted = false;
+        }
+      }
+      setMessages(prev => prev.map(m =>
+        m.id === message.id ? { ...m, ...message, content, isEncrypted } : m
+      ));
     };
 
     const handleUserJoined = ({ user, roomUsers }) => {
