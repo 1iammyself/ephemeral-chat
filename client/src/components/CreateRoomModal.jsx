@@ -227,7 +227,6 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
 
   const handleJoinRoom = () => {
     if (createdRoom) {
-      if (roomKey) window.location.hash = roomKey;
       onRoomCreated(createdRoom.roomCode);
     }
   };

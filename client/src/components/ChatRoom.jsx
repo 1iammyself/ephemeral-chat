@@ -2034,6 +2034,8 @@ const ChatRoom = () => {
     }
   };
 
+  const handleCancelJoin = useCallback(() => navigate('/'), [navigate]);
+
   const formatDuration = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -3079,7 +3081,7 @@ const ChatRoom = () => {
     );
   }
 
-  if (showJoinModal) return <JoinRoomModal roomCode={roomCode} onJoin={handleJoinRoom} onCancel={() => navigate('/')} error={error} isProcessingInvite={isProcessingInvite} isWaitingForHost={isWaitingForHost} />;
+  if (showJoinModal) return <JoinRoomModal roomCode={roomCode} onJoin={handleJoinRoom} onCancel={handleCancelJoin} error={error} isProcessingInvite={isProcessingInvite} isWaitingForHost={isWaitingForHost} />;
 
   return (
     <div
