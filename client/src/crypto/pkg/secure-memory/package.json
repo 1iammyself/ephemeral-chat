@@ -1,0 +1,15 @@
+{
+  "name": "secure-memory",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "secure_memory_bg.wasm",
+    "secure_memory.js",
+    "secure_memory.d.ts"
+  ],
+  "main": "secure_memory.js",
+  "types": "secure_memory.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
