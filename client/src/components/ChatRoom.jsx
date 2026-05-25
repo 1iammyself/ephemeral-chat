@@ -112,6 +112,7 @@ import { useMessageSearch } from '../hooks/useMessageSearch';
 import MessageSearch from './MessageSearch';
 import FileTransferModal from './FileTransferModal';
 import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
 import { Keyboard } from '@capacitor/keyboard';
 import { useGeofence } from '../hooks/useGeofence';
 import QuickVideoCapture from './QuickVideoCapture';
@@ -753,6 +754,16 @@ const ChatRoom = () => {
       };
     }
   }, []);
+  // ─── Android hardware back button ──────────────────────────────
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== 'android') return;
+    let listenerHandle;
+    CapApp.addListener('backButton', () => {
+      navigate('/home', { replace: true });
+    }).then(handle => { listenerHandle = handle; });
+    return () => { if (listenerHandle) listenerHandle.remove(); };
+  }, [navigate]);
+
   // ─── MLS Session State ──────────────────────────────────
   const [mlsReady, setMlsReady] = useState(false);
   const mlsReadyRef = useRef(false);
@@ -905,6 +916,7 @@ const ChatRoom = () => {
       }
       if (response.redirect) {
         navigate(`/room#${response.roomCode}`, {
+          replace: true,
           state: { fromInvite: true, nickname, inviteToken }
         });
         return;
@@ -1489,7 +1501,7 @@ const ChatRoom = () => {
       setActivityLogs(prev => [{ id: `log_kick_${Date.now()}`, type: 'system', content: `You were kicked by ${kickedBy}: ${reason}`, timestamp: new Date().toISOString() }, ...prev].slice(0, 50));
       setIsJoined(false);
       setRoom(null);
-      navigate('/', { replace: true });
+      navigate('/home', { replace: true });
     };
 
     const handleUserKicked = ({ userId, nickname, kickedBy }) => {
@@ -2034,7 +2046,7 @@ const ChatRoom = () => {
     }
   };
 
-  const handleCancelJoin = useCallback(() => navigate('/', { replace: true }), [navigate]);
+  const handleCancelJoin = useCallback(() => navigate('/home', { replace: true }), [navigate]);
 
   const formatDuration = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -3072,7 +3084,7 @@ const ChatRoom = () => {
   // without a hash due to back-button stripping behaviour on some WebViews),
   // redirect immediately to Home so the user never sees a blank/loading screen.
   if (!roomCode) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/home" replace />;
   }
 
   if (error && !isJoined) {
@@ -3082,7 +3094,7 @@ const ChatRoom = () => {
           <div className="bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded mb-4">
             <p className="font-bold">{t('chatRoom.error')}</p><p>{error}</p>
           </div>
-          <button onClick={() => navigate('/', { replace: true })} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">{t('common.goHome')}</button>
+          <button onClick={() => navigate('/home', { replace: true })} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">{t('common.goHome')}</button>
         </div>
       </div>
     );
@@ -3110,7 +3122,7 @@ const ChatRoom = () => {
       <div className={`${getVibeById(roomVibe).panelClass} px-4 pt-1 sm:pt-3 pb-2 sm:py-3 sticky top-0 z-50 shrink-0`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 sm:space-x-4">
-            <button onClick={() => navigate('/', { replace: true })} className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
+            <button onClick={() => navigate('/home', { replace: true })} className="p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300 flex-shrink-0"><ArrowLeft className="w-5 h-5" /></button>
             <div className="min-w-0">
               <h1 className="text-base sm:text-lg font-bold truncate text-gray-900 dark:text-white leading-tight">{/^[A-Z0-9]{10}$/.test(roomCode) ? t('chatRoom.chatroom') : roomCode}</h1>
               <div className="flex items-center space-x-3 sm:space-x-4 text-sm text-gray-600 dark:text-gray-400 mt-1">

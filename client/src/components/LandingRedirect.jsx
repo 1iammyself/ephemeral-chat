@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
-import Home from './Home';
 
 /**
  * LandingRedirect
@@ -38,7 +38,7 @@ function LandingRedirect() {
   }, [shouldRedirect]);
 
   if (!shouldRedirect) {
-    return <Home />;
+    return <Navigate to="/home" replace />;
   }
 
   return (

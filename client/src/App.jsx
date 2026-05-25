@@ -155,15 +155,16 @@ function App() {
         {desktopLocked && <LockScreen onUnlock={() => setDesktopLocked(false)} />}
         <Routes>
           <Route path="/" element={<LandingRedirect />} />
+          <Route path="/home" element={<Home />} />
           <Route path="/my-rooms" element={<MyRooms />} /> {/* Add MyRooms route */}
           <Route path="/my-drops" element={<MyDrops />} />
           <Route path="/drop/:dropId" element={<DropPage />} />
           <Route path="/nearby" element={<NearbyTransfer />} />
           <Route path="/room" element={<ChatRoom />} />
-          <Route path="/join" element={<Navigate to="/" replace />} />
+          <Route path="/join" element={<Navigate to="/home" replace />} />
           <Route path="/invite/:token" element={<InviteHandler />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
         <ToastContainer />
       </div>
