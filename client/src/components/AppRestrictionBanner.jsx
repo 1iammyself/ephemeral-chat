@@ -34,7 +34,10 @@ const AppRestrictionBanner = () => {
             // 1. Desktop/Electron
             const isElectron = !!(window.electronAPI || window.process?.versions?.electron || document.body.classList.contains('electron-app'));
 
-            // 2. Android Native (APK/WebView/Capacitor)
+            // 2. Tauri desktop app (window.__TAURI__ in v1, window.__TAURI_INTERNALS__ in v2)
+            const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
+
+            // 3. Android Native (APK/WebView/Capacitor)
             const isAndroidApp = isAndroidDevice && (
                 window.matchMedia('(display-mode: standalone)').matches ||
                 window.navigator.standalone === true ||
@@ -43,11 +46,11 @@ const AppRestrictionBanner = () => {
                 userAgent.includes('version/4.0')
             );
 
-            // 3. iOS detection
+            // 4. iOS detection
             const isIOS = /iphone|ipad|ipod/i.test(userAgent);
 
-            // Only allow Electron or Android native app
-            if (isElectron || isAndroidApp) {
+            // Allow Electron, Tauri, or Android native app
+            if (isElectron || isTauri || isAndroidApp) {
                 setIsVisible(false);
                 return true;
             }
