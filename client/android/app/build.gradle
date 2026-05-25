@@ -62,7 +62,6 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
-    implementation 'com.google.android.play:integrity:1.4.0'
     implementation 'androidx.biometric:biometric:1.1.0'
 }
 

@@ -68,13 +68,17 @@ final class RootTamperCheck {
     // ── Root frameworks ──────────────────────────────────────────────────────
 
     private static boolean isMagiskPresent() {
+        // /data/adb/* and /sbin/* are blocked by SELinux on Android 9+ so we
+        // target paths that a normal app context can actually stat.
         String[] paths = {
-            "/data/adb/magisk",   // Magisk
-            "/data/adb/ksu",      // KernelSU
-            "/data/adb/apatch",   // APatch
-            "/sbin/.magisk",      // Magisk (older)
-            "/sbin/.core/mirror",
-            "/sbin/.core/img",
+            "/system/app/MagiskManager.apk",        // legacy system-mode install
+            "/system/priv-app/MagiskManager.apk",
+            "/system/app/SuperSU.apk",
+            "/system/xbin/daemonsu",                // SuperSU daemon
+            "/system/xbin/sugote",
+            "/system/bin/.ext/.su",
+            "/system/usr/we-need-root/su-backup",
+            "/dev/magisk",                           // Magisk daemon socket (sometimes accessible)
         };
         for (String path : paths) {
             if (new File(path).exists()) return true;

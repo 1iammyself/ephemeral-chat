@@ -11,7 +11,6 @@ import { useTheme } from '../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import { secureFetch } from '../utils/secure-fetch.js';
 import { API_BASE } from '../utils/resolve-url.js';
-import { IntegrityPlugin } from '../capacitor/security-plugins';
 import { useGeofence } from '../hooks/useGeofence';
 
 const CreateRoomModal = ({ onClose, onRoomCreated }) => {
@@ -126,28 +125,13 @@ const CreateRoomModal = ({ onClose, onRoomCreated }) => {
 
       const creatorId = getCreatorId();
 
-      const integrityHeaders = {};
-      if (Capacitor.getPlatform() === 'android') {
-        try {
-          const nonceRes = await secureFetch(`${API_BASE}/api/integrity/nonce`);
-          if (nonceRes.ok) {
-            const { nonce } = await nonceRes.json();
-            const { token: attToken } = await IntegrityPlugin.requestIntegrityToken({ nonce });
-            integrityHeaders['x-device-attestation'] = attToken;
-            integrityHeaders['x-attestation-nonce'] = nonce;
-          }
-        } catch {
-          // Play Integrity unavailable — proceed without
-        }
-      }
-
       let response;
       let lastError;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           response = await secureFetch(`${API_BASE}/api/rooms`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...integrityHeaders },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               messageTTL: roomSettings.messageTTL !== 'none' ? roomSettings.messageTTL : undefined,
               password: roomSettings.password.trim() || undefined,

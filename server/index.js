@@ -47,7 +47,6 @@ const { attachMASQUEProxy } = require('./masque-proxy');
 const { attachWebAuthnRoutes } = require('./webauthn');
 const { trafficPaddingMiddleware, startServerChaff, stopServerChaff, isChaff, stripPadding, padResponseMiddleware } = require('./traffic-padding');
 const { LinkPreviewService } = require('./link-preview');
-const { initializeAttestation, verifyAndroidAttestation, requireDeviceAttestation } = require('./device-attestation-verifier');
 const { initSigningKey, signSocketPayload, getPublicKeyBase64 } = require('./middleware/response-signing');
 
 // Initialize Cap.js for proof-of-work CAPTCHA
@@ -116,9 +115,6 @@ async function initializeServer() {
   } catch (e) {
     logger.warn('⚠️  WebAuthn routes init failed (non-fatal):', e.message);
   }
-
-  // Device Attestation — Android/iOS authenticity verification (optional; logs status)
-  initializeAttestation();
 
   // Ed25519 response signing — clients verify key-bundle events
   try {
@@ -765,25 +761,9 @@ app.post('/api/verbal-join', async (req, res) => {
   }
 });
 
-app.post('/api/rooms', requireDeviceAttestation, async (req, res) => {
+app.post('/api/rooms', async (req, res) => {
   try {
     const { messageTTL, password, maxUsers, capToken, creatorId, persistenceMode, customCode, hp_email, hp_website, hp_timestamp, autoApprove, preApprovedList, scheduledFor, geofence } = req.body;
-
-    // Verify Play Integrity token for Android clients (middleware sets req.deviceAttestation)
-    if (req.deviceAttestation?.platform === 'android') {
-      const { token: attToken, nonce: attNonce } = req.deviceAttestation;
-      const nonceEntry = pendingNonces.get(attNonce);
-      if (!nonceEntry || nonceEntry.used) {
-        return res.status(403).json({ error: 'Invalid or replayed attestation nonce', code: 'ATTESTATION_FAILED' });
-      }
-      pendingNonces.set(attNonce, { ...nonceEntry, used: true });
-      try {
-        await verifyAndroidAttestation(attToken, attNonce);
-      } catch (err) {
-        logger.warn('[Integrity] Room creation blocked:', err.message);
-        return res.status(403).json({ error: 'Device integrity check failed', code: 'ATTESTATION_FAILED' });
-      }
-    }
 
     // Honeypot validation - bots fill these hidden fields, humans don't
     if (hp_email || hp_website) {
@@ -1045,84 +1025,6 @@ app.post('/api/creator-token', creatorTokenLimiter, express.json(), (req, res) =
 
 // ─── Play Integrity API Endpoints ──────────────────────────────────────────
 // In-memory nonce store — entries expire after 10 minutes.
-// Rate-limited naturally by Play Integrity's own per-app quota; an explicit
-// RateLimit on the nonce endpoint prevents bulk pre-generation.
-const pendingNonces = new Map(); // nonce -> { createdAt: number, used: boolean }
-
-const integrityLimiter = RateLimit({
-  windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 20, // 20 integrity operations per IP per window
-  message: { error: 'Too many integrity requests' },
-});
-
-// GET /api/integrity/nonce — Issue a server-generated nonce for Play Integrity.
-// Clients pass this nonce to IntegrityPlugin.requestIntegrityToken(), then
-// POST the resulting token + nonce to /api/integrity/verify.
-app.get('/api/integrity/nonce', integrityLimiter, (req, res) => {
-  const nonce = nodeCrypto.randomBytes(24).toString('base64');
-  pendingNonces.set(nonce, { createdAt: Date.now(), used: false });
-
-  // Prune nonces older than 10 minutes to bound memory growth
-  const TEN_MIN = 10 * 60 * 1000;
-  for (const [k, v] of pendingNonces) {
-    if (Date.now() - v.createdAt > TEN_MIN) pendingNonces.delete(k);
-  }
-
-  res.json({ nonce });
-});
-
-// POST /api/integrity/verify — Verify a Play Integrity token (enforcement active).
-// Validates nonce provenance and replay protection, then enforces device integrity.
-// Returns 403 if the device fails the integrity check.
-app.post('/api/integrity/verify', integrityLimiter, express.json(), async (req, res) => {
-  const { token, nonce } = req.body;
-
-  if (!token || !nonce) {
-    return res.status(400).json({ error: 'token and nonce required' });
-  }
-
-  // Verify nonce was issued by us and has not been replayed
-  const nonceEntry = pendingNonces.get(nonce);
-  if (!nonceEntry) {
-    return res.status(400).json({ error: 'Unknown or expired nonce' });
-  }
-  if (nonceEntry.used) {
-    return res.status(400).json({ error: 'Nonce already used' });
-  }
-
-  // Mark nonce as used before the async call to prevent concurrent replays
-  pendingNonces.set(nonce, { ...nonceEntry, used: true });
-
-  try {
-    const result = await verifyAndroidAttestation(token, nonce);
-
-    if (result.verdict.unconfigured) {
-      return res.json({ valid: true, unconfigured: true });
-    }
-
-    logger.info('[Integrity] Verdict:', {
-      deviceTrusted: result.verdict.deviceTrusted,
-      appAuthentic: result.verdict.appAuthentic,
-    });
-
-    if (!result.verdict.deviceTrusted) {
-      return res.status(403).json({
-        error: 'Device integrity check failed',
-        code: 'DEVICE_NOT_TRUSTED',
-      });
-    }
-
-    return res.json({ valid: true });
-
-  } catch (err) {
-    logger.error('[Integrity] Token verification failed:', err.message);
-    return res.status(403).json({
-      error: 'Device attestation failed',
-      code: 'ATTESTATION_FAILED',
-    });
-  }
-});
-
 // GET /api/my-rooms — List rooms created or joined by this creator.
 // The creatorId is a 128-bit UUID stored only in the user's sessionStorage —
 // sufficient protection for this metadata-only endpoint.

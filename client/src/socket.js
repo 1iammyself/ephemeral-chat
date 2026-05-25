@@ -1,6 +1,5 @@
 import { io } from 'socket.io-client';
 import { resolveBaseUrl } from './utils/resolve-url.js';
-import { AttestationProvider } from './capacitor/attestation-provider';
 import { initServerSigning } from './crypto/server-signing.js';
 
 /**
@@ -25,20 +24,6 @@ class SocketManager {
     const SERVER_URL = this.getServerUrl();
     console.log(`🔌 Connecting to socket server: ${SERVER_URL}`);
 
-    // Attach device attestation headers for mobile clients (M5)
-    let attestationAuth = {};
-    try {
-      const attest = await AttestationProvider.getAttestation();
-      if (attest.token) {
-        attestationAuth = {
-          'x-device-attestation': attest.token,
-          'x-attestation-nonce': attest.nonce,
-        };
-      }
-    } catch {
-      // Attestation failure is non-fatal — proceed without it
-    }
-
     this.socket = io(SERVER_URL, {
       transports: ['websocket', 'polling'],
       withCredentials: true,
@@ -47,7 +32,6 @@ class SocketManager {
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: 20000,
-      extraHeaders: attestationAuth,
     });
 
     this.socket.on('connect', () => {
