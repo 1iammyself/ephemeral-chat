@@ -10,6 +10,7 @@
  */
 
 import { hkdf } from './hkdf.js';
+import { secureZero } from './secure-zero.js';
 
 // ─── Generate ──────────────────────────────────────────────
 
@@ -33,8 +34,7 @@ export async function generateSenderKey() {
  * @returns {Promise<void>}
  */
 export async function rotateSenderKey(state) {
-  // Zero old key material
-  if (state.key) state.key.fill(0);
+  if (state.key) secureZero(state.key);
 
   // Generate fresh key — do NOT derive from old key (break backward access)
   state.key = crypto.getRandomValues(new Uint8Array(32));
@@ -82,7 +82,7 @@ export async function encryptWithSenderKey(state, plaintext) {
   state.key = await _advanceChainKey(state.key);
   state.counter++;
 
-  messageKey.fill(0);
+  secureZero(messageKey);
 
   return {
     ct: _toBase64(new Uint8Array(cipherBuffer)),
@@ -138,10 +138,10 @@ export async function decryptWithSenderKey(state, payload) {
   for (let i = state.counter; i < targetCounter; i++) {
     // Derive and discard this counter's message key
     const skippedMsgKey = await _deriveSenderMessageKey(currentKey, i);
-    skippedMsgKey.fill(0);
+    secureZero(skippedMsgKey);
     // Advance the chain
     const next = await _advanceChainKey(currentKey);
-    currentKey.fill(0);
+    secureZero(currentKey);
     currentKey = next;
   }
 
@@ -159,11 +159,11 @@ export async function decryptWithSenderKey(state, payload) {
   const plainBuffer = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, cipherBytes);
 
   // Decryption succeeded — now commit the new chain state
-  currentKey.fill(0);
-  messageKey.fill(0);
+  secureZero(currentKey);
+  secureZero(messageKey);
 
   // Update mutable state: key is now the chain key at targetCounter+1
-  state.key.fill(0);
+  secureZero(state.key);
   state.key = nextChainKey;
   state.counter = targetCounter + 1;
 

@@ -17,6 +17,7 @@
 import { generateX25519Keypair, x25519DH, serializePublicKey, publicKeyToBase64, base64ToPublicKey } from './x25519.js';
 import { initMLKEM, isMLKEMAvailable, mlkemKeyGen, mlkemEncaps, mlkemDecaps, mlkemPublicKeyToBase64, base64ToMLKEMPublicKey, mlkemCiphertextToBase64, base64ToMLKEMCiphertext } from './ml-kem.js';
 import { hkdf } from './hkdf.js';
+import { secureZero } from './secure-zero.js';
 
 // ─── Key Bundle ────────────────────────────────────────────
 
@@ -173,12 +174,8 @@ export async function pqxdhInitiator(ourBundle, peerPublicBundle) {
   const salt = new Uint8Array(32); // All-zero salt per Signal spec
   const sharedSecret = await hkdf(combinedSecret, salt, info, 32);
   
-  // Securely erase intermediate values (best-effort in JS)
-  dh1.fill(0);
-  dh2.fill(0);
-  dh3.fill(0);
-  combinedSecret.fill(0);
-  
+  secureZero(dh1); secureZero(dh2); secureZero(dh3); secureZero(combinedSecret);
+
   return {
     sharedSecret,
     pqCiphertext,
@@ -245,11 +242,7 @@ export async function pqxdhResponder(ourBundle, peerPublicBundle, pqCiphertext) 
   const salt = new Uint8Array(32);
   const sharedSecret = await hkdf(combinedSecret, salt, info, 32);
   
-  // Securely erase intermediate values
-  dh1.fill(0);
-  dh2.fill(0);
-  dh3.fill(0);
-  combinedSecret.fill(0);
+  secureZero(dh1); secureZero(dh2); secureZero(dh3); secureZero(combinedSecret);
   
   return {
     sharedSecret,

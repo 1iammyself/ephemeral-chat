@@ -14,6 +14,7 @@
 
 import { Capacitor } from '@capacitor/core';
 import { KeystorePlugin } from '../capacitor/security-plugins';
+import { secureZero } from './secure-zero.js';
 
 const isAndroid = Capacitor.getPlatform() === 'android';
 
@@ -46,10 +47,9 @@ export function destroyKeyBundle(roomCode) {
   const bundle = keyBundles.get(roomCode);
   if (!bundle) return;
 
-  // Best-effort zeroization of raw key bytes
-  if (bundle.identityKey?.privateKey instanceof Uint8Array) bundle.identityKey.privateKey.fill(0);
-  if (bundle.ephemeralKey?.privateKey instanceof Uint8Array) bundle.ephemeralKey.privateKey.fill(0);
-  if (bundle.pqKey?.secretKey instanceof Uint8Array) bundle.pqKey.secretKey.fill(0);
+  if (bundle.identityKey?.privateKey instanceof Uint8Array) secureZero(bundle.identityKey.privateKey);
+  if (bundle.ephemeralKey?.privateKey instanceof Uint8Array) secureZero(bundle.ephemeralKey.privateKey);
+  if (bundle.pqKey?.secretKey instanceof Uint8Array) secureZero(bundle.pqKey.secretKey);
 
   keyBundles.delete(roomCode);
 }

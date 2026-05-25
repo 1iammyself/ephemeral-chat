@@ -1,3 +1,5 @@
+import { KeyTransparencyClient } from './key-transparency-client.js';
+
 /**
  * server-signing.js — Ed25519 server-response verification + TOFU pinning
  *
@@ -99,6 +101,15 @@ export async function initServerSigning() {
 
   if (!storedKeyBase64) {
     await _storePin(remoteKeyBase64);
+  }
+
+  // Also pin via Key Transparency client (separate KTTOFUStore — belt-and-suspenders TOFU)
+  try {
+    const spkiBytes = Uint8Array.from(atob(remoteKeyBase64), c => c.charCodeAt(0));
+    const rawKeyHex = Array.from(spkiBytes.slice(-32)).map(b => b.toString(16).padStart(2, '0')).join('');
+    await KeyTransparencyClient.verifyAndPinServerKey(location.hostname, rawKeyHex);
+  } catch (ktErr) {
+    throw new Error('[ServerSigning] Key Transparency TOFU violation: ' + ktErr.message);
   }
 
   _pinnedCryptoKey = await _importPublicKey(remoteKeyBase64);

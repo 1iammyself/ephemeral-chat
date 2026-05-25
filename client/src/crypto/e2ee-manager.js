@@ -47,6 +47,7 @@ import {
 } from './sender-key.js';
 import { storeKeyBundle, getKeyBundle, destroyKeyBundle, decryptForRoom, ensureKeystoreKey } from './key-store.js';
 import { verifyServerSignature, isServerSigningReady } from './server-signing.js';
+import { KeyTransparencyClient } from './key-transparency-client.js';
 
 // ─── Session State ──────────────────────────────────────────
 
@@ -124,7 +125,24 @@ export async function initE2EE(roomCode, socketManager) {
       if (!roster || roster.length === 0) return;
       const myBundle = getKeyBundle(roomCode);
       if (!myBundle) return;
-      for (const { socketId: peerId, bundle: peerBundleData } of roster) {
+      for (const { socketId: peerId, bundle: peerBundleData, merkleProof } of roster) {
+        if (merkleProof) {
+          try {
+            const leafData = Uint8Array.from(atob(merkleProof.leafData), c => c.charCodeAt(0));
+            const root = Uint8Array.from(atob(merkleProof.root), c => c.charCodeAt(0));
+            const siblings = merkleProof.siblings.map(s => Uint8Array.from(atob(s), c => c.charCodeAt(0)));
+            const valid = await KeyTransparencyClient.verifyInclusionProof(
+              merkleProof.index, leafData, { ...merkleProof, siblings }, root
+            );
+            if (!valid) {
+              dbg(`[E2EE] ⚠️ Merkle proof invalid for roster peer ${peerId} — dropping`);
+              continue;
+            }
+          } catch (e) {
+            dbg(`[E2EE] ⚠️ Merkle proof error for ${peerId}: ${e.message} — dropping`);
+            continue;
+          }
+        }
         await _initiateWithPeer(roomCode, peerId, peerBundleData, myBundle, publicBundle, socketManager);
       }
     };
@@ -134,13 +152,31 @@ export async function initE2EE(roomCode, socketManager) {
     // Simultaneous join case: both peers get an empty roster; neither side has a DR session yet.
     // Tie-break: the peer with the lexicographically smaller socket ID acts as initiator.
     const handlePeerBundle = async (payload) => {
-      const { socketId: peerId, bundle: peerBundleData, roomCode: rc } = payload;
+      const { socketId: peerId, bundle: peerBundleData, roomCode: rc, merkleProof } = payload;
       if (rc !== roomCode) return;
       // Verify server signature if signing is active
       if (isServerSigningReady()) {
         const valid = await verifyServerSignature(payload);
         if (!valid) {
           dbg('[E2EE] ⚠️ peer-key-bundle signature INVALID — dropping');
+          return;
+        }
+      }
+      // Verify Merkle inclusion proof if present
+      if (merkleProof) {
+        try {
+          const leafData = Uint8Array.from(atob(merkleProof.leafData), c => c.charCodeAt(0));
+          const root = Uint8Array.from(atob(merkleProof.root), c => c.charCodeAt(0));
+          const siblings = merkleProof.siblings.map(s => Uint8Array.from(atob(s), c => c.charCodeAt(0)));
+          const valid = await KeyTransparencyClient.verifyInclusionProof(
+            merkleProof.index, leafData, { ...merkleProof, siblings }, root
+          );
+          if (!valid) {
+            dbg(`[E2EE] ⚠️ Merkle proof invalid for peer-key-bundle ${peerId} — dropping`);
+            return;
+          }
+        } catch (e) {
+          dbg(`[E2EE] ⚠️ Merkle proof error for ${peerId}: ${e.message} — dropping`);
           return;
         }
       }

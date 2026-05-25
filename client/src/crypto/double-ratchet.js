@@ -16,6 +16,7 @@
 
 import { deriveChainKeys, deriveRootKeys, hkdf, constantTimeEqual } from './hkdf.js';
 import { generateX25519Keypair, x25519DH, serializePublicKey, publicKeyToBase64, base64ToPublicKey } from './x25519.js';
+import { secureZero } from './secure-zero.js';
 
 // Maximum number of skipped message keys to store (prevents DoS)
 const MAX_SKIP = 256;
@@ -119,9 +120,8 @@ export async function ratchetEncrypt(state, plaintext) {
   // Encrypt with AES-256-GCM using the derived message key
   const { encrypted, iv } = await aesGcmEncrypt(plaintext, messageKey);
   
-  // Securely erase message key (best-effort in JS)
-  messageKey.fill(0);
-  
+  secureZero(messageKey);
+
   return { header, ciphertext: encrypted, iv };
 }
 
@@ -145,7 +145,7 @@ export async function ratchetDecrypt(state, header, ciphertext, iv) {
   const skippedKey = trySkippedKeys(state, header);
   if (skippedKey) {
     const plaintext = await aesGcmDecrypt(ciphertext, iv, skippedKey);
-    skippedKey.fill(0);
+    secureZero(skippedKey);
     return plaintext;
   }
   
@@ -169,9 +169,8 @@ export async function ratchetDecrypt(state, header, ciphertext, iv) {
   // Decrypt
   const plaintext = await aesGcmDecrypt(ciphertext, iv, messageKey);
   
-  // Securely erase message key
-  messageKey.fill(0);
-  
+  secureZero(messageKey);
+
   return plaintext;
 }
 
@@ -232,7 +231,7 @@ async function skipMessageKeys(state, until) {
     if (state.skippedKeys.size > MAX_SKIP) {
       const firstKey = state.skippedKeys.keys().next().value;
       const oldKey = state.skippedKeys.get(firstKey);
-      if (oldKey) oldKey.fill(0);
+      if (oldKey) secureZero(oldKey);
       state.skippedKeys.delete(firstKey);
     }
   }
@@ -325,12 +324,12 @@ async function aesGcmDecrypt(ciphertextBase64, ivBase64, messageKey) {
  * @param {RatchetState} state - State to destroy
  */
 export function destroyRatchetState(state) {
-  if (state.rootKey) state.rootKey.fill(0);
-  if (state.sendChainKey) state.sendChainKey.fill(0);
-  if (state.recvChainKey) state.recvChainKey.fill(0);
-  
+  if (state.rootKey) secureZero(state.rootKey);
+  if (state.sendChainKey) secureZero(state.sendChainKey);
+  if (state.recvChainKey) secureZero(state.recvChainKey);
+
   for (const [, key] of state.skippedKeys) {
-    key.fill(0);
+    secureZero(key);
   }
   state.skippedKeys.clear();
   

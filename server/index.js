@@ -4505,8 +4505,9 @@ io.on('connection', (socket) => {
       socket.emit('error', { code: 'INVALID_KEY_BUNDLE', message: 'Key bundle validation failed' });
       return;
     }
-    // Broadcast to other room members so they can initiate key exchange
-    socket.to(roomCode).emit('peer-key-bundle', signSocketPayload({ socketId: socket.id, bundle, roomCode }));
+    // Broadcast to other room members with Merkle inclusion proof for key transparency
+    const merkleProof = keyRegistry.getInclusionProof(socket.id);
+    socket.to(roomCode).emit('peer-key-bundle', signSocketPayload({ socketId: socket.id, bundle, roomCode, merkleProof }));
     logger.info(`🔑 Key bundle registered for socket ${socket.id} in room ${roomCode}`);
   });
 

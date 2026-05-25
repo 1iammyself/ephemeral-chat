@@ -113,7 +113,7 @@ export default defineConfig(({ mode }) => {
             }
             // Split heavy local modules out of the main chunk
             if (id.includes('/src/crypto/')) return 'app-crypto';
-            if (id.includes('/src/utils/aesEncryption') || id.includes('/src/utils/mlsEncryption') || id.includes('/src/utils/security')) return 'app-e2ee';
+            if (id.includes('/src/utils/aesEncryption') || id.includes('/src/utils/security')) return 'app-e2ee';
             if (id.includes('/src/i18n/')) return 'app-i18n';
           }
         }

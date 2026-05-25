@@ -58,6 +58,9 @@ class OfflineP2PManager extends EventTarget {
     this._myInfo        = null;
     this._nativeListeners = [];
     this._electronListenersSetup = false;
+    this._myKeyPair         = null;        // X25519 keypair for P2P E2EE
+    this._myPublicKeyB64    = null;        // base64 public key injected into SDP payloads
+    this._peerAesKeys       = new Map();   // peerId → AES-GCM-256 CryptoKey
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -66,6 +69,8 @@ class OfflineP2PManager extends EventTarget {
 
   async start(nickname) {
     if (this._running) return this._myInfo;
+
+    await this._initKeyPair();
 
     if (isElectron) {
       await this._startElectron(nickname);
@@ -96,6 +101,7 @@ class OfflineP2PManager extends EventTarget {
 
     this._peers.clear();
     console.log('[OfflineP2P] Stopped');
+    this._peerAesKeys.clear();
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -106,8 +112,8 @@ class OfflineP2PManager extends EventTarget {
     const peer = this._peers.get(peerId);
     if (!peer) throw new Error(`Unknown peer: ${peerId}`);
 
-    const sdpStr = typeof sdpPayload === 'string'
-      ? sdpPayload : JSON.stringify(sdpPayload);
+    // Inject our X25519 public key so the peer can derive a shared AES-GCM key
+    const sdpStr = this._injectMyPubKey(sdpPayload);
 
     if (isElectron) {
       return electronIpc('mdns-send-sdp', peer.ip, peer.port, sdpStr);
@@ -116,10 +122,8 @@ class OfflineP2PManager extends EventTarget {
     if (isCapacitorApp) {
       const native = await getNative();
       if (peer.transport === 'ble' && peer.address) {
-        // BLE GATT write path (offline without WiFi)
         return native.writeBleGatt({ address: peer.address, sdp: sdpStr });
       }
-      // NSD path — send via local HTTP
       return native.sendSdpToPeer({
         peerIp: peer.ip,
         peerPort: peer.port,
@@ -129,6 +133,48 @@ class OfflineP2PManager extends EventTarget {
     }
 
     throw new Error('sendSdp not supported on this platform');
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // E2EE: encrypt / decrypt messages for a specific peer
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Encrypt arbitrary data for a specific P2P peer using AES-GCM-256.
+   * Requires key exchange (sendSdp must have been called first and a
+   * 'p2p-key-ready' event received for this peerId).
+   *
+   * @param {string} peerId
+   * @param {string|Uint8Array} data
+   * @returns {Promise<{p2pEncrypted: true, ct: string, iv: string}>}
+   */
+  async encryptForPeer(peerId, data) {
+    const aesKey = this._peerAesKeys.get(peerId);
+    if (!aesKey) throw new Error(`No P2P key established for peer: ${peerId}`);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const plaintext = typeof data === 'string' ? new TextEncoder().encode(data) : data;
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, plaintext);
+    return {
+      p2pEncrypted: true,
+      ct: btoa(String.fromCharCode(...new Uint8Array(ct))),
+      iv: btoa(String.fromCharCode(...iv)),
+    };
+  }
+
+  /**
+   * Decrypt a P2P-encrypted payload from a peer.
+   *
+   * @param {string} peerId
+   * @param {{ ct: string, iv: string }} encryptedData
+   * @returns {Promise<string>}
+   */
+  async decryptFromPeer(peerId, encryptedData) {
+    const aesKey = this._peerAesKeys.get(peerId);
+    if (!aesKey) throw new Error(`No P2P key established for peer: ${peerId}`);
+    const ctBytes  = Uint8Array.from(atob(encryptedData.ct), c => c.charCodeAt(0));
+    const ivBytes  = Uint8Array.from(atob(encryptedData.iv), c => c.charCodeAt(0));
+    const plain    = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: ivBytes }, aesKey, ctBytes);
+    return new TextDecoder().decode(plain);
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -297,7 +343,7 @@ class OfflineP2PManager extends EventTarget {
     const service = await server.getPrimaryService('12345678-1234-1234-1234-123456789abc');
     const char = await service.getCharacteristic('12345678-1234-1234-1234-123456789abd');
     const enc = new TextEncoder();
-    const sdpStr = typeof sdpPayload === 'string' ? sdpPayload : JSON.stringify(sdpPayload);
+    const sdpStr = this._injectMyPubKey(sdpPayload);
     await char.writeValueWithResponse(enc.encode(sdpStr));
 
     // Read the peer's SDP in response
@@ -330,7 +376,90 @@ class OfflineP2PManager extends EventTarget {
   }
 
   _emit(type, detail) {
+    if (type === 'sdp-received' && detail?.sdp) {
+      // Async: extract peer's X25519 key, derive shared AES key, then re-emit clean SDP
+      this._handleIncomingSdp(detail).then(cleanDetail => {
+        this.dispatchEvent(new CustomEvent('sdp-received', { detail: cleanDetail }));
+      }).catch(() => {
+        this.dispatchEvent(new CustomEvent('sdp-received', { detail }));
+      });
+      return;
+    }
     this.dispatchEvent(new CustomEvent(type, { detail }));
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // P2P E2EE internals
+  // ──────────────────────────────────────────────────────────────────────────
+
+  async _initKeyPair() {
+    this._myKeyPair = await crypto.subtle.generateKey(
+      { name: 'X25519' },
+      true,          // public key must be exportable to send to peer
+      ['deriveBits']
+    );
+    const rawPub = await crypto.subtle.exportKey('raw', this._myKeyPair.publicKey);
+    this._myPublicKeyB64 = btoa(String.fromCharCode(...new Uint8Array(rawPub)));
+  }
+
+  _injectMyPubKey(sdpPayload) {
+    let obj = typeof sdpPayload === 'string' ? (() => { try { return JSON.parse(sdpPayload); } catch { return { raw: sdpPayload }; } })() : sdpPayload;
+    if (this._myPublicKeyB64) obj = { ...obj, p2pPubKey: this._myPublicKeyB64 };
+    return JSON.stringify(obj);
+  }
+
+  async _handleIncomingSdp(detail) {
+    const { fromPeerId, sdp, ...rest } = detail;
+    let sdpObj;
+    try {
+      sdpObj = typeof sdp === 'string' ? JSON.parse(sdp) : sdp;
+    } catch {
+      return detail;
+    }
+
+    const { p2pPubKey, ...cleanSdp } = sdpObj;
+
+    if (p2pPubKey && fromPeerId && this._myKeyPair) {
+      try {
+        await this._derivePeerKey(fromPeerId, p2pPubKey);
+        // Notify listeners that a shared key is ready for this peer
+        this.dispatchEvent(new CustomEvent('p2p-key-ready', { detail: { peerId: fromPeerId } }));
+      } catch (_) {}
+    }
+
+    return { fromPeerId, sdp: JSON.stringify(cleanSdp), ...rest };
+  }
+
+  async _derivePeerKey(peerId, peerPublicKeyB64) {
+    const rawPub = Uint8Array.from(atob(peerPublicKeyB64), c => c.charCodeAt(0));
+    const peerPublicKey = await crypto.subtle.importKey(
+      'raw', rawPub, { name: 'X25519' }, false, []
+    );
+
+    const sharedBits = await crypto.subtle.deriveBits(
+      { name: 'X25519', public: peerPublicKey },
+      this._myKeyPair.privateKey,
+      256
+    );
+
+    const hkdfKey = await crypto.subtle.importKey(
+      'raw', sharedBits, { name: 'HKDF' }, false, ['deriveKey']
+    );
+
+    const aesKey = await crypto.subtle.deriveKey(
+      {
+        name: 'HKDF',
+        hash: 'SHA-256',
+        salt: new Uint8Array(32),
+        info: new TextEncoder().encode('ephchat-p2p-aes'),
+      },
+      hkdfKey,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+
+    this._peerAesKeys.set(peerId, aesKey);
   }
 }
 
