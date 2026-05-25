@@ -40,6 +40,7 @@ Unlike messengers that rely on simple symmetric keys, Ephemeral Chat uses a laye
 - **Privacy Blur:** Content obscures itself the moment the window loses focus, blocking screen recordings and shoulder surfing.
 - **Screenshot Blocking:** `FLAG_SECURE` is set on Android, preventing OS-level screen capture by any app.
 - **Root & Tamper Detection (Android):** On every launch and every resume from background, the app runs seven independent integrity checks entirely in native code before the WebView loads:
+
   - Active Frida instrumentation (TCP localhost:27042/27043)
   - Injected libraries in `/proc/self/maps` (Frida Gadget, Xposed modules)
   - Root framework artefacts (Magisk, KernelSU, APatch, SuperSU)
@@ -76,34 +77,37 @@ Privacy does not mean compromising on usability:
 
 ## Multi-Platform
 
-| Platform | Shell | Notes |
-|---|---|---|
-| Android / iOS | Capacitor | Native plugins for biometric auth, proximity, Keystore TEE |
-| Windows / Mac / Linux | Electron | Hardened shell, sandboxed renderer, screen capture blocked |
-| Browser | Web | Full crypto stack via SubtleCrypto, no install required |
+| Platform              | Shell     | Notes                                                      |
+| --------------------- | --------- | ---------------------------------------------------------- |
+| Android / iOS         | Capacitor | Native plugins for biometric auth, proximity, Keystore TEE |
+| Windows / Mac / Linux | Electron  | Hardened shell, sandboxed renderer, screen capture blocked |
+| Windows / Mac / Linux | Tauri     | Lightweight Rust shell, bundles built client assets        |
 
 ---
 
 ## Technology Stack
 
-| Component | Technologies |
-|---|---|
-| **Frontend** | React, Vite, Tailwind CSS, Lucide |
-| **Backend** | Node.js, Express, Socket.IO |
-| **Cryptography** | Web Crypto API (SubtleCrypto), `@noble/curves` (Ristretto255), `hpke`, `mlkem`, Rust/WASM (`zeroize`) |
-| **P2P Transport** | WebRTC, mDNS-SD, BLE, Wi-Fi Direct |
-| **Desktop Shell** | Electron |
-| **Mobile Shell** | Capacitor (Java custom plugins) |
+| Component               | Technologies                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **Frontend**      | React, Vite, Tailwind CSS, Lucide                                                                            |
+| **Backend**       | Node.js, Express, Socket.IO                                                                                  |
+| **Cryptography**  | Web Crypto API (SubtleCrypto),`@noble/curves` (Ristretto255), `hpke`, `mlkem`, Rust/WASM (`zeroize`) |
+| **P2P Transport** | WebRTC, mDNS-SD, BLE, Wi-Fi Direct                                                                           |
+| **Desktop Shell** | Electron, Tauri (Rust)                                                                                       |
+| **Mobile Shell**  | Capacitor (Java custom plugins)                                                                              |
 
 ---
 
 ## Quick Start (Development)
 
 ### Prerequisites
-- **Node.js** v18+
-- **npm** v9+
+
+- **Node.js** v18+, **npm** v9+
+- **Rust** + `cargo-tauri` — Tauri desktop builds only
+- **Android Studio** — Capacitor Android builds only
 
 ### Installation
+
 ```bash
 git clone https://github.com/cLLeB/ephemeral-chat.git
 cd ephemeral-chat
@@ -112,20 +116,71 @@ cd client && npm install
 cd ../server && npm install
 ```
 
-### Environment variables
+### Environment Variables
+
 Copy `.env.example` to `.env` and fill in the required values (see comments in the file).
 
-### Run
+---
+
+### Desktop — Electron
+
+Electron wraps the hosted app at `https://chat.kyere.me`. For local dev, run the server and client first, then point Electron at them:
+
 ```bash
 # Terminal 1 — server
 cd server && npm start
 
-# Terminal 2 — client
+# Terminal 2 — client dev server (http://localhost:5173)
 cd client && npm run dev
+
+# Terminal 3 — Electron shell
+cd electron-app
+npm install
+CHAT_URL=http://localhost:5173 npm run dev
+
+# Production build (loads https://chat.kyere.me)
+npm run build:win    # Windows installer + portable + MSIX
+npm run build:mac    # macOS DMG
+npm run build:linux  # AppImage + deb
 ```
 
 ---
 
+### Desktop — Tauri
+
+Tauri bundles the built client assets directly into the binary.
+
+```bash
+# 1. Build the web frontend
+cd client && npm run build
+
+# 2. Build the Tauri app
+cd ../tauri-app
+npm run build        # release build
+npm run build:debug  # debug build
+```
+
+Output is in `tauri-app/src-tauri/target/release/bundle/`.
+
+---
+
+### Mobile — Android (Capacitor)
+
+```bash
+# 1. Build the web frontend
+cd client && npm run build
+
+# 2. Sync assets into the Android project
+npx cap sync android
+
+# 3. Open in Android Studio to build / run on device
+npx cap open android
+```
+
+> iOS follows the same steps using `npx cap sync ios` and `npx cap open ios`.
+
+---
+
 <div align="center">
-  <i>Maintained by <a href="https://portfolio.kyere.me/">Caleb Kyere-Boateng</a></i>
+  <i>Maintained by <a href="https://portfolio.kyere.me/">cLLeB</a></i>
 </div>
