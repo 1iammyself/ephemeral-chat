@@ -1,11 +1,8 @@
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import wasm from 'vite-plugin-wasm';
 
 export default defineConfig(({ mode }) => {
-  // Load environment variables based on the current mode
-  const env = loadEnv(mode, process.cwd(), '');
-
   // Determine base URL based on environment
   const isProd = mode === 'production';
   let baseUrl = process.env.VITE_BASE_URL || (isProd ? 'https://chat.kyere.me' : '/');
@@ -17,12 +14,29 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [
+      {
+        name: 'node-crypto-browser-shim',
+        enforce: 'pre',
+        resolveId(id) {
+          if (id === 'crypto' || id === 'node:crypto') return '\0node-crypto-shim';
+        },
+        load(id) {
+          if (id === '\0node-crypto-shim') {
+            return [
+              'export const webcrypto = globalThis.crypto;',
+              'export const subtle = globalThis.crypto?.subtle;',
+              'export const getRandomValues = (arr) => globalThis.crypto.getRandomValues(arr);',
+              'export default globalThis.crypto;',
+            ].join('\n');
+          }
+        }
+      },
       wasm(),
       react()
     ],
     base: baseUrl,
     define: {
-      'process.env': env
+      'process.env.NODE_ENV': JSON.stringify(isProd ? 'production' : 'development'),
     },
     server: {
       port: 5173,
