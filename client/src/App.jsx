@@ -10,6 +10,7 @@ import LandingRedirect from './components/LandingRedirect';
 import ChatRoom from './components/ChatRoom';
 import InviteHandler from './components/InviteHandler.jsx';
 import { useAppResume } from './hooks/useAppResume';
+import { useRootDetection } from './hooks/useRootDetection';
 import MyRooms from './components/MyRooms'; // Import MyRooms component
 import MyDrops from './components/MyDrops';
 import DropPage from './components/DropPage';
@@ -62,6 +63,7 @@ function App() {
   const idleCheckRef = useRef(null);
 
   useAppResume();
+  useRootDetection();
 
   // ── Desktop lock-app event from tray ──────────────────────────────────────
   useEffect(() => {

@@ -6,3 +6,5 @@ export const KeystorePlugin = registerPlugin('Keystore');
 export const IntegrityPlugin = registerPlugin('Integrity');
 // Phase 2 — native plugin implemented in BiometricPlugin.java (active)
 export const BiometricPlugin = registerPlugin('Biometric');
+// Security — native plugin implemented in RootDetectionPlugin.java (active)
+export const RootDetectionPlugin = registerPlugin('RootDetection');
