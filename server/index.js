@@ -3646,6 +3646,19 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('edit-message', async ({ messageId, ...update }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const userId = socket.persistentUserId || socket.id;
+      const updated = await roomManager.editMessage(socket.roomCode, messageId, update, userId);
+      if (updated) {
+        io.to(socket.roomCode).emit('message-edited', { message: updated });
+      }
+    } catch (error) {
+      logger.error('Error editing message:', error);
+    }
+  });
+
   socket.on('message-viewed', async ({ messageId }) => {
     try {
       if (!socket.roomCode || !messageId) return;
