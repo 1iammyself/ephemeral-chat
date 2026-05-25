@@ -1,8 +1,8 @@
-# 👻 Ephemeral Chat
+# Ephemeral Chat
 
 **The Gold Standard for Private, Zero-Knowledge Communication.**
 
-Ephemeral Chat is a cutting-edge messaging platform engineered for users who treat privacy as a fundamental right. Built on a **RAM-only, Zero-Persistence** server model, it delivers military-grade, verifiable end-to-end security without compromising on modern collaborative features.
+Ephemeral Chat is a messaging platform engineered for users who treat privacy as a fundamental right. Built on a **RAM-only, Zero-Persistence** server model, it delivers verifiable end-to-end security without compromising on modern collaborative features.
 
 <p align="center">
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"></a>
@@ -13,77 +13,119 @@ Ephemeral Chat is a cutting-edge messaging platform engineered for users who tre
 
 ---
 
-## 🔐 Uncompromising Security Architecture
+## Security Architecture
 
-Unlike other encrypted messengers that rely on simple symmetric keys, Ephemeral Chat utilizes a deeply layered, defense-in-depth cryptographic architecture. 
+Unlike messengers that rely on simple symmetric keys, Ephemeral Chat uses a layered, defense-in-depth cryptographic architecture where every layer is independently verifiable.
 
-*(Note: In the codebase, you may see older variables named `MLS`. This is a legacy facade pattern. All `MLS` functions act as transparent routers to our modern `v5` and `v4` engines to maintain UI parity and prevent frontend breakage.)*
+### The Cryptographic Core
 
-### 🛡️ The Cryptographic Core (v5)
-*   **Hybrid Key Exchange (PQXDH):** Combines proven classical **X25519** Diffie-Hellman with Post-Quantum **ML-KEM-768**. Even if a quantum computer breaks standard elliptic curves tomorrow, the initial key exchange remains secure.
-*   **Double Ratchet Algorithm (For 1:1 sessions):** True Signal-style ratcheting. Every single message is encrypted with a unique, non-reusable key. Provides perfect forward secrecy and break-in recovery.
-*   **Megolm-style Sender Keys (For group chats):** When a room exceeds 2 users, the protocol seamlessly transitions to scalable per-sender chains, allowing efficient group encryption while maintaining forward secrecy.
-*   **SubtleCrypto Fallback (v4 AES-256-GCM):** For bulk media or fallback scenarios, keys derived securely via HKDF-SHA-256 ensure 100% encrypted payloads.
+- **Hybrid Key Exchange (PQXDH):** Combines classical **X25519** Diffie-Hellman with Post-Quantum **ML-KEM-768**. Both algorithms must be broken simultaneously to compromise the initial key exchange. Quantum-safe by default.
+- **Double Ratchet (1:1 sessions):** Signal-style ratcheting. Every message uses a unique, non-reusable key. Provides perfect forward secrecy and break-in recovery — past and future messages stay safe even if one key is exposed.
+- **Megolm-style Sender Keys (group chats):** When a room has more than two users, the protocol transitions to scalable per-sender chains. Efficient O(n) group encryption with forward secrecy and epoch barriers that prevent replay after member rotation.
+- **AES-256-GCM (fallback / bulk):** For media and fallback paths, keys derived via HKDF-SHA-256 ensure every payload is authenticated and encrypted.
+- **Key Transparency (RFC 6962 Merkle proofs):** Every public key bundle registered with the server is committed to a Merkle tree. Clients independently verify their inclusion proof before establishing any session — silent key substitution is cryptographically detectable.
+- **Secure Memory (Rust/WASM):** Cryptographic key material is zeroed using Rust's `zeroize` crate, which emits volatile writes. JavaScript's JIT compiler cannot optimize away the erasure. All intermediate DH outputs and ratchet keys are wiped from RAM immediately after use.
+- **Offline Proximity E2EE:** When the internet is unavailable, the device-to-device mesh (mDNS-SD / BLE / Wi-Fi Direct) runs its own X25519 key exchange piggybacked on the WebRTC SDP handshake. Every peer gets a unique AES-GCM-256 session key derived via HKDF — offline chat is encrypted end-to-end with no server involvement.
 
-### 🕵️ Anti-Traffic Analysis
-*   **Traffic Padding & Chaffing:** Ephemeral Chat pads *all* messages to fixed bucket sizes (e.g., 1024 bytes, 4KB, 16KB). It injects random **timing jitter** and fires fake encrypted "chaff" messages at random intervals. ISPs or passive interceptors cannot distinguish between an empty chat room, file transfers, or text messages.
-*   **Oblivious HTTP (OHTTP) [RFC 9458]:** Encapsulates HTTP payloads using **HPKE**. Traffic is routed through a third-party relay. The Gateway sees the payload but not the IP; the Relay sees the IP but not the payload.
-*   **Privacy Pass [RFC 9497 / 9578]:** Validates users to prevent DDoS without tracking their connection. Uses blind VOPRFs on the **Ristretto255** curve (via `@noble/curves`), with strict server-side **DLEQ** zero-knowledge proofs before token ingestion.
+### Anti-Traffic Analysis
 
-### 📸 Anti-Surveillance Suite
-*   **Stealth Mode / Panic Burn:** Wipe all device-local traces in milliseconds.
-*   **Ghost Watermarking:** Drifting screen watermarks built to defeat optical character recognition (OCR) and bad actors capturing the screen.
-*   **Privacy Blur:** Content obfuscates hardware-level screenshots and screen-recordings (via OS APIs in native apps) and blurs identically on Web when the window loses focus.
+- **Traffic Padding & Chaffing:** All messages are padded to fixed bucket sizes (256B → 64KB). Random timing jitter (50–500ms) and fake encrypted "chaff" messages are injected at random intervals. Network observers cannot distinguish idle from active sessions or infer message sizes.
+- **Oblivious HTTP (OHTTP) [RFC 9458]:** Payloads are encapsulated using HPKE and routed through a third-party relay. The gateway sees the payload but not the IP; the relay sees the IP but not the payload.
+- **Privacy Pass [RFC 9497/9578]:** Anti-DDoS validation without tracking. Uses blind VOPRFs on the Ristretto255 curve with DLEQ zero-knowledge proofs — the server proves it issued a token without learning which one gets redeemed.
+
+### Anti-Surveillance & Device Protection
+
+- **Stealth Mode / Panic Burn:** Host can trigger a cryptographic kill switch that wipes local chat state on every connected device simultaneously.
+- **Ghost Watermarking:** Drifting screen watermarks defeat OCR and camera-based exfiltration.
+- **Privacy Blur:** Content obscures itself the moment the window loses focus, blocking screen recordings and shoulder surfing.
+- **Screenshot Blocking:** `FLAG_SECURE` is set on Android, preventing OS-level screen capture by any app.
+- **Root & Tamper Detection (Android):** On every launch and every resume from background, the app runs seven independent integrity checks entirely in native code before the WebView loads:
+  - Active Frida instrumentation (TCP localhost:27042/27043)
+  - Injected libraries in `/proc/self/maps` (Frida Gadget, Xposed modules)
+  - Root framework artefacts (Magisk, KernelSU, APatch, SuperSU)
+  - `/system` partition mounted read-write
+  - Xposed/LSPosed framework class loading
+  - Root management apps installed (Magisk Manager, SuperSU, LSPosed, etc.)
+  - `su` binary at nine standard root paths
+
+  Any positive result → `finishAndRemoveTask()` + `Process.killProcess()`. No UI shown. All checks work correctly with sideloaded release APKs on clean devices.
+
+### Server-Side Hardening
+
+- Helmet.js: HSTS (1yr + preload), X-Frame-Options DENY, no-referrer, Permissions-Policy
+- Strict Content Security Policy: `default-src 'self'`, `object-src 'none'`, `base-uri 'none'`
+- Rate limiting across all sensitive endpoints
+- Proof-of-Work CAPTCHA (Cap.js) on room creation
+- Ed25519 response signing on all key-bundle socket events — clients verify before accepting
+- TOFU key pinning in IndexedDB: first-seen server key is pinned and any change on reconnect throws
+- Zero log policy: no output in any environment
 
 ---
 
-## ✨ Features (The Fun Stuff)
+## Features
 
-Privacy doesn’t have to mean compromising on usability:
+Privacy does not mean compromising on usability:
 
-*   **Slash Commands:** Effortlessly trigger features via chat: `/camera`, `/poll`, `/timer`, `/vibe`, and `/pulse`. 
-*   **Watch Party 2.0:** Use `/media <media url>` to sync playback for the entire room instantly. Works collaboratively.
-*   **Offline Proximity Mesh:** Powered by **mDNS-SD and a Native Capacitor Plugin**, allowing local device-to-device file transfers when the internet drops.
-*   **Polls:** Fully synchronized client-side without permanent server storage.
-*   **Rich File Transfers:** P2P file transfers powered by WebRTC for large files, gracefully falling back to heavily-encrypted Socket.IO chunking if NAT traversal fails.
-
----
-
-## 🚀 The Multi-Platform Ecosystem
-
-One codebase, everywhere:
-*   **📱 Capacitor** for direct hardware integration (Bluetooth proximity, OS-level secure screen guards).
-*   **💻 Desktop (Win/Mac/Linux)**: Electron-hardened shell blocking injection and sniffing at the OS memory level.
+- **Slash Commands:** `/camera`, `/poll`, `/timer`, `/vibe`, `/pulse`, `/ice`, `/media`
+- **Watch Party:** `/media <url>` syncs video playback across all room members instantly
+- **Offline Proximity Mesh:** mDNS-SD + BLE + Wi-Fi Direct device discovery with full E2EE — works when the internet is down
+- **Polls:** Fully synchronized client-side, no permanent server storage
+- **Rich File Transfers:** WebRTC P2P for large files, falling back to encrypted Socket.IO chunking
 
 ---
 
-## 🛠️ Technology Stack
+## Multi-Platform
 
-| Component | technologies |
-| :--- | :--- |
-| **Frontend UI** | React, Vite, Tailwind CSS, Lucide |
-| **Backend & Socket** | Node.js, Express, Socket.io |
-| **Cryptography** | Web Crypto API, `@noble/curves` (Ristretto255), `hpke` |
-| **P2P Transport** | WebRTC, TCP/UDP bridging, mDNS |
+| Platform | Shell | Notes |
+|---|---|---|
+| Android / iOS | Capacitor | Native plugins for biometric auth, proximity, Keystore TEE |
+| Windows / Mac / Linux | Electron | Hardened shell, sandboxed renderer, screen capture blocked |
+| Browser | Web | Full crypto stack via SubtleCrypto, no install required |
+
+---
+
+## Technology Stack
+
+| Component | Technologies |
+|---|---|
+| **Frontend** | React, Vite, Tailwind CSS, Lucide |
+| **Backend** | Node.js, Express, Socket.IO |
+| **Cryptography** | Web Crypto API (SubtleCrypto), `@noble/curves` (Ristretto255), `hpke`, `mlkem`, Rust/WASM (`zeroize`) |
+| **P2P Transport** | WebRTC, mDNS-SD, BLE, Wi-Fi Direct |
 | **Desktop Shell** | Electron |
-| **Mobile Shell** | Capacitor (Java/Kotlin custom plugins) |
+| **Mobile Shell** | Capacitor (Java custom plugins) |
 
 ---
 
-## 🚀 Quick Start (Development)
+## Quick Start (Development)
 
-### 1. Prerequisites
-- **Node.js** (v18+)
-- **npm** (v9+)
+### Prerequisites
+- **Node.js** v18+
+- **npm** v9+
 
-### 2. Installation
+### Installation
 ```bash
-# Clone the repository
 git clone https://github.com/cLLeB/ephemeral-chat.git
 cd ephemeral-chat
+npm install
+cd client && npm install
+cd ../server && npm install
+```
 
+### Environment variables
+Copy `.env.example` to `.env` and fill in the required values (see comments in the file).
+
+### Run
+```bash
+# Terminal 1 — server
+cd server && npm start
+
+# Terminal 2 — client
+cd client && npm run dev
+```
 
 ---
+
 <div align="center">
-  <i>Maintained with ❤️ by <a href="https://portfolio.kyere.me/">Caleb Kyere-Boateng</a></i>
+  <i>Maintained by <a href="https://portfolio.kyere.me/">Caleb Kyere-Boateng</a></i>
 </div>

@@ -1,73 +1,126 @@
 # Privacy Policy for Ephemeral Chat
 
-**Last Updated: February 5, 2026**
+**Last Updated: May 25, 2026**
 
-Ephemeral Chat ("the App") is built with a "Privacy by Design" philosophy. Our goal is to provide a secure, anonymous communication platform where your data stays yours.
+Ephemeral Chat is built with a Privacy by Design philosophy. Our goal is a secure, anonymous communication platform where your data stays yours.
 
-## 1. Information Collection
+---
 
-- **No Personal Data:** We do not require registration, names, email addresses, or phone numbers.
-- **No Message Logs:** Messages are ephemeral. They are held in memory only as long as necessary for delivery and are never permanently stored on our servers.
-- **Anonymous Usage:** We do not track individual users or create user profiles.
+## 1. Information We Collect
+
+- **No personal data.** We do not require registration, names, email addresses, or phone numbers.
+- **No message logs.** Messages are held in server RAM only as long as necessary for delivery and are never written to disk.
+- **No user profiles.** We do not track individual users or correlate sessions.
+- **No analytics.** We do not embed third-party tracking or advertising SDKs.
+
+---
 
 ## 2. Device Permissions
 
-The App requires the following permissions to function:
+| Permission                                          | Purpose                                                   | How data is handled                                                                   |
+| --------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| **Internet**                                  | Connect to chat rooms and relay messages                  | Encrypted before leaving your device                                                  |
+| **Microphone**                                | Voice calls and voice notes, only when you initiate them  | Transmitted peer-to-peer or encrypted for delivery; never recorded by us              |
+| **Camera**                                    | Photos you choose to share                                | Encrypted and sent directly to recipients; we never store or access them              |
+| **File Access**                               | Files you choose to send or receive                       | End-to-end encrypted; we never store or access them                                   |
+| **Location (coarse)**                         | Geofenced room enforcement only, when enabled by the host | Used locally to verify you are within the geofence; not transmitted to our servers    |
+| **Nearby Devices / Bluetooth / Wi-Fi Direct** | Offline proximity discovery                               | Used only for local device-to-device communication; no data leaves your local network |
+| **Local Storage**                             | Saving chat history in persistent mode                    | Stored only on your device; never uploaded                                            |
 
-| Permission | Purpose | Data Handling |
-|------------|---------|---------------|
-| **Internet Access** | Required to connect to chat rooms and transmit messages/calls. | Encrypted data transmitted to our relay servers. |
-| **Microphone** | Used only when you explicitly start a voice call or record a voice note. | Audio is transmitted peer-to-peer or processed for immediate delivery and is not recorded by the developer. |
-| **Camera** | Used only when you explicitly capture a photo to share in chat. | Photos are encrypted and transmitted directly to chat recipients. We do not store or access your photos. |
-| **File Access** | Used when you choose to send or receive files in chat. | Files are encrypted end-to-end and transmitted directly between users. We do not store or access your files. |
-| **Local Storage** | Used to optionally save chat history locally on your device (if you enable persistent mode). | Data is stored only on your device and is never uploaded to our servers. |
+---
 
-## 3. Data Encryption
+## 3. Encryption
 
-- All messages are encrypted client-side using a **Hybrid Post-Quantum architecture** (PQXDH combining X25519 and ML-KEM-768).
-- Sessions are secured using the **Double Ratchet** algorithm (for 1:1) and **Megolm-style Sender Keys** (for groups), ensuring perfect forward secrecy for every single message.
-- Your metadata (IP address and routing info) is masked using **Oblivious HTTP (OHTTP)** and **Privacy Pass**, preventing even network providers from tracking your activity.
-- The encryption keys are established peer-to-peer and are **never sent to our servers**.
+All communication is protected by a multi-layer cryptographic architecture:
 
-## 4. Local Storage (Persistent Mode)
+**Hybrid Post-Quantum Key Exchange (PQXDH):**
+Session keys are established using both X25519 (classical) and ML-KEM-768 (post-quantum). Both algorithms must be broken simultaneously to compromise any session — the design is safe against quantum computers.
 
-- If you enable persistent storage, your chat history is saved **only on your device**.
-- This data never leaves your device and is not accessible to us.
-- You can delete this data at any time through the app settings.
+**Per-Message Key Derivation:**
+1:1 sessions use the Double Ratchet algorithm. Group sessions use Megolm-style Sender Keys. Every individual message is encrypted with a unique key that is immediately discarded. Past messages remain safe even if a future key is somehow exposed.
 
-## 5. Third-Party Sharing
+**Key Transparency:**
+Every public key published through our server is committed to a tamper-evident Merkle tree (RFC 6962). Before your device trusts anyone's key, it independently verifies that key's inclusion proof. Silent key substitution is cryptographically detectable.
 
-- We do **not** sell, trade, or share any information with third parties.
-- We do **not** use third-party analytics or advertising trackers.
+**Offline Proximity Encryption:**
+When devices communicate over local Wi-Fi, Bluetooth, or Wi-Fi Direct with no internet connection, a separate X25519 key exchange is performed directly between the devices. Each pair gets a unique AES-GCM-256 session key derived via HKDF. The server is not involved.
 
-## 6. Desktop App (Electron)
+**Secure Key Erasure:**
+Cryptographic key material — including intermediate Diffie-Hellman outputs and message keys — is zeroed from device memory immediately after use using Rust-compiled WASM that emits volatile writes. The erasure cannot be optimized away by the device's JIT compiler.
 
-The desktop application includes additional security features:
-- **Screen Capture Protection:** Prevents screenshots and screen recording on Windows.
-- **Sandboxed Execution:** The app runs in an isolated environment for security.
-- **No Telemetry:** The desktop app does not collect or transmit usage data.
+**Server-Side Signatures:**
+The server signs all key-bundle events with Ed25519. Your device verifies every signature and pins the server's public key on first connection (Trust On First Use). Any change to the server key on reconnect is flagged as a potential MITM.
 
-## 7. Data Retention
+**Encryption keys are established peer-to-peer and are never sent to our servers.**
 
-- **Messages:** Automatically deleted based on room settings (30 seconds to 1 hour).
-- **Rooms:** Expire and are deleted after 24 hours of inactivity.
-- **Files:** Not stored on our servers; transmitted directly between users.
-- **Local Data:** Retained on your device until you delete it.
+---
 
-## 8. Children's Privacy
+## 4. Metadata Protection
 
-The App is not intended for children under 13. We do not knowingly collect any information from children.
+- **Oblivious HTTP (OHTTP, RFC 9458):** HTTP payloads are encapsulated using HPKE and routed through a third-party relay. The relay sees your IP but not the payload. The gateway sees the payload but not your IP. Neither party sees both.
+- **Privacy Pass (RFC 9497/9578):** Anti-abuse validation that does not track you. Uses blind cryptographic tokens on the Ristretto255 curve — the server proves it issued a token without learning which token gets redeemed.
+- **Traffic Padding:** All messages are padded to fixed sizes and sent with random timing jitter. Fake encrypted packets are injected continuously. Network observers cannot determine when you send, how often, or how large your messages are.
 
-## 9. Changes to This Policy
+---
 
-We may update this Privacy Policy from time to time. Any changes will be posted on this page with an updated "Last Updated" date.
+## 5. Local Storage
 
-## 10. Contact
+If you enable persistent storage mode, your chat history is saved only on your device. This data never leaves your device and is not accessible to us. You can delete it at any time through the app settings or by clearing app data.
 
-If you have any questions about this Privacy Policy, you can reach out via:
+---
+
+## 6. Third-Party Sharing
+
+We do not sell, trade, or share any information with third parties. We do not use third-party analytics, advertising networks, or crash reporting services.
+
+---
+
+## 7. Platform-Specific Features
+
+### Android
+
+- **Screenshot and screen recording protection:** `FLAG_SECURE` prevents any other app on the device from capturing your screen while Ephemeral Chat is open.
+- **Device integrity checks:** On every launch and every return from background, the app runs seven independent native-code checks to verify the device has not been modified by root frameworks or active instrumentation tools (e.g. Frida). If the device fails, the app shuts down immediately. These checks run entirely on-device; no data is sent to our servers.
+- **Hardware-backed key storage:** Cryptographic keys can be stored in the device's Trusted Execution Environment (TEE / StrongBox) via the Android Keystore, where they cannot be extracted even with root access.
+- **Biometric lock:** The app can require fingerprint or face authentication on every open and resume.
+
+### Desktop (Electron)
+
+- **Screen capture blocking:** The Electron shell prevents screenshots and screen recording on Windows.
+- **Sandboxed renderer:** The web content runs in an isolated renderer process.
+- **No telemetry:** The desktop app collects and transmits no usage data.
+
+---
+
+## 8. Data Retention
+
+| Data type       | Retention                                                                       |
+| --------------- | ------------------------------------------------------------------------------- |
+| Messages        | Automatically deleted per room TTL setting (30 seconds to 1 hour, or never)     |
+| Rooms           | Expire after 24 hours of inactivity; immediately on Panic Burn                  |
+| Encryption keys | Wiped from server memory on disconnect; wiped from device memory after each use |
+| Files           | Never stored on our servers; transmitted directly between users                 |
+| Local history   | Retained on your device until you delete it                                     |
+
+---
+
+## 9. Children's Privacy
+
+This app is not intended for children under 13. We do not knowingly collect any information from children.
+
+---
+
+## 10. Changes to This Policy
+
+We may update this policy. Changes are posted on this page with an updated date at the top.
+
+---
+
+## 11. Contact
+
 - **GitHub:** https://github.com/cLLeB/ephemeral-chat
 - **Website:** https://ephchat.kyere.me
 
 ---
 
-*This privacy policy applies to Ephemeral Chat version 1.1.0 and later.*
+*This policy applies to Ephemeral Chat v1.1.0 and later.*
