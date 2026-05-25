@@ -16,6 +16,7 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
   const [password, setPassword] = useState('');
   const [roomInfo, setRoomInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [roomNotFound, setRoomNotFound] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [fromInvite, setFromInvite] = useState(false);
   const [inviteValid, setInviteValid] = useState(false);
@@ -81,15 +82,12 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
             setFromInvite(false);
           }
         } else {
-          // Room doesn't exist, redirect to home
-          // console.error('Room not found or error:', roomData);
-          onCancel();
+          // Room not found — show inline error instead of navigating away
+          if (isMounted) setRoomNotFound(true);
         }
       } catch (error) {
-        // console.error('Error checking room:', error);
-        if (isMounted) {
-          onCancel();
-        }
+        // Network/server error — show inline error, do not navigate away
+        if (isMounted) setRoomNotFound(true);
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -187,6 +185,24 @@ const JoinRoomModal = ({ roomCode, onJoin, onCancel, error, isProcessingInvite =
         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 flex flex-col items-center border border-gray-300 dark:border-gray-700">
           <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-2" />
           <p className="text-gray-700 dark:text-gray-300">{t('joinRoom.loadingRoomInfo')}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (roomNotFound) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 flex flex-col items-center max-w-md w-full border border-gray-300 dark:border-gray-700 text-center">
+          <AlertCircle className="w-10 h-10 text-red-500 mb-3" />
+          <h3 className="text-lg font-bold mb-2 dark:text-white">{t('joinRoom.roomNotFound') || 'Room Not Found'}</h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-5 text-sm">{t('joinRoom.roomNotFoundDesc') || 'This room may have expired or never existed.'}</p>
+          <button
+            onClick={onCancel}
+            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+          >
+            {t('common.goHome') || 'Go Home'}
+          </button>
         </div>
       </div>
     );

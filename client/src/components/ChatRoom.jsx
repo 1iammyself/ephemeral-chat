@@ -1081,7 +1081,7 @@ const ChatRoom = () => {
         setIsJoined(false); // Kick user out if room is gone
       }
     });
-  }, [roomCode, navigate, roomKey, fetchGeoPosition]);
+  }, [roomCode, navigate, fetchGeoPosition]);
 
   const spawnReaction = useCallback((emoji) => {
     if (!reactionLayerRef.current) return;
@@ -1793,11 +1793,11 @@ const ChatRoom = () => {
       // Explicitly leave the room before disconnecting
       socketManager.emit('leave-room');
 
-      if (process.env.NODE_ENV !== 'development') {
+      if (!import.meta.env.DEV) {
         socketManager.disconnect();
       }
     };
-  }, [roomCode, performJoin, roomKey, handleFileTransferInvite, triggerPulse]); // Removed isJoined, sessionToken to prevent cleanup on state change
+  }, [roomCode, performJoin, handleFileTransferInvite, triggerPulse]); // roomKey excluded — not used in effect body, was causing spurious socket restarts
 
   useEffect(() => {
     if (!isConnected) return;

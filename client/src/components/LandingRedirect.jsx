@@ -24,10 +24,12 @@ function LandingRedirect() {
   const isNative = Capacitor.getPlatform() !== 'web';
   const isElectron =
     typeof window !== 'undefined' && !!window.electronAPI?.isElectron;
+  const isTauri =
+    typeof window !== 'undefined' && !!window.__TAURI__;
   const isDev = import.meta.env.DEV;
 
   const shouldRedirect =
-    !isNative && !isElectron && !isDev && !!LANDING_URL;
+    !isNative && !isElectron && !isTauri && !isDev && !!LANDING_URL;
 
   useEffect(() => {
     if (shouldRedirect) {
