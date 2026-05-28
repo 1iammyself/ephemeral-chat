@@ -306,8 +306,10 @@ const SingleMediaPlayer = ({
       let parsed;
       if (data.v === 4 && data.ct) {
         try { parsed = JSON.parse(await decryptMLSMessage(data, roomCode)); }
+        catch (e) { console.error('[SharedMediaPlayer] sync decrypt v4 error:', e); return; }
       } else if (data.v === 3 && data.mls) {
         try { parsed = JSON.parse(await decryptMLSMessage(data, roomCode)); }
+        catch (e) { console.error('[SharedMediaPlayer] sync decrypt v3 error:', e); return; }
       } else {
         parsed = data;
       }
@@ -794,8 +796,10 @@ const SharedMediaPlayer = ({
 
         if (item.v === 4 && item.ct) {
           try { parsed = JSON.parse(await decryptMLSMessage(item, roomCode)); }
+          catch (e) { console.error('[SharedMediaPlayer] playlist decrypt v4 error:', e); decryptFailed = true; }
         } else if (item.v === 3 && item.mls) {
           try { parsed = JSON.parse(await decryptMLSMessage(item, roomCode)); }
+          catch (e) { console.error('[SharedMediaPlayer] playlist decrypt v3 error:', e); decryptFailed = true; }
         } else if (item.isEncrypted) {
           decryptFailed = true;
         } else {
@@ -845,8 +849,10 @@ const SharedMediaPlayer = ({
       let parsed;
       if (data.v === 4 && data.ct) {
         try { parsed = JSON.parse(await decryptMLSMessage(data, roomCode)); }
+        catch (e) { console.error('[SharedMediaPlayer] share decrypt v4 error:', e); return; }
       } else if (data.v === 3 && data.mls) {
         try { parsed = JSON.parse(await decryptMLSMessage(data, roomCode)); }
+        catch (e) { console.error('[SharedMediaPlayer] share decrypt v3 error:', e); return; }
       } else {
         parsed = data;
       }

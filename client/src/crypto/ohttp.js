@@ -55,6 +55,7 @@ export function initOHTTP(config) {
       const relayOrigin = new URL(ohttpConfig.relayUrl).origin;
       const gatewayOrigin = new URL(ohttpConfig.gatewayUrl).origin;
       if (relayOrigin === gatewayOrigin) {
+        console.error(
           '[OHTTP] ❌ Relay and Gateway have the same origin (' + relayOrigin + '). ' +
           'OHTTP provides no privacy benefit when relay === gateway. ' +
           'Set VITE_OHTTP_RELAY_URL to a distinct origin (Cloudflare Worker, Fastly relay, etc.). ' +

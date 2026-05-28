@@ -527,6 +527,7 @@ class WebRTCService {
                 const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
                 if (audioSender) {
                     audioSender.replaceTrack(scrambledTrack).catch(e =>
+                        console.error('[WebRTC] replaceTrack error:', e)
                     );
                 }
             });
@@ -551,6 +552,7 @@ class WebRTCService {
                     const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
                     if (audioSender) {
                         audioSender.replaceTrack(this._originalAudioTrack).catch(e =>
+                            console.error('[WebRTC] replaceTrack restore error:', e)
                         );
                     }
                 });

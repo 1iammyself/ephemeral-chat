@@ -425,6 +425,7 @@ export class ProximityService {
 
     s.on('rtc-offer', async ({ from, offer }) => {
       try { await this._handleOffer(from, offer); }
+      catch (e) { console.error('[Proximity] handleOffer error:', e); }
     });
 
     s.on('rtc-answer', async ({ from, answer }) => {
@@ -433,6 +434,7 @@ export class ProximityService {
         if (!conn?.pc) return;
         await conn.pc.setRemoteDescription(new RTCSessionDescription(answer));
         this._flushIceCandidates(from);
+      } catch (e) { console.error('[Proximity] handleAnswer error:', e); }
     });
 
     s.on('rtc-ice-candidate', async ({ from, candidate }) => {
@@ -445,6 +447,7 @@ export class ProximityService {
         return;
       }
       try { await conn.pc.addIceCandidate(new RTCIceCandidate(candidate)); }
+      catch (e) { console.error('[Proximity] addIceCandidate error:', e); }
     });
 
     // Legacy signaling-path transfer events (not used for actual transfer,
@@ -693,6 +696,7 @@ export class ProximityService {
     // Resolve pairing code dynamically without blocking JSON generation
     this._waitForConnection(peerId, CONNECT_TIMEOUT).then(code => {
       conn.pairingCode = code;
+    });
 
     const answerObj = {
       t: 'answer',
@@ -798,6 +802,7 @@ export class ProximityService {
               }
             }
           });
+        });
       }
     };
   }
@@ -859,6 +864,7 @@ export class ProximityService {
     const candidates = conn._pendingCandidates.splice(0);
     for (const c of candidates) {
       conn.pc.addIceCandidate(new RTCIceCandidate(c)).catch(e =>
+        console.error('[Proximity] flushIceCandidate error:', e)
       );
     }
   }
@@ -1103,6 +1109,7 @@ export class ProximityService {
     const conn = this.connections.get(peerId);
     if (conn?.dataChannel?.readyState === 'open') {
       try { conn.dataChannel.send(JSON.stringify(obj)); }
+      catch (e) { console.error('[Proximity] sendControl error:', e); }
     }
   }
 
