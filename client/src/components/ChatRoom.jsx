@@ -4582,7 +4582,7 @@ const ChatRoom = () => {
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 w-full max-w-xs"
             onClick={e => e.stopPropagation()}>
             <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-4 text-center">✊ Rock·Paper·Scissors</p>
-            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">Rounds</p>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">vs Player — choose rounds</p>
             <div className="flex gap-2 mb-4">
               {[3, 5, 7].map(r => (
                 <button key={r} onClick={() => handleSendRps(r, null)}
@@ -4591,12 +4591,12 @@ const ChatRoom = () => {
                 </button>
               ))}
             </div>
-            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">vs CPU</p>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">vs CPU (5 rounds)</p>
             <div className="flex gap-2">
-              {[3, 5, 7].map(r => (
-                <button key={r} onClick={() => handleSendRps(r, 'medium')}
+              {['easy', 'medium', 'hard'].map(d => (
+                <button key={d} onClick={() => handleSendRps(5, d)}
                   className="flex-1 py-2 rounded-xl text-xs font-black bg-purple-500 text-white hover:opacity-90 capitalize">
-                  🤖 {r}R
+                  🤖 {d}
                 </button>
               ))}
             </div>

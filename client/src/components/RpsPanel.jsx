@@ -44,6 +44,12 @@ export default function RpsPanel({ message, currentUser, roomVibe }) {
     setWaitingPicks(gameData.pickedIds ? Object.fromEntries(gameData.pickedIds.map(id => [id, true])) : {});
   }, [gameData]);
 
+  // Auto-start CPU game when host opens a panel already configured for CPU
+  useEffect(() => {
+    if (!messageId || !isHost || !isCpuMode || status !== 'waiting') return;
+    socketManager.emit('rps-start', { messageId });
+  }, [messageId, isHost, isCpuMode, status]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!messageId) return;
     const onReveal = (data) => {
@@ -190,7 +196,10 @@ export default function RpsPanel({ message, currentUser, roomVibe }) {
       )}
 
       {/* Host controls */}
-      {isHost && status === 'waiting' && (
+      {isHost && status === 'waiting' && isCpuMode && (
+        <p className="text-sm text-gray-500 dark:text-gray-400">Starting vs CPU…</p>
+      )}
+      {isHost && status === 'waiting' && !isCpuMode && (
         <div className="flex flex-col items-center gap-2 w-full max-w-xs">
           <button
             onClick={handleStartGame}
@@ -199,23 +208,21 @@ export default function RpsPanel({ message, currentUser, roomVibe }) {
           >
             ▶ Start Game ({players.length} {players.length === 1 ? 'player' : 'players'})
           </button>
-          {!isCpuMode && (
-            pendingCpu ? (
-              <div className="flex gap-2">
-                {['easy','medium','hard'].map(d => (
-                  <button key={d} onClick={() => handleSetCpu(d)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-bold text-white capitalize"
-                    style={{ background: accentColor }}>
-                    {d}
-                  </button>
-                ))}
-                <button onClick={() => setPendingCpu(false)} className="px-2 py-1.5 rounded-lg text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">✕</button>
-              </div>
-            ) : (
-              <button onClick={() => setPendingCpu(true)} className="text-xs text-purple-500 hover:underline">
-                🤖 Play solo vs CPU
-              </button>
-            )
+          {pendingCpu ? (
+            <div className="flex gap-2">
+              {['easy','medium','hard'].map(d => (
+                <button key={d} onClick={() => handleSetCpu(d)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-white capitalize"
+                  style={{ background: accentColor }}>
+                  {d}
+                </button>
+              ))}
+              <button onClick={() => setPendingCpu(false)} className="px-2 py-1.5 rounded-lg text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">✕</button>
+            </div>
+          ) : (
+            <button onClick={() => setPendingCpu(true)} className="text-xs text-purple-500 hover:underline">
+              🤖 Play solo vs CPU
+            </button>
           )}
         </div>
       )}
