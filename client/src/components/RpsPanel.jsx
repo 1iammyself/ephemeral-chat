@@ -44,12 +44,6 @@ export default function RpsPanel({ message, currentUser, roomVibe }) {
     setWaitingPicks(gameData.pickedIds ? Object.fromEntries(gameData.pickedIds.map(id => [id, true])) : {});
   }, [gameData]);
 
-  // Auto-start CPU game when host opens a panel already configured for CPU
-  useEffect(() => {
-    if (!messageId || !isHost || !isCpuMode || status !== 'waiting') return;
-    socketManager.emit('rps-start', { messageId });
-  }, [messageId, isHost, isCpuMode, status]); // eslint-disable-line react-hooks/exhaustive-deps
-
   useEffect(() => {
     if (!messageId) return;
     const onReveal = (data) => {
@@ -197,7 +191,15 @@ export default function RpsPanel({ message, currentUser, roomVibe }) {
 
       {/* Host controls */}
       {isHost && status === 'waiting' && isCpuMode && (
-        <p className="text-sm text-gray-500 dark:text-gray-400">Starting vs CPU…</p>
+        <div className="flex flex-col items-center gap-2 w-full max-w-xs">
+          <button
+            onClick={handleStartGame}
+            className="w-full py-2 rounded-xl text-sm font-bold text-white"
+            style={{ background: accentColor }}
+          >
+            ▶ Start vs CPU ({totalRounds} rounds)
+          </button>
+        </div>
       )}
       {isHost && status === 'waiting' && !isCpuMode && (
         <div className="flex flex-col items-center gap-2 w-full max-w-xs">

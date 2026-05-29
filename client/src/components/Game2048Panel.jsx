@@ -45,12 +45,6 @@ export default function Game2048Panel({ message, currentUser, roomVibe }) {
     }
   }, [gameData]);
 
-  // Auto-start solo game when host opens a panel already configured for solo
-  useEffect(() => {
-    if (!messageId || !isHost || !isSolo || status !== 'waiting') return;
-    socketManager.emit('g2048-start', { messageId, soloMode: true });
-  }, [messageId, isHost, isSolo, status]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // Countdown timer
   useEffect(() => {
     if (status !== 'playing' || isSolo || !timeLeft) return;
@@ -211,24 +205,24 @@ export default function Game2048Panel({ message, currentUser, roomVibe }) {
       ) : (
         <div className="flex flex-col items-center gap-4 py-6 w-full max-w-[280px]">
           {status === 'waiting' && isHost && isSolo && (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Starting solo game…</p>
+            <>
+              <p className="text-sm font-bold text-gray-700 dark:text-gray-300">🎯 Solo Mode</p>
+              <button onClick={() => socketManager.emit('g2048-start', { messageId, soloMode: true })}
+                className="w-full py-3 rounded-xl text-white font-black text-sm" style={{ background: accentColor }}>
+                ▶ Start Solo Game
+              </button>
+            </>
           )}
           {status === 'waiting' && isHost && !isSolo && (
             <>
-              <p className="text-sm font-bold text-gray-700 dark:text-gray-300">2048 — How do you want to play?</p>
-              <div className="flex flex-col gap-2 w-full">
-                <button onClick={() => { socketManager.emit('g2048-start', { messageId, soloMode: true }); }}
-                  className="w-full py-3 rounded-xl text-white font-black text-sm" style={{ background: accentColor }}>
-                  🎯 Solo — Play alone
-                </button>
-                <button onClick={handleStart}
-                  className="w-full py-3 rounded-xl font-black text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200">
-                  🏁 Race — {players.length > 1 ? `${players.length} players` : 'wait for others to join'}
-                </button>
-              </div>
+              <p className="text-sm font-bold text-gray-700 dark:text-gray-300">🏁 Race Mode</p>
               {players.length > 1 && (
                 <p className="text-xs text-gray-400">{players.map(p => p.name).join(', ')}</p>
               )}
+              <button onClick={handleStart}
+                className="w-full py-3 rounded-xl font-black text-sm text-white" style={{ background: accentColor }}>
+                🏁 Start Race — {players.length > 1 ? `${players.length} players` : 'wait for others to join'}
+              </button>
             </>
           )}
           {status === 'waiting' && !isHost && (

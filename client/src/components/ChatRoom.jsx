@@ -726,6 +726,7 @@ const ChatRoom = () => {
   const [showC4Config, setShowC4Config] = useState(false);
   const [showRpsConfig, setShowRpsConfig] = useState(false);
   const [showSnakeConfig, setShowSnakeConfig] = useState(false);
+  const [show2048Config, setShow2048Config] = useState(false);
   const [showGamesSubmenu, setShowGamesSubmenu] = useState(false);
   const setShowStegoModal = (v) => { if (!v) setStegoExtractImage(null); v ? openPanel('secrets') : closePanel('secrets'); };
   const setShowCodeShare    = (v) => v ? openPanel('code')    : closePanel('code');
@@ -3654,7 +3655,7 @@ const ChatRoom = () => {
                                   { emoji: '🔴', label: 'C4', name: 'Connect 4', action: () => { setShowC4Config(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
                                   { emoji: '✊', label: 'RPS', name: 'Rock·Paper·Scissors', action: () => { setShowRpsConfig(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
                                   { emoji: '⛀', label: 'Check', name: 'Checkers', action: () => { setShowCheckersConfig(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
-                                  { emoji: '2048', label: '2048', name: '2048', action: () => { handleSend2048(); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
+                                  { emoji: '2048', label: '2048', name: '2048', action: () => { setShow2048Config(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
                                   { emoji: '🐍', label: 'Snake', name: 'Snake', action: () => { setShowSnakeConfig(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
                                   { emoji: '🟦', label: 'Tetris', name: 'Tetris', action: () => { handleSendTetris(); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
                                   { emoji: '♟', label: 'Chess', name: 'Chess', action: () => { setShowChessConfig(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
@@ -4616,6 +4617,25 @@ const ChatRoom = () => {
               🎯 Solo — Play alone
             </button>
             <button onClick={() => handleSendSnake(false)}
+              className="w-full py-3 rounded-xl font-black text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:opacity-90 transition-opacity">
+              🏁 Race — Invite others
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 2048 config picker ── */}
+      {show2048Config && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={() => setShow2048Config(false)}>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 w-full max-w-xs"
+            onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-4 text-center">2048</p>
+            <button onClick={() => { handleSend2048(true); setShow2048Config(false); }}
+              className={`w-full mb-3 py-3 rounded-xl text-white font-black text-sm ${currentVibe.accentClass} hover:opacity-90 transition-opacity`}>
+              🎯 Solo — Play alone
+            </button>
+            <button onClick={() => { handleSend2048(false); setShow2048Config(false); }}
               className="w-full py-3 rounded-xl font-black text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:opacity-90 transition-opacity">
               🏁 Race — Invite others
             </button>

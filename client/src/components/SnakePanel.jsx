@@ -32,12 +32,6 @@ export default function SnakePanel({ message, currentUser, roomVibe }) {
     setStatus(gameData.status || 'waiting');
   }, [gameData]);
 
-  // Auto-start solo game when host opens a panel already configured for solo
-  useEffect(() => {
-    if (!messageId || !isHost || !isSolo || status !== 'waiting') return;
-    socketManager.emit('snake-start', { messageId, soloMode: true });
-  }, [messageId, isHost, isSolo, status]); // eslint-disable-line react-hooks/exhaustive-deps
-
   useEffect(() => {
     if (!messageId) return;
     const onStarted = ({ messageId: mid }) => {
@@ -179,6 +173,15 @@ export default function SnakePanel({ message, currentUser, roomVibe }) {
       ) : (
         <div className="flex flex-col items-center gap-4 py-6 w-full max-w-[320px] rounded-lg px-4"
           style={{ background: darkBg + '33', justifyContent: 'center', minHeight: 200 }}>
+          {status === 'waiting' && isHost && isSolo && (
+            <>
+              <p className="text-sm font-bold text-gray-700 dark:text-gray-300">🎯 Solo Mode</p>
+              <button onClick={handlePlaySolo}
+                className="w-full py-3 rounded-xl font-black text-sm text-white" style={{ background: accentColor }}>
+                ▶ Start Solo Game
+              </button>
+            </>
+          )}
           {status === 'waiting' && isHost && !isSolo && (
             <>
               <p className="text-sm font-bold text-gray-700 dark:text-gray-300">🏁 Race Mode</p>
@@ -193,9 +196,6 @@ export default function SnakePanel({ message, currentUser, roomVibe }) {
                 🏁 Start Race ({players.length} {players.length === 1 ? 'player' : 'players'})
               </button>
             </>
-          )}
-          {status === 'waiting' && isHost && isSolo && (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Starting solo game…</p>
           )}
           {status === 'waiting' && !isHost && (
             <p className="text-sm text-gray-400 text-center">Waiting for the host to start…</p>
