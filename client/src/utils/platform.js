@@ -88,6 +88,7 @@ export function setupWakeLockReacquire() {
 
 export const isElectron = !!(window.electronAPI?.isElectron);
 export const isCapacitor = !!(window.Capacitor?.isNativePlatform?.());
+export const isTauri = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
 export const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 export const isAndroid = /Android/i.test(navigator.userAgent);
 export const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);

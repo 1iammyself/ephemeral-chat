@@ -275,6 +275,40 @@ pub fn proximity_save_file(_file_data: serde_json::Value) -> serde_json::Value {
 }
 
 #[tauri::command]
+pub async fn save_file_dialog(
+    app: AppHandle,
+    base64_data: String,
+    file_name: String,
+) -> serde_json::Value {
+    use tauri_plugin_dialog::DialogExt;
+
+    let data = match STANDARD.decode(&base64_data) {
+        Ok(d) => d,
+        Err(e) => return serde_json::json!({ "success": false, "error": format!("base64: {}", e) }),
+    };
+
+    let path = app.dialog()
+        .file()
+        .set_file_name(&file_name)
+        .blocking_save_file();
+
+    match path {
+        Some(file_path) => {
+            let p: std::path::PathBuf = file_path.into_path()
+                .unwrap_or_else(|_| std::path::PathBuf::new());
+            if p.as_os_str().is_empty() {
+                return serde_json::json!({ "success": false, "error": "invalid path" });
+            }
+            match std::fs::write(&p, &data) {
+                Ok(_) => serde_json::json!({ "success": true, "path": p.display().to_string() }),
+                Err(e) => serde_json::json!({ "success": false, "error": e.to_string() }),
+            }
+        }
+        None => serde_json::json!({ "success": false, "error": "cancelled" }),
+    }
+}
+
+#[tauri::command]
 pub fn proximity_show_in_folder(app: AppHandle, file_path: String) -> serde_json::Value {
     use tauri_plugin_opener::OpenerExt;
     #[cfg(target_os = "windows")]

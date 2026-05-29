@@ -11,7 +11,7 @@
  * native Share plugin to let the OS handle the file.
  */
 
-import { isCapacitor, isMobile } from './platform';
+import { isCapacitor, isMobile, isTauri } from './platform';
 import { toast } from 'react-toastify';
 
 /**
@@ -25,46 +25,72 @@ export async function downloadFileOnDevice(blob, fileName, mimeType) {
   const type = mimeType || blob.type || 'application/octet-stream';
 
   // ── Strategy 1: Capacitor native share ──────────────────
-  // On Android/iOS: writes file to Documents, then opens it with the native file viewer.
+  // Write to Cache (no permissions needed on any Android/iOS version), then
+  // open the OS share sheet so the user can "Save to Files" / "Save Image".
+  // Directory.Documents requires WRITE_EXTERNAL_STORAGE which is blocked on
+  // Android 11+ and explicitly removed from our manifest.
   if (isCapacitor) {
     try {
       const { Filesystem, Directory } = await import('@capacitor/filesystem');
-      const { FileOpener } = await import('@capacitor-community/file-opener');
-
-      // Request filesystem permissions (crucial for modern Android)
-      await Filesystem.requestPermissions();
+      const { Share } = await import('@capacitor/share');
 
       const base64Data = await blobToBase64(blob);
       const safeFileName = fileName || 'download';
 
-      // Write file to device's Documents directory
       const writeResult = await Filesystem.writeFile({
         path: safeFileName,
         data: base64Data,
-        directory: Directory.Documents,
+        directory: Directory.Cache,
       });
 
-      toast.success(`Downloaded: ${safeFileName}`);
-
-      // Open the saved file with the native file viewer
-      await FileOpener.open({
-        filePath: writeResult.uri,
-        contentType: type,
+      await Share.share({
+        title: safeFileName,
+        url: writeResult.uri,
+        dialogTitle: `Save ${safeFileName}`,
       });
 
       return true;
     } catch (capErr) {
-      if (capErr?.message?.toLowerCase().includes('cancel')) return true;
-      if (capErr?.message?.toLowerCase().includes('no activity')) {
-        console.warn('[downloadHelper] File saved but no viewer app for this type');
-        return true;
+      if (
+        capErr?.message?.toLowerCase().includes('cancel') ||
+        capErr?.message?.toLowerCase().includes('share was canceled') ||
+        capErr?.errorMessage?.toLowerCase().includes('cancel')
+      ) {
+        return true; // user dismissed share sheet — not an error
       }
       console.warn('[downloadHelper] Capacitor path failed:', capErr.message);
-      // Fall through to navigator.share or <a> fallback
+      // Fall through to web share / <a> as last resort
     }
   }
 
-  // ── Strategy 2: Web Share API with file (mobile browsers) ──
+  // ── Strategy 2: Tauri desktop — native save dialog ─────────
+  // WebView2 on Windows silently drops <a download> clicks, so we use the
+  // Rust `save_file_dialog` command which opens a native OS save dialog.
+  if (isTauri) {
+    try {
+      const invoke = window.__TAURI__?.core?.invoke
+        ?? window.__TAURI__?.invoke
+        ?? window.__TAURI_INTERNALS__?.invoke;
+
+      if (invoke) {
+        const base64Data = await blobToBase64(blob);
+        const result = await invoke('save_file_dialog', { base64Data, fileName });
+        if (result?.success) {
+          toast.success(`Saved: ${fileName}`);
+          return true;
+        }
+        if (result?.error && result.error !== 'cancelled') {
+          console.warn('[downloadHelper] Tauri save_file_dialog error:', result.error);
+        }
+        return true; // cancelled or saved — don't fall through
+      }
+    } catch (tauriErr) {
+      console.warn('[downloadHelper] Tauri path failed:', tauriErr.message);
+      // Fall through to <a> as last resort
+    }
+  }
+
+  // ── Strategy 3: Web Share API with file (mobile browsers) ──
   if (isMobile && navigator.share && navigator.canShare) {
     try {
       const file = new File([blob], fileName, { type });
@@ -79,7 +105,7 @@ export async function downloadFileOnDevice(blob, fileName, mimeType) {
     }
   }
 
-  // ── Strategy 3: Desktop fallback — <a download> click ──
+  // ── Strategy 4: Desktop fallback — <a download> click ──
   const url = URL.createObjectURL(new Blob([blob], { type }));
   const a = document.createElement('a');
   a.href = url;

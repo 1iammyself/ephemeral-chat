@@ -65,6 +65,7 @@ pub fn run() {
             commands::proximity_get_device_id,
             commands::proximity_get_device_name,
             commands::proximity_save_file,
+            commands::save_file_dialog,
             commands::proximity_show_in_folder,
             commands::proximity_open_file,
             commands::pp_store_tokens,
