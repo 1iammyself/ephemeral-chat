@@ -203,18 +203,29 @@ export default function Game2048Panel({ message, currentUser, roomVibe }) {
           </div>
         </div>
       ) : (
-        <div className="flex flex-col items-center gap-3 py-4">
-          {status === 'waiting' && (
+        <div className="flex flex-col items-center gap-4 py-6 w-full max-w-[280px]">
+          {status === 'waiting' && isHost && (
             <>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {isHost ? 'Start when ready' : 'Waiting for host to start…'}
-              </p>
-              {isHost && (
-                <button onClick={handleStart} className="px-6 py-2 rounded-xl text-sm font-bold text-white" style={{ background: accentColor }}>
-                  ▶ Start {isSolo ? 'Solo' : `Race (${players.length})`}
+              <p className="text-sm font-bold text-gray-700 dark:text-gray-300">2048 — How do you want to play?</p>
+              <div className="flex flex-col gap-2 w-full">
+                <button onClick={() => { socketManager.emit('g2048-start', { messageId, soloMode: true }); }}
+                  className="w-full py-3 rounded-xl text-white font-black text-sm" style={{ background: accentColor }}>
+                  🎯 Solo — Play alone
                 </button>
+                <button onClick={handleStart}
+                  className="w-full py-3 rounded-xl font-black text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200">
+                  🏁 Race — {players.length > 1 ? `${players.length} players` : 'wait for others to join'}
+                </button>
+              </div>
+              {players.length > 1 && (
+                <p className="text-xs text-gray-400">{players.map(p => p.name).join(', ')}</p>
               )}
             </>
+          )}
+          {status === 'waiting' && !isHost && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+              Waiting for the host to start…
+            </p>
           )}
         </div>
       )}

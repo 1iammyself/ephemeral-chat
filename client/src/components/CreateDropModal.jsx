@@ -2,12 +2,13 @@ import React, { useState, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   X, Package, Type, Image, Mic, FileUp, Plus, Minus,
-  Clock, Eye, EyeOff, Users, Shield, Loader2, AlertTriangle
+  Clock, Eye, EyeOff, Users, Shield, Loader2, AlertTriangle, Lock
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { hapticSuccess, hapticError } from '../utils/platform';
 import { encryptDrop, createDropAPI, fileToArrayBuffer } from '../utils/drops';
 import { getCreatorId } from '../utils/creator';
+import StegoModal from './StegoModal';
 
 // ─── Constants ────────────────────────────────────────────
 
@@ -53,6 +54,10 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
   const [viewOnce, setViewOnce] = useState(false);
   const [hint, setHint] = useState('');
 
+  // Stego embedding (image drops only)
+  const [stegoBlob, setStegoBlob] = useState(null);
+  const [showStegoModal, setShowStegoModal] = useState(false);
+
   // State
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
@@ -86,6 +91,7 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
     setSelectedFile(null);
     setFilePreview(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    setStegoBlob(null);
   }, []);
 
   // ─── Recipient Management ──────────────────────────────
@@ -197,12 +203,16 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
         contentBuffer = encoder.encode(textContent).buffer;
         contentMeta = { type: 'text', size: contentBuffer.byteLength };
       } else {
-        contentBuffer = await fileToArrayBuffer(selectedFile);
+        // If user configured stego, use the pre-embedded blob; otherwise the original file
+        const fileToUse = (contentType === 'image' && stegoBlob)
+          ? new File([stegoBlob], selectedFile.name.replace(/\.[^.]+$/, '.png'), { type: 'image/png' })
+          : selectedFile;
+        contentBuffer = await fileToArrayBuffer(fileToUse);
         contentMeta = {
           type: contentType,
-          fileName: selectedFile.name,
-          mimeType: selectedFile.type,
-          size: selectedFile.size,
+          fileName: fileToUse.name,
+          mimeType: fileToUse.type,
+          size: fileToUse.size,
         };
       }
 
@@ -229,6 +239,15 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
         encryptedHint: encrypted.encryptedHint || null,
         // hint is NOT sent — server stores only encrypted blob
       });
+
+      if (contentType === 'image' && stegoBlob && result.id) {
+        try {
+          const existing = JSON.parse(localStorage.getItem('stegoDropIds') || '[]');
+          if (!existing.includes(result.id)) {
+            localStorage.setItem('stegoDropIds', JSON.stringify([...existing, result.id]));
+          }
+        } catch { /* ignore storage errors */ }
+      }
 
       hapticSuccess();
       onDropCreated({
@@ -415,6 +434,27 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
                     className="hidden"
                   />
                 </div>
+              )}
+
+              {/* Stego section — only for images */}
+              {contentType === 'image' && selectedFile && (
+                stegoBlob ? (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-200 dark:border-indigo-800/30">
+                    <Lock className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
+                    <span className="flex-1 text-xs font-bold text-indigo-700 dark:text-indigo-400">{t('drops.create.stegoConfigured')}</span>
+                    <button type="button" onClick={() => setShowStegoModal(true)} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium">{t('drops.create.stegoReconfigure')}</button>
+                    <button type="button" onClick={() => setStegoBlob(null)} className="text-xs text-red-400 hover:text-red-600 font-medium">{t('common.remove')}</button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowStegoModal(true)}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-indigo-200 dark:border-indigo-700/50 hover:border-indigo-400 dark:hover:border-indigo-500 transition-colors"
+                  >
+                    <Lock className="w-3.5 h-3.5 text-indigo-500" />
+                    <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">{t('drops.create.stegoToggle')}</span>
+                  </button>
+                )
               )}
             </div>
           )}
@@ -654,6 +694,15 @@ const CreateDropModal = ({ onClose, onDropCreated }) => {
           )}
         </div>
       </div>
+
+      {showStegoModal && selectedFile && (
+        <StegoModal
+          isOpen={showStegoModal}
+          onClose={() => setShowStegoModal(false)}
+          initialCarrierImage={selectedFile}
+          onEmbedResult={(blob) => { setStegoBlob(blob); setShowStegoModal(false); }}
+        />
+      )}
     </div>
   );
 };

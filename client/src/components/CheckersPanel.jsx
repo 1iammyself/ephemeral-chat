@@ -163,24 +163,28 @@ export default function CheckersPanel({ message, currentUser, roomVibe }) {
         ))}
       </div>
 
-      {/* CPU picker */}
+      {/* Waiting for opponent — creator can switch to CPU */}
       {isP1 && status === 'waiting' && !gameData?.player2 && !isCpu && (
-        pendingCpu ? (
-          <div className="flex gap-2">
-            {['easy','medium','hard'].map(d => (
-              <button key={d} onClick={() => handleSetCpu(d)}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold text-white capitalize"
-                style={{ background: accentColor }}>
-                {d}
-              </button>
-            ))}
-            <button onClick={() => setPendingCpu(false)} className="px-2 py-1.5 rounded-lg text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">✕</button>
-          </div>
-        ) : (
-          <button onClick={() => setPendingCpu(true)} className="px-4 py-2 rounded-xl text-xs font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
-            🤖 Play vs CPU
-          </button>
-        )
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-xs text-gray-400">Waiting for someone to join…</p>
+          {pendingCpu ? (
+            <div className="flex gap-2">
+              {['easy','medium','hard'].map(d => (
+                <button key={d} onClick={() => handleSetCpu(d)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-white capitalize"
+                  style={{ background: accentColor }}>
+                  {d}
+                </button>
+              ))}
+              <button onClick={() => setPendingCpu(false)} className="px-2 py-1.5 rounded-lg text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">✕</button>
+            </div>
+          ) : (
+            <button onClick={() => setPendingCpu(true)}
+              className="px-4 py-1.5 rounded-xl text-xs font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+              🤖 Switch to vs CPU
+            </button>
+          )}
+        </div>
       )}
 
       {isFinished && (isP1 || isP2) && (

@@ -4,8 +4,9 @@ import { useTranslation } from 'react-i18next';
 import {
   ArrowLeft, Radio, Wifi, WifiOff, Monitor, Smartphone, Tablet,
   Send, FileUp, MessageSquare, X, CheckCircle2, XCircle, AlertCircle,
-  Loader2, Zap, Share2, QrCode, Camera, Files
+  Loader2, Zap, Share2, QrCode, Camera, Files, Lock
 } from 'lucide-react';
+import StegoModal from './StegoModal';
 import { useNearbyPeers } from '../hooks/useNearbyPeers';
 import { useProximityTransfer } from '../hooks/useProximityTransfer';
 import TransferProgress from './TransferProgress';
@@ -37,6 +38,8 @@ const NearbyTransfer = () => {
   const [batchFiles, setBatchFiles] = useState([]);
   const [isBatchSending, setIsBatchSending] = useState(false);
   const [connectionQuality, setConnectionQuality] = useState(null);
+  const [pendingImageFile, setPendingImageFile] = useState(null);
+  const [showStegoModal, setShowStegoModal] = useState(false);
   const fileInputRef = useRef(null);
   const batchInputRef = useRef(null);
   const statsTimerRef = useRef(null);
@@ -145,12 +148,31 @@ const NearbyTransfer = () => {
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !connectedPeer) return;
-    try {
-      await sendFile(connectedPeer.id, file);
-    } catch (err) {
-      console.error('Send failed:', err);
-    }
     e.target.value = '';
+    if (file.type.startsWith('image/')) {
+      setPendingImageFile(file);
+    } else {
+      try { await sendFile(connectedPeer.id, file); }
+      catch (err) { console.error('Send failed:', err); }
+    }
+  };
+
+  const handleSendImageAsIs = async () => {
+    const file = pendingImageFile;
+    setPendingImageFile(null);
+    if (!file || !connectedPeer) return;
+    try { await sendFile(connectedPeer.id, file); }
+    catch (err) { console.error('Send failed:', err); }
+  };
+
+  const handleStegoEmbedResult = async (blob) => {
+    const original = pendingImageFile;
+    setPendingImageFile(null);
+    setShowStegoModal(false);
+    if (!connectedPeer) return;
+    const stegoFile = new File([blob], original.name.replace(/\.[^.]+$/, '.png'), { type: 'image/png' });
+    try { await sendFile(connectedPeer.id, stegoFile); }
+    catch (err) { console.error('Stego send failed:', err); }
   };
 
   // Send text
@@ -671,6 +693,28 @@ const NearbyTransfer = () => {
                           </p>
                         </button>
 
+                        {/* Image pre-send card */}
+                        {pendingImageFile && (
+                          <div className="p-3 rounded-xl border border-indigo-200 dark:border-indigo-700/50 bg-indigo-50 dark:bg-indigo-900/10 space-y-2">
+                            <p className="text-xs font-bold text-indigo-700 dark:text-indigo-400 truncate">{pendingImageFile.name}</p>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={handleSendImageAsIs}
+                                className="flex-1 py-1.5 text-xs rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
+                              >
+                                {t('nearby.sendAsIs')}
+                              </button>
+                              <button
+                                onClick={() => setShowStegoModal(true)}
+                                className="flex-1 py-1.5 text-xs rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition-colors flex items-center justify-center gap-1"
+                              >
+                                <Lock className="w-3 h-3" />
+                                {t('nearby.embedAndSend')}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Batch send button */}
                         <button
                           onClick={() => batchInputRef.current?.click()}
@@ -813,6 +857,15 @@ const NearbyTransfer = () => {
         onScan={handleQRScan}
         onClose={() => setShowScanner(false)}
       />
+
+      {showStegoModal && pendingImageFile && (
+        <StegoModal
+          isOpen={showStegoModal}
+          onClose={() => setShowStegoModal(false)}
+          initialCarrierImage={pendingImageFile}
+          onEmbedResult={handleStegoEmbedResult}
+        />
+      )}
     </div>
   );
 };

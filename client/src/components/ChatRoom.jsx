@@ -722,6 +722,8 @@ const ChatRoom = () => {
   const [activeSnakeMessage, setActiveSnakeMessage] = useState(null);
   const [showCheckersConfig, setShowCheckersConfig] = useState(false);
   const [showChessConfig, setShowChessConfig] = useState(false);
+  const [showTttConfig, setShowTttConfig] = useState(false);
+  const [showC4Config, setShowC4Config] = useState(false);
   const [showGamesSubmenu, setShowGamesSubmenu] = useState(false);
   const setShowStegoModal = (v) => { if (!v) setStegoExtractImage(null); v ? openPanel('secrets') : closePanel('secrets'); };
   const setShowCodeShare    = (v) => v ? openPanel('code')    : closePanel('code');
@@ -2244,10 +2246,10 @@ const ChatRoom = () => {
           setShowChessConfig(true);
           break;
         case '/ttt':
-          handleSendTtt();
+          setShowTttConfig(true);
           break;
         case '/c4':
-          handleSendC4();
+          setShowC4Config(true);
           break;
         case '/rps':
           handleSendRps();
@@ -2857,9 +2859,10 @@ const ChatRoom = () => {
   }, [activeChessMessage]);
 
   // ── Tic-Tac-Toe ──────────────────────────────────────────────────────────
-  const handleSendTtt = () => {
+  const handleSendTtt = (cpuDifficulty = null) => {
     if (!isConnected) return;
-    socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'ttt' }, userId: persistentUserId, isAnonymous: false });
+    socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'ttt', ...(cpuDifficulty ? { cpuDifficulty } : {}) }, userId: persistentUserId, isAnonymous: false });
+    setShowTttConfig(false);
   };
   const handleTttJoin = (messageId) => {
     if (!isConnected) return;
@@ -2872,9 +2875,10 @@ const ChatRoom = () => {
   useEffect(() => { if (!activeTttMessage && isPanelOpen('ttt')) closePanel('ttt'); }, [activeTttMessage]);
 
   // ── Connect Four ─────────────────────────────────────────────────────────
-  const handleSendC4 = () => {
+  const handleSendC4 = (cpuDifficulty = null) => {
     if (!isConnected) return;
-    socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'c4' }, userId: persistentUserId, isAnonymous: false });
+    socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'c4', ...(cpuDifficulty ? { cpuDifficulty } : {}) }, userId: persistentUserId, isAnonymous: false });
+    setShowC4Config(false);
   };
   const handleC4Join = (messageId) => {
     if (!isConnected) return;
@@ -3638,8 +3642,8 @@ const ChatRoom = () => {
                               </div>
                               <div className="grid grid-cols-4 sm:grid-cols-4 gap-1">
                                 {[
-                                  { emoji: '✕○', label: 'TTT', name: 'Tic-Tac-Toe', action: () => { handleSendTtt(); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
-                                  { emoji: '🔴', label: 'C4', name: 'Connect 4', action: () => { handleSendC4(); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
+                                  { emoji: '✕○', label: 'TTT', name: 'Tic-Tac-Toe', action: () => { setShowTttConfig(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
+                                  { emoji: '🔴', label: 'C4', name: 'Connect 4', action: () => { setShowC4Config(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
                                   { emoji: '✊', label: 'RPS', name: 'Rock·Paper·Scissors', action: () => { handleSendRps(); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
                                   { emoji: '⛀', label: 'Check', name: 'Checkers', action: () => { setShowCheckersConfig(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
                                   { emoji: '2048', label: '2048', name: '2048', action: () => { handleSend2048(); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
@@ -4489,6 +4493,54 @@ const ChatRoom = () => {
           defaultWidth={400} defaultHeight={560} defaultX={130} defaultY={60} visible={isPanelOpen('snake')}>
           <SnakePanel message={activeSnakeMessage} currentUser={currentUser} roomVibe={roomVibe} />
         </FloatingPanel>
+      )}
+
+      {/* ── Tic-Tac-Toe config picker ── */}
+      {showTttConfig && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={() => setShowTttConfig(false)}>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 w-full max-w-xs"
+            onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-4 text-center">✕○ Tic-Tac-Toe — New Game</p>
+            <button onClick={() => handleSendTtt(null)}
+              className="w-full mb-3 py-3 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white font-black text-sm transition-colors">
+              ⚔️ vs Player
+            </button>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">vs CPU</p>
+            <div className="flex gap-2">
+              {['easy','medium','hard'].map(d => (
+                <button key={d} onClick={() => handleSendTtt(d)}
+                  className={`flex-1 py-2.5 rounded-xl text-white font-black text-xs capitalize ${currentVibe.accentClass} hover:opacity-90 transition-opacity`}>
+                  🤖 {d}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Connect Four config picker ── */}
+      {showC4Config && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={() => setShowC4Config(false)}>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 w-full max-w-xs"
+            onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-4 text-center">🔴 Connect Four — New Game</p>
+            <button onClick={() => handleSendC4(null)}
+              className="w-full mb-3 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-black text-sm transition-colors">
+              ⚔️ vs Player
+            </button>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">vs CPU</p>
+            <div className="flex gap-2">
+              {['easy','medium','hard'].map(d => (
+                <button key={d} onClick={() => handleSendC4(d)}
+                  className={`flex-1 py-2.5 rounded-xl text-white font-black text-xs capitalize ${currentVibe.accentClass} hover:opacity-90 transition-opacity`}>
+                  🤖 {d}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Checkers config picker ── */}

@@ -1,8 +1,8 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Camera, RefreshCw, Check, AlertCircle, Image as ImageIcon, Wand2, Lock, Eye, EyeOff } from 'lucide-react';
+import { X, Camera, RefreshCw, Check, AlertCircle, Image as ImageIcon, Wand2, Lock } from 'lucide-react';
 import { FILTERS } from '../utils/cameraFilters';
-import { embed } from '../crypto/steganography';
+import StegoModal from './StegoModal';
 
 const CameraModal = ({ isOpen, onClose, onCapture }) => {
     const { t } = useTranslation();
@@ -21,11 +21,9 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
 
     const [isViewOnce, setIsViewOnce] = useState(true);
 
-    const [showStegoPanel, setShowStegoPanel] = useState(false);
-    const [stegoText, setStegoText] = useState('');
-    const [stegoPassphrase, setStegoPassphrase] = useState('');
-    const [showStegoPass, setShowStegoPass] = useState(false);
-    const [isEmbedding, setIsEmbedding] = useState(false);
+    const [stegoBlob, setStegoBlob] = useState(null);
+    const [stegoCarrierBlob, setStegoCarrierBlob] = useState(null);
+    const [showStegoModal, setShowStegoModal] = useState(false);
 
     const startCamera = useCallback(async () => {
         try {
@@ -70,10 +68,9 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
             setError(null);
             setCurrentFilter(FILTERS[0]);
             setIsViewOnce(true);
-            setShowStegoPanel(false);
-            setStegoText('');
-            setStegoPassphrase('');
-            setShowStegoPass(false);
+            setStegoBlob(null);
+            setStegoCarrierBlob(null);
+            setShowStegoModal(false);
         }
         return () => {
             if (streamRef.current) {
@@ -138,27 +135,24 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
         reader.readAsDataURL(file);
     };
 
-    const handleConfirm = async () => {
+    const handleOpenStegoModal = useCallback(async () => {
         if (!previewImage) return;
-        if (showStegoPanel && stegoText.trim() && stegoPassphrase.trim()) {
-            setIsEmbedding(true);
-            try {
-                const res = await fetch(previewImage);
-                const blob = await res.blob();
-                const stegoBlob = await embed(blob, stegoText.trim(), stegoPassphrase.trim());
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    onCapture(e.target.result, isViewOnce);
-                    onClose();
-                };
-                reader.readAsDataURL(stegoBlob);
-            } catch (err) {
-                console.error('Stego embed failed:', err);
-                onCapture(previewImage, isViewOnce);
-                onClose();
-            } finally {
-                setIsEmbedding(false);
-            }
+        try {
+            const res = await fetch(previewImage);
+            const blob = await res.blob();
+            setStegoCarrierBlob(blob);
+            setShowStegoModal(true);
+        } catch (err) {
+            console.error('Failed to prepare carrier:', err);
+        }
+    }, [previewImage]);
+
+    const handleConfirm = () => {
+        if (!previewImage) return;
+        if (stegoBlob) {
+            const reader = new FileReader();
+            reader.onload = (e) => { onCapture(e.target.result, isViewOnce); onClose(); };
+            reader.readAsDataURL(stegoBlob);
         } else {
             onCapture(previewImage, isViewOnce);
             onClose();
@@ -167,12 +161,10 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
 
     const handleRetake = () => {
         setPreviewImage(null);
-        setShowStegoPanel(false);
-        setStegoText('');
-        setStegoPassphrase('');
-        if (galleryInputRef.current) {
-            galleryInputRef.current.value = '';
-        }
+        setStegoBlob(null);
+        setStegoCarrierBlob(null);
+        setShowStegoModal(false);
+        if (galleryInputRef.current) galleryInputRef.current.value = '';
     };
 
     if (!isOpen) return null;
@@ -290,31 +282,7 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
                 </div>
             )}
 
-            {/* Stego Panel */}
-            {previewImage && showStegoPanel && (
-                <div className="w-full bg-black/90 border-t border-white/10 px-6 py-4 space-y-3 animate-in slide-in-from-bottom duration-200">
-                    <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">{t('camera.hideSecret')}</p>
-                    <textarea
-                        value={stegoText}
-                        onChange={e => setStegoText(e.target.value)}
-                        placeholder={t('camera.secretPlaceholder')}
-                        rows={2}
-                        className="w-full rounded-xl bg-white/10 text-white text-sm placeholder-white/30 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/40 resize-none"
-                    />
-                    <div className="flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 focus-within:ring-2 focus-within:ring-indigo-500/40">
-                        <input
-                            type={showStegoPass ? 'text' : 'password'}
-                            value={stegoPassphrase}
-                            onChange={e => setStegoPassphrase(e.target.value)}
-                            placeholder={t('camera.passphrasePlaceholder')}
-                            className="flex-1 bg-transparent text-white text-sm placeholder-white/30 outline-none"
-                        />
-                        <button type="button" onClick={() => setShowStegoPass(p => !p)} className="text-white/40 hover:text-white transition-colors">
-                            {showStegoPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                    </div>
-                </div>
-            )}
+
 
             {/* Controls Bar */}
             <div className={`px-8 transition-all duration-300 bg-black flex flex-col items-center safe-area-inset-bottom ${showFilters ? 'py-4' : 'py-8 sm:py-12'}`}>
@@ -347,23 +315,23 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
                             </button>
 
                             <button
-                                onClick={() => setShowStegoPanel(p => !p)}
+                                onClick={handleOpenStegoModal}
                                 className="flex flex-col items-center space-y-2 group flex-1"
                             >
-                                <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-90 ${showStegoPanel ? 'bg-indigo-500/20 text-indigo-400 border-2 border-indigo-500' : 'bg-white/10 text-white border-2 border-transparent'}`}>
+                                <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-90 relative ${stegoBlob ? 'bg-indigo-500/20 text-indigo-400 border-2 border-indigo-500' : 'bg-white/10 text-white border-2 border-transparent'}`}>
                                     <Lock className="w-5 h-5" />
+                                    {stegoBlob && <span className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-500 rounded-full flex items-center justify-center text-white text-[8px] font-black">✓</span>}
                                 </div>
-                                <span className={`text-[10px] font-bold uppercase tracking-widest ${showStegoPanel ? 'text-indigo-400' : 'text-white/40'}`}>
+                                <span className={`text-[10px] font-bold uppercase tracking-widest ${stegoBlob ? 'text-indigo-400' : 'text-white/40'}`}>
                                     {t('camera.stego')}
                                 </span>
                             </button>
 
                             <button
                                 onClick={handleConfirm}
-                                disabled={isEmbedding}
-                                className="w-20 h-20 rounded-full bg-white flex items-center justify-center text-black shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-105 active:scale-90 transition-all disabled:opacity-50"
+                                className="w-20 h-20 rounded-full bg-white flex items-center justify-center text-black shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-105 active:scale-90 transition-all"
                             >
-                                {isEmbedding ? <RefreshCw className="w-8 h-8 animate-spin" /> : <Check className="w-10 h-10" />}
+                                <Check className="w-10 h-10" />
                             </button>
                         </>
                     ) : (
@@ -402,6 +370,15 @@ const CameraModal = ({ isOpen, onClose, onCapture }) => {
                 </div>
             </div>
             <canvas ref={canvasRef} className="hidden" />
+
+            {showStegoModal && stegoCarrierBlob && (
+                <StegoModal
+                    isOpen={showStegoModal}
+                    onClose={() => { setShowStegoModal(false); setStegoCarrierBlob(null); }}
+                    initialCarrierImage={stegoCarrierBlob}
+                    onEmbedResult={(blob) => { setStegoBlob(blob); setShowStegoModal(false); setStegoCarrierBlob(null); }}
+                />
+            )}
         </div>
     );
 };

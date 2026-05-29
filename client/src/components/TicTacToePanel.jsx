@@ -13,7 +13,7 @@ export default function TicTacToePanel({ message, currentUser, roomVibe }) {
   const [winLine, setWinLine] = useState(null);
   const [status, setStatus] = useState('waiting');
   const [scores, setScores] = useState({ X: 0, O: 0, draw: 0 });
-  const [pendingCpu, setPendingCpu] = useState(null);
+  const [pendingCpu, setPendingCpu] = useState(false);
   const cpuPendingRef = useRef(false);
 
   const messageId = message?.id;
@@ -137,32 +137,28 @@ export default function TicTacToePanel({ message, currentUser, roomVibe }) {
         })}
       </div>
 
-      {/* CPU difficulty picker (creator, waiting, no opponent yet) */}
+      {/* Waiting for opponent — creator can switch to CPU */}
       {isP1 && status === 'waiting' && !gameData?.player2 && !isCpu && (
-        pendingCpu ? (
-          <div className="flex gap-2 flex-wrap justify-center">
-            {['easy','medium','hard'].map(d => (
-              <button
-                key={d}
-                onClick={() => handleSetCpu(d)}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold text-white"
-                style={{ background: accentColor }}
-              >
-                {DIFF_LABELS[d]}
-              </button>
-            ))}
-            <button onClick={() => setPendingCpu(null)} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-              Cancel
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-xs text-gray-400">Waiting for someone to join…</p>
+          {pendingCpu ? (
+            <div className="flex gap-2">
+              {['easy','medium','hard'].map(d => (
+                <button key={d} onClick={() => handleSetCpu(d)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-white capitalize"
+                  style={{ background: accentColor }}>
+                  {d}
+                </button>
+              ))}
+              <button onClick={() => setPendingCpu(false)} className="px-2 py-1.5 rounded-lg text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">✕</button>
+            </div>
+          ) : (
+            <button onClick={() => setPendingCpu(true)}
+              className="px-4 py-1.5 rounded-xl text-xs font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+              🤖 Switch to vs CPU
             </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setPendingCpu(true)}
-            className="px-4 py-2 rounded-xl text-xs font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300"
-          >
-            🤖 Play vs CPU
-          </button>
-        )
+          )}
+        </div>
       )}
 
       {/* Rematch */}

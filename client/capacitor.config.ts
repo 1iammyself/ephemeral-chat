@@ -6,8 +6,6 @@ const config: CapacitorConfig = {
   appName: 'Ephemeral Chat',
   webDir: 'dist',
   server: {
-    // Use the production URL — also enables Android App Links verification
-    url: 'https://chat.kyere.me',
     cleartext: false,
     // Allow YouTube embeds for Watch Party feature
     allowNavigation: [

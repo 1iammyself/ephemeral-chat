@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowLeft, Package, Trash2, RefreshCw, Clock, Eye, EyeOff,
-  Users, Shield, Type, Image, Mic, FileUp, Loader2, AlertTriangle, Plus
+  Users, Shield, Type, Image, Mic, FileUp, Loader2, AlertTriangle, Plus, Lock
 } from 'lucide-react';
 import { getCreatorId } from '../utils/creator';
 import { getMyDropsAPI, deleteDropAPI } from '../utils/drops';
@@ -18,6 +18,11 @@ const MyDrops = () => {
   const [error, setError] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const navigate = useNavigate();
+
+  const stegoDropIds = useMemo(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('stegoDropIds') || '[]')); }
+    catch { return new Set(); }
+  }, []);
 
   // ─── Fetch ──────────────────────────────────────────────
 
@@ -194,6 +199,12 @@ const MyDrops = () => {
                       </div>
 
                       <div className="flex items-center gap-2">
+                        {stegoDropIds.has(drop.id) && (
+                          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400" title={t('myDrops.stegoLabel')}>
+                            <Lock className="w-2.5 h-2.5" />
+                            {t('myDrops.stegoLabel')}
+                          </span>
+                        )}
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.bg} ${status.text}`}>
                           {status.label}
                         </span>

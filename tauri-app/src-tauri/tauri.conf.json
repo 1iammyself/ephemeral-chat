@@ -4,8 +4,10 @@
   "version": "1.2.0",
   "identifier": "me.kyere.chat",
   "build": {
+    "beforeBuildCommand": "npm --prefix ../client run build",
+    "beforeDevCommand": "npm --prefix ../client run dev",
     "frontendDist": "../../client/dist",
-    "devUrl": "https://chat.kyere.me"
+    "devUrl": "http://localhost:5173"
   },
   "app": {
     "security": {

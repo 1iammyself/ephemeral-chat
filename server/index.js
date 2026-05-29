@@ -2626,42 +2626,46 @@ io.on('connection', (socket) => {
           messageContent = withCpu ? `Chess vs CPU (${cpuDiff})` : 'Chess';
         } else if (gameData.gameType === 'ttt') {
           const senderId = socket.persistentUserId || data.userId || socket.id;
+          const cpuDiff = ['easy','medium','hard'].includes(gameData.cpuDifficulty) ? gameData.cpuDifficulty : null;
+          const withCpu = !!cpuDiff;
           data.gameData = {
             gameType: 'ttt',
             creatorId: senderId,
             player1: { id: senderId, socketId: socket.id, name: socket.nickname },
-            player2: null,
-            cpu: null,
+            player2: withCpu ? { id: 'cpu', socketId: null, name: `CPU (${cpuDiff})` } : null,
+            cpu: withCpu ? { enabled: true, difficulty: cpuDiff } : null,
             board: Array(9).fill(null),
             turn: 'X',
             winLine: null,
-            status: 'waiting',
+            status: withCpu ? 'playing' : 'waiting',
             result: null,
             winner: null,
             queue: [],
             scores: { X: 0, O: 0, draw: 0 },
           };
           overrideTtl = 0;
-          messageContent = 'Tic-Tac-Toe';
+          messageContent = withCpu ? `Tic-Tac-Toe vs CPU (${cpuDiff})` : 'Tic-Tac-Toe';
         } else if (gameData.gameType === 'c4') {
           const senderId = socket.persistentUserId || data.userId || socket.id;
+          const cpuDiff = ['easy','medium','hard'].includes(gameData.cpuDifficulty) ? gameData.cpuDifficulty : null;
+          const withCpu = !!cpuDiff;
           data.gameData = {
             gameType: 'c4',
             creatorId: senderId,
             player1: { id: senderId, socketId: socket.id, name: socket.nickname },
-            player2: null,
-            cpu: null,
+            player2: withCpu ? { id: 'cpu', socketId: null, name: `CPU (${cpuDiff})` } : null,
+            cpu: withCpu ? { enabled: true, difficulty: cpuDiff } : null,
             board: Array(6).fill(null).map(() => Array(7).fill(null)),
             turn: 1,
             winCells: null,
-            status: 'waiting',
+            status: withCpu ? 'playing' : 'waiting',
             result: null,
             winner: null,
             queue: [],
             scores: { 1: 0, 2: 0, draw: 0 },
           };
           overrideTtl = 0;
-          messageContent = 'Connect Four';
+          messageContent = withCpu ? `Connect Four vs CPU (${cpuDiff})` : 'Connect Four';
         } else if (gameData.gameType === 'rps') {
           const senderId = socket.persistentUserId || data.userId || socket.id;
           data.gameData = {
@@ -4419,7 +4423,7 @@ io.on('connection', (socket) => {
     } catch (err) { logger.error('g2048-join err:', err); }
   });
 
-  socket.on('g2048-start', async ({ messageId }) => {
+  socket.on('g2048-start', async ({ messageId, soloMode }) => {
     try {
       if (!socket.roomCode || !messageId) return;
       const room = await roomManager.getRoom(socket.roomCode);
@@ -4429,6 +4433,7 @@ io.on('connection', (socket) => {
       const { gameData } = message;
       const senderId = socket.persistentUserId || socket.id;
       if (gameData.hostId !== senderId) return;
+      if (soloMode) gameData.soloMode = true;
       gameData.status = 'playing';
       gameData.startedAt = Date.now();
       gameData.scores = {};
@@ -4503,7 +4508,7 @@ io.on('connection', (socket) => {
     } catch (err) { logger.error('snake-join err:', err); }
   });
 
-  socket.on('snake-start', async ({ messageId }) => {
+  socket.on('snake-start', async ({ messageId, soloMode }) => {
     try {
       if (!socket.roomCode || !messageId) return;
       const room = await roomManager.getRoom(socket.roomCode);
@@ -4513,6 +4518,7 @@ io.on('connection', (socket) => {
       const { gameData } = message;
       const senderId = socket.persistentUserId || socket.id;
       if (gameData.hostId !== senderId) return;
+      if (soloMode) gameData.soloMode = true;
       gameData.status = 'playing';
       gameData.startedAt = Date.now();
       gameData.scores = {};

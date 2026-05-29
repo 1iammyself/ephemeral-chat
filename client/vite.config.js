@@ -4,14 +4,8 @@ import wasm from 'vite-plugin-wasm';
 import { resolve } from 'path';
 
 export default defineConfig(({ mode }) => {
-  // Determine base URL based on environment
   const isProd = mode === 'production';
-  let baseUrl = process.env.VITE_BASE_URL || (isProd ? 'https://chat.kyere.me' : '/');
-
-  // For production on Render
-  if (isProd && process.env.RENDER) {
-    baseUrl = 'https://chat.kyere.me'; // fallback to Render only if Koyeb is down
-  }
+  const baseUrl = '/';
 
   return {
     plugins: [
