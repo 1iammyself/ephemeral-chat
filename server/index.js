@@ -2298,7 +2298,6 @@ io.on('connection', (socket) => {
           autoApprove: roomData[roomCode].autoApprove || false,
           preApprovedList: roomData[roomCode].preApprovedList || [],
           pinnedMessage: roomData[roomCode].pinnedMessage || null,
-          hotSeatTarget: roomData[roomCode].hotSeatTarget || null,
           geofence: roomData[roomCode].geofence
             ? { radiusMeters: roomData[roomCode].geofence.radiusMeters }
             : null,
@@ -2324,10 +2323,6 @@ io.on('connection', (socket) => {
           activeMedia: rd?.activeMedia || []
         });
 
-        // Sync active hot seat to late joiners
-        if (rd?.hotSeatTarget) {
-          socket.emit('hotSeat-started', { targetNickname: rd.hotSeatTarget });
-        }
         // Notify others
         socket.to(roomCode).emit('user-joined', {
           user: {
@@ -2629,6 +2624,114 @@ io.on('connection', (socket) => {
           };
           overrideTtl = 0;
           messageContent = withCpu ? `Chess vs CPU (${cpuDiff})` : 'Chess';
+        } else if (gameData.gameType === 'ttt') {
+          const senderId = socket.persistentUserId || data.userId || socket.id;
+          data.gameData = {
+            gameType: 'ttt',
+            creatorId: senderId,
+            player1: { id: senderId, socketId: socket.id, name: socket.nickname },
+            player2: null,
+            cpu: null,
+            board: Array(9).fill(null),
+            turn: 'X',
+            winLine: null,
+            status: 'waiting',
+            result: null,
+            winner: null,
+            queue: [],
+            scores: { X: 0, O: 0, draw: 0 },
+          };
+          overrideTtl = 0;
+          messageContent = 'Tic-Tac-Toe';
+        } else if (gameData.gameType === 'c4') {
+          const senderId = socket.persistentUserId || data.userId || socket.id;
+          data.gameData = {
+            gameType: 'c4',
+            creatorId: senderId,
+            player1: { id: senderId, socketId: socket.id, name: socket.nickname },
+            player2: null,
+            cpu: null,
+            board: Array(6).fill(null).map(() => Array(7).fill(null)),
+            turn: 1,
+            winCells: null,
+            status: 'waiting',
+            result: null,
+            winner: null,
+            queue: [],
+            scores: { 1: 0, 2: 0, draw: 0 },
+          };
+          overrideTtl = 0;
+          messageContent = 'Connect Four';
+        } else if (gameData.gameType === 'rps') {
+          const senderId = socket.persistentUserId || data.userId || socket.id;
+          data.gameData = {
+            gameType: 'rps',
+            creatorId: senderId,
+            hostId: senderId,
+            players: [{ id: senderId, socketId: socket.id, name: socket.nickname }],
+            cpu: null,
+            round: 1,
+            totalRounds: 5,
+            picks: {},
+            revealed: false,
+            roundResults: [],
+            scores: {},
+            status: 'waiting',
+          };
+          overrideTtl = 0;
+          messageContent = 'Rock-Paper-Scissors';
+        } else if (gameData.gameType === 'checkers') {
+          const senderId = socket.persistentUserId || data.userId || socket.id;
+          const cpuDiff = ['easy','medium','hard'].includes(gameData.cpuDifficulty) ? gameData.cpuDifficulty : null;
+          const withCpu = !!cpuDiff;
+          data.gameData = {
+            gameType: 'checkers',
+            creatorId: senderId,
+            player1: { id: senderId, socketId: socket.id, name: socket.nickname },
+            player2: withCpu ? { id: 'cpu', socketId: null, name: `CPU (${cpuDiff})` } : null,
+            cpu: withCpu ? { enabled: true, difficulty: cpuDiff } : null,
+            board: initCheckersBoard(),
+            turn: 1,
+            status: withCpu ? 'playing' : 'waiting',
+            result: null,
+            winner: null,
+            queue: [],
+            scores: { 1: 0, 2: 0 },
+          };
+          overrideTtl = 0;
+          messageContent = withCpu ? `Checkers vs CPU (${cpuDiff})` : 'Checkers';
+        } else if (gameData.gameType === 'g2048') {
+          const senderId = socket.persistentUserId || data.userId || socket.id;
+          const seed = Date.now();
+          data.gameData = {
+            gameType: 'g2048',
+            creatorId: senderId,
+            hostId: senderId,
+            seed,
+            players: [{ id: senderId, socketId: socket.id, name: socket.nickname }],
+            scores: {},
+            bestTiles: {},
+            status: 'waiting',
+            soloMode: !!gameData.soloMode,
+            startedAt: null,
+            duration: 180000,
+          };
+          overrideTtl = 0;
+          messageContent = '2048';
+        } else if (gameData.gameType === 'snake') {
+          const senderId = socket.persistentUserId || data.userId || socket.id;
+          data.gameData = {
+            gameType: 'snake',
+            creatorId: senderId,
+            hostId: senderId,
+            players: [{ id: senderId, socketId: socket.id, name: socket.nickname }],
+            scores: {},
+            status: 'waiting',
+            soloMode: !!gameData.soloMode,
+            startedAt: null,
+          };
+          overrideTtl = 0;
+          messageContent = 'Snake';
         } else {
           socket.emit('error', { message: 'Unknown game type' });
           return;
@@ -3087,6 +3190,20 @@ io.on('connection', (socket) => {
     const message = (room.messages || []).find(m => m.id === messageId);
     if (!message || message.messageType !== 'game' || message.gameData?.gameType !== 'chess') return null;
     return message;
+  }
+
+  function initCheckersBoard() {
+    // 8x8: null = empty, {p:1|2, k:bool} = piece
+    const board = Array(8).fill(null).map(() => Array(8).fill(null));
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        if ((r + c) % 2 === 1) {
+          if (r < 3) board[r][c] = { p: 2, k: false };
+          else if (r > 4) board[r][c] = { p: 1, k: false };
+        }
+      }
+    }
+    return board;
   }
 
   function chessStartNewRound(gameData, winner, loserColor) {
@@ -3571,6 +3688,885 @@ io.on('connection', (socket) => {
       await roomManager.saveRoom(socket.roomCode, room);
       io.to(socket.roomCode).emit('message-updated', message);
     } catch (err) { logger.error('chess-queue-again err:', err); }
+  });
+
+  // ─── Tic-Tac-Toe Handlers ────────────────────────────────────────────────
+
+  const TTT_WIN_LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+  function tttGetMsg(room, messageId) {
+    const msg = (room.messages || []).find(m => m.id === messageId);
+    if (!msg || msg.messageType !== 'game' || msg.gameData?.gameType !== 'ttt') return null;
+    return msg;
+  }
+
+  function tttCheckWinner(board) {
+    for (const [a,b,c] of TTT_WIN_LINES) {
+      if (board[a] && board[a] === board[b] && board[a] === board[c]) return { winner: board[a], line: [a,b,c] };
+    }
+    if (board.every(c => c !== null)) return { winner: 'draw', line: [] };
+    return null;
+  }
+
+  socket.on('ttt-join', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = tttGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status === 'finished') return;
+      const joinerId = socket.persistentUserId || socket.id;
+      const joinerName = socket.nickname;
+      if (gameData.player1?.id === joinerId || gameData.player2?.id === joinerId) return;
+      if (gameData.queue?.some(p => p.id === joinerId)) return;
+      if (!gameData.player2 && gameData.status === 'waiting' && !gameData.cpu?.enabled) {
+        gameData.player2 = { id: joinerId, socketId: socket.id, name: joinerName };
+        gameData.status = 'playing';
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        io.to(socket.roomCode).emit('ttt-opponent-joined', { messageId, gameData });
+      } else if (gameData.status === 'playing') {
+        if (!gameData.queue) gameData.queue = [];
+        gameData.queue.push({ id: joinerId, socketId: socket.id, name: joinerName });
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+      }
+    } catch (err) { logger.error('ttt-join err:', err); }
+  });
+
+  socket.on('ttt-set-cpu', async ({ messageId, difficulty }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = tttGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      const senderId = socket.persistentUserId || socket.id;
+      if (gameData.player1?.id !== senderId) return;
+      if (gameData.player2 || gameData.status !== 'waiting') return;
+      const diff = ['easy','medium','hard'].includes(difficulty) ? difficulty : 'medium';
+      gameData.cpu = { enabled: true, difficulty: diff };
+      gameData.player2 = { id: 'cpu', socketId: null, name: `CPU (${diff})` };
+      gameData.status = 'playing';
+      gameData.turn = 'X';
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+      io.to(socket.roomCode).emit('ttt-opponent-joined', { messageId, gameData });
+    } catch (err) { logger.error('ttt-set-cpu err:', err); }
+  });
+
+  socket.on('ttt-move', async ({ messageId, index }) => {
+    try {
+      if (!socket.roomCode || !messageId || index === undefined) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = tttGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'playing') return;
+      if (gameData.board[index] !== null) return;
+
+      const moverId = socket.persistentUserId || socket.id;
+      const isP1 = gameData.player1?.id === moverId;
+      const isP2 = gameData.player2?.id === moverId;
+      const isCpuTurn = gameData.cpu?.enabled && gameData.turn === 'O';
+      // CPU moves are submitted by P1's socket
+      if (!isP1 && !isP2 && !(isCpuTurn && isP1)) return;
+      if (gameData.turn === 'X' && !isP1) return;
+      if (gameData.turn === 'O' && !isP2 && !isCpuTurn) return;
+
+      const newBoard = [...gameData.board];
+      newBoard[index] = gameData.turn;
+      const result = tttCheckWinner(newBoard);
+
+      gameData.board = newBoard;
+      if (result) {
+        gameData.status = 'finished';
+        gameData.winLine = result.line;
+        gameData.result = result.winner;
+        gameData.winner = result.winner === 'draw' ? null : (result.winner === 'X' ? gameData.player1 : gameData.player2);
+        if (!gameData.scores) gameData.scores = { X: 0, O: 0, draw: 0 };
+        if (result.winner === 'draw') gameData.scores.draw = (gameData.scores.draw || 0) + 1;
+        else gameData.scores[result.winner] = (gameData.scores[result.winner] || 0) + 1;
+      } else {
+        gameData.winLine = null;
+        gameData.turn = gameData.turn === 'X' ? 'O' : 'X';
+      }
+
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+      io.to(socket.roomCode).emit('ttt-move-made', {
+        messageId, board: newBoard, turn: gameData.turn,
+        winLine: gameData.winLine, result: gameData.result,
+        winner: gameData.winner, scores: gameData.scores, status: gameData.status,
+      });
+    } catch (err) { logger.error('ttt-move err:', err); }
+  });
+
+  socket.on('ttt-rematch', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = tttGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'finished') return;
+      const requesterId = socket.persistentUserId || socket.id;
+      if (!gameData.rematchVotes) gameData.rematchVotes = [];
+      if (gameData.rematchVotes.includes(requesterId)) return;
+      gameData.rematchVotes.push(requesterId);
+      const needed = gameData.cpu?.enabled ? 1 : 2;
+      if (gameData.rematchVotes.length >= needed) {
+        // Swap sides, promote queue
+        const nextP2 = gameData.queue?.length > 0 ? gameData.queue.shift() : null;
+        const prev1 = gameData.player1;
+        if (!nextP2) {
+          gameData.player1 = gameData.player2?.id === 'cpu' ? prev1 : gameData.player2;
+          gameData.player2 = gameData.player2?.id === 'cpu' ? gameData.player2 : prev1;
+        } else {
+          gameData.player1 = gameData.player2;
+          gameData.player2 = nextP2;
+        }
+        gameData.board = Array(9).fill(null);
+        gameData.winLine = null; gameData.turn = 'X';
+        gameData.status = 'playing'; gameData.result = null;
+        gameData.winner = null; gameData.rematchVotes = [];
+      }
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+      if (gameData.status === 'playing') {
+        io.to(socket.roomCode).emit('ttt-move-made', {
+          messageId, board: gameData.board, turn: gameData.turn,
+          winLine: null, status: 'playing', scores: gameData.scores,
+        });
+      }
+    } catch (err) { logger.error('ttt-rematch err:', err); }
+  });
+
+  // ─── Connect Four Handlers ───────────────────────────────────────────────
+
+  const C4_ROWS = 6, C4_COLS = 7;
+
+  function c4GetMsg(room, messageId) {
+    const msg = (room.messages || []).find(m => m.id === messageId);
+    if (!msg || msg.messageType !== 'game' || msg.gameData?.gameType !== 'c4') return null;
+    return msg;
+  }
+
+  function c4CheckWinner(board) {
+    const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+    for (let r = 0; r < C4_ROWS; r++) {
+      for (let c = 0; c < C4_COLS; c++) {
+        const p = board[r][c]; if (!p) continue;
+        for (const [dr,dc] of dirs) {
+          const cells = [[r,c]];
+          for (let i = 1; i < 4; i++) {
+            const nr = r+dr*i, nc = c+dc*i;
+            if (nr<0||nr>=C4_ROWS||nc<0||nc>=C4_COLS||board[nr][nc]!==p) break;
+            cells.push([nr,nc]);
+          }
+          if (cells.length === 4) return { winner: p, cells };
+        }
+      }
+    }
+    if (board[0].every(c => c !== null)) return { winner: 'draw', cells: [] };
+    return null;
+  }
+
+  function c4Drop(board, col, player) {
+    for (let r = C4_ROWS-1; r >= 0; r--) {
+      if (!board[r][col]) {
+        const next = board.map(row => [...row]);
+        next[r][col] = player;
+        return { board: next, row: r };
+      }
+    }
+    return null;
+  }
+
+  socket.on('c4-join', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = c4GetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status === 'finished') return;
+      const joinerId = socket.persistentUserId || socket.id;
+      const joinerName = socket.nickname;
+      if (gameData.player1?.id === joinerId || gameData.player2?.id === joinerId) return;
+      if (gameData.queue?.some(p => p.id === joinerId)) return;
+      if (!gameData.player2 && gameData.status === 'waiting' && !gameData.cpu?.enabled) {
+        gameData.player2 = { id: joinerId, socketId: socket.id, name: joinerName };
+        gameData.status = 'playing';
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        io.to(socket.roomCode).emit('c4-opponent-joined', { messageId, gameData });
+      } else if (gameData.status === 'playing') {
+        if (!gameData.queue) gameData.queue = [];
+        gameData.queue.push({ id: joinerId, socketId: socket.id, name: joinerName });
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+      }
+    } catch (err) { logger.error('c4-join err:', err); }
+  });
+
+  socket.on('c4-set-cpu', async ({ messageId, difficulty }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = c4GetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      const senderId = socket.persistentUserId || socket.id;
+      if (gameData.player1?.id !== senderId || gameData.player2 || gameData.status !== 'waiting') return;
+      const diff = ['easy','medium','hard'].includes(difficulty) ? difficulty : 'medium';
+      gameData.cpu = { enabled: true, difficulty: diff };
+      gameData.player2 = { id: 'cpu', socketId: null, name: `CPU (${diff})` };
+      gameData.status = 'playing';
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+      io.to(socket.roomCode).emit('c4-opponent-joined', { messageId, gameData });
+    } catch (err) { logger.error('c4-set-cpu err:', err); }
+  });
+
+  socket.on('c4-drop', async ({ messageId, col }) => {
+    try {
+      if (!socket.roomCode || !messageId || col === undefined) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = c4GetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'playing' || gameData.board[0][col] !== null) return;
+      const moverId = socket.persistentUserId || socket.id;
+      const isP1 = gameData.player1?.id === moverId;
+      const isP2 = gameData.player2?.id === moverId;
+      const isCpuTurn = gameData.cpu?.enabled && gameData.turn === 2;
+      if (!isP1 && !isP2 && !(isCpuTurn && isP1)) return;
+      if (gameData.turn === 1 && !isP1) return;
+      if (gameData.turn === 2 && !isP2 && !(isCpuTurn && isP1)) return;
+
+      const res = c4Drop(gameData.board, col, gameData.turn);
+      if (!res) return;
+      gameData.board = res.board;
+      const result = c4CheckWinner(gameData.board);
+      if (result) {
+        gameData.status = 'finished';
+        gameData.winCells = result.cells;
+        gameData.result = result.winner;
+        gameData.winner = result.winner === 'draw' ? null : (result.winner === 1 ? gameData.player1 : gameData.player2);
+        if (!gameData.scores) gameData.scores = { 1: 0, 2: 0, draw: 0 };
+        if (result.winner === 'draw') gameData.scores.draw = (gameData.scores.draw||0)+1;
+        else gameData.scores[result.winner] = (gameData.scores[result.winner]||0)+1;
+      } else {
+        gameData.turn = gameData.turn === 1 ? 2 : 1;
+      }
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+      io.to(socket.roomCode).emit('c4-drop-made', {
+        messageId, board: gameData.board, turn: gameData.turn,
+        winCells: gameData.winCells, result: gameData.result,
+        winner: gameData.winner, scores: gameData.scores, status: gameData.status,
+      });
+    } catch (err) { logger.error('c4-drop err:', err); }
+  });
+
+  socket.on('c4-rematch', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = c4GetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'finished') return;
+      const requesterId = socket.persistentUserId || socket.id;
+      if (!gameData.rematchVotes) gameData.rematchVotes = [];
+      if (gameData.rematchVotes.includes(requesterId)) return;
+      gameData.rematchVotes.push(requesterId);
+      const needed = gameData.cpu?.enabled ? 1 : 2;
+      if (gameData.rematchVotes.length >= needed) {
+        const nextP2 = gameData.queue?.length > 0 ? gameData.queue.shift() : null;
+        const prev1 = gameData.player1;
+        gameData.player1 = gameData.player2?.id === 'cpu' ? prev1 : gameData.player2;
+        gameData.player2 = nextP2 || (gameData.player2?.id === 'cpu' ? gameData.player2 : prev1);
+        gameData.board = Array(C4_ROWS).fill(null).map(() => Array(C4_COLS).fill(null));
+        gameData.turn = 1; gameData.winCells = null;
+        gameData.status = 'playing'; gameData.result = null;
+        gameData.winner = null; gameData.rematchVotes = [];
+      }
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+      if (gameData.status === 'playing') {
+        io.to(socket.roomCode).emit('c4-drop-made', {
+          messageId, board: gameData.board, turn: gameData.turn,
+          winCells: null, status: 'playing', scores: gameData.scores,
+        });
+      }
+    } catch (err) { logger.error('c4-rematch err:', err); }
+  });
+
+  // ─── Rock-Paper-Scissors Handlers ───────────────────────────────────────
+
+  const RPS_BEATS = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
+  const RPS_PICKS = ['rock','paper','scissors'];
+
+  function rpsGetMsg(room, messageId) {
+    const msg = (room.messages || []).find(m => m.id === messageId);
+    if (!msg || msg.messageType !== 'game' || msg.gameData?.gameType !== 'rps') return null;
+    return msg;
+  }
+
+  function rpsResolveRound(picks) {
+    const entries = Object.entries(picks);
+    if (entries.length < 2) return null;
+    if (entries.length === 2) {
+      const [[id1,p1],[id2,p2]] = entries;
+      if (p1 === p2) return { picks, outcomes: { [id1]:'draw', [id2]:'draw' }, draws: [id1,id2] };
+      const w = RPS_BEATS[p1] === p2 ? id1 : id2;
+      const l = w === id1 ? id2 : id1;
+      return { picks, outcomes: { [w]:'win', [l]:'lose' }, winners: [w] };
+    }
+    // multiplayer: players with unique winning picks score a point
+    const outcomes = {};
+    const winners = [];
+    for (const [id, pick] of entries) {
+      const others = entries.filter(([oid]) => oid !== id).map(([,p]) => p);
+      const beaten = others.filter(p => RPS_BEATS[pick] === p).length;
+      const lost = others.filter(p => RPS_BEATS[p] === pick).length;
+      if (beaten > 0 && lost === 0) { outcomes[id] = 'win'; winners.push(id); }
+      else if (lost > 0) outcomes[id] = 'lose';
+      else outcomes[id] = 'draw';
+    }
+    return { picks, outcomes, winners };
+  }
+
+  socket.on('rps-join', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = rpsGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'waiting') return;
+      const joinerId = socket.persistentUserId || socket.id;
+      const joinerName = socket.nickname;
+      if (gameData.players.some(p => p.id === joinerId)) return;
+      gameData.players.push({ id: joinerId, socketId: socket.id, name: joinerName });
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('rps-join err:', err); }
+  });
+
+  socket.on('rps-set-cpu', async ({ messageId, difficulty }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = rpsGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      const senderId = socket.persistentUserId || socket.id;
+      if (gameData.hostId !== senderId || gameData.status !== 'waiting') return;
+      const diff = ['easy','medium','hard'].includes(difficulty) ? difficulty : 'medium';
+      gameData.cpu = { enabled: true, difficulty: diff };
+      if (!gameData.players.some(p => p.id === 'cpu'))
+        gameData.players.push({ id: 'cpu', socketId: null, name: `CPU (${diff})` });
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('rps-set-cpu err:', err); }
+  });
+
+  socket.on('rps-start', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = rpsGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      const senderId = socket.persistentUserId || socket.id;
+      if (gameData.hostId !== senderId) return;
+      if (gameData.players.length < (gameData.cpu?.enabled ? 1 : 2)) return;
+      gameData.status = 'playing';
+      gameData.picks = {};
+      gameData.pickedIds = [];
+      gameData.startedAt = Date.now();
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('rps-start err:', err); }
+  });
+
+  socket.on('rps-pick', async ({ messageId, pick }) => {
+    try {
+      if (!socket.roomCode || !messageId || !RPS_PICKS.includes(pick)) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = rpsGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'playing' || gameData.revealed) return;
+      const playerId = socket.persistentUserId || socket.id;
+      if (!gameData.players.some(p => p.id === playerId)) return;
+      if (gameData.picks[playerId]) return;
+      gameData.picks[playerId] = pick;
+      if (!gameData.pickedIds) gameData.pickedIds = [];
+      if (!gameData.pickedIds.includes(playerId)) gameData.pickedIds.push(playerId);
+      io.to(socket.roomCode).emit('rps-player-picked', { messageId, playerId });
+      const humanPlayers = gameData.players.filter(p => p.id !== 'cpu');
+      const allHumansPicked = humanPlayers.every(p => gameData.picks[p.id]);
+      if (allHumansPicked && !gameData.cpu?.enabled) {
+        // Auto-reveal for non-CPU games
+        gameData.revealed = true;
+        const roundResult = rpsResolveRound(gameData.picks);
+        if (!gameData.roundResults) gameData.roundResults = [];
+        gameData.roundResults.push(roundResult);
+        (roundResult.winners || []).forEach(wid => {
+          gameData.scores[wid] = (gameData.scores[wid] || 0) + 1;
+        });
+        const isMatchOver = gameData.round >= gameData.totalRounds;
+        if (isMatchOver) {
+          gameData.status = 'finished';
+          const topScore = Math.max(...gameData.players.map(p => gameData.scores[p.id] || 0));
+          const winners = gameData.players.filter(p => (gameData.scores[p.id] || 0) === topScore);
+          gameData.overallWinner = winners.length === 1 ? winners[0] : null;
+        }
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        io.to(socket.roomCode).emit('rps-round-reveal', { messageId, roundResult, scores: gameData.scores, status: gameData.status });
+      } else if (allHumansPicked && gameData.cpu?.enabled) {
+        // CPU pick will be sent separately by client
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+      } else {
+        await roomManager.saveRoom(socket.roomCode, room);
+      }
+    } catch (err) { logger.error('rps-pick err:', err); }
+  });
+
+  socket.on('rps-cpu-pick', async ({ messageId, pick }) => {
+    try {
+      if (!socket.roomCode || !messageId || !RPS_PICKS.includes(pick)) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = rpsGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'playing' || !gameData.cpu?.enabled) return;
+      gameData.picks['cpu'] = pick;
+      if (!gameData.pickedIds) gameData.pickedIds = [];
+      if (!gameData.pickedIds.includes('cpu')) gameData.pickedIds.push('cpu');
+      // All picked — resolve
+      const allPicked = gameData.players.every(p => gameData.picks[p.id]);
+      if (allPicked) {
+        gameData.revealed = true;
+        const roundResult = rpsResolveRound(gameData.picks);
+        if (!gameData.roundResults) gameData.roundResults = [];
+        gameData.roundResults.push(roundResult);
+        (roundResult.winners || []).forEach(wid => {
+          gameData.scores[wid] = (gameData.scores[wid] || 0) + 1;
+        });
+        const isMatchOver = gameData.round >= gameData.totalRounds;
+        if (isMatchOver) {
+          gameData.status = 'finished';
+          const topScore = Math.max(...gameData.players.map(p => gameData.scores[p.id] || 0));
+          const winners = gameData.players.filter(p => (gameData.scores[p.id] || 0) === topScore);
+          gameData.overallWinner = winners.length === 1 ? winners[0] : null;
+        }
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        io.to(socket.roomCode).emit('rps-round-reveal', { messageId, roundResult, scores: gameData.scores, status: gameData.status });
+      } else {
+        await roomManager.saveRoom(socket.roomCode, room);
+      }
+    } catch (err) { logger.error('rps-cpu-pick err:', err); }
+  });
+
+  socket.on('rps-next-round', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = rpsGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      const senderId = socket.persistentUserId || socket.id;
+      if (gameData.hostId !== senderId || !gameData.revealed || gameData.status === 'finished') return;
+      gameData.round++;
+      gameData.picks = {}; gameData.pickedIds = []; gameData.revealed = false;
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+      io.to(socket.roomCode).emit('rps-next-round', { messageId, round: gameData.round });
+    } catch (err) { logger.error('rps-next-round err:', err); }
+  });
+
+  // ─── Checkers Handlers ───────────────────────────────────────────────────
+
+  function checkersGetMsg(room, messageId) {
+    const msg = (room.messages || []).find(m => m.id === messageId);
+    if (!msg || msg.messageType !== 'game' || msg.gameData?.gameType !== 'checkers') return null;
+    return msg;
+  }
+
+  function checkersDirs(piece) {
+    if (piece.k) return [[-1,-1],[-1,1],[1,-1],[1,1]];
+    return piece.p === 1 ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]];
+  }
+
+  function checkersGetJumps(board, r, c) {
+    const piece = board[r][c]; if (!piece) return [];
+    const jumps = [];
+    for (const [dr,dc] of checkersDirs(piece)) {
+      const mr=r+dr,mc=c+dc,lr=r+dr*2,lc=c+dc*2;
+      if (lr<0||lr>7||lc<0||lc>7) continue;
+      const mid=board[mr]?.[mc];
+      if (mid&&mid.p!==piece.p&&!board[lr][lc]) jumps.push({from:[r,c],to:[lr,lc],captured:[mr,mc]});
+    }
+    return jumps;
+  }
+
+  function checkersGetAllMoves(board, player) {
+    const jumps=[],moves=[];
+    for (let r=0;r<8;r++) for (let c=0;c<8;c++) {
+      if (board[r][c]?.p===player) {
+        jumps.push(...checkersGetJumps(board,r,c));
+        if (!jumps.length) {
+          for (const [dr,dc] of checkersDirs(board[r][c])) {
+            const nr=r+dr,nc=c+dc;
+            if (nr>=0&&nr<8&&nc>=0&&nc<8&&!board[nr][nc]) moves.push({from:[r,c],to:[nr,nc],captured:null});
+          }
+        }
+      }
+    }
+    return jumps.length>0?jumps:moves;
+  }
+
+  function checkersApplyMove(board, move) {
+    const next = board.map(row => row.map(c => c ? {...c} : null));
+    const [fr,fc]=move.from,[tr,tc]=move.to;
+    next[tr][tc]=next[fr][fc]; next[fr][fc]=null;
+    if (move.captured) { const [cr,cc]=move.captured; next[cr][cc]=null; }
+    if (next[tr][tc].p===1&&tr===0) next[tr][tc].k=true;
+    if (next[tr][tc].p===2&&tr===7) next[tr][tc].k=true;
+    return next;
+  }
+
+  function checkersCheckWinner(board) {
+    const p1=board.flat().filter(c=>c?.p===1).length;
+    const p2=board.flat().filter(c=>c?.p===2).length;
+    if (p1===0) return 2; if (p2===0) return 1;
+    if (!checkersGetAllMoves(board,1).length) return 2;
+    if (!checkersGetAllMoves(board,2).length) return 1;
+    return null;
+  }
+
+  socket.on('checkers-join', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = checkersGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status === 'finished') return;
+      const joinerId = socket.persistentUserId || socket.id;
+      const joinerName = socket.nickname;
+      if (gameData.player1?.id === joinerId || gameData.player2?.id === joinerId) return;
+      if (gameData.queue?.some(p => p.id === joinerId)) return;
+      if (!gameData.player2 && gameData.status === 'waiting' && !gameData.cpu?.enabled) {
+        gameData.player2 = { id: joinerId, socketId: socket.id, name: joinerName };
+        gameData.status = 'playing';
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+        io.to(socket.roomCode).emit('checkers-opponent-joined', { messageId, gameData });
+      } else if (gameData.status === 'playing') {
+        if (!gameData.queue) gameData.queue = [];
+        gameData.queue.push({ id: joinerId, socketId: socket.id, name: joinerName });
+        await roomManager.saveRoom(socket.roomCode, room);
+        io.to(socket.roomCode).emit('message-updated', message);
+      }
+    } catch (err) { logger.error('checkers-join err:', err); }
+  });
+
+  socket.on('checkers-set-cpu', async ({ messageId, difficulty }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = checkersGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      const senderId = socket.persistentUserId || socket.id;
+      if (gameData.player1?.id !== senderId || gameData.player2 || gameData.status !== 'waiting') return;
+      const diff = ['easy','medium','hard'].includes(difficulty) ? difficulty : 'medium';
+      gameData.cpu = { enabled: true, difficulty: diff };
+      gameData.player2 = { id: 'cpu', socketId: null, name: `CPU (${diff})` };
+      gameData.status = 'playing';
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+      io.to(socket.roomCode).emit('checkers-opponent-joined', { messageId, gameData });
+    } catch (err) { logger.error('checkers-set-cpu err:', err); }
+  });
+
+  socket.on('checkers-move', async ({ messageId, move }) => {
+    try {
+      if (!socket.roomCode || !messageId || !move) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = checkersGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'playing') return;
+      const moverId = socket.persistentUserId || socket.id;
+      const isP1 = gameData.player1?.id === moverId;
+      const isP2 = gameData.player2?.id === moverId;
+      const isCpuTurn = gameData.cpu?.enabled && gameData.turn === 2;
+      if (gameData.turn === 1 && !isP1) return;
+      if (gameData.turn === 2 && !isP2 && !(isCpuTurn && isP1)) return;
+
+      // Validate move
+      const legalMoves = checkersGetAllMoves(gameData.board, gameData.turn);
+      const isLegal = legalMoves.some(m =>
+        m.from[0]===move.from[0]&&m.from[1]===move.from[1]&&
+        m.to[0]===move.to[0]&&m.to[1]===move.to[1]);
+      if (!isLegal) return;
+
+      gameData.board = checkersApplyMove(gameData.board, move);
+      const winner = checkersCheckWinner(gameData.board);
+      if (winner) {
+        gameData.status = 'finished';
+        gameData.result = winner;
+        gameData.winner = winner === 1 ? gameData.player1 : gameData.player2;
+        if (!gameData.scores) gameData.scores = { 1: 0, 2: 0 };
+        gameData.scores[winner] = (gameData.scores[winner] || 0) + 1;
+      } else {
+        gameData.turn = gameData.turn === 1 ? 2 : 1;
+      }
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+      io.to(socket.roomCode).emit('checkers-move-made', {
+        messageId, board: gameData.board, turn: gameData.turn,
+        status: gameData.status, scores: gameData.scores, winner: gameData.winner,
+      });
+    } catch (err) { logger.error('checkers-move err:', err); }
+  });
+
+  socket.on('checkers-rematch', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = checkersGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'finished') return;
+      const requesterId = socket.persistentUserId || socket.id;
+      if (!gameData.rematchVotes) gameData.rematchVotes = [];
+      if (gameData.rematchVotes.includes(requesterId)) return;
+      gameData.rematchVotes.push(requesterId);
+      const needed = gameData.cpu?.enabled ? 1 : 2;
+      if (gameData.rematchVotes.length >= needed) {
+        const nextP2 = gameData.queue?.length > 0 ? gameData.queue.shift() : null;
+        const prev1 = gameData.player1;
+        gameData.player1 = gameData.player2?.id === 'cpu' ? prev1 : gameData.player2;
+        gameData.player2 = nextP2 || (gameData.player2?.id === 'cpu' ? gameData.player2 : prev1);
+        gameData.board = initCheckersBoard();
+        gameData.turn = 1; gameData.status = 'playing';
+        gameData.result = null; gameData.winner = null; gameData.rematchVotes = [];
+      }
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+      if (gameData.status === 'playing') {
+        io.to(socket.roomCode).emit('checkers-move-made', {
+          messageId, board: gameData.board, turn: gameData.turn,
+          status: gameData.status, scores: gameData.scores,
+        });
+      }
+    } catch (err) { logger.error('checkers-rematch err:', err); }
+  });
+
+  // ─── 2048 Handlers ───────────────────────────────────────────────────────
+
+  function g2048GetMsg(room, messageId) {
+    const msg = (room.messages || []).find(m => m.id === messageId);
+    if (!msg || msg.messageType !== 'game' || msg.gameData?.gameType !== 'g2048') return null;
+    return msg;
+  }
+
+  socket.on('g2048-join', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = g2048GetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'waiting') return;
+      const joinerId = socket.persistentUserId || socket.id;
+      const joinerName = socket.nickname;
+      if (gameData.players.some(p => p.id === joinerId)) return;
+      gameData.players.push({ id: joinerId, socketId: socket.id, name: joinerName });
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('g2048-join err:', err); }
+  });
+
+  socket.on('g2048-start', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = g2048GetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      const senderId = socket.persistentUserId || socket.id;
+      if (gameData.hostId !== senderId) return;
+      gameData.status = 'playing';
+      gameData.startedAt = Date.now();
+      gameData.scores = {};
+      gameData.bestTiles = {};
+      gameData.players.forEach(p => { gameData.scores[p.id] = 0; gameData.bestTiles[p.id] = 0; });
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('g2048-start err:', err); }
+  });
+
+  socket.on('g2048-score-update', async ({ messageId, score, bestTile }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = g2048GetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'playing') return;
+      const playerId = socket.persistentUserId || socket.id;
+      if (!gameData.players.some(p => p.id === playerId)) return;
+      gameData.scores[playerId] = Math.max(gameData.scores[playerId] || 0, score || 0);
+      gameData.bestTiles[playerId] = Math.max(gameData.bestTiles[playerId] || 0, bestTile || 0);
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+      io.to(socket.roomCode).emit('g2048-scores-update', { messageId, scores: gameData.scores, bestTiles: gameData.bestTiles });
+    } catch (err) { logger.error('g2048-score-update err:', err); }
+  });
+
+  socket.on('g2048-time-up', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = g2048GetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'playing' || gameData.soloMode) return;
+      gameData.status = 'finished';
+      const topScore = Math.max(...gameData.players.map(p => gameData.scores[p.id] || 0));
+      const winners = gameData.players.filter(p => (gameData.scores[p.id] || 0) === topScore);
+      gameData.winner = winners.length === 1 ? winners[0] : null;
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+      io.to(socket.roomCode).emit('g2048-game-over', { messageId, scores: gameData.scores, bestTiles: gameData.bestTiles, winner: gameData.winner });
+    } catch (err) { logger.error('g2048-time-up err:', err); }
+  });
+
+  // ─── Snake Handlers ───────────────────────────────────────────────────────
+
+  function snakeGetMsg(room, messageId) {
+    const msg = (room.messages || []).find(m => m.id === messageId);
+    if (!msg || msg.messageType !== 'game' || msg.gameData?.gameType !== 'snake') return null;
+    return msg;
+  }
+
+  socket.on('snake-join', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = snakeGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'waiting') return;
+      const joinerId = socket.persistentUserId || socket.id;
+      const joinerName = socket.nickname;
+      if (gameData.players.some(p => p.id === joinerId)) return;
+      gameData.players.push({ id: joinerId, socketId: socket.id, name: joinerName });
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('snake-join err:', err); }
+  });
+
+  socket.on('snake-start', async ({ messageId }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = snakeGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      const senderId = socket.persistentUserId || socket.id;
+      if (gameData.hostId !== senderId) return;
+      gameData.status = 'playing';
+      gameData.startedAt = Date.now();
+      gameData.scores = {};
+      gameData.players.forEach(p => { gameData.scores[p.id] = 0; });
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+      io.to(socket.roomCode).emit('snake-started', { messageId });
+    } catch (err) { logger.error('snake-start err:', err); }
+  });
+
+  socket.on('snake-score-update', async ({ messageId, score }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = snakeGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'playing') return;
+      const playerId = socket.persistentUserId || socket.id;
+      if (!gameData.players.some(p => p.id === playerId)) return;
+      gameData.scores[playerId] = Math.max(gameData.scores[playerId] || 0, score || 0);
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+      io.to(socket.roomCode).emit('snake-scores-update', { messageId, scores: gameData.scores });
+    } catch (err) { logger.error('snake-score-update err:', err); }
+  });
+
+  socket.on('snake-died', async ({ messageId, score }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = snakeGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'playing') return;
+      const playerId = socket.persistentUserId || socket.id;
+      gameData.scores[playerId] = Math.max(gameData.scores[playerId] || 0, score || 0);
+      if (!gameData.deadPlayers) gameData.deadPlayers = [];
+      if (!gameData.deadPlayers.includes(playerId)) gameData.deadPlayers.push(playerId);
+      const humanPlayers = gameData.players.filter(p => p.id !== 'cpu');
+      const allDead = humanPlayers.every(p => gameData.deadPlayers.includes(p.id));
+      if (allDead || gameData.soloMode) {
+        gameData.status = 'finished';
+        const topScore = Math.max(...gameData.players.map(p => gameData.scores[p.id] || 0));
+        const winners = gameData.players.filter(p => (gameData.scores[p.id] || 0) === topScore);
+        gameData.winner = winners.length === 1 ? winners[0] : null;
+        io.to(socket.roomCode).emit('snake-game-over', { messageId, scores: gameData.scores, winner: gameData.winner });
+      }
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+      io.to(socket.roomCode).emit('snake-scores-update', { messageId, scores: gameData.scores });
+    } catch (err) { logger.error('snake-died err:', err); }
   });
 
   // Handle ephemeral view token requests
@@ -4224,53 +5220,6 @@ io.on('connection', (socket) => {
     } catch (err) {
       logger.error('fork-room error:', err);
     }
-  });
-
-  // ─── Hot Seat ───
-  socket.on('hotSeat-start', ({ targetNickname } = {}) => {
-    const rc = socket.roomCode;
-    if (!rc || !targetNickname) return;
-    const rd = roomData[rc];
-    if (!rd || rd.hostId !== socket.id) return;
-    rd.hotSeatTarget = targetNickname;
-    rd.hotSeatQueue = [];
-    io.to(rc).emit('hotSeat-started', { targetNickname });
-  });
-
-  socket.on('hotSeat-question', ({ text } = {}) => {
-    const rc = socket.roomCode;
-    if (!rc || !text || typeof text !== 'string') return;
-    const rd = roomData[rc];
-    if (!rd?.hotSeatTarget) return;
-    // Block the hot-seat subject from submitting questions about themselves
-    if (socket.nickname === rd.hotSeatTarget) return;
-    const safe = text.trim().slice(0, 200);
-    if (!safe) return;
-    rd.hotSeatQueue = rd.hotSeatQueue || [];
-    rd.hotSeatQueue.push(safe);
-    // Broadcast anonymously — no sender info
-    io.to(rc).emit('hotSeat-question-received', { text: safe });
-  });
-
-  socket.on('hotSeat-next', () => {
-    const rc = socket.roomCode;
-    if (!rc) return;
-    const rd = roomData[rc];
-    if (!rd?.hotSeatTarget || !Array.isArray(rd.hotSeatQueue)) return;
-    // Only the hot-seat subject or the host may advance to the next question
-    if (socket.nickname !== rd.hotSeatTarget && rd.hostId !== socket.id) return;
-    const q = rd.hotSeatQueue.shift() || null;
-    io.to(rc).emit('hotSeat-next-question', { question: q });
-  });
-
-  socket.on('hotSeat-end', () => {
-    const rc = socket.roomCode;
-    if (!rc) return;
-    const rd = roomData[rc];
-    if (!rd || rd.hostId !== socket.id) return;
-    rd.hotSeatTarget = null;
-    rd.hotSeatQueue = [];
-    io.to(rc).emit('hotSeat-ended');
   });
 
   // ─── Code Share — Yjs CRDT relay ────────────────────────────

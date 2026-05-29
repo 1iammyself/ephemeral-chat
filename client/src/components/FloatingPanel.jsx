@@ -35,12 +35,16 @@ export default function FloatingPanel({
   const { effective } = useTheme();
   const isDark = effective === 'dark';
 
-  const ix = defaultX ?? Math.max(20, (window.innerWidth  - (defaultWidth  ?? 660)) / 2);
-  const iy = defaultY ?? Math.max(60, (window.innerHeight - (defaultHeight ?? 500)) / 3);
+  const isMobile = window.innerWidth < 640;
+  const clampedW = isMobile ? Math.min(defaultWidth ?? 660, window.innerWidth - 8) : (defaultWidth ?? 660);
+  const clampedH = isMobile ? Math.min(defaultHeight ?? 500, window.innerHeight - 80) : (defaultHeight ?? 500);
+
+  const ix = defaultX ?? Math.max(isMobile ? 4 : 20, (window.innerWidth  - clampedW) / 2);
+  const iy = defaultY ?? Math.max(isMobile ? 8 : 60, (window.innerHeight - clampedH) / 3);
 
   const panelRef = useRef(null);
   const [pos,       setPos]       = useState({ x: ix, y: iy });
-  const [size,      setSize]      = useState({ w: defaultWidth, h: defaultHeight });
+  const [size,      setSize]      = useState({ w: clampedW, h: clampedH });
   const [minimized, setMinimized] = useState(false);
   const [maximized, setMaximized] = useState(false);
   const [saved,     setSaved]     = useState(null);

@@ -83,7 +83,6 @@ import TimerModal from './TimerModal';
 import PinnedMessageBanner from './PinnedMessageBanner';
 import RoomCountdown from './RoomCountdown';
 import ThreadView from './ThreadView';
-import HotSeat from './HotSeat';
 import TypingPreview from './TypingPreview';
 import EditMessageModal from './EditMessageModal';
 import DragDropOverlay from './DragDropOverlay';
@@ -93,6 +92,12 @@ import StegoModal from './StegoModal';
 import TetrisMessage from './TetrisMessage';
 import TetrisPanel from './TetrisPanel';
 import ChessPanel from './ChessPanel';
+import TicTacToePanel from './TicTacToePanel';
+import ConnectFourPanel from './ConnectFourPanel';
+import RpsPanel from './RpsPanel';
+import CheckersPanel from './CheckersPanel';
+import Game2048Panel from './Game2048Panel';
+import SnakePanel from './SnakePanel';
 import { getVibeById, getAllVibes } from '../utils/vibes';
 import SharedMediaPlayer, { detectMediaUrl } from './SharedMediaPlayer';
 import WatchPartyModal from './WatchPartyModal';
@@ -130,12 +135,17 @@ const SLASH_COMMANDS = [
   { icon: Edit2, label: 'Topic', value: '/topic', cmdKey: 'topic', adminOnly: true },
   { icon: Clock, label: 'Timer', value: '/timer', cmdKey: 'timer', adminOnly: true },
   { icon: Activity, label: 'Vibe', value: '/vibe', cmdKey: 'vibe', adminOnly: true },
-  { icon: Sparkles, label: 'Hot Seat', value: '/hotSeat', cmdKey: 'hotSeat', adminOnly: true },
   { icon: Activity, label: 'Watch Party', value: '/media', cmdKey: 'watchParty' },
   { icon: FileText, label: 'Stego', value: '/stego', cmdKey: 'stego' },
   { icon: Code2, label: 'Code Share', value: '/code', cmdKey: 'codeShare' },
   { icon: Gamepad2, label: 'Tetris', value: '/tetris', cmdKey: 'tetris' },
   { icon: Gamepad2, label: 'Chess', value: '/chess', cmdKey: 'chess' },
+  { icon: Gamepad2, label: 'Tic-Tac-Toe', value: '/ttt', cmdKey: 'ttt' },
+  { icon: Gamepad2, label: 'Connect Four', value: '/c4', cmdKey: 'c4' },
+  { icon: Gamepad2, label: 'Rock-Paper-Scissors', value: '/rps', cmdKey: 'rps' },
+  { icon: Gamepad2, label: 'Checkers', value: '/checkers', cmdKey: 'checkers' },
+  { icon: Gamepad2, label: '2048', value: '/2048', cmdKey: 'g2048' },
+  { icon: Gamepad2, label: 'Snake', value: '/snake', cmdKey: 'snake' },
 ];
 
 const CONFETTI_COLORS = [
@@ -433,7 +443,6 @@ const ChatRoom = () => {
   const [isConnected, setIsConnected] = useState(socketManager.isConnected);
   const [isJoined, setIsJoined] = useState(false);
   const [roomOpensAt, setRoomOpensAt] = useState(null); // ms timestamp — non-null = show countdown
-  const [hotSeatTarget, setHotSeatTarget] = useState(null); // nickname of hot seat subject
   const [showJoinModal, setShowJoinModal] = useState(true);
   const [isProcessingInvite, setIsProcessingInvite] = useState(false);
   const [showFileModal, setShowFileModal] = useState(false);
@@ -705,7 +714,15 @@ const ChatRoom = () => {
   const [stegoExtractImage, setStegoExtractImage] = useState(null);
   const [activeTetrisMessage, setActiveTetrisMessage] = useState(null);
   const [activeChessMessage, setActiveChessMessage] = useState(null);
+  const [activeTttMessage, setActiveTttMessage] = useState(null);
+  const [activeC4Message, setActiveC4Message] = useState(null);
+  const [activeRpsMessage, setActiveRpsMessage] = useState(null);
+  const [activeCheckersMessage, setActiveCheckersMessage] = useState(null);
+  const [active2048Message, setActive2048Message] = useState(null);
+  const [activeSnakeMessage, setActiveSnakeMessage] = useState(null);
+  const [showCheckersConfig, setShowCheckersConfig] = useState(false);
   const [showChessConfig, setShowChessConfig] = useState(false);
+  const [showGamesSubmenu, setShowGamesSubmenu] = useState(false);
   const setShowStegoModal = (v) => { if (!v) setStegoExtractImage(null); v ? openPanel('secrets') : closePanel('secrets'); };
   const setShowCodeShare    = (v) => v ? openPanel('code')    : closePanel('code');
   const [activeTimer, setActiveTimer] = useState(null);
@@ -984,7 +1001,6 @@ const ChatRoom = () => {
         setActiveTimer(response.room.timer);
         setAutoApprove(response.room.autoApprove || false);
         setPreApprovedList(response.room.preApprovedList || []);
-        if (response.room.hotSeatTarget) setHotSeatTarget(response.room.hotSeatTarget);
         socketManager.setRoomType(response.room.settings?.persistenceMode || 'ephemeral');
 
         setCurrentUser({ id: persistentUserId, socketId: socketManager.socket?.id, nickname: response.nickname, isAdmin: myRole === 'host' || myRole === 'tier1' });
@@ -1385,6 +1401,12 @@ const ChatRoom = () => {
       setMessages(prev => prev.filter(m => m.id !== messageId));
       setActiveTetrisMessage(prev => prev?.id === messageId ? null : prev);
       setActiveChessMessage(prev => prev?.id === messageId ? null : prev);
+      setActiveTttMessage(prev => prev?.id === messageId ? null : prev);
+      setActiveC4Message(prev => prev?.id === messageId ? null : prev);
+      setActiveRpsMessage(prev => prev?.id === messageId ? null : prev);
+      setActiveCheckersMessage(prev => prev?.id === messageId ? null : prev);
+      setActive2048Message(prev => prev?.id === messageId ? null : prev);
+      setActiveSnakeMessage(prev => prev?.id === messageId ? null : prev);
     };
 
     const handleMessageEdited = async ({ message }) => {
@@ -1499,6 +1521,12 @@ const ChatRoom = () => {
       // Keep open game panels in sync
       setActiveTetrisMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
       setActiveChessMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
+      setActiveTttMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
+      setActiveC4Message(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
+      setActiveRpsMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
+      setActiveCheckersMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
+      setActive2048Message(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
+      setActiveSnakeMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
     };
 
     // Role and moderation event handlers
@@ -1683,8 +1711,6 @@ const ChatRoom = () => {
         performJoin(joinParamsRef.current);
       }
     });
-    socketManager.on('hotSeat-started', ({ targetNickname }) => setHotSeatTarget(targetNickname));
-    socketManager.on('hotSeat-ended', () => setHotSeatTarget(null));
     socketManager.on('room-fork-invite', ({ newRoomCode, fromNickname, isHost: forkIsHost }) => {
       const msg = forkIsHost ? `Forked room ${newRoomCode} is ready.` : `${fromNickname} forked the room — join code: ${newRoomCode}`;
       setActivityLogs(prev => [{ id: `log_fork_${Date.now()}`, type: 'system', content: msg, timestamp: new Date().toISOString() }, ...prev].slice(0, 50));
@@ -1807,8 +1833,6 @@ const ChatRoom = () => {
       socketManager.off('message-unpinned', handleMessageUnpinned);
       socketManager.off('room-opening');
       socketManager.off('room-fork-invite');
-      socketManager.off('hotSeat-started');
-      socketManager.off('hotSeat-ended');
       socketManager.off('file-transfer-invite', handleFileTransferInvite);
       socketManager.off('screenshot-detected', handleScreenshotDetected);
       socketManager.off('auto-approve-updated', handleAutoApproveUpdated);
@@ -2193,14 +2217,6 @@ const ChatRoom = () => {
             if (vibe) handleUpdateVibe(vibe.id);
           }
           break;
-        case '/hotseat':
-        case '/hotSeat':
-          if (isHost) {
-            const targetNick = args.trim() || users.find(u => u.nickname !== currentUser?.nickname)?.nickname;
-            if (targetNick) socketManager.emit('hotSeat-start', { targetNickname: targetNick });
-            else setError('Usage: /hotSeat <nickname>');
-          } else setError('Only the host can start Hot Seat');
-          break;
         case '/media':
         case '/watch':
         case '/watchparty':
@@ -2226,6 +2242,24 @@ const ChatRoom = () => {
           break;
         case '/chess':
           setShowChessConfig(true);
+          break;
+        case '/ttt':
+          handleSendTtt();
+          break;
+        case '/c4':
+          handleSendC4();
+          break;
+        case '/rps':
+          handleSendRps();
+          break;
+        case '/checkers':
+          setShowCheckersConfig(true);
+          break;
+        case '/2048':
+          handleSend2048();
+          break;
+        case '/snake':
+          handleSendSnake();
           break;
         default: break;
       }
@@ -2822,6 +2856,93 @@ const ChatRoom = () => {
     if (!activeChessMessage && isPanelOpen('chess')) closePanel('chess');
   }, [activeChessMessage]);
 
+  // ── Tic-Tac-Toe ──────────────────────────────────────────────────────────
+  const handleSendTtt = () => {
+    if (!isConnected) return;
+    socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'ttt' }, userId: persistentUserId, isAnonymous: false });
+  };
+  const handleTttJoin = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('ttt-join', { messageId });
+    setMessages(prev => { const msg = prev.find(m => m.id === messageId); if (msg) { setActiveTttMessage(msg); openPanel('ttt'); } return prev; });
+  };
+  const handleTttLaunch = (message) => { setActiveTttMessage(message); openPanel('ttt'); hapticLight(); };
+  const handleTttSpectate = (message) => { setActiveTttMessage(message); openPanel('ttt'); };
+  const handleTttVsCpu = (message) => { setActiveTttMessage(message); openPanel('ttt'); hapticLight(); };
+  useEffect(() => { if (!activeTttMessage && isPanelOpen('ttt')) closePanel('ttt'); }, [activeTttMessage]);
+
+  // ── Connect Four ─────────────────────────────────────────────────────────
+  const handleSendC4 = () => {
+    if (!isConnected) return;
+    socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'c4' }, userId: persistentUserId, isAnonymous: false });
+  };
+  const handleC4Join = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('c4-join', { messageId });
+    setMessages(prev => { const msg = prev.find(m => m.id === messageId); if (msg) { setActiveC4Message(msg); openPanel('c4'); } return prev; });
+  };
+  const handleC4Launch = (message) => { setActiveC4Message(message); openPanel('c4'); hapticLight(); };
+  const handleC4Spectate = (message) => { setActiveC4Message(message); openPanel('c4'); };
+  const handleC4VsCpu = (message) => { setActiveC4Message(message); openPanel('c4'); hapticLight(); };
+  useEffect(() => { if (!activeC4Message && isPanelOpen('c4')) closePanel('c4'); }, [activeC4Message]);
+
+  // ── Rock-Paper-Scissors ──────────────────────────────────────────────────
+  const handleSendRps = () => {
+    if (!isConnected) return;
+    socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'rps' }, userId: persistentUserId, isAnonymous: false });
+  };
+  const handleRpsJoin = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('rps-join', { messageId });
+    setMessages(prev => { const msg = prev.find(m => m.id === messageId); if (msg) { setActiveRpsMessage(msg); openPanel('rps'); } return prev; });
+  };
+  const handleRpsLaunch = (message) => { setActiveRpsMessage(message); openPanel('rps'); hapticLight(); };
+  const handleRpsSpectate = (message) => { setActiveRpsMessage(message); openPanel('rps'); };
+  useEffect(() => { if (!activeRpsMessage && isPanelOpen('rps')) closePanel('rps'); }, [activeRpsMessage]);
+
+  // ── Checkers ─────────────────────────────────────────────────────────────
+  const handleSendCheckers = (cpuDifficulty = null) => {
+    if (!isConnected) return;
+    socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'checkers', ...(cpuDifficulty ? { cpuDifficulty } : {}) }, userId: persistentUserId, isAnonymous: false });
+    setShowCheckersConfig(false);
+  };
+  const handleCheckersJoin = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('checkers-join', { messageId });
+    setMessages(prev => { const msg = prev.find(m => m.id === messageId); if (msg) { setActiveCheckersMessage(msg); openPanel('checkers'); } return prev; });
+  };
+  const handleCheckersLaunch = (message) => { setActiveCheckersMessage(message); openPanel('checkers'); hapticLight(); };
+  const handleCheckersSpectate = (message) => { setActiveCheckersMessage(message); openPanel('checkers'); };
+  const handleCheckersVsCpu = (message) => { setActiveCheckersMessage(message); openPanel('checkers'); hapticLight(); };
+  useEffect(() => { if (!activeCheckersMessage && isPanelOpen('checkers')) closePanel('checkers'); }, [activeCheckersMessage]);
+
+  // ── 2048 ─────────────────────────────────────────────────────────────────
+  const handleSend2048 = (soloMode = false) => {
+    if (!isConnected) return;
+    socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'g2048', soloMode }, userId: persistentUserId, isAnonymous: false });
+  };
+  const handle2048Join = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('g2048-join', { messageId });
+    setMessages(prev => { const msg = prev.find(m => m.id === messageId); if (msg) { setActive2048Message(msg); openPanel('g2048'); } return prev; });
+  };
+  const handle2048Launch = (message) => { setActive2048Message(message); openPanel('g2048'); hapticLight(); };
+  const handle2048Spectate = (message) => { setActive2048Message(message); openPanel('g2048'); };
+  useEffect(() => { if (!active2048Message && isPanelOpen('g2048')) closePanel('g2048'); }, [active2048Message]);
+
+  // ── Snake ─────────────────────────────────────────────────────────────────
+  const handleSendSnake = (soloMode = false) => {
+    if (!isConnected) return;
+    socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'snake', soloMode }, userId: persistentUserId, isAnonymous: false });
+  };
+  const handleSnakeJoin = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('snake-join', { messageId });
+    setMessages(prev => { const msg = prev.find(m => m.id === messageId); if (msg) { setActiveSnakeMessage(msg); openPanel('snake'); } return prev; });
+  };
+  const handleSnakeLaunch = (message) => { setActiveSnakeMessage(message); openPanel('snake'); hapticLight(); };
+  const handleSnakeSpectate = (message) => { setActiveSnakeMessage(message); openPanel('snake'); };
+  useEffect(() => { if (!activeSnakeMessage && isPanelOpen('snake')) closePanel('snake'); }, [activeSnakeMessage]);
 
   const handleEditMessage = (message) => {
     setEditingMessage(message);
@@ -3262,14 +3383,6 @@ const ChatRoom = () => {
               }
             }}
           />
-          {hotSeatTarget && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-red-50/90 dark:bg-red-900/20 border-b border-red-100 dark:border-red-800/30">
-              <span className="text-base">🎤</span>
-              <span className="text-xs font-bold text-red-700 dark:text-red-400 flex-1 truncate">
-                {hotSeatTarget} is in the Hot Seat!
-              </span>
-            </div>
-          )}
           {showSearch && (
             <MessageSearch
               query={searchQuery}
@@ -3330,6 +3443,27 @@ const ChatRoom = () => {
               onChessSpectate={handleChessSpectate}
               onChessLaunch={handleChessLaunch}
               onChessVsCpu={handleChessVsCpu}
+              onTttJoin={handleTttJoin}
+              onTttSpectate={handleTttSpectate}
+              onTttLaunch={handleTttLaunch}
+              onTttVsCpu={handleTttVsCpu}
+              onC4Join={handleC4Join}
+              onC4Spectate={handleC4Spectate}
+              onC4Launch={handleC4Launch}
+              onC4VsCpu={handleC4VsCpu}
+              onRpsJoin={handleRpsJoin}
+              onRpsSpectate={handleRpsSpectate}
+              onRpsLaunch={handleRpsLaunch}
+              onCheckersJoin={handleCheckersJoin}
+              onCheckersSpectate={handleCheckersSpectate}
+              onCheckersLaunch={handleCheckersLaunch}
+              onCheckersVsCpu={handleCheckersVsCpu}
+              on2048Join={handle2048Join}
+              on2048Spectate={handle2048Spectate}
+              on2048Launch={handle2048Launch}
+              onSnakeJoin={handleSnakeJoin}
+              onSnakeSpectate={handleSnakeSpectate}
+              onSnakeLaunch={handleSnakeLaunch}
               linkPreviews={linkPreviews}
               onOpenEmojiPicker={(messageId) => {
                 setReactionTargetId(messageId);
@@ -3442,7 +3576,7 @@ const ChatRoom = () => {
                     >
                       <button
                         type="button"
-                        onClick={() => { emitSound('toggle'); setShowFeatureMenu(!showFeatureMenu); }}
+                        onClick={() => { emitSound('toggle'); setShowFeatureMenu(v => { if (v) setShowGamesSubmenu(false); return !v; }); }}
                         disabled={!isConnected}
                         className={`p-1.5 sm:p-2.5 rounded-full transition-all duration-200 border-none outline-none focus:outline-none focus:ring-0 ${showFeatureMenu ? `bg-transparent hover:bg-transparent dark:bg-transparent dark:hover:bg-transparent text-${vibeAccent}-500 shadow-none` : `hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400`}`}
                         title={t('chatRoom.features')}
@@ -3451,7 +3585,7 @@ const ChatRoom = () => {
                       </button>
 
                       {showFeatureMenu && (
-                        <div className={`absolute bottom-full mb-2 sm:mb-3 left-0 z-50 ${getVibeById(roomVibe).panelClass} rounded-2xl sm:rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] border border-white/20 dark:border-white/10 p-1.5 sm:p-3 flex flex-col space-y-1 sm:space-y-2 w-[70vw] max-w-[220px] sm:w-[85vw] sm:max-w-[320px] animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-3xl ring-1 ring-white/10 dark:ring-white/5`}>
+                        <div className={`absolute bottom-full mb-2 sm:mb-3 left-0 z-50 ${getVibeById(roomVibe).panelClass} rounded-2xl sm:rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] border border-white/20 dark:border-white/10 p-1.5 sm:p-3 flex flex-col space-y-1 sm:space-y-2 animate-in slide-in-from-bottom-2 duration-300 backdrop-blur-3xl ring-1 ring-white/10 dark:ring-white/5 ${showGamesSubmenu ? 'w-[80vw] max-w-[260px] sm:w-[85vw] sm:max-w-[320px]' : 'w-[70vw] max-w-[220px] sm:w-[85vw] sm:max-w-[320px]'}`}>
                           {/* Reaction Row */}
                           <div className="flex items-center gap-0.5 sm:gap-1 bg-white/40 dark:bg-white/5 rounded-xl sm:rounded-2xl p-0.5 sm:p-1 px-1 sm:px-1.5 border border-white/10 shadow-inner">
                             <div className="flex items-center flex-1 overflow-x-auto scrollbar-none gap-0.5 sm:gap-1 sm:py-0.5 no-scrollbar">
@@ -3489,8 +3623,48 @@ const ChatRoom = () => {
 
                           <div className="h-px bg-gray-100 dark:bg-gray-700/50 sm:mx-1 hidden sm:block" />
 
+                          {/* ── Games Submenu ── */}
+                          {showGamesSubmenu && (
+                            <div className="animate-in slide-in-from-bottom-2 duration-200">
+                              <div className="flex items-center gap-2 mb-2 px-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowGamesSubmenu(false)}
+                                  className="p-1 rounded-lg hover:bg-white/20 dark:hover:bg-white/10 transition-colors text-gray-500 dark:text-gray-400"
+                                >
+                                  ←
+                                </button>
+                                <p className="text-xs font-black text-gray-700 dark:text-gray-200 tracking-wide">🎮 Games</p>
+                              </div>
+                              <div className="grid grid-cols-4 sm:grid-cols-4 gap-1">
+                                {[
+                                  { emoji: '✕○', label: 'TTT', name: 'Tic-Tac-Toe', action: () => { handleSendTtt(); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
+                                  { emoji: '🔴', label: 'C4', name: 'Connect 4', action: () => { handleSendC4(); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
+                                  { emoji: '✊', label: 'RPS', name: 'Rock·Paper·Scissors', action: () => { handleSendRps(); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
+                                  { emoji: '⛀', label: 'Check', name: 'Checkers', action: () => { setShowCheckersConfig(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
+                                  { emoji: '2048', label: '2048', name: '2048', action: () => { handleSend2048(); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
+                                  { emoji: '🐍', label: 'Snake', name: 'Snake', action: () => { handleSendSnake(); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
+                                  { emoji: '🟦', label: 'Tetris', name: 'Tetris', action: () => { handleSendTetris(); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
+                                  { emoji: '♟', label: 'Chess', name: 'Chess', action: () => { setShowChessConfig(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
+                                ].map(game => (
+                                  <button
+                                    key={game.label}
+                                    type="button"
+                                    onClick={game.action}
+                                    disabled={!isConnected}
+                                    className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 transition-all border border-white/10 active:scale-95"
+                                    title={game.name}
+                                  >
+                                    <span className="text-lg leading-none">{game.emoji}</span>
+                                    <span className="text-[9px] font-bold text-gray-600 dark:text-gray-400 truncate w-full text-center">{game.label}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
                           {/* Actions Grid — mobile: 4-col icon-only, desktop: 3-col with labels */}
-                          <div className="grid grid-cols-4 sm:grid-cols-3 gap-1 sm:gap-1.5">
+                          {!showGamesSubmenu && <div className="grid grid-cols-4 sm:grid-cols-3 gap-1 sm:gap-1.5">
                             <button type="button" onClick={() => { setShowFileModal(true); setShowFeatureMenu(false); const recipientNames = selectedRecipients.length > 0 ? `targeting ${selectedRecipients.map(id => users.find(u => u.socketId === id)?.nickname || id).join(', ')}` : 'as a broadcast'; setActivityLogs(prev => [{ id: `log_ft_init_${Date.now()}`, type: 'system', content: `You initiated a secure file transfer intent ${recipientNames}`, timestamp: new Date().toISOString() }, ...prev].slice(0, 50)); }} disabled={!isConnected} className={`flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group`} title="Files">
                               <div className={`sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/10 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm`}>
                                 <FileText className={`w-4 h-4 text-${vibeAccent}-500`} />
@@ -3543,7 +3717,20 @@ const ChatRoom = () => {
                                 <Smile className="w-4 h-4 text-yellow-400" />
                               </div>
                             </button>
-                          </div>
+                            {/* Games button — always visible in the grid */}
+                            <button
+                              type="button"
+                              onClick={() => setShowGamesSubmenu(true)}
+                              disabled={!isConnected}
+                              className="flex items-center justify-center sm:flex-col p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-all border border-white/10 group"
+                              title="Games"
+                            >
+                              <div className="sm:w-8 sm:h-8 sm:rounded-lg sm:bg-white/10 dark:sm:bg-white/10 flex items-center justify-center sm:mb-1 group-hover:scale-110 transition-transform sm:shadow-sm">
+                                <span className="text-base sm:text-lg leading-none">🎮</span>
+                              </div>
+                              <span className="hidden sm:block text-[10px] font-bold text-gray-700 dark:text-gray-300">Games</span>
+                            </button>
+                          </div>}
 
                           {/* Admin Section — mobile: compact row, desktop: full with labels */}
                           {canManageRoom(currentUserRole) && (
@@ -4081,14 +4268,6 @@ const ChatRoom = () => {
         onClose={() => setShowSettingsModal(false)}
         initialTab={settingsInitialTab}
       />
-      {hotSeatTarget && (
-        <HotSeat
-          hotSeatTarget={hotSeatTarget}
-          isHotSeat={currentUser?.nickname === hotSeatTarget}
-          isHost={isHost}
-          onEnd={() => socketManager.emit('hotSeat-end')}
-        />
-      )}
       <ThreadView
         parentMessage={threadParent}
         messages={messages}
@@ -4261,6 +4440,74 @@ const ChatRoom = () => {
                 <button key={d} onClick={() => handleSendChess(d)}
                   className={`flex-1 py-2.5 rounded-xl text-white font-black text-xs capitalize ${currentVibe.accentClass} hover:opacity-90 transition-opacity`}>
                   🤖 {d}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── New Games FloatingPanels ── */}
+      {activeTttMessage && (
+        <FloatingPanel title="Tic-Tac-Toe" icon={Gamepad2} iconColor="text-indigo-400"
+          onClose={() => closePanel('ttt')} onFocus={() => focusPanel('ttt')} zIndex={getZ('ttt')}
+          defaultWidth={380} defaultHeight={480} defaultX={130} defaultY={60} visible={isPanelOpen('ttt')}>
+          <TicTacToePanel message={activeTttMessage} currentUser={currentUser} roomVibe={roomVibe} />
+        </FloatingPanel>
+      )}
+      {activeC4Message && (
+        <FloatingPanel title="Connect Four" icon={Gamepad2} iconColor="text-red-400"
+          onClose={() => closePanel('c4')} onFocus={() => focusPanel('c4')} zIndex={getZ('c4')}
+          defaultWidth={400} defaultHeight={540} defaultX={140} defaultY={55} visible={isPanelOpen('c4')}>
+          <ConnectFourPanel message={activeC4Message} currentUser={currentUser} roomVibe={roomVibe} />
+        </FloatingPanel>
+      )}
+      {activeRpsMessage && (
+        <FloatingPanel title="Rock-Paper-Scissors" icon={Gamepad2} iconColor="text-green-400"
+          onClose={() => closePanel('rps')} onFocus={() => focusPanel('rps')} zIndex={getZ('rps')}
+          defaultWidth={360} defaultHeight={500} defaultX={110} defaultY={65} visible={isPanelOpen('rps')}>
+          <RpsPanel message={activeRpsMessage} currentUser={currentUser} roomVibe={roomVibe} />
+        </FloatingPanel>
+      )}
+      {activeCheckersMessage && (
+        <FloatingPanel title="Checkers" icon={Gamepad2} iconColor="text-amber-400"
+          onClose={() => closePanel('checkers')} onFocus={() => focusPanel('checkers')} zIndex={getZ('checkers')}
+          defaultWidth={420} defaultHeight={520} defaultX={120} defaultY={50} visible={isPanelOpen('checkers')}>
+          <CheckersPanel message={activeCheckersMessage} currentUser={currentUser} roomVibe={roomVibe} />
+        </FloatingPanel>
+      )}
+      {active2048Message && (
+        <FloatingPanel title="2048" icon={Gamepad2} iconColor="text-yellow-400"
+          onClose={() => closePanel('g2048')} onFocus={() => focusPanel('g2048')} zIndex={getZ('g2048')}
+          defaultWidth={400} defaultHeight={560} defaultX={150} defaultY={55} visible={isPanelOpen('g2048')}>
+          <Game2048Panel message={active2048Message} currentUser={currentUser} roomVibe={roomVibe} />
+        </FloatingPanel>
+      )}
+      {activeSnakeMessage && (
+        <FloatingPanel title="Snake" icon={Gamepad2} iconColor="text-green-500"
+          onClose={() => closePanel('snake')} onFocus={() => focusPanel('snake')} zIndex={getZ('snake')}
+          defaultWidth={400} defaultHeight={560} defaultX={130} defaultY={60} visible={isPanelOpen('snake')}>
+          <SnakePanel message={activeSnakeMessage} currentUser={currentUser} roomVibe={roomVibe} />
+        </FloatingPanel>
+      )}
+
+      {/* ── Checkers config picker ── */}
+      {showCheckersConfig && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={() => setShowCheckersConfig(false)}>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 w-full max-w-xs"
+            onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-4 text-center">⛀ Checkers — New Game</p>
+            <button onClick={() => handleSendCheckers(null)}
+              className="w-full mb-2 py-2 text-xs font-black rounded-xl bg-indigo-500 text-white hover:opacity-90">
+              ⚔️ vs Player
+            </button>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">vs CPU</p>
+            <div className="flex gap-2">
+              {['easy','medium','hard'].map(d => (
+                <button key={d} onClick={() => handleSendCheckers(d)}
+                  className="flex-1 py-2 text-xs font-black rounded-xl bg-purple-500 text-white hover:opacity-90 capitalize">
+                  {d}
                 </button>
               ))}
             </div>
