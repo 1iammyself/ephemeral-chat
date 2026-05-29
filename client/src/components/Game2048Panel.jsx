@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { socketManager } from '../socket';
+import socketManager from '../socket';
 import { createBoard, move, addTile, getBestTile, isGameOver, TILE_COLORS } from './games/Game2048Engine';
 import { getVibeById } from '../utils/vibes';
 

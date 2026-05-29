@@ -2,11 +2,12 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   X, Package, Clock, Eye, EyeOff, AlertTriangle,
-  FileDown, Type, Image, Mic, FileUp, Shield, Loader2
+  FileDown, Type, Image, Mic, FileUp, Shield, Loader2, Lock
 } from 'lucide-react';
 import { decryptDrop, arrayBufferToText, arrayBufferToDataUrl, arrayBufferToObjectUrl } from '../utils/drops';
 import { formatTimeRemaining } from '../utils/eph-file';
 import { downloadDataUrlOnDevice, downloadObjectUrlOnDevice } from '../utils/downloadHelper';
+import StegoModal from './StegoModal';
 
 // ─── Component ────────────────────────────────────────────
 
@@ -41,6 +42,8 @@ const DropViewer = ({ onClose, claimData }) => {
   const [timeRemaining, setTimeRemaining] = useState('');
   const [isExpired, setIsExpired] = useState(false);
   const [objectUrl, setObjectUrl] = useState(null);
+  const [stegoImage, setStegoImage] = useState(null);
+  const [showStego, setShowStego] = useState(false);
 
   // ─── Decrypt on mount ───────────────────────────────────
 
@@ -164,6 +167,16 @@ const DropViewer = ({ onClose, claimData }) => {
     }
   }, [decryptedContent, contentMeta]);
 
+  // ─── Stego extraction ──────────────────────────────────
+
+  const openStegoExtract = useCallback((dataUrl) => {
+    const [header, b64] = dataUrl.split(',');
+    const mime = header.match(/:(.*?);/)[1];
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    setStegoImage(new Blob([bytes], { type: mime }));
+    setShowStego(true);
+  }, []);
+
   // ─── Content Type Icon ──────────────────────────────────
 
   const ContentIcon = useMemo(() => {
@@ -178,6 +191,7 @@ const DropViewer = ({ onClose, claimData }) => {
   // ─── Render ─────────────────────────────────────────────
 
   return (
+    <>
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
       <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-lg relative shadow-2xl overflow-hidden">
         {/* Header */}
@@ -276,19 +290,28 @@ const DropViewer = ({ onClose, claimData }) => {
                     alt="Decrypted drop"
                     className="max-w-full max-h-[50vh] mx-auto object-contain bg-gray-900"
                   />
-                  <div className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700/50">
+                  <div className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700/50 gap-2 flex-wrap">
                     {contentMeta?.fileName && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate flex-1">
                         {contentMeta.fileName}
                       </p>
                     )}
-                    <button
-                      onClick={handleDownload}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white font-medium rounded-lg transition-colors text-xs ml-auto"
-                    >
-                      <FileDown className="w-3.5 h-3.5" />
-                      {t('drops.viewer.saveImage')}
-                    </button>
+                    <div className="flex items-center gap-2 ml-auto">
+                      <button
+                        onClick={() => openStegoExtract(decryptedContent.data)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 dark:hover:bg-indigo-800/40 text-indigo-700 dark:text-indigo-400 font-medium rounded-lg transition-colors text-xs"
+                      >
+                        <Lock className="w-3 h-3" />
+                        {t('drops.viewer.decodeStego')}
+                      </button>
+                      <button
+                        onClick={handleDownload}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white font-medium rounded-lg transition-colors text-xs"
+                      >
+                        <FileDown className="w-3.5 h-3.5" />
+                        {t('drops.viewer.saveImage')}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -366,6 +389,14 @@ const DropViewer = ({ onClose, claimData }) => {
         )}
       </div>
     </div>
+      {showStego && (
+        <StegoModal
+          isOpen={showStego}
+          onClose={() => { setShowStego(false); setStegoImage(null); }}
+          initialExtractImage={stegoImage}
+        />
+      )}
+    </>
   );
 };
 

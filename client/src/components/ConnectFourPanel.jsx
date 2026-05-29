@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { socketManager } from '../socket';
+import socketManager from '../socket';
 import { dropDisc, checkWinner, getCpuMove } from './games/ConnectFourEngine';
 import { getVibeById } from '../utils/vibes';
 

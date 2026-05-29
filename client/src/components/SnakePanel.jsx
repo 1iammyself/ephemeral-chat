@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { socketManager } from '../socket';
+import socketManager from '../socket';
 import { createInitialState, tick, changeDir, getSpeed, GRID } from './games/SnakeEngine';
 import { getVibeById } from '../utils/vibes';
 

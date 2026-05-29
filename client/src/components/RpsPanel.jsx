@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { socketManager } from '../socket';
+import socketManager from '../socket';
 import { getRoundResult, getCpuPick, PICK_EMOJI } from './games/RpsEngine';
 import { getVibeById } from '../utils/vibes';
 
