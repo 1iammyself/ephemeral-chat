@@ -2684,7 +2684,9 @@ io.on('connection', (socket) => {
             revealed: false,
             roundResults: [],
             scores: { [senderId]: 0 },
-            status: 'waiting',
+            // CPU game starts in 'playing' immediately (TTT/Chess pattern — no rps-start needed)
+            status: rpsWithCpu ? 'playing' : 'waiting',
+            startedAt: rpsWithCpu ? Date.now() : null,
           };
           overrideTtl = 0;
           messageContent = rpsWithCpu ? `Rock-Paper-Scissors vs CPU — ${rpsTotalRounds} rounds` : `Rock-Paper-Scissors — ${rpsTotalRounds} rounds`;
@@ -4069,6 +4071,14 @@ io.on('connection', (socket) => {
       const joinerName = socket.nickname;
       if (gameData.players.some(p => p.id === joinerId)) return;
       gameData.players.push({ id: joinerId, socketId: socket.id, name: joinerName });
+      gameData.scores[joinerId] = 0;
+      // Auto-start when second player joins (TTT/Chess pattern — no host Start button needed)
+      if (gameData.players.length >= 2 && !gameData.cpu?.enabled) {
+        gameData.status = 'playing';
+        gameData.startedAt = Date.now();
+        gameData.picks = {};
+        gameData.pickedIds = [];
+      }
       await roomManager.saveRoom(socket.roomCode, room);
       io.to(socket.roomCode).emit('message-updated', message);
     } catch (err) { logger.error('rps-join err:', err); }
@@ -4206,8 +4216,10 @@ io.on('connection', (socket) => {
       const message = rpsGetMsg(room, messageId);
       if (!message) return;
       const { gameData } = message;
+      if (!gameData.revealed || gameData.status === 'finished') return;
+      // Only host (or CPU-game player) may advance rounds
       const senderId = socket.persistentUserId || socket.id;
-      if (gameData.hostId !== senderId || !gameData.revealed || gameData.status === 'finished') return;
+      if (gameData.hostId !== senderId) return;
       gameData.round++;
       gameData.picks = {}; gameData.pickedIds = []; gameData.revealed = false;
       await roomManager.saveRoom(socket.roomCode, room);

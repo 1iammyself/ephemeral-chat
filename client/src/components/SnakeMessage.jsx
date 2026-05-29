@@ -8,12 +8,12 @@ const SnakeMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, room
   const userId = currentUser?.id || currentUser?.socketId;
   const nickname = currentUser?.nickname;
 
-  const isMember = gameData.players?.some(p => p.id === userId || (nickname && p.name === nickname));
-  const isHost = gameData.hostId === userId;
+  const isMember   = gameData.players?.some(p => p.id === userId || (nickname && p.name === nickname));
+  const isHost     = gameData.hostId === userId;
   const isFinished = gameData.status === 'finished';
-  const isLive = gameData.status === 'playing';
-  const isWaiting = gameData.status === 'waiting';
-  const isSolo = gameData.soloMode;
+  const isLive     = gameData.status === 'playing';
+  const isWaiting  = gameData.status === 'waiting';
+  const isSolo     = !!gameData.soloMode;
 
   const scores = gameData.scores || {};
   const sortedPlayers = (gameData.players || []).slice().sort((a,b) => (scores[b.id]||0) - (scores[a.id]||0));
