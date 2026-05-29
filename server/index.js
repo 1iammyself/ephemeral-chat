@@ -2668,22 +2668,26 @@ io.on('connection', (socket) => {
           messageContent = withCpu ? `Connect Four vs CPU (${cpuDiff})` : 'Connect Four';
         } else if (gameData.gameType === 'rps') {
           const senderId = socket.persistentUserId || data.userId || socket.id;
+          const rpsCpuDiff = ['easy','medium','hard'].includes(gameData.cpuDifficulty) ? gameData.cpuDifficulty : null;
+          const rpsWithCpu = !!rpsCpuDiff;
+          const rpsTotalRounds = [3,5,7].includes(gameData.totalRounds) ? gameData.totalRounds : 5;
           data.gameData = {
             gameType: 'rps',
             creatorId: senderId,
             hostId: senderId,
             players: [{ id: senderId, socketId: socket.id, name: socket.nickname }],
-            cpu: null,
+            cpu: rpsWithCpu ? { enabled: true, difficulty: rpsCpuDiff } : null,
             round: 1,
-            totalRounds: 5,
+            totalRounds: rpsTotalRounds,
             picks: {},
+            pickedIds: [],
             revealed: false,
             roundResults: [],
-            scores: {},
+            scores: { [senderId]: 0 },
             status: 'waiting',
           };
           overrideTtl = 0;
-          messageContent = 'Rock-Paper-Scissors';
+          messageContent = rpsWithCpu ? `Rock-Paper-Scissors vs CPU — ${rpsTotalRounds} rounds` : `Rock-Paper-Scissors — ${rpsTotalRounds} rounds`;
         } else if (gameData.gameType === 'checkers') {
           const senderId = socket.persistentUserId || data.userId || socket.id;
           const cpuDiff = ['easy','medium','hard'].includes(gameData.cpuDifficulty) ? gameData.cpuDifficulty : null;

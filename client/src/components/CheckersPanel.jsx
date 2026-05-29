@@ -46,7 +46,7 @@ export default function CheckersPanel({ message, currentUser, roomVibe }) {
       cpuRef.current = false;
     }, 600);
     return () => { clearTimeout(tid); cpuRef.current = false; };
-  }, [turn, status, board, isCpu, isP1, messageId, gameData]);
+  }, [turn, status, board, isCpu, isP1, messageId]); // gameData intentionally omitted — avoids double-fire on message-updated
 
   useEffect(() => {
     if (!messageId) return;

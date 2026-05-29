@@ -724,6 +724,8 @@ const ChatRoom = () => {
   const [showChessConfig, setShowChessConfig] = useState(false);
   const [showTttConfig, setShowTttConfig] = useState(false);
   const [showC4Config, setShowC4Config] = useState(false);
+  const [showRpsConfig, setShowRpsConfig] = useState(false);
+  const [showSnakeConfig, setShowSnakeConfig] = useState(false);
   const [showGamesSubmenu, setShowGamesSubmenu] = useState(false);
   const setShowStegoModal = (v) => { if (!v) setStegoExtractImage(null); v ? openPanel('secrets') : closePanel('secrets'); };
   const setShowCodeShare    = (v) => v ? openPanel('code')    : closePanel('code');
@@ -2891,9 +2893,14 @@ const ChatRoom = () => {
   useEffect(() => { if (!activeC4Message && isPanelOpen('c4')) closePanel('c4'); }, [activeC4Message]);
 
   // ── Rock-Paper-Scissors ──────────────────────────────────────────────────
-  const handleSendRps = () => {
+  const handleSendRps = (rounds = 5, cpuDifficulty = null) => {
     if (!isConnected) return;
-    socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'rps' }, userId: persistentUserId, isAnonymous: false });
+    socketManager.emit('send-message', {
+      messageType: 'game',
+      gameData: { gameType: 'rps', totalRounds: rounds, ...(cpuDifficulty ? { cpuDifficulty } : {}) },
+      userId: persistentUserId, isAnonymous: false,
+    });
+    setShowRpsConfig(false);
   };
   const handleRpsJoin = (messageId) => {
     if (!isConnected) return;
@@ -2938,6 +2945,7 @@ const ChatRoom = () => {
   const handleSendSnake = (soloMode = false) => {
     if (!isConnected) return;
     socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'snake', soloMode }, userId: persistentUserId, isAnonymous: false });
+    setShowSnakeConfig(false);
   };
   const handleSnakeJoin = (messageId) => {
     if (!isConnected) return;
@@ -3644,10 +3652,10 @@ const ChatRoom = () => {
                                 {[
                                   { emoji: '✕○', label: 'TTT', name: 'Tic-Tac-Toe', action: () => { setShowTttConfig(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
                                   { emoji: '🔴', label: 'C4', name: 'Connect 4', action: () => { setShowC4Config(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
-                                  { emoji: '✊', label: 'RPS', name: 'Rock·Paper·Scissors', action: () => { handleSendRps(); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
+                                  { emoji: '✊', label: 'RPS', name: 'Rock·Paper·Scissors', action: () => { setShowRpsConfig(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
                                   { emoji: '⛀', label: 'Check', name: 'Checkers', action: () => { setShowCheckersConfig(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
                                   { emoji: '2048', label: '2048', name: '2048', action: () => { handleSend2048(); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
-                                  { emoji: '🐍', label: 'Snake', name: 'Snake', action: () => { handleSendSnake(); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
+                                  { emoji: '🐍', label: 'Snake', name: 'Snake', action: () => { setShowSnakeConfig(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
                                   { emoji: '🟦', label: 'Tetris', name: 'Tetris', action: () => { handleSendTetris(); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
                                   { emoji: '♟', label: 'Chess', name: 'Chess', action: () => { setShowChessConfig(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
                                 ].map(game => (
@@ -4563,6 +4571,54 @@ const ChatRoom = () => {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Rock-Paper-Scissors config picker ── */}
+      {showRpsConfig && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={() => setShowRpsConfig(false)}>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 w-full max-w-xs"
+            onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-4 text-center">✊ Rock·Paper·Scissors</p>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">Rounds</p>
+            <div className="flex gap-2 mb-4">
+              {[3, 5, 7].map(r => (
+                <button key={r} onClick={() => handleSendRps(r, null)}
+                  className={`flex-1 py-2.5 rounded-xl font-black text-sm ${currentVibe.accentClass} text-white hover:opacity-90 transition-opacity`}>
+                  {r}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">vs CPU</p>
+            <div className="flex gap-2">
+              {[3, 5, 7].map(r => (
+                <button key={r} onClick={() => handleSendRps(r, 'medium')}
+                  className="flex-1 py-2 rounded-xl text-xs font-black bg-purple-500 text-white hover:opacity-90 capitalize">
+                  🤖 {r}R
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Snake config picker ── */}
+      {showSnakeConfig && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={() => setShowSnakeConfig(false)}>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 w-full max-w-xs"
+            onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-4 text-center">🐍 Snake</p>
+            <button onClick={() => handleSendSnake(true)}
+              className={`w-full mb-3 py-3 rounded-xl text-white font-black text-sm ${currentVibe.accentClass} hover:opacity-90 transition-opacity`}>
+              🎯 Solo — Play alone
+            </button>
+            <button onClick={() => handleSendSnake(false)}
+              className="w-full py-3 rounded-xl font-black text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:opacity-90 transition-opacity">
+              🏁 Race — Invite others
+            </button>
           </div>
         </div>
       )}

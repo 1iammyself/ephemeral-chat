@@ -47,7 +47,7 @@ export default function TicTacToePanel({ message, currentUser, roomVibe }) {
       cpuPendingRef.current = false;
     }, 500);
     return () => { clearTimeout(tid); cpuPendingRef.current = false; };
-  }, [turn, status, board, isCpu, isP1, winLine, messageId, gameData]);
+  }, [turn, status, board, isCpu, isP1, winLine, messageId]); // gameData intentionally omitted — avoids double-fire on message-updated
 
   // Socket events
   useEffect(() => {

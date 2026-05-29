@@ -47,7 +47,7 @@ export default function ConnectFourPanel({ message, currentUser, roomVibe }) {
       cpuRef.current = false;
     }, 600);
     return () => { clearTimeout(tid); cpuRef.current = false; };
-  }, [turn, status, board, isCpu, isP1, winCells, messageId, gameData]);
+  }, [turn, status, board, isCpu, isP1, winCells, messageId]); // gameData intentionally omitted — avoids double-fire on message-updated
 
   useEffect(() => {
     if (!messageId) return;

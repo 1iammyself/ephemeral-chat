@@ -32,6 +32,12 @@ export default function SnakePanel({ message, currentUser, roomVibe }) {
     setStatus(gameData.status || 'waiting');
   }, [gameData]);
 
+  // Auto-start solo game when host opens a panel already configured for solo
+  useEffect(() => {
+    if (!messageId || !isHost || !isSolo || status !== 'waiting') return;
+    socketManager.emit('snake-start', { messageId, soloMode: true });
+  }, [messageId, isHost, isSolo, status]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!messageId) return;
     const onStarted = ({ messageId: mid }) => {
@@ -173,23 +179,23 @@ export default function SnakePanel({ message, currentUser, roomVibe }) {
       ) : (
         <div className="flex flex-col items-center gap-4 py-6 w-full max-w-[320px] rounded-lg px-4"
           style={{ background: darkBg + '33', justifyContent: 'center', minHeight: 200 }}>
-          {status === 'waiting' && isHost && (
+          {status === 'waiting' && isHost && !isSolo && (
             <>
-              <p className="text-sm font-bold text-gray-700 dark:text-gray-300">Snake — How do you want to play?</p>
-              <div className="flex flex-col gap-2 w-full">
-                <button onClick={handlePlaySolo}
-                  className="w-full py-3 rounded-xl text-white font-black text-sm" style={{ background: accentColor }}>
-                  🎯 Solo — Play alone
-                </button>
-                <button onClick={handleStart}
-                  className="w-full py-3 rounded-xl font-black text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200">
-                  🏁 Race — {players.length > 1 ? `${players.length} players` : 'wait for others to join'}
-                </button>
-              </div>
+              <p className="text-sm font-bold text-gray-700 dark:text-gray-300">🏁 Race Mode</p>
+              <p className="text-xs text-gray-400 text-center">
+                {players.length > 1 ? `${players.length} players joined` : 'Waiting for others to join…'}
+              </p>
               {players.length > 1 && (
                 <p className="text-xs text-gray-400">{players.map(p => p.name).join(', ')}</p>
               )}
+              <button onClick={handleStart}
+                className="w-full py-3 rounded-xl font-black text-sm text-white" style={{ background: accentColor }}>
+                🏁 Start Race ({players.length} {players.length === 1 ? 'player' : 'players'})
+              </button>
             </>
+          )}
+          {status === 'waiting' && isHost && isSolo && (
+            <p className="text-sm text-gray-500 dark:text-gray-400">Starting solo game…</p>
           )}
           {status === 'waiting' && !isHost && (
             <p className="text-sm text-gray-400 text-center">Waiting for the host to start…</p>
