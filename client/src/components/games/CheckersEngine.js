@@ -123,7 +123,9 @@ export function getCpuMove(board, difficulty, player = 2) {
   const moves = getAllMoves(board, player);
   if (!moves.length) return null;
   if (difficulty === 'easy') return moves[Math.floor(Math.random() * moves.length)];
-  const depth = difficulty === 'medium' ? 3 : 6;
+  // medium: depth 2 (fast, makes real mistakes); hard: depth 4 (strong but never freezes browser)
+  // depth 6 with 20+ moves/pos = up to 64M nodes — catastrophic on any device
+  const depth = difficulty === 'medium' ? 2 : 4;
   let best = -Infinity, bestMove = moves[0];
   for (const m of moves) {
     const score = minimaxCheckers(applyMove(board, m), depth-1, false, -Infinity, Infinity, player);

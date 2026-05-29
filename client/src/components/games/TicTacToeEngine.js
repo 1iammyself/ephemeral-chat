@@ -53,7 +53,8 @@ export function getCpuMove(board, difficulty) {
   const empty = board.map((v,i) => v === null ? i : -1).filter(i => i >= 0);
   if (!empty.length) return -1;
   if (difficulty === 'easy') return empty[Math.floor(Math.random() * empty.length)];
-  if (difficulty === 'medium' && Math.random() < 0.45) return empty[Math.floor(Math.random() * empty.length)];
+  // medium: 65% random moves so it makes visible mistakes; hard is full minimax (unbeatable)
+  if (difficulty === 'medium' && Math.random() < 0.65) return empty[Math.floor(Math.random() * empty.length)];
   let bestScore = -Infinity, bestMove = empty[0];
   const b = [...board];
   for (const i of empty) {

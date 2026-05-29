@@ -110,13 +110,9 @@ export default function SnakePanel({ message, currentUser, roomVibe }) {
   }, [handleDir]);
 
   const handleStart = () => socketManager.emit('snake-start', { messageId });
+  // Solo: emit only — state init happens in the onStarted handler to avoid double-init race condition
   const handlePlaySolo = () => {
     socketManager.emit('snake-start', { messageId, soloMode: true });
-    const state = createInitialState(Date.now());
-    stateRef.current = state;
-    setGameState(state);
-    setStatus('playing');
-    lastScoreRef.current = 0;
   };
 
   const accentColor = vibe?.colors?.primary || '#22c55e';

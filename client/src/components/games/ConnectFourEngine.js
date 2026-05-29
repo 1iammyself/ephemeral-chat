@@ -129,7 +129,8 @@ export function getCpuMove(board, difficulty, player = 2) {
   const valid = validCols(board);
   if (!valid.length) return -1;
   if (difficulty === 'easy') return valid[Math.floor(Math.random() * valid.length)];
-  const depth = difficulty === 'medium' ? 3 : 6;
+  // medium: depth 3 (~50 nodes with pruning, sub-100ms); hard: depth 5 (~1K nodes, stays responsive)
+  const depth = difficulty === 'medium' ? 3 : 5;
   let best = -Infinity, bestCol = valid[Math.floor(valid.length / 2)];
   for (const c of valid) {
     const res = dropDisc(board, c, player);
