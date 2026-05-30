@@ -4604,13 +4604,16 @@ io.on('connection', (socket) => {
       const validPicks = RPS_PICKS[gameData.variant] || RPS_PICKS.standard;
       if (!validPicks.includes(pick)) return;
       const playerId = socket.persistentUserId || socket.id;
-      const isP1 = gameData.player1?.id === playerId;
-      const isP2 = gameData.player2?.id === playerId && !gameData.cpu?.enabled;
+      // Mirror chess: ID check + nickname fallback so ID drift never silently rejects a pick
+      const isP1 = gameData.player1?.id === playerId || (socket.nickname && gameData.player1?.name === socket.nickname);
+      const isP2 = (gameData.player2?.id === playerId || (socket.nickname && gameData.player2?.name === socket.nickname)) && !gameData.cpu?.enabled;
       if (!isP1 && !isP2) return;
-      if (gameData.picks[playerId]) return;
-      gameData.picks[playerId] = pick;
+      // Always store pick under the canonical player ID that rpsResolveAndAdvance will look up
+      const canonicalId = isP1 ? gameData.player1.id : gameData.player2.id;
+      if (gameData.picks[canonicalId]) return;
+      gameData.picks[canonicalId] = pick;
       if (!gameData.pickedIds) gameData.pickedIds = [];
-      if (!gameData.pickedIds.includes(playerId)) gameData.pickedIds.push(playerId);
+      if (!gameData.pickedIds.includes(canonicalId)) gameData.pickedIds.push(canonicalId);
       io.to(socket.roomCode).emit('rps-player-picked', { messageId, pickedIds: gameData.pickedIds });
       // If CPU game, pick for CPU and resolve immediately
       if (gameData.cpu?.enabled && isP1) {
@@ -4641,8 +4644,8 @@ io.on('connection', (socket) => {
       const { gameData } = message;
       if (gameData.status !== 'playing') return;
       const resignerId = socket.persistentUserId || socket.id;
-      const isP1 = gameData.player1?.id === resignerId;
-      const isP2 = gameData.player2?.id === resignerId && !gameData.cpu?.enabled;
+      const isP1 = gameData.player1?.id === resignerId || (socket.nickname && gameData.player1?.name === socket.nickname);
+      const isP2 = (gameData.player2?.id === resignerId || (socket.nickname && gameData.player2?.name === socket.nickname)) && !gameData.cpu?.enabled;
       if (!isP1 && !isP2) return;
       gameData.status = 'finished';
       gameData.result = 'resign';
@@ -4738,8 +4741,8 @@ io.on('connection', (socket) => {
       const { gameData } = message;
       if (gameData.status !== 'playing' || !gameData.challengeQueue?.length) return;
       const playerId = socket.persistentUserId || socket.id;
-      const isP1 = gameData.player1?.id === playerId;
-      const isP2 = gameData.player2?.id === playerId && !gameData.cpu?.enabled;
+      const isP1 = gameData.player1?.id === playerId || (socket.nickname && gameData.player1?.name === socket.nickname);
+      const isP2 = (gameData.player2?.id === playerId || (socket.nickname && gameData.player2?.name === socket.nickname)) && !gameData.cpu?.enabled;
       if (!isP1 && !isP2) return;
       const next = gameData.challengeQueue.shift();
       if (isP1) { gameData.challengeQueue.push(gameData.player1); gameData.player1 = next; }
