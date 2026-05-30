@@ -4507,7 +4507,7 @@ const ChatRoom = () => {
         <FloatingPanel title="Checkers" icon={Gamepad2} iconColor="text-amber-400"
           onClose={() => closePanel('checkers')} onFocus={() => focusPanel('checkers')} zIndex={getZ('checkers')}
           defaultWidth={gW} defaultHeight={gHtall} visible={isPanelOpen('checkers')}>
-          <CheckersPanel message={activeCheckersMessage} currentUser={currentUser} roomVibe={roomVibe} />
+          <CheckersPanel message={activeCheckersMessage} currentUser={currentUser} roomVibe={roomVibe} onDelete={handleDeleteMessage} />
         </FloatingPanel>
       )}
       {active2048Message && (
