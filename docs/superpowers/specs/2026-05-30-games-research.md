@@ -784,15 +784,25 @@ Critical strategic rule: within a single swipe, a tile produced by a merge is "l
 6. **Mathematical guarantee:** for any weighting of victory conditions, a proportional throw distribution adjustment restores expected value to zero.
 
 ### Implementation Features Status
-- Markov chain AI (hard mode) ✅ (implemented)
-- Config dialog pre-send ✅ (fixed)
-- Round history ✅
-- Win streak ✅
-- Pick speed ✅
-- Pick distribution ✅
-- RPSLS (5-symbol variant): not yet implemented
+- Full chess-sibling panel ✅ — same resign → result banner → rematch/difficulty-buttons flow as chess; identical queue controls, spectator bar, finished-spectator section, creator delete with confirm
+- Config dialog pre-send ✅ — variant (Standard / RPSLS) + rounds (Bo3/5/7) + vs Player / vs CPU buttons
+- RPSLS (5-symbol variant) ✅ — all 10 beat relationships, full BEATS table, beat-phrase text in reveal UI
+- ResizeObserver board sizing ✅ — pick buttons and reveal emoji scale proportionally with container
+- Pick buttons ✅ — large tap targets with emoji + label, scale derived from boardSize
+- Locked-in view ✅ — shows your pick emoji after submitting while waiting for opponent
+- Reveal view ✅ — both picks side-by-side, win/lose/draw badge per side, beat-text caption (e.g. "Rock crushes Scissors"), 2.5 s auto-dismiss
+- Round history strip ✅ — emoji pair + ①/②/= winner marker per round, like chess move history
+- Player score bars ✅ — P2 on top, P1 on bottom, current match score shown
+- Status strip ✅ — "Make your pick!" flash, "Waiting for opponent…", "CPU thinking…", opponent-disconnected forfeit countdown
+- Disconnect countdown ✅ — 60 s forfeit, same as chess
+- CPU pick server-side ✅ — resolves immediately when human picks; easy=random, medium=60 % counter, hard=always counter most-frequent
+- Resign flow ✅ — CPU: local state + rps-game-end (mirrors chess-game-end); human: rps-resign; result banner shows winner immediately
+- Queue controls ✅ — +1 Slot, Lock/Unlock, tag-out, re-queue (exact chess copy)
+- In-chat message card ✅ — Bo3/5/7 badge, CPU difficulty chip, round-history dot display, live scores, Challenge/Queue/Open/vsCPU/Spectate/Review/Delete
+- Markov chain AI (hard mode) ✅ — tracks transition probabilities from round history; medium=60 % counter most-frequent; easy=pure random
 - Camera gesture recognition: not applicable
 - Janken animation ceremony: not yet implemented
+- Statistics overlay (pick distribution, win rate %): not yet implemented
 
 ---
 
@@ -815,6 +825,7 @@ Critical strategic rule: within a single swipe, a tile produced by a merge is "l
 10. **Checkers: 40-move no-progress counter** — warning at 20+, draw claim message at 40+
 11. **Checkers: mid-jump visual** — blue ring on jumping piece, pulsing blue targets, "⚡ Continue your jump!" status
 12. **RPS: Markov chain AI** — hard mode now tracks transition probabilities, not just frequency
+13. **RPS: full chess-sibling rebuild** — new RpsPanel/RpsMessage/RpsEngine from scratch; RPSLS, pick/locked-in/reveal views, chess-identical resign→rematch flow, queue controls, spectator support, disconnect countdown
 13. **2048: score delta animation** — "+N" bounces above score counter on each merge batch
 
 ### Already Implemented Before This Session ✅
@@ -823,6 +834,9 @@ Critical strategic rule: within a single swipe, a tile produced by a merge is "l
 - Connect Four: threat column detection, mobile tap buttons, disc counts, CPU AI with alpha-beta
 - TicTacToe: move counter, CPU difficulties (easy/medium/hard), win line highlight
 - RPS: round history (last 5), win streak badge (🔥×N), pick speed, pick distribution at match end
+- RPS: RPSLS 5-symbol variant (all 10 beat relationships, beat-phrase captions)
+- RPS: pick buttons scale with container; locked-in view; reveal view with 2.5 s auto-dismiss
+- RPS: full queue controls, spectator bar, finished-spectator section, creator delete (chess parity)
 - Snake: level progress bar, best score, paused-at-start overlay, pause/resume with P key
 - 2048: undo stack (3 deep), session best score, move counter, "Keep Going" after 2048, started-state overlay
 
@@ -830,7 +844,7 @@ Critical strategic rule: within a single swipe, a tile produced by a merge is "l
 - Checkers: variant selector (American / International / Russian rules)
 - TTT: Ultimate Tic-Tac-Toe mode
 - Connect Four: alternating first-player tracking across a match
-- RPS: RPSLS (5-symbol) mode; Janken animation ceremony
+- RPS: Janken animation ceremony; statistics overlay (pick distribution %, win rate)
 - Snake: input buffering; ghost/replay mode; daily challenge (fixed seed)
 - 2048: timer mode (1-min / 5-min sprint); grid size selector (5×5 etc.); Threes! mode
 - 2048: smooth tile slide/merge CSS animation on the grid itself
