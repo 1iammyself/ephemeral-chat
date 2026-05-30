@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, FileText, Download, Check, CheckCheck, Pencil, X, Pin, MessageSquare, Video } from 'lucide-react';
+import { Clock, User, Eye, Lock, Image as ImageIcon, Mic, Reply, Smile, Plus, FileText, Download, Check, CheckCheck, Pencil, X, Pin, MessageSquare, Video, AlertCircle } from 'lucide-react';
 import VideoReplyMessage from './VideoReplyMessage';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { useTheme } from '../context/ThemeContext';
@@ -433,6 +433,27 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
               )}
               {!isOwnMessage && <span>•</span>}
               <span>{formatTime(message.timestamp)}</span>
+              {isOwnMessage && message.deliveryStatus && message.deliveryStatus !== 'delivered' && (
+                <span
+                  className={`flex items-center ${message.deliveryStatus === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}
+                  title={
+                    message.deliveryStatus === 'queued' ? 'Waiting to send — will deliver when you reconnect'
+                      : message.deliveryStatus === 'sending' ? 'Sending…'
+                      : message.deliveryStatus === 'sent' ? 'Sent'
+                      : message.deliveryStatus === 'failed' ? 'Failed to send'
+                      : ''
+                  }
+                  aria-label={`Message ${message.deliveryStatus}`}
+                >
+                  {(message.deliveryStatus === 'queued' || message.deliveryStatus === 'sending')
+                    ? <Clock className="w-2.5 h-2.5" />
+                    : message.deliveryStatus === 'sent'
+                      ? <Check className="w-2.5 h-2.5" />
+                      : message.deliveryStatus === 'failed'
+                        ? <AlertCircle className="w-2.5 h-2.5" />
+                        : null}
+                </span>
+              )}
               {message.recipients && message.recipients.length > 0 && (
                 <>
                   <span>•</span>

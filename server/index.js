@@ -419,6 +419,44 @@ const pendingKnocks = new Map(); // roomCode → Set<socketId>
 // Key: sessionToken, Value: { timeoutId, socketId, roomCode }
 const deferredRemovals = new Map();
 
+// ── Send-message idempotency / dedup ──
+// When a client's network flickers, a queued message may be (re)sent more than
+// once — by the outbox flush AND Socket.IO's own emit buffer. We dedup on the
+// client-generated `clientMsgId` so each logical message is broadcast exactly
+// once. Short-lived + capped: this is delivery dedup, not a durable message log.
+const seenClientMsgIds = new Map(); // `${roomCode}:${clientMsgId}` → { id, ts }
+const CLIENT_MSG_ID_TTL_MS = 5 * 60 * 1000;
+const CLIENT_MSG_ID_MAX = 5000;
+
+function recordClientMsgId(roomCode, clientMsgId, serverId) {
+  if (!clientMsgId) return;
+  seenClientMsgIds.set(`${roomCode}:${clientMsgId}`, { id: serverId, ts: Date.now() });
+  // Opportunistic prune: drop the oldest entries when over the cap.
+  if (seenClientMsgIds.size > CLIENT_MSG_ID_MAX) {
+    const cutoff = Date.now() - CLIENT_MSG_ID_TTL_MS;
+    for (const [key, val] of seenClientMsgIds) {
+      if (val.ts < cutoff) seenClientMsgIds.delete(key);
+    }
+    // If still over cap (all fresh), evict oldest insertion-order entries.
+    while (seenClientMsgIds.size > CLIENT_MSG_ID_MAX) {
+      const oldestKey = seenClientMsgIds.keys().next().value;
+      if (oldestKey === undefined) break;
+      seenClientMsgIds.delete(oldestKey);
+    }
+  }
+}
+
+function lookupClientMsgId(roomCode, clientMsgId) {
+  if (!clientMsgId) return null;
+  const hit = seenClientMsgIds.get(`${roomCode}:${clientMsgId}`);
+  if (!hit) return null;
+  if (Date.now() - hit.ts > CLIENT_MSG_ID_TTL_MS) {
+    seenClientMsgIds.delete(`${roomCode}:${clientMsgId}`);
+    return null;
+  }
+  return hit;
+}
+
 // Initialize Redis client (optional)
 let redisClient = null;
 let roomManager;
@@ -1177,6 +1215,14 @@ function tetrisFillFromBench(gameData, messageId, io) {
 
 io.on('connection', (socket) => {
   // logger.info(`🔌 User connected: ${socket.id}`);
+
+  // ── Application-level heartbeat ──
+  // The client's connection monitor probes this every few seconds to detect a
+  // half-open link long before Socket.IO's lenient pingTimeout would. We simply
+  // ack so the round-trip succeeds when the link is genuinely alive.
+  socket.on('hb', (cb) => {
+    if (typeof cb === 'function') cb();
+  });
 
   // Per-socket rate limit for confetti bomb (10 s cooldown)
   let lastConfettiTime = 0;
@@ -2408,9 +2454,30 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('send-message', async (data) => {
+  socket.on('send-message', async (data, callback) => {
+    // Ack helper — resolves the client's emitWithAck so the outbox can mark the
+    // message delivered. Always safe to call even when no callback was passed
+    // (older clients send without one).
+    const ack = typeof callback === 'function' ? callback : () => {};
     try {
-      if (!socket.roomCode) return;
+      if (!socket.roomCode) {
+        // Retryable: the socket may simply be mid-rejoin after a reconnect.
+        // The outbox will resend once the room is re-bound.
+        ack({ success: false, error: 'Not in a room' });
+        return;
+      }
+
+      // ── Idempotency: drop duplicate sends of the same logical message ──
+      const clientMsgId = typeof data?.clientMsgId === 'string' ? data.clientMsgId : null;
+      if (clientMsgId) {
+        const dup = lookupClientMsgId(socket.roomCode, clientMsgId);
+        if (dup) {
+          // Already processed — re-ack with the original server id, do NOT
+          // re-broadcast. This makes retries harmless.
+          ack({ success: true, id: dup.id, clientMsgId, duplicate: true });
+          return;
+        }
+      }
 
       // Update user activity
       securityManager.updateUserActivity(socket.id, (socketId, userId, roomCode) => {
@@ -2824,6 +2891,10 @@ io.on('connection', (socket) => {
 
       const message = {
         id: `msg_${Date.now()}_${nodeCrypto.randomBytes(9).toString('base64url')}`,
+        // Echo the client's idempotency key on the broadcast so the sender can
+        // reconcile its optimistic bubble exactly-once (and ignore the echo if
+        // it already marked the message delivered via the ack).
+        clientMsgId: clientMsgId || undefined,
         content: messageContent,
         messageType,
         isViewOnce,
@@ -2893,6 +2964,12 @@ io.on('connection', (socket) => {
 
       await roomManager.addMessage(socket.roomCode, message);
 
+      // Record the idempotency key and ack the sender. The ack resolves the
+      // client's emitWithAck so the outbox marks this message delivered and
+      // stops retrying.
+      recordClientMsgId(socket.roomCode, clientMsgId, message.id);
+      ack({ success: true, id: message.id, clientMsgId: clientMsgId || undefined });
+
       // Update user activity on any message sent
       securityManager.updateUserActivity(socket.id, handleInactivityTimeout);
 
@@ -2936,6 +3013,8 @@ io.on('connection', (socket) => {
     } catch (error) {
       logger.error('Error sending message:', error);
       socket.emit('error', { message: 'Failed to send message' });
+      // Ack the failure so the client's outbox can retry rather than hang.
+      ack({ success: false, error: 'Failed to send message' });
     }
   });
 

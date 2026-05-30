@@ -1,6 +1,10 @@
 import { io } from 'socket.io-client';
 import { resolveBaseUrl } from './utils/resolve-url.js';
 import { initServerSigning } from './crypto/server-signing.js';
+import connectionMonitor from './transport/connection-monitor.js';
+
+// Default timeout (ms) for ack'd emits before we treat a send as failed.
+const DEFAULT_ACK_TIMEOUT_MS = 10000;
 
 /**
  * Simplified Socket.IO Manager based on working branch implementation
@@ -50,7 +54,14 @@ class SocketManager {
           this.socket.on(event, callback);
         });
       });
+
+      // NOTE: we deliberately do NOT flush the outbox here. On reconnect the
+      // server has not yet re-bound this socket to its room, so a send would be
+      // rejected. ChatRoom flushes the outbox once the rejoin is confirmed.
     });
+
+    // Wire the application-level liveness monitor onto this socket.
+    connectionMonitor.attach(this.socket);
 
     this.socket.on('disconnect', (reason) => {
       console.log('❌ Socket disconnected:', reason);
@@ -151,8 +162,48 @@ class SocketManager {
     }
   }
 
+  /**
+   * Emit an event and resolve only when the server acks it (or reject on
+   * timeout / disconnect). This is the delivery-guarantee primitive used by
+   * the message outbox: a resolved promise means the server received it.
+   * @param {string} event
+   * @param {Object} data
+   * @param {number} [timeoutMs]
+   * @returns {Promise<any>} the server's ack payload
+   */
+  emitWithAck(event, data, timeoutMs = DEFAULT_ACK_TIMEOUT_MS) {
+    return new Promise((resolve, reject) => {
+      if (!this.socket || this.socket.disconnected) {
+        reject(new Error('socket-disconnected'));
+        return;
+      }
+      this.socket.timeout(timeoutMs).emit(event, data, (err, response) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(response);
+        }
+      });
+    });
+  }
+
+  /**
+   * Subscribe to coarse connection-health changes
+   * ('online' | 'degraded' | 'reconnecting' | 'offline').
+   * @param {(state: string) => void} cb
+   * @returns {() => void} unsubscribe
+   */
+  onConnectionState(cb) {
+    return connectionMonitor.subscribe(cb);
+  }
+
+  getConnectionState() {
+    return connectionMonitor.getState();
+  }
+
   disconnect() {
     if (this.socket) {
+      connectionMonitor.detach();
       this.socket.disconnect();
       this.socket = null;
       this.isConnected = false;

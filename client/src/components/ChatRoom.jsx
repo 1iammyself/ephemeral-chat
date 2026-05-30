@@ -74,6 +74,7 @@ import { getKeyBundle } from '../crypto/key-store';
 import { initOHTTP } from '../crypto/ohttp';
 import { initPrivacyPass, getAuthToken, refreshTokensIfNeeded, isPrivacyPassReady } from '../crypto/privacy-pass';
 import { TransportManager, TRANSPORT } from '../transport/transport-manager';
+import messageOutbox from '../transport/message-outbox';
 import { Mp3Recorder } from '../utils/mp3Recorder';
 import ThemeToggle from './ThemeToggle';
 import PrivacyOverlay from './PrivacyOverlay';
@@ -426,6 +427,46 @@ class ChessPanelErrorBoundary extends React.Component {
     }
     return this.props.children;
   }
+}
+
+/**
+ * Merge an incoming server message into the local list exactly-once.
+ * - If it echoes a pending optimistic bubble (matched by clientMsgId), replace
+ *   that bubble in place and mark it delivered (no duplicate, preserves order).
+ * - If we already have it by server id, ignore (a reconnect re-broadcast).
+ * - Otherwise append.
+ * @param {Array} prev existing messages
+ * @param {Object} message incoming server message
+ * @returns {Array}
+ */
+function mergeIncomingMessage(prev, message) {
+  if (message.clientMsgId) {
+    const idx = prev.findIndex(m => m.clientMsgId === message.clientMsgId);
+    if (idx !== -1) {
+      const next = [...prev];
+      next[idx] = { ...message, deliveryStatus: 'delivered' };
+      return next;
+    }
+  }
+  if (prev.some(m => m.id === message.id)) return prev;
+  return [...prev, message];
+}
+
+/**
+ * On (re)join the server sends the full history. Merge it with any optimistic
+ * bubbles that are still pending in the outbox so messages composed during the
+ * outage stay visible until their flush echo arrives (no flicker, no loss).
+ * @param {Array} history decrypted server history
+ * @param {Array} prevMessages current local messages (may hold optimistic bubbles)
+ * @returns {Array}
+ */
+function mergeHistoryWithPending(history, prevMessages) {
+  const historyCmids = new Set(history.filter(m => m.clientMsgId).map(m => m.clientMsgId));
+  const pendingCmids = new Set(messageOutbox.getPending().map(e => e.clientMsgId));
+  const survivingOptimistic = prevMessages.filter(m =>
+    m.clientMsgId && pendingCmids.has(m.clientMsgId) && !historyCmids.has(m.clientMsgId)
+  );
+  return [...history, ...survivingOptimistic];
 }
 
 const ChatRoom = () => {
@@ -899,6 +940,63 @@ const ChatRoom = () => {
   }, [isJoined, isConnected]);
   // --------------------------------------------------------------------------
 
+  // --- Outbox sender: encrypt-at-flush + ack'd delivery for queued messages ---
+  // Registered per-room. The outbox calls this for each queued message (on
+  // enqueue and on every reconnect flush). Resolving = delivered; throwing =
+  // retry (unless the error is marked permanent).
+  useEffect(() => {
+    if (!roomCode) return;
+
+    messageOutbox.setSender(async (entry) => {
+      const p = entry.payload;
+      let v2Payload;
+      try {
+        v2Payload = await encryptMLSMessage(p.content, roomCode);
+      } catch (e) {
+        // Encryption can't succeed without room keys — non-retryable.
+        const err = new Error('encryption-failed');
+        err.permanent = true;
+        throw err;
+      }
+
+      // Preserve traffic-padding jitter while capturing the server ack.
+      let response;
+      await withJitter(async () => {
+        response = await socketManager.emitWithAck('send-message', {
+          ...v2Payload,
+          clientMsgId: entry.clientMsgId,
+          messageType: 'text',
+          recipients: p.recipients || [],
+          replyTo: p.replyTo || null,
+          isAnonymous: !!p.isAnonymous,
+          isEncrypted: true,
+          overrideTtl: p.overrideTtl || null,
+        });
+      });
+
+      if (!response || response.success === false) {
+        const err = new Error(response?.error || 'send-failed');
+        if (response?.permanent) err.permanent = true;
+        throw err;
+      }
+
+      // Server received it. Mark the optimistic bubble as sent; the broadcast
+      // echo (handleNewMessage) then upgrades it to 'delivered'. Never downgrade
+      // a bubble the echo already reconciled (the two race over the socket).
+      setMessages(prev => prev.map(m =>
+        (m.clientMsgId === entry.clientMsgId && m.deliveryStatus !== 'delivered')
+          ? { ...m, deliveryStatus: 'sent' }
+          : m
+      ));
+    });
+
+    return () => {
+      // Leave the sender in place across re-renders; the outbox itself is
+      // cleared on room leave / panic-burn.
+    };
+  }, [roomCode]);
+  // --------------------------------------------------------------------------
+
   // Check for invite token and room key
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -998,7 +1096,7 @@ const ChatRoom = () => {
           }
           return msg;
         }));
-        setMessages(msgs);
+        setMessages(prev => mergeHistoryWithPending(msgs, prev));
         setUsers(response.users || []);
 
         const myRole = response.room.userRoles?.[socketManager.socket?.id] || (response.room.hostId === socketManager.socket?.id ? 'host' : 'user');
@@ -1023,6 +1121,9 @@ const ChatRoom = () => {
         setIsReconnecting(false);
         setError(null);
         emitSound('connectionEstablished');
+
+        // Room is bound on the server — drain any messages queued while offline.
+        messageOutbox.flush();
 
         // ─── AES-GCM Room Key Setup ───────────────────────
         // All members derive the same key from the roomCode via HKDF.
@@ -1326,7 +1427,7 @@ const ChatRoom = () => {
         }
         return msg;
       }));
-      setMessages(msgs);
+      setMessages(prev => mergeHistoryWithPending(msgs, prev));
       setUsers(data.users || []);
 
       const myRole = data.room.userRoles?.[socketManager.socket?.id] || (data.room.hostId === socketManager.socket?.id ? 'host' : 'user');
@@ -1342,6 +1443,10 @@ const ChatRoom = () => {
       setIsJoined(true);
       setShowJoinModal(false);
       setError(null);
+
+      // Now that the room is re-bound on the server, flush anything queued while
+      // we were offline.
+      messageOutbox.flush();
 
       // Restore persisted media state if the room had active media sessions
       if (data.activeMedia && (Array.isArray(data.activeMedia) ? data.activeMedia.length > 0 : data.activeMedia)) {
@@ -1396,12 +1501,14 @@ const ChatRoom = () => {
           const hasMention = myNick && new RegExp(`@${myNick}\\b`, 'i').test(message.content ?? '');
           emitSound(hasMention ? 'mention' : 'receive');
         }
-        setMessages(prev => [...prev, message]);
+        if (message.clientMsgId) messageOutbox.markDelivered(message.clientMsgId);
+        setMessages(prev => mergeIncomingMessage(prev, message));
         return;
       }
       // Unencrypted — show as-is
       if (!isOwnMessage) emitSound('receive');
-      setMessages(prev => [...prev, message]);
+      if (message.clientMsgId) messageOutbox.markDelivered(message.clientMsgId);
+      setMessages(prev => mergeIncomingMessage(prev, message));
     };
 
     const handleMessageDeleted = ({ messageId }) => {
@@ -1862,6 +1969,10 @@ const ChatRoom = () => {
       // Explicitly leave the room before disconnecting
       socketManager.emit('leave-room');
 
+      // Drop any undelivered queued messages — they belong to this room only
+      // and must not leak into another room (ephemerality).
+      messageOutbox.clear();
+
       if (!import.meta.env.DEV) {
         socketManager.disconnect();
       }
@@ -1902,6 +2013,7 @@ const ChatRoom = () => {
       window.electronAPI.onPanicBurn(() => {
         if (socketManager.socket?.connected) {
           socketManager.emit('panic-burn', { roomCode });
+          messageOutbox.clear();
           hapticHeavy();
         }
       });
@@ -1924,6 +2036,7 @@ const ChatRoom = () => {
       destroyMLSSession(roomCode);
       destroyE2EESession(roomCode);
       stopTrafficPadding();
+      messageOutbox.clear();
     };
     window.addEventListener('beforeunload', wipe);
     window.addEventListener('pagehide', wipe); // iOS Safari
@@ -1942,6 +2055,7 @@ const ChatRoom = () => {
       e.preventDefault();
       if (socketManager.socket?.connected && roomCode) {
         socketManager.emit('panic-burn', { roomCode });
+        messageOutbox.clear();
       }
     };
     window.addEventListener('keydown', handlePanicKey, true);
@@ -2182,7 +2296,9 @@ const ChatRoom = () => {
   // Core send logic — called directly (no event needed)
   // This avoids the form submission pipeline that causes Android keyboard blur flash
   const doSendMessage = async () => {
-    if (!newMessage.trim() || isSending || !isConnected) return;
+    // Note: we intentionally no longer block on `!isConnected`. Messages typed
+    // while offline are queued in the outbox and auto-sent on reconnect.
+    if (!newMessage.trim() || isSending) return;
 
     // 1. Handle Slash Commands
     if (newMessage.trim().startsWith('/')) {
@@ -2316,15 +2432,6 @@ const ChatRoom = () => {
 
       const finalRecipients = mentionedSocketIds.length > 0 ? mentionedSocketIds : selectedRecipients;
 
-      let v2Payload;
-      try {
-        v2Payload = await encryptMLSMessage(content, roomCode);
-      } catch (e) {
-        console.error('AES encrypt failed — message NOT sent:', e.message);
-        setError('Encryption failed. Please rejoin the room.');
-        return;
-      }
-
       const replyData = replyingTo ? {
         id: replyingTo.id,
         content: (() => {
@@ -2339,17 +2446,43 @@ const ChatRoom = () => {
         sender: replyingTo.sender.nickname
       } : null;
 
-      await withJitter(() => {
-        socketManager.emit('send-message', {
-          ...v2Payload,
-          messageType: 'text',
+      // Queue for reliable delivery. Encryption happens at flush time inside the
+      // outbox sender (registered below), so a message composed offline is
+      // encrypted with the room key that is live when it actually goes out.
+      const clientMsgId = messageOutbox.enqueue(
+        {
+          content,
           recipients: finalRecipients,
           replyTo: replyData,
           isAnonymous: isAnonymousMode,
-          isEncrypted: true,
-          overrideTtl: overrideTtl || null
-        });
-      });
+          overrideTtl: overrideTtl || null,
+        },
+        { overrideTtl: overrideTtl || null }
+      );
+
+      // Optimistic bubble — shows immediately with a delivery status, then is
+      // reconciled in-place when the server echoes the same clientMsgId.
+      const optimisticMessage = {
+        id: clientMsgId,
+        clientMsgId,
+        content,
+        messageType: 'text',
+        sender: {
+          socketId: socketManager.socket?.id,
+          nickname: isAnonymousMode ? 'Anonymous 👻' : currentUser?.nickname,
+          id: persistentUserId,
+        },
+        recipients: finalRecipients,
+        replyTo: replyData,
+        isAnonymous: isAnonymousMode,
+        isEncrypted: false,
+        reactions: {},
+        viewedBy: [],
+        timestamp: new Date().toISOString(),
+        overrideTtl: overrideTtl || null,
+        deliveryStatus: 'queued',
+      };
+      setMessages(prev => [...prev, optimisticMessage]);
 
       if (overrideTtl) setOverrideTtl(null);
       if (!isStealthMode) socketManager.emit('user-activity');
@@ -3952,7 +4085,7 @@ const ChatRoom = () => {
                         onPaste={(e) => e.preventDefault()}
                         placeholder={isAnonymousMode ? t('chatRoom.sendAnon') : t('chatRoom.sendMessage')}
                         className={`w-full bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white text-[15px] sm:text-base py-2.5 min-w-0 placeholder:text-gray-500 dark:placeholder:text-gray-400 ${newMessage.startsWith('🧊 ') ? 'pl-2 pr-10' : 'px-2'}`}
-                        disabled={!isConnected}
+                        /* Always editable — messages typed offline queue in the outbox and send on reconnect. */
                         maxLength={500}
                         style={{ boxShadow: 'none' }}
                       />
@@ -4054,7 +4187,7 @@ const ChatRoom = () => {
                           doSendMessage();
                         }}
                         onClick={doSendMessage}
-                        disabled={!isConnected}
+                        /* No connectivity gate — offline sends are queued and auto-delivered. */
                         className={`flex-shrink-0 ml-1 sm:ml-2 ${getVibeById(roomVibe).accentClass} h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
                         <Send className="w-4 h-4 sm:w-5 sm:h-5 -ml-0.5" />
