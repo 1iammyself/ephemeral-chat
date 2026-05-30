@@ -2628,6 +2628,7 @@ io.on('connection', (socket) => {
           const senderId = socket.persistentUserId || data.userId || socket.id;
           const cpuDiff = ['easy','medium','hard'].includes(gameData.cpuDifficulty) ? gameData.cpuDifficulty : null;
           const withCpu = !!cpuDiff;
+          const tttMode = gameData.mode === 'ultimate' ? 'ultimate' : 'standard';
           data.gameData = {
             gameType: 'ttt',
             creatorId: senderId,
@@ -2642,9 +2643,10 @@ io.on('connection', (socket) => {
             winner: null,
             queue: [],
             scores: { X: 0, O: 0, draw: 0 },
+            mode: tttMode,
           };
           overrideTtl = 0;
-          messageContent = withCpu ? `Tic-Tac-Toe vs CPU (${cpuDiff})` : 'Tic-Tac-Toe';
+          messageContent = withCpu ? `Tic-Tac-Toe vs CPU (${cpuDiff})` : (tttMode === 'ultimate' ? 'Ultimate Tic-Tac-Toe' : 'Tic-Tac-Toe');
         } else if (gameData.gameType === 'c4') {
           const senderId = socket.persistentUserId || data.userId || socket.id;
           const cpuDiff = ['easy','medium','hard'].includes(gameData.cpuDifficulty) ? gameData.cpuDifficulty : null;
@@ -2671,6 +2673,7 @@ io.on('connection', (socket) => {
           const rpsCpuDiff = ['easy','medium','hard'].includes(gameData.cpuDifficulty) ? gameData.cpuDifficulty : null;
           const rpsWithCpu = !!rpsCpuDiff;
           const rpsTotalRounds = [3,5,7].includes(gameData.totalRounds) ? gameData.totalRounds : 5;
+          const rpsVariant = gameData.variant === 'rpsls' ? 'rpsls' : 'standard';
           data.gameData = {
             gameType: 'rps',
             creatorId: senderId,
@@ -2679,21 +2682,23 @@ io.on('connection', (socket) => {
             cpu: rpsWithCpu ? { enabled: true, difficulty: rpsCpuDiff } : null,
             round: 1,
             totalRounds: rpsTotalRounds,
+            variant: rpsVariant,
             picks: {},
             pickedIds: [],
             revealed: false,
             roundResults: [],
             scores: { [senderId]: 0 },
-            // CPU game starts in 'playing' immediately (TTT/Chess pattern — no rps-start needed)
             status: rpsWithCpu ? 'playing' : 'waiting',
             startedAt: rpsWithCpu ? Date.now() : null,
           };
           overrideTtl = 0;
-          messageContent = rpsWithCpu ? `Rock-Paper-Scissors vs CPU — ${rpsTotalRounds} rounds` : `Rock-Paper-Scissors — ${rpsTotalRounds} rounds`;
+          const rpsLabel = rpsVariant === 'rpsls' ? 'RPSLS' : 'Rock-Paper-Scissors';
+          messageContent = rpsWithCpu ? `${rpsLabel} vs CPU — ${rpsTotalRounds} rounds` : `${rpsLabel} — ${rpsTotalRounds} rounds`;
         } else if (gameData.gameType === 'checkers') {
           const senderId = socket.persistentUserId || data.userId || socket.id;
           const cpuDiff = ['easy','medium','hard'].includes(gameData.cpuDifficulty) ? gameData.cpuDifficulty : null;
           const withCpu = !!cpuDiff;
+          const checkersVariant = ['american','russian','brazilian'].includes(gameData.variant) ? gameData.variant : 'american';
           data.gameData = {
             gameType: 'checkers',
             creatorId: senderId,
@@ -2707,12 +2712,17 @@ io.on('connection', (socket) => {
             winner: null,
             queue: [],
             scores: { 1: 0, 2: 0 },
+            variant: checkersVariant,
           };
           overrideTtl = 0;
-          messageContent = withCpu ? `Checkers vs CPU (${cpuDiff})` : 'Checkers';
+          const checkersLabel = checkersVariant !== 'american' ? `Checkers (${checkersVariant[0].toUpperCase() + checkersVariant.slice(1)})` : 'Checkers';
+          messageContent = withCpu ? `${checkersLabel} vs CPU (${cpuDiff})` : checkersLabel;
         } else if (gameData.gameType === 'g2048') {
           const senderId = socket.persistentUserId || data.userId || socket.id;
           const seed = Date.now();
+          const g2048Mode = gameData.gameMode === 'threes' ? 'threes' : 'standard';
+          const g2048Grid = [4, 5].includes(gameData.gridSize) ? gameData.gridSize : 4;
+          const g2048Timer = ['1min', '5min'].includes(gameData.timerMode) ? gameData.timerMode : null;
           data.gameData = {
             gameType: 'g2048',
             creatorId: senderId,
@@ -2725,9 +2735,13 @@ io.on('connection', (socket) => {
             soloMode: !!gameData.soloMode,
             startedAt: null,
             duration: 180000,
+            gameMode: g2048Mode,
+            gridSize: g2048Grid,
+            timerMode: g2048Timer,
           };
           overrideTtl = 0;
-          messageContent = '2048';
+          const g2048Label = g2048Mode === 'threes' ? 'Threes!' : (g2048Grid === 5 ? '2048 (5×5)' : '2048');
+          messageContent = g2048Label;
         } else if (gameData.gameType === 'snake') {
           const senderId = socket.persistentUserId || data.userId || socket.id;
           data.gameData = {
@@ -2738,10 +2752,14 @@ io.on('connection', (socket) => {
             scores: {},
             status: 'waiting',
             soloMode: !!gameData.soloMode,
+            wrapWalls: !!gameData.wrapWalls,
+            dailyChallenge: !!gameData.dailyChallenge,
+            dailySeed: gameData.dailySeed ?? null,
             startedAt: null,
           };
           overrideTtl = 0;
-          messageContent = 'Snake';
+          const snakeLabel = gameData.dailyChallenge ? 'Snake — Daily Challenge' : (gameData.wrapWalls ? 'Snake (Wrap)' : 'Snake');
+          messageContent = snakeLabel;
         } else {
           socket.emit('error', { message: 'Unknown game type' });
           return;

@@ -2897,6 +2897,7 @@ const ChatRoom = () => {
 
   // ── Rock-Paper-Scissors ──────────────────────────────────────────────────
   const [rpsVariant, setRpsVariant] = useState('standard');
+  const [rpsRounds, setRpsRounds] = useState(5);
   const handleSendRps = (rounds = 5, cpuDifficulty = null) => {
     if (!isConnected) return;
     socketManager.emit('send-message', {
@@ -4621,12 +4622,12 @@ const ChatRoom = () => {
       {/* ── Rock-Paper-Scissors config picker ── */}
       {showRpsConfig && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4 bg-black/40 backdrop-blur-sm"
-          onClick={() => { setShowRpsConfig(false); setRpsVariant('standard'); }}>
+          onClick={() => { setShowRpsConfig(false); setRpsVariant('standard'); setRpsRounds(5); }}>
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 w-full max-w-xs"
             onClick={e => e.stopPropagation()}>
             <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-3 text-center">✊ Rock·Paper·Scissors</p>
             <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">Variant</p>
-            <div className="flex gap-2 mb-4">
+            <div className="flex gap-2 mb-3">
               <button onClick={() => setRpsVariant('standard')}
                 className={`flex-1 py-2 rounded-xl text-xs font-black transition-colors ${rpsVariant==='standard' ? `${currentVibe.accentClass} text-white` : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
                 ✊ Standard
@@ -4636,19 +4637,23 @@ const ChatRoom = () => {
                 🖖 RPSLS
               </button>
             </div>
-            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">vs Player — choose rounds</p>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">Rounds</p>
             <div className="flex gap-2 mb-4">
               {[3, 5, 7].map(r => (
-                <button key={r} onClick={() => handleSendRps(r, null)}
-                  className={`flex-1 py-2.5 rounded-xl font-black text-sm ${currentVibe.accentClass} text-white hover:opacity-90 transition-opacity`}>
+                <button key={r} onClick={() => setRpsRounds(r)}
+                  className={`flex-1 py-2 rounded-xl font-black text-sm transition-colors ${rpsRounds===r ? `${currentVibe.accentClass} text-white` : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
                   {r}
                 </button>
               ))}
             </div>
-            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">vs CPU (5 rounds)</p>
+            <button onClick={() => { handleSendRps(rpsRounds, null); setRpsRounds(5); }}
+              className={`w-full mb-2 py-2.5 rounded-xl font-black text-sm ${currentVibe.accentClass} text-white hover:opacity-90`}>
+              ⚔️ vs Player — {rpsRounds} rounds
+            </button>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">vs CPU</p>
             <div className="flex gap-2">
               {['easy', 'medium', 'hard'].map(d => (
-                <button key={d} onClick={() => handleSendRps(5, d)}
+                <button key={d} onClick={() => { handleSendRps(rpsRounds, d); setRpsRounds(5); }}
                   className="flex-1 py-2 rounded-xl text-xs font-black bg-purple-500 text-white hover:opacity-90 capitalize">
                   🤖 {d}
                 </button>
@@ -4661,7 +4666,7 @@ const ChatRoom = () => {
       {/* ── Snake config picker ── */}
       {showSnakeConfig && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4 bg-black/40 backdrop-blur-sm"
-          onClick={() => { setShowSnakeConfig(false); setSnakeConfigWall(false); setSnakeDailyChallenge(false); }}>
+          onClick={() => { setShowSnakeConfig(false); setSnakeConfigWall(false); }}>
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 w-full max-w-xs"
             onClick={e => e.stopPropagation()}>
             <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-4 text-center">🐍 Snake</p>
