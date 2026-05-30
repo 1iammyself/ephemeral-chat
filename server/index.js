@@ -4634,6 +4634,31 @@ io.on('connection', (socket) => {
     } catch (err) { logger.error('rps-pick err:', err); }
   });
 
+  socket.on('rps-cpu-pick', async ({ messageId, humanPick, cpuPick }) => {
+    try {
+      if (!socket.roomCode || !messageId) return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = rpsGetMsg(room, messageId);
+      if (!message) return;
+      const { gameData } = message;
+      if (gameData.status !== 'playing' || !gameData.cpu?.enabled) return;
+      const validPicks = RPS_PICKS[gameData.variant] || RPS_PICKS.standard;
+      if (!validPicks.includes(humanPick) || !validPicks.includes(cpuPick)) return;
+      const p1Id = gameData.player1.id;
+      const p2Id = gameData.player2.id; // 'cpu'
+      if (gameData.picks[p1Id] || gameData.picks[p2Id]) return; // already picked this round
+      gameData.picks[p1Id] = humanPick;
+      gameData.picks[p2Id] = cpuPick;
+      if (!gameData.pickedIds) gameData.pickedIds = [];
+      gameData.pickedIds = [p1Id, p2Id];
+      io.to(socket.roomCode).emit('rps-player-picked', { messageId, pickedIds: gameData.pickedIds });
+      rpsResolveAndAdvance(gameData, room, socket.roomCode, messageId);
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+    } catch (err) { logger.error('rps-cpu-pick err:', err); }
+  });
+
   socket.on('rps-resign', async ({ messageId }) => {
     try {
       if (!socket.roomCode || !messageId) return;

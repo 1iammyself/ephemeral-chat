@@ -131,6 +131,10 @@ export default function RpsPanel({ message, currentUser, roomVibe, onDelete }) {
       setRevealData({ round, p1Pick, p2Pick, result, beatText, replay: !!replay });
       setMyPickThisRound(null);
       setPickedIds([]);
+      // Update roundHistory immediately so client-side CPU AI has current data for next pick
+      if (p1Pick && p2Pick && result) {
+        setRoundHistory(prev => [...prev, { round, p1Pick, p2Pick, result }]);
+      }
       if (s) setScores(s);
       if (cr) setCurrentRound(cr);
       if (st) setStatus(st);
@@ -198,8 +202,16 @@ export default function RpsPanel({ message, currentUser, roomVibe, onDelete }) {
   const handlePick = useCallback((pick) => {
     if (!isPlaying || iHavePicked || !isLive || isFinished) return;
     setMyPickThisRound(pick);
-    socketManager.emit('rps-pick', { messageId, pick });
-  }, [isPlaying, iHavePicked, isLive, isFinished, messageId]);
+    if (isCpu) {
+      // Mirror chess CPU pattern: generate CPU pick client-side and send both to server.
+      // This bypasses the server-side identity check that causes "CPU thinking forever"
+      // when socket.persistentUserId and data.userId differ between game creation and pick.
+      const cpuMove = getCpuPick(variant, cpuDifficulty, roundHistory);
+      socketManager.emit('rps-cpu-pick', { messageId, humanPick: pick, cpuPick: cpuMove });
+    } else {
+      socketManager.emit('rps-pick', { messageId, pick });
+    }
+  }, [isPlaying, iHavePicked, isLive, isFinished, messageId, isCpu, variant, cpuDifficulty, roundHistory]);
 
   const handleStartCpu = (diff) => socketManager.emit('rps-set-cpu', { messageId, difficulty: diff });
 
