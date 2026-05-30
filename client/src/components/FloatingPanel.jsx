@@ -212,7 +212,7 @@ export default function FloatingPanel({
       </div>
 
       {/* ── content — always mounted so game state is preserved on minimize ── */}
-      <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: minimized ? 'none' : undefined }}>
+      <div style={{ flex: 1, overflow: 'auto', minHeight: 0, display: minimized ? 'none' : undefined }}>
         {children}
       </div>
 

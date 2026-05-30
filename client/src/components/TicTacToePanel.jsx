@@ -146,69 +146,79 @@ function StandardTTT({ message, currentUser, roomVibe }) {
     : 'bg-gray-50 dark:bg-gray-800/40 text-gray-500 dark:text-gray-400';
 
   return (
-    <div className="flex flex-col items-center p-4 h-full gap-3 overflow-y-auto">
-      <div className="flex gap-6 text-sm font-semibold">
-        <span className="text-indigo-500 dark:text-indigo-400">✕ {scores.X}</span>
-        <span className="text-gray-400">{scores.draw ?? 0} draw</span>
-        <span className="text-red-500 dark:text-red-400">○ {scores.O}</span>
-      </div>
-      <div className={`w-full max-w-sm text-center text-xs font-semibold py-1.5 px-3 rounded-lg transition-colors ${statusBg}`}>{statusText}</div>
-      {status === 'playing' && <p className="text-[10px] text-gray-400 tabular-nums -mt-1">Move {moveCount} / 9</p>}
-
-      <div className="grid grid-cols-3 gap-1.5 sm:gap-2 p-2 rounded-2xl w-full max-w-sm" style={{ background: lightCell + '66' }}>
-        {board.map((cell, i) => {
-          const isWin   = winLine?.includes(i);
-          const canClick = isMyTurn && !cell && !winLine && status === 'playing' && !(isCpu && turn === 'O');
-          const isHint  = hintCell === i && !cell;
-          const isHover = hoverCell === i && !cell && canClick;
-          return (
-            <button key={i} onClick={() => handleCell(i)}
-              onMouseEnter={() => canClick && setHoverCell(i)}
-              onMouseLeave={() => setHoverCell(null)}
-              disabled={!canClick}
-              className={`aspect-square w-full rounded-xl text-3xl sm:text-4xl font-black transition-all duration-150
-                ${canClick ? 'hover:scale-105 active:scale-95 cursor-pointer' : 'cursor-default'}
-                ${isWin ? 'scale-105 shadow-xl' : ''}
-                ${isHint ? 'ring-2 ring-yellow-400 ring-offset-1 animate-pulse' : ''}`}
-              style={{
-                background: isWin ? accentColor : cell ? (cell==='X'?'#e0e7ff':'#fee2e2') : lightCell,
-                color: isWin ? '#fff' : cell==='X' ? '#4f46e5' : '#ef4444',
-                border: `2px solid ${isWin ? accentColor : isHint ? '#facc15' : 'transparent'}`,
-              }}>
-              {cell || (isHint
-                ? <span style={{ color:'#facc15', opacity:0.9 }}>{turn==='X'?'✕':'○'}</span>
-                : isHover
-                ? <span style={{ color:turn==='X'?'#4f46e5':'#ef4444', opacity:0.3 }}>{turn==='X'?'✕':'○'}</span>
-                : '')}
-            </button>
-          );
-        })}
-      </div>
-
-      {isMyTurn && !winLine && status === 'playing' && !(isCpu && turn === 'O') && (
-        <button onClick={handleHint} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 hover:opacity-80 transition-opacity">
-          <Lightbulb className="w-3.5 h-3.5" /> Hint
-        </button>
-      )}
-
-      {isP1 && status === 'waiting' && !gameData?.player2 && !isCpu && (
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-xs text-gray-400">Waiting for someone to join…</p>
-          {pendingCpu ? (
-            <div className="flex gap-2">
-              {['easy','medium','hard'].map(d => (
-                <button key={d} onClick={() => handleSetCpu(d)} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white capitalize" style={{ background: accentColor }}>{d}</button>
-              ))}
-              <button onClick={() => setPendingCpu(false)} className="px-2 py-1.5 rounded-lg text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">✕</button>
-            </div>
-          ) : (
-            <button onClick={() => setPendingCpu(true)} className="px-4 py-1.5 rounded-xl text-xs font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">🤖 Switch to vs CPU</button>
-          )}
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Fixed header */}
+      <div className="flex-shrink-0 flex flex-col items-center gap-2 px-4 pt-3">
+        <div className="flex gap-6 text-sm font-semibold">
+          <span className="text-indigo-500 dark:text-indigo-400">✕ {scores.X}</span>
+          <span className="text-gray-400">{scores.draw ?? 0} draw</span>
+          <span className="text-red-500 dark:text-red-400">○ {scores.O}</span>
         </div>
-      )}
-      {isFinished && (isP1 || isP2) && (
-        <button onClick={handleRematch} className="mt-1 px-6 py-2 rounded-xl text-sm font-bold text-white" style={{ background: accentColor }}>🔁 Rematch</button>
-      )}
+        <div className={`w-full max-w-sm text-center text-xs font-semibold py-1.5 px-3 rounded-lg transition-colors ${statusBg}`}>{statusText}</div>
+        {status === 'playing' && <p className="text-[10px] text-gray-400 tabular-nums -mt-1">Move {moveCount} / 9</p>}
+      </div>
+
+      {/* Board fills remaining space */}
+      <div className="flex-1 min-h-0 flex items-center justify-center p-3">
+        <div className="aspect-square max-h-full max-w-full p-2 rounded-2xl" style={{ background: lightCell + '66' }}>
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 h-full w-full">
+            {board.map((cell, i) => {
+              const isWin   = winLine?.includes(i);
+              const canClick = isMyTurn && !cell && !winLine && status === 'playing' && !(isCpu && turn === 'O');
+              const isHint  = hintCell === i && !cell;
+              const isHover = hoverCell === i && !cell && canClick;
+              return (
+                <button key={i} onClick={() => handleCell(i)}
+                  onMouseEnter={() => canClick && setHoverCell(i)}
+                  onMouseLeave={() => setHoverCell(null)}
+                  disabled={!canClick}
+                  className={`rounded-xl font-black transition-all duration-150 flex items-center justify-center text-3xl sm:text-4xl
+                    ${canClick ? 'hover:scale-105 active:scale-95 cursor-pointer' : 'cursor-default'}
+                    ${isWin ? 'scale-105 shadow-xl' : ''}
+                    ${isHint ? 'ring-2 ring-yellow-400 ring-offset-1 animate-pulse' : ''}`}
+                  style={{
+                    background: isWin ? accentColor : cell ? (cell==='X'?'#e0e7ff':'#fee2e2') : lightCell,
+                    color: isWin ? '#fff' : cell==='X' ? '#4f46e5' : '#ef4444',
+                    border: `2px solid ${isWin ? accentColor : isHint ? '#facc15' : 'transparent'}`,
+                  }}>
+                  {cell || (isHint
+                    ? <span style={{ color:'#facc15', opacity:0.9 }}>{turn==='X'?'✕':'○'}</span>
+                    : isHover
+                    ? <span style={{ color:turn==='X'?'#4f46e5':'#ef4444', opacity:0.3 }}>{turn==='X'?'✕':'○'}</span>
+                    : '')}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Fixed footer */}
+      <div className="flex-shrink-0 flex flex-col items-center gap-2 px-4 pb-3">
+        {isMyTurn && !winLine && status === 'playing' && !(isCpu && turn === 'O') && (
+          <button onClick={handleHint} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 hover:opacity-80 transition-opacity">
+            <Lightbulb className="w-3.5 h-3.5" /> Hint
+          </button>
+        )}
+        {isP1 && status === 'waiting' && !gameData?.player2 && !isCpu && (
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-xs text-gray-400">Waiting for someone to join…</p>
+            {pendingCpu ? (
+              <div className="flex gap-2">
+                {['easy','medium','hard'].map(d => (
+                  <button key={d} onClick={() => handleSetCpu(d)} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white capitalize" style={{ background: accentColor }}>{d}</button>
+                ))}
+                <button onClick={() => setPendingCpu(false)} className="px-2 py-1.5 rounded-lg text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">✕</button>
+              </div>
+            ) : (
+              <button onClick={() => setPendingCpu(true)} className="px-4 py-1.5 rounded-xl text-xs font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">🤖 Switch to vs CPU</button>
+            )}
+          </div>
+        )}
+        {isFinished && (isP1 || isP2) && (
+          <button onClick={handleRematch} className="px-6 py-2 rounded-xl text-sm font-bold text-white" style={{ background: accentColor }}>🔁 Rematch</button>
+        )}
+      </div>
     </div>
   );
 }

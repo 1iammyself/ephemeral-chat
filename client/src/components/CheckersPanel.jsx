@@ -224,113 +224,111 @@ export default function CheckersPanel({ message, currentUser, roomVibe }) {
   const displayBoard = flipped ? [...board].reverse().map(row => [...row].reverse()) : board;
 
   return (
-    <div className="flex flex-col items-center p-3 h-full gap-3 overflow-y-auto">
+    <div className="flex flex-col h-full overflow-hidden">
 
-      {/* Variant badge */}
-      {variant !== 'american' && (
-        <span className="text-[9px] font-black uppercase tracking-widest bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">
-          {VARIANT_LABEL[variant]} rules
-        </span>
-      )}
-
-      {/* Scores + piece counts */}
-      <div className="flex gap-4 text-sm font-semibold items-start">
-        <div className="flex flex-col items-center gap-0.5">
-          <span className="text-gray-700 dark:text-gray-300">⚪ {scores[1]}</span>
-          <span className="text-[9px] text-gray-500">{p1Count} left{p1Kings>0?` · ♛×${p1Kings}`:''}</span>
-          {p1Captured>0 && <span className="text-[9px] text-red-400">{p1Captured} captured</span>}
-        </div>
-        <div className="flex flex-col items-center gap-0.5">
-          <span className="text-gray-700 dark:text-gray-300">⚫ {scores[2]}</span>
-          <span className="text-[9px] text-gray-500">{p2Count} left{p2Kings>0?` · ♛×${p2Kings}`:''}</span>
-          {p2Captured>0 && <span className="text-[9px] text-red-400">{p2Captured} captured</span>}
-        </div>
-      </div>
-
-      <div className={`w-full max-w-xl text-center text-xs font-semibold py-1.5 px-3 rounded-lg transition-colors ${statusBg}`}>{statusText}</div>
-
-      {/* 40-move draw counter */}
-      {status==='playing' && noProgressMoves>=20 && (
-        <div className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${noProgressMoves>=40?'bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400':'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400'}`}>
-          {noProgressMoves} / 40 moves without progress{noProgressMoves>=40?' — Draw can be claimed':''}
-        </div>
-      )}
-
-      {/* Board */}
-      <div className="w-full max-w-xl rounded-xl overflow-hidden border-2 border-black/20" style={{ background: darkSq }}>
-        {displayBoard.map((row, visualR) => (
-          <div key={visualR} className="grid grid-cols-8">
-            {row.map((cell, visualC) => {
-              const logicalR = flipped ? 7-visualR : visualR;
-              const logicalC = flipped ? 7-visualC : visualC;
-              const isDark = (logicalR+logicalC)%2===1;
-              const isSelected = selected && selected[0]===logicalR && selected[1]===logicalC;
-              const isMJP = midJumpPiece && midJumpPiece[0]===logicalR && midJumpPiece[1]===logicalC;
-              const isTarget = validToSet.has(`${logicalR},${logicalC}`);
-              return (
-                <div key={visualC}
-                  onClick={() => isDark && handleSquareClick(visualR, visualC)}
-                  className={`aspect-square flex items-center justify-center transition-all relative ${isDark&&isMyTurn&&status==='playing'&&!(isCpu&&turn===2)?'cursor-pointer':''}`}
-                  style={{ background: isMJP?'#3b82f622':isSelected?accentColor+'66':isDark?darkSq:lightSq }}>
-                  {isTarget && !cell && (
-                    <div className="w-1/3 h-1/3 rounded-full opacity-50" style={{ background: accentColor }} />
-                  )}
-                  {isTarget && midJump && !cell && (
-                    <div className="absolute inset-0.5 rounded-sm border border-blue-400/60 animate-pulse pointer-events-none" />
-                  )}
-                  {cell && isDark && (
-                    <div className={`rounded-full flex items-center justify-center transition-transform ${isSelected||isMJP?'scale-110':''} ${isTarget?'ring-1 ring-yellow-400':''}`}
-                      style={{
-                        width:'78%', height:'78%',
-                        background: cell.p===1 ? '#f1f5f9' : '#1e293b',
-                        boxShadow: isMJP ? '0 0 0 3px rgba(59,130,246,0.7)' : cell.p===1 ? '0 2px 4px rgba(0,0,0,0.3)' : '0 2px 4px rgba(0,0,0,0.5)',
-                        border: cell.k ? '2px solid #facc15' : `2px solid ${cell.p===1?'#cbd5e1':'#475569'}`,
-                        fontSize:'55%',
-                      }}>
-                      {cell.k && '♛'}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+      {/* ── Fixed header: badges, scores, status ── */}
+      <div className="flex-shrink-0 flex flex-col items-center gap-1.5 px-3 pt-2">
+        {variant !== 'american' && (
+          <span className="text-[9px] font-black uppercase tracking-widest bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">
+            {VARIANT_LABEL[variant]} rules
+          </span>
+        )}
+        <div className="flex gap-6 text-sm font-semibold">
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="text-gray-700 dark:text-gray-300">⚪ {scores[1]}</span>
+            <span className="text-[9px] text-gray-500">{p1Count} left{p1Kings>0?` · ♛×${p1Kings}`:''}</span>
+            {p1Captured>0 && <span className="text-[9px] text-red-400">{p1Captured} cap</span>}
           </div>
-        ))}
-      </div>
-
-      {/* Controls */}
-      <div className="flex gap-2 items-center flex-wrap justify-center">
-        <button onClick={() => setFlipped(f=>!f)}
-          className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:opacity-80 transition-opacity" title="Flip board">
-          <RotateCcw className="w-4 h-4" />
-        </button>
-        {isP1 && status==='waiting' && !gameData?.player2 && !isCpu && (
-          pendingCpu ? (
-            <div className="flex gap-2">
-              {['easy','medium','hard'].map(d => (
-                <button key={d} onClick={() => handleSetCpu(d)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-white capitalize" style={{ background: accentColor }}>{d}</button>
-              ))}
-              <button onClick={() => setPendingCpu(false)} className="px-2 py-1.5 rounded-lg text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">✕</button>
-            </div>
-          ) : (
-            <button onClick={() => setPendingCpu(true)} className="px-4 py-1.5 rounded-xl text-xs font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
-              🤖 vs CPU
-            </button>
-          )
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="text-gray-700 dark:text-gray-300">⚫ {scores[2]}</span>
+            <span className="text-[9px] text-gray-500">{p2Count} left{p2Kings>0?` · ♛×${p2Kings}`:''}</span>
+            {p2Captured>0 && <span className="text-[9px] text-red-400">{p2Captured} cap</span>}
+          </div>
+        </div>
+        <div className={`w-full text-center text-xs font-semibold py-1 px-3 rounded-lg transition-colors ${statusBg}`}>{statusText}</div>
+        {status==='playing' && noProgressMoves>=20 && (
+          <div className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${noProgressMoves>=40?'bg-red-100 dark:bg-red-900/20 text-red-600':'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700'}`}>
+            {noProgressMoves}/40 no-progress{noProgressMoves>=40?' — Draw can be claimed':''}
+          </div>
         )}
       </div>
 
-      {/* Variant key for Russian/Brazilian */}
-      {variant !== 'american' && (
-        <div className="text-[9px] text-gray-400 text-center leading-relaxed max-w-[320px]">
-          {variant==='russian' && '👑 Flying kings · Men capture backward · Promotion continues mid-jump'}
-          {variant==='brazilian' && '👑 Flying kings · Men capture backward · Must maximize captures'}
+      {/* ── Board — fills all remaining height, scales as a square ── */}
+      <div className="flex-1 min-h-0 flex items-center justify-center p-2">
+        <div className="aspect-square max-h-full max-w-full rounded-xl overflow-hidden border-2 border-black/20" style={{ background: darkSq }}>
+          {displayBoard.map((row, visualR) => (
+            <div key={visualR} className="grid grid-cols-8" style={{ height: '12.5%' }}>
+              {row.map((cell, visualC) => {
+                const logicalR = flipped ? 7-visualR : visualR;
+                const logicalC = flipped ? 7-visualC : visualC;
+                const isDark = (logicalR+logicalC)%2===1;
+                const isSelected = selected && selected[0]===logicalR && selected[1]===logicalC;
+                const isMJP = midJumpPiece && midJumpPiece[0]===logicalR && midJumpPiece[1]===logicalC;
+                const isTarget = validToSet.has(`${logicalR},${logicalC}`);
+                return (
+                  <div key={visualC}
+                    onClick={() => isDark && handleSquareClick(visualR, visualC)}
+                    className={`h-full flex items-center justify-center transition-all relative ${isDark&&isMyTurn&&status==='playing'&&!(isCpu&&turn===2)?'cursor-pointer':''}`}
+                    style={{ background: isMJP?'#3b82f622':isSelected?accentColor+'66':isDark?darkSq:lightSq }}>
+                    {isTarget && !cell && (
+                      <div className="w-1/3 h-1/3 rounded-full opacity-50" style={{ background: accentColor }} />
+                    )}
+                    {isTarget && midJump && !cell && (
+                      <div className="absolute inset-0.5 rounded-sm border border-blue-400/60 animate-pulse pointer-events-none" />
+                    )}
+                    {cell && isDark && (
+                      <div className={`rounded-full flex items-center justify-center transition-transform ${isSelected||isMJP?'scale-110':''} ${isTarget?'ring-1 ring-yellow-400':''}`}
+                        style={{
+                          width:'78%', height:'78%',
+                          background: cell.p===1 ? '#f1f5f9' : '#1e293b',
+                          boxShadow: isMJP ? '0 0 0 3px rgba(59,130,246,0.7)' : cell.p===1 ? '0 2px 4px rgba(0,0,0,0.3)' : '0 2px 4px rgba(0,0,0,0.5)',
+                          border: cell.k ? '2px solid #facc15' : `2px solid ${cell.p===1?'#cbd5e1':'#475569'}`,
+                          fontSize:'55%',
+                        }}>
+                        {cell.k && '♛'}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
-      )}
+      </div>
 
-      {isFinished && (isP1||isP2) && (
-        <button onClick={handleRematch} className="px-6 py-2 rounded-xl text-sm font-bold text-white" style={{ background: accentColor }}>🔁 Rematch</button>
-      )}
+      {/* ── Fixed footer: controls, variant key, rematch ── */}
+      <div className="flex-shrink-0 flex flex-col items-center gap-1.5 px-3 pb-2">
+        <div className="flex gap-2 items-center flex-wrap justify-center">
+          <button onClick={() => setFlipped(f=>!f)}
+            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:opacity-80 transition-opacity" title="Flip board">
+            <RotateCcw className="w-4 h-4" />
+          </button>
+          {isP1 && status==='waiting' && !gameData?.player2 && !isCpu && (
+            pendingCpu ? (
+              <div className="flex gap-2">
+                {['easy','medium','hard'].map(d => (
+                  <button key={d} onClick={() => handleSetCpu(d)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold text-white capitalize" style={{ background: accentColor }}>{d}</button>
+                ))}
+                <button onClick={() => setPendingCpu(false)} className="px-2 py-1.5 rounded-lg text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">✕</button>
+              </div>
+            ) : (
+              <button onClick={() => setPendingCpu(true)} className="px-4 py-1.5 rounded-xl text-xs font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                🤖 vs CPU
+              </button>
+            )
+          )}
+        </div>
+        {variant !== 'american' && (
+          <div className="text-[9px] text-gray-400 text-center leading-relaxed">
+            {variant==='russian' && '👑 Flying kings · Men capture backward · Promotion continues mid-jump'}
+            {variant==='brazilian' && '👑 Flying kings · Men capture backward · Must maximize captures'}
+          </div>
+        )}
+        {isFinished && (isP1||isP2) && (
+          <button onClick={handleRematch} className="px-6 py-2 rounded-xl text-sm font-bold text-white" style={{ background: accentColor }}>🔁 Rematch</button>
+        )}
+      </div>
     </div>
   );
 }

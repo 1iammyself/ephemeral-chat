@@ -186,7 +186,7 @@ export default function ConnectFourPanel({ message, currentUser, roomVibe }) {
     : 'bg-gray-50 dark:bg-gray-800/40 text-gray-500 dark:text-gray-400';
 
   return (
-    <div className="flex flex-col items-center p-3 h-full gap-3 overflow-y-auto">
+    <div className="flex flex-col h-full overflow-hidden p-3 gap-2">
 
       {/* Scores + disc counts */}
       <div className="flex gap-6 items-end">
@@ -211,7 +211,7 @@ export default function ConnectFourPanel({ message, currentUser, roomVibe }) {
         <p className="text-[9px] text-gray-500 -mt-1.5">↺ First player alternates each rematch</p>
       )}
 
-      <div className="w-full max-w-lg px-1">
+      <div className="flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-lg px-1 mx-auto">
         {/* Column headers */}
         <div className="grid mb-0.5" style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)` }}>
           {Array.from({ length: COLS }, (_, c) => {
