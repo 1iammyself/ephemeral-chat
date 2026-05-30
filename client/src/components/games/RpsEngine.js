@@ -47,19 +47,53 @@ export function getBeatText(winnerPick, loserPick) {
     || `${PICK_LABEL[winnerPick] || winnerPick} beats ${PICK_LABEL[loserPick] || loserPick}`;
 }
 
-// CPU pick strategy — easy: random, medium: 60% counter, hard: always counter
+// CPU pick strategy — per WRPSA research
+// Easy: pure 1/3 random (Nash equilibrium — unexploitable)
+// Medium: counter the player's last move (simple reactive, per research spec)
+// Hard: Markov chain — track P[previous→next] transitions; predict from last throw;
+//        fall back to counter-frequency if not enough data (per research spec)
 export function getCpuPick(variant, difficulty, roundHistory = []) {
   const picks = getPicks(variant);
-  if (difficulty === 'easy' || roundHistory.length < 2) {
-    return picks[Math.floor(Math.random() * picks.length)];
+  const rand = () => picks[Math.floor(Math.random() * picks.length)];
+  const counter = (pick) => picks.find(p => (BEATS[p] || []).includes(pick)) || rand();
+
+  if (difficulty === 'easy') return rand();
+
+  // Use only decisive (non-draw) rounds for analysis — draws don't reveal tendency
+  const decisive = roundHistory.filter(r => r.p1Pick && r.result !== 'draw');
+
+  if (difficulty === 'medium') {
+    if (decisive.length === 0) return rand();
+    // Counter the player's last move
+    return counter(decisive[decisive.length - 1].p1Pick);
   }
-  const freq = {};
-  roundHistory.forEach(r => { if (r.p1Pick) freq[r.p1Pick] = (freq[r.p1Pick] || 0) + 1; });
-  const top = Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0];
-  if (!top) return picks[Math.floor(Math.random() * picks.length)];
-  const counter = picks.find(p => (BEATS[p] || []).includes(top));
-  if (difficulty === 'hard') return counter || picks[Math.floor(Math.random() * picks.length)];
-  return Math.random() < 0.6
-    ? (counter || picks[Math.floor(Math.random() * picks.length)])
-    : picks[Math.floor(Math.random() * picks.length)];
+
+  // Hard: Markov chain (needs ≥2 decisive rounds to build transitions)
+  if (decisive.length < 2) {
+    // Fall back: counter most-frequent pick
+    const freq = {};
+    decisive.forEach(r => { freq[r.p1Pick] = (freq[r.p1Pick] || 0) + 1; });
+    const top = Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0];
+    return top ? counter(top) : rand();
+  }
+  // Build transition matrix: transitions[prevPick][nextPick] = count
+  const transitions = {};
+  for (let i = 0; i < decisive.length - 1; i++) {
+    const from = decisive[i].p1Pick;
+    const to   = decisive[i + 1].p1Pick;
+    if (!transitions[from]) transitions[from] = {};
+    transitions[from][to] = (transitions[from][to] || 0) + 1;
+  }
+  const lastPick = decisive[decisive.length - 1].p1Pick;
+  const row = transitions[lastPick];
+  if (!row || Object.keys(row).length === 0) {
+    // No transitions from this pick yet — fall back to counter-frequency
+    const freq = {};
+    decisive.forEach(r => { freq[r.p1Pick] = (freq[r.p1Pick] || 0) + 1; });
+    const top = Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0];
+    return top ? counter(top) : rand();
+  }
+  // Predict most probable next throw and counter it
+  const predicted = Object.entries(row).sort((a, b) => b[1] - a[1])[0][0];
+  return counter(predicted);
 }

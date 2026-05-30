@@ -4457,14 +4457,38 @@ io.on('connection', (socket) => {
 
   function rpsCpuPick(variant, difficulty, roundHistory) {
     const picks = RPS_PICKS[variant] || RPS_PICKS.standard;
-    if (difficulty === 'easy' || roundHistory.length < 2) return picks[Math.floor(Math.random() * picks.length)];
-    const freq = {};
-    roundHistory.forEach(r => { if (r.p1Pick) freq[r.p1Pick] = (freq[r.p1Pick] || 0) + 1; });
-    const top = Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0];
-    if (!top) return picks[Math.floor(Math.random() * picks.length)];
-    const counter = picks.find(p => (RPS_BEATS[p] || []).includes(top));
-    if (difficulty === 'hard') return counter || picks[Math.floor(Math.random() * picks.length)];
-    return Math.random() < 0.6 ? (counter || picks[Math.floor(Math.random() * picks.length)]) : picks[Math.floor(Math.random() * picks.length)];
+    const rand = () => picks[Math.floor(Math.random() * picks.length)];
+    const counter = (pick) => picks.find(p => (RPS_BEATS[p] || []).includes(pick)) || rand();
+    if (difficulty === 'easy') return rand();
+    // Only decisive (non-draw) rounds reveal player tendency
+    const decisive = roundHistory.filter(r => r.p1Pick && r.result !== 'draw');
+    if (difficulty === 'medium') {
+      if (decisive.length === 0) return rand();
+      return counter(decisive[decisive.length - 1].p1Pick);
+    }
+    // Hard: Markov chain (≥2 decisive rounds needed)
+    if (decisive.length < 2) {
+      const freq = {};
+      decisive.forEach(r => { freq[r.p1Pick] = (freq[r.p1Pick] || 0) + 1; });
+      const top = Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0];
+      return top ? counter(top) : rand();
+    }
+    const transitions = {};
+    for (let i = 0; i < decisive.length - 1; i++) {
+      const from = decisive[i].p1Pick, to = decisive[i + 1].p1Pick;
+      if (!transitions[from]) transitions[from] = {};
+      transitions[from][to] = (transitions[from][to] || 0) + 1;
+    }
+    const lastPick = decisive[decisive.length - 1].p1Pick;
+    const row = transitions[lastPick];
+    if (!row || !Object.keys(row).length) {
+      const freq = {};
+      decisive.forEach(r => { freq[r.p1Pick] = (freq[r.p1Pick] || 0) + 1; });
+      const top = Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0];
+      return top ? counter(top) : rand();
+    }
+    const predicted = Object.entries(row).sort((a, b) => b[1] - a[1])[0][0];
+    return counter(predicted);
   }
 
   function rpsResolveAndAdvance(gameData, room, roomCode, messageId) {
@@ -4476,43 +4500,51 @@ io.on('connection', (socket) => {
     if (!result) return;
 
     if (!gameData.roundHistory) gameData.roundHistory = [];
-    gameData.roundHistory.push({ round: gameData.currentRound, p1Pick, p2Pick, result });
-    if (result === 'player1') gameData.scores.player1 = (gameData.scores.player1 || 0) + 1;
-    else if (result === 'player2') gameData.scores.player2 = (gameData.scores.player2 || 0) + 1;
-    else gameData.scores.draw = (gameData.scores.draw || 0) + 1;
+    const resolvedRound = gameData.currentRound;
+    gameData.roundHistory.push({ round: resolvedRound, p1Pick, p2Pick, result });
 
-    const isMatchOver = gameData.roundHistory.length >= gameData.totalRounds;
-    let winner = null;
+    // WRPSA rule: draw = immediate replay, no point awarded
+    const isDraw = result === 'draw';
+    if (isDraw) {
+      gameData.scores.draw = (gameData.scores.draw || 0) + 1;
+      // currentRound stays the same — same round replays
+    } else {
+      if (result === 'player1') gameData.scores.player1 = (gameData.scores.player1 || 0) + 1;
+      else gameData.scores.player2 = (gameData.scores.player2 || 0) + 1;
+    }
+
+    // Match ends first-to-winsNeeded (Bo3 = first to 2, Bo5 = first to 3, Bo7 = first to 4)
+    const winsNeeded = Math.ceil(gameData.totalRounds / 2);
+    const p1Wins = gameData.scores.player1 || 0;
+    const p2Wins = gameData.scores.player2 || 0;
+    const isMatchOver = !isDraw && (p1Wins >= winsNeeded || p2Wins >= winsNeeded);
+
     if (isMatchOver) {
       gameData.status = 'finished';
       gameData.endedAt = Date.now();
       gameData.result = 'match_complete';
-      if (gameData.scores.player1 > gameData.scores.player2) winner = gameData.player1;
-      else if (gameData.scores.player2 > gameData.scores.player1) winner = gameData.player2;
-      gameData.winner = winner;
+      gameData.winner = p1Wins >= winsNeeded ? gameData.player1 : gameData.player2;
+    } else if (!isDraw) {
+      gameData.currentRound++;
     }
+    // On draw: currentRound unchanged — same round replays
 
-    const nextRound = gameData.currentRound + 1;
-    const revealPayload = {
-      messageId,
-      round: gameData.currentRound,
-      p1Pick,
-      p2Pick,
-      result,
-      scores: { ...gameData.scores },
-      currentRound: isMatchOver ? gameData.currentRound : nextRound,
-      status: gameData.status,
-      winner: gameData.winner,
-    };
-
-    // Advance round and clear picks
-    if (!isMatchOver) {
-      gameData.currentRound = nextRound;
-    }
     gameData.picks = {};
     gameData.pickedIds = [];
 
-    io.to(roomCode).emit('rps-round-reveal', revealPayload);
+    io.to(roomCode).emit('rps-round-reveal', {
+      messageId,
+      round: resolvedRound,
+      p1Pick,
+      p2Pick,
+      result,
+      replay: isDraw,           // client shows "Draw — pick again!" and re-opens pick buttons
+      scores: { ...gameData.scores },
+      currentRound: gameData.currentRound,
+      status: gameData.status,
+      winner: gameData.winner || null,
+    });
+
     if (isMatchOver) {
       io.to(roomCode).emit('rps-game-over', { messageId, gameData });
     }

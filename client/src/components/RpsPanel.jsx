@@ -122,13 +122,13 @@ export default function RpsPanel({ message, currentUser, roomVibe, onDelete }) {
       setPickedIds(pids || []);
     };
 
-    const onRoundReveal = ({ messageId: mid, round, p1Pick, p2Pick, result, scores: s, currentRound: cr, status: st, winner: w }) => {
+    const onRoundReveal = ({ messageId: mid, round, p1Pick, p2Pick, result, replay, scores: s, currentRound: cr, status: st, winner: w }) => {
       if (mid !== messageId) return;
       const beatText = result !== 'draw' && result
         ? getBeatText(result === 'player1' ? p1Pick : p2Pick, result === 'player1' ? p2Pick : p1Pick)
         : null;
       clearTimeout(revealTimerRef.current);
-      setRevealData({ round, p1Pick, p2Pick, result, beatText });
+      setRevealData({ round, p1Pick, p2Pick, result, beatText, replay: !!replay });
       setMyPickThisRound(null);
       setPickedIds([]);
       if (s) setScores(s);
@@ -136,7 +136,8 @@ export default function RpsPanel({ message, currentUser, roomVibe, onDelete }) {
       if (st) setStatus(st);
       if (w) setGameData(prev => prev ? { ...prev, winner: w, status: st || prev.status } : prev);
       if (st !== 'finished') {
-        revealTimerRef.current = setTimeout(() => setRevealData(null), 2500);
+        // Draw replays the same round — shorter dismiss so player can pick again quickly
+        revealTimerRef.current = setTimeout(() => setRevealData(null), replay ? 1500 : 2500);
       }
     };
 
@@ -300,6 +301,8 @@ export default function RpsPanel({ message, currentUser, roomVibe, onDelete }) {
         <div className={`text-center text-xs font-semibold py-1 transition-colors ${
           opponentDisconnected
             ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-300'
+            : revealData?.replay
+              ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300'
             : revealData
               ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300'
             : cpuThinking
@@ -312,8 +315,10 @@ export default function RpsPanel({ message, currentUser, roomVibe, onDelete }) {
         }`}>
           {opponentDisconnected
             ? `⚠️ Opponent disconnected — forfeit in ${disconnectSecondsLeft ?? 60}s`
+            : revealData?.replay
+              ? '🤝 Draw — pick again!'
             : revealData
-              ? `Round ${revealData.round} — ${revealResult === 'draw' ? '🤝 Draw' : iWon ? '🎉 You win!' : '😞 You lose'}`
+              ? `Round ${revealData.round} — ${iWon ? '🎉 You win this round!' : '😞 You lose this round'}`
             : cpuThinking ? '🤖 CPU thinking...'
             : iHavePicked ? '⏳ Waiting for opponent...'
             : myTurnFlash ? '✓ Make your pick!'
@@ -343,25 +348,34 @@ export default function RpsPanel({ message, currentUser, roomVibe, onDelete }) {
       <div ref={boardContainerRef} className="flex-1 min-h-0 flex items-center justify-center p-3">
         <div className="flex flex-col items-center gap-4 w-full" style={{ maxWidth: boardSize }}>
 
-          {/* Round indicator */}
-          {(isLive || isFinished) && (
-            <div className="flex items-center gap-2">
-              {Array.from({ length: totalRounds }, (_, i) => {
-                const r = roundHistory[i];
-                const isCurrent = i === (roundHistory.length) && !isFinished;
-                const color = !r ? (isCurrent ? `ring-2 ring-offset-1 ${vibe.accentClass} opacity-100` : 'bg-gray-200 dark:bg-gray-700')
-                  : r.result === 'player1' ? 'bg-indigo-500'
-                  : r.result === 'player2' ? 'bg-red-500'
-                  : 'bg-gray-400';
-                return (
-                  <div key={i} className={`w-4 h-4 rounded-full transition-all ${r ? color : isCurrent ? 'bg-white dark:bg-gray-800 ring-2 ring-gray-400 dark:ring-gray-500 animate-pulse' : 'bg-gray-200 dark:bg-gray-700'}`} />
-                );
-              })}
-              <span className="text-[10px] text-gray-500 dark:text-gray-400 ml-1">
-                Round {Math.min(currentRound, totalRounds)} of {totalRounds}
-              </span>
-            </div>
-          )}
+          {/* Round indicator — shows decisive (non-draw) round wins, first-to-winsNeeded */}
+          {(isLive || isFinished) && (() => {
+            const winsNeeded = Math.ceil(totalRounds / 2);
+            const decisive = roundHistory.filter(r => r.result !== 'draw');
+            const drawCount = roundHistory.filter(r => r.result === 'draw').length;
+            return (
+              <div className="flex flex-col items-center gap-1">
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: winsNeeded }, (_, i) => {
+                    const r = decisive[i];
+                    const isCurrent = !r && i === decisive.length && !isFinished;
+                    return (
+                      <div key={i} className={`w-4 h-4 rounded-full transition-all ${
+                        !r
+                          ? isCurrent ? 'bg-white dark:bg-gray-800 ring-2 ring-gray-400 dark:ring-gray-500 animate-pulse' : 'bg-gray-200 dark:bg-gray-700'
+                          : r.result === 'player1' ? 'bg-indigo-500'
+                          : 'bg-red-500'
+                      }`} />
+                    );
+                  })}
+                  <span className="text-[10px] text-gray-500 dark:text-gray-400 ml-1">
+                    First to {winsNeeded}
+                    {drawCount > 0 ? ` · ${drawCount} draw${drawCount !== 1 ? 's' : ''}` : ''}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Main game content */}
           {isLive && revealData ? (
@@ -454,7 +468,7 @@ export default function RpsPanel({ message, currentUser, roomVibe, onDelete }) {
               <p className="text-sm font-black text-amber-700 dark:text-amber-300">{buildResultMsg(gameData)}</p>
               <p className="text-[10px] text-gray-500 dark:text-gray-400">
                 {p1Name} {scores.player1 ?? 0} – {scores.player2 ?? 0} {p2Name}
-                {(scores.draw ?? 0) > 0 ? ` · ${scores.draw} draw${scores.draw !== 1 ? 's' : ''}` : ''}
+                {(scores.draw ?? 0) > 0 ? ` · ${scores.draw} drawn` : ''}
               </p>
             </div>
             {isCreator && (!isCpu || queueCount > 0) && (
@@ -477,6 +491,36 @@ export default function RpsPanel({ message, currentUser, roomVibe, onDelete }) {
               })}
             </div>
           )}
+          {/* Post-match stats strip — pick distribution + win rate (per research spec) */}
+          {(() => {
+            const myRounds = roundHistory.filter(r => isP1 ? r.p1Pick : r.p2Pick);
+            if (myRounds.length === 0) return null;
+            const myPicks = myRounds.map(r => isP1 ? r.p1Pick : r.p2Pick);
+            const myWins = myRounds.filter(r => r.result === (isP1 ? 'player1' : 'player2')).length;
+            const myDraws = myRounds.filter(r => r.result === 'draw').length;
+            const myLosses = myRounds.filter(r => r.result !== 'draw' && r.result !== (isP1 ? 'player1' : 'player2')).length;
+            const pickCounts = {};
+            myPicks.forEach(p => { pickCounts[p] = (pickCounts[p] || 0) + 1; });
+            const total = myPicks.length;
+            const winRate = total > 0 ? Math.round(myWins / total * 100) : 0;
+            return (
+              <div className="border-t border-amber-100 dark:border-amber-800/40 px-3 py-2">
+                <p className="text-[9px] text-gray-400 uppercase tracking-widest mb-1.5">
+                  {isPlaying ? 'Your stats' : `${p1Name}'s picks`}
+                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {Object.entries(pickCounts).sort((a, b) => b[1] - a[1]).map(([pick, count]) => (
+                    <span key={pick} className="text-[10px] text-gray-600 dark:text-gray-300 flex items-center gap-0.5">
+                      {PICK_EMOJI[pick]}<span className="font-black">×{count}</span>
+                    </span>
+                  ))}
+                  <span className="ml-auto text-[10px] tabular-nums text-gray-500 dark:text-gray-400">
+                    {myWins}W {myDraws}D {myLosses}L · {winRate}% win
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
