@@ -11,6 +11,7 @@ import TetrisMessage from './TetrisMessage';
 import ChessMessage from './ChessMessage';
 import TicTacToeMessage from './TicTacToeMessage';
 import ConnectFourMessage from './ConnectFourMessage';
+import RpsMessage from './RpsMessage';
 import CheckersMessage from './CheckersMessage';
 import Game2048Message from './Game2048Message';
 import SnakeMessage from './SnakeMessage';
@@ -25,7 +26,7 @@ import { FileOpener } from '@capacitor-community/file-opener';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '🔥', '🙏', '💯', '👌', '😍', '😒', '😘', '😁', '😊', '💕', '🎶', '🤷‍♂️', '😑', '😶‍🌫️', '😉', '✨', '⚡', '🎉', '👏', '👀', '🤔', '😎', '🙌', '🎈', '⭐', '🌈', '🥳', '🤯', '💎', '🎨', '🍕', '🐱', '🦋', '🍀', '🍕', '🍔', '🍦', '🍩', '🍺', '🎸', '🎮', '🚀', '🌈', '🍄'];
 
-const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onPin, onViewThread, isHost, pinnedMessageId, roomVibe, linkPreviews = {}, onOpenEmojiPicker, highlightMap = {}, focusedMessageId = null, onStegoExtract, onTetrisJoin, onTetrisSpectate, onTetrisLaunch, onChessJoin, onChessSpectate, onChessLaunch, onChessVsCpu, onVideoReply = null, onTttJoin, onTttSpectate, onTttLaunch, onTttVsCpu, onC4Join, onC4Spectate, onC4Launch, onC4VsCpu, onCheckersJoin, onCheckersSpectate, onCheckersLaunch, onCheckersVsCpu, on2048Join, on2048Spectate, on2048Launch, onSnakeJoin, onSnakeSpectate, onSnakeLaunch }) => {
+const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onReact, onEdit, onDelete, onPin, onViewThread, isHost, pinnedMessageId, roomVibe, linkPreviews = {}, onOpenEmojiPicker, highlightMap = {}, focusedMessageId = null, onStegoExtract, onTetrisJoin, onTetrisSpectate, onTetrisLaunch, onChessJoin, onChessSpectate, onChessLaunch, onChessVsCpu, onVideoReply = null, onTttJoin, onTttSpectate, onTttLaunch, onTttVsCpu, onC4Join, onC4Spectate, onC4Launch, onC4VsCpu, onRpsJoin, onRpsSpectate, onRpsLaunch, onRpsVsCpu, onCheckersJoin, onCheckersSpectate, onCheckersLaunch, onCheckersVsCpu, on2048Join, on2048Spectate, on2048Launch, onSnakeJoin, onSnakeSpectate, onSnakeLaunch }) => {
   const { t } = useTranslation();
   const [activeReactionId, setActiveReactionId] = useState(null);
   const [showFullPicker, setShowFullPicker] = useState(false);
@@ -102,7 +103,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
     messages.forEach(message => {
       const ttl = message.overrideTtl || messageTTL;
       if (!ttl || ttl <= 0 || message.type === 'system') return;
-      if (message.messageType === 'game' && ['tetris','chess','ttt','c4','checkers','g2048','snake'].includes(message.gameData?.gameType)) return;
+      if (message.messageType === 'game' && ['tetris','chess','ttt','c4','rps','checkers','g2048','snake'].includes(message.gameData?.gameType)) return;
       if (messageTimers.has(message.id)) return;
       if (ttlTimerIdsRef.current[message.id]) return;
 
@@ -172,7 +173,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
   const getTimeLeft = (message) => {
   const ttl = message.overrideTtl || messageTTL;
     if (!ttl || ttl === 0 || message.type === 'system') return null;
-    if (message.messageType === 'game' && ['tetris','chess','ttt','c4','checkers','g2048','snake'].includes(message.gameData?.gameType)) return null;
+    if (message.messageType === 'game' && ['tetris','chess','ttt','c4','rps','checkers','g2048','snake'].includes(message.gameData?.gameType)) return null;
     const messageTime = new Date(message.timestamp).getTime();
     const expiryTime = messageTime + (ttl * 1000);
     const timeLeft = Math.max(0, expiryTime - Date.now());
@@ -446,7 +447,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
             <div className={`flex items-center w-full ${isOwnMessage ? 'justify-end pl-8 sm:pl-12' : 'justify-start pr-8 sm:pr-12'}`}>
               <div className="relative group/bubble w-fit max-w-[80%] sm:max-w-lg md:max-w-xl">
                 <div
-                  className={`relative z-10 w-fit rounded-2xl transition-all duration-300 ${(message.messageType === 'poll' || (message.messageType === 'game' && ['tetris','chess','ttt','c4','checkers','g2048','snake'].includes(message.gameData?.gameType))) ? 'shadow-sm' :
+                  className={`relative z-10 w-fit rounded-2xl transition-all duration-300 ${(message.messageType === 'poll' || (message.messageType === 'game' && ['tetris','chess','ttt','c4','rps','checkers','g2048','snake'].includes(message.gameData?.gameType))) ? 'shadow-sm' :
                     'shadow-sm px-2.5 py-1.5 sm:px-3 sm:py-2 box-border'
                     } ${isOwnMessage
                       ? currentVibe.messageClass
@@ -558,6 +559,14 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         message={message} currentUser={currentUser}
                         onJoin={onC4Join} onSpectate={onC4Spectate}
                         onLaunch={onC4Launch} onVsCpu={onC4VsCpu}
+                        onDelete={onDelete}
+                        roomVibe={roomVibe}
+                      />
+                    ) : message.messageType === 'game' && message.gameData?.gameType === 'rps' ? (
+                      <RpsMessage
+                        message={message} currentUser={currentUser}
+                        onJoin={onRpsJoin} onSpectate={onRpsSpectate}
+                        onLaunch={onRpsLaunch} onVsCpu={onRpsVsCpu}
                         onDelete={onDelete}
                         roomVibe={roomVibe}
                       />

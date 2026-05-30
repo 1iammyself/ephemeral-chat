@@ -94,6 +94,7 @@ import TetrisPanel from './TetrisPanel';
 import ChessPanel from './ChessPanel';
 import TicTacToePanel from './TicTacToePanel';
 import ConnectFourPanel from './ConnectFourPanel';
+import RpsPanel from './RpsPanel';
 import CheckersPanel from './CheckersPanel';
 import Game2048Panel from './Game2048Panel';
 import SnakePanel from './SnakePanel';
@@ -141,6 +142,7 @@ const SLASH_COMMANDS = [
   { icon: Gamepad2, label: 'Chess', value: '/chess', cmdKey: 'chess' },
   { icon: Gamepad2, label: 'Tic-Tac-Toe', value: '/ttt', cmdKey: 'ttt' },
   { icon: Gamepad2, label: 'Connect Four', value: '/c4', cmdKey: 'c4' },
+  { icon: Gamepad2, label: 'Rock-Paper-Scissors', value: '/rps', cmdKey: 'rps' },
   { icon: Gamepad2, label: 'Checkers', value: '/checkers', cmdKey: 'checkers' },
   { icon: Gamepad2, label: '2048', value: '/2048', cmdKey: 'g2048' },
   { icon: Gamepad2, label: 'Snake', value: '/snake', cmdKey: 'snake' },
@@ -714,6 +716,8 @@ const ChatRoom = () => {
   const [activeChessMessage, setActiveChessMessage] = useState(null);
   const [activeTttMessage, setActiveTttMessage] = useState(null);
   const [activeC4Message, setActiveC4Message] = useState(null);
+  const [activeRpsMessage, setActiveRpsMessage] = useState(null);
+  const [showRpsConfig, setShowRpsConfig] = useState(false);
   const [activeCheckersMessage, setActiveCheckersMessage] = useState(null);
   const [active2048Message, setActive2048Message] = useState(null);
   const [activeSnakeMessage, setActiveSnakeMessage] = useState(null);
@@ -1406,6 +1410,7 @@ const ChatRoom = () => {
       setActiveChessMessage(prev => prev?.id === messageId ? null : prev);
       setActiveTttMessage(prev => prev?.id === messageId ? null : prev);
       setActiveC4Message(prev => prev?.id === messageId ? null : prev);
+      setActiveRpsMessage(prev => prev?.id === messageId ? null : prev);
       setActiveCheckersMessage(prev => prev?.id === messageId ? null : prev);
       setActive2048Message(prev => prev?.id === messageId ? null : prev);
       setActiveSnakeMessage(prev => prev?.id === messageId ? null : prev);
@@ -1525,6 +1530,7 @@ const ChatRoom = () => {
       setActiveChessMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
       setActiveTttMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
       setActiveC4Message(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
+      setActiveRpsMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
       setActiveCheckersMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
       setActive2048Message(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
       setActiveSnakeMessage(prev => (prev && prev.id === finalMessage.id) ? finalMessage : prev);
@@ -2250,6 +2256,9 @@ const ChatRoom = () => {
         case '/c4':
           setShowC4Config(true);
           break;
+        case '/rps':
+          setShowRpsConfig(true);
+          break;
         case '/checkers':
           setShowCheckersConfig(true);
           break;
@@ -2886,6 +2895,28 @@ const ChatRoom = () => {
   const handleC4VsCpu = (message) => { setActiveC4Message(message); openPanel('c4'); hapticLight(); };
   useEffect(() => { if (!activeC4Message && isPanelOpen('c4')) closePanel('c4'); }, [activeC4Message]);
 
+  // ── Rock-Paper-Scissors ──────────────────────────────────────────────────
+  const [rpsVariant, setRpsVariant] = useState('standard');
+  const [rpsRounds, setRpsRounds] = useState(5);
+  const handleSendRps = (rounds = 5, cpuDifficulty = null) => {
+    if (!isConnected) return;
+    socketManager.emit('send-message', {
+      messageType: 'game',
+      gameData: { gameType: 'rps', totalRounds: rounds, variant: rpsVariant, ...(cpuDifficulty ? { cpuDifficulty } : {}) },
+      userId: persistentUserId, isAnonymous: false,
+    });
+    setShowRpsConfig(false);
+  };
+  const handleRpsJoin = (messageId) => {
+    if (!isConnected) return;
+    socketManager.emit('rps-join', { messageId });
+    setMessages(prev => { const msg = prev.find(m => m.id === messageId); if (msg) { setActiveRpsMessage(msg); openPanel('rps'); } return prev; });
+  };
+  const handleRpsLaunch = (message) => { setActiveRpsMessage(message); openPanel('rps'); hapticLight(); };
+  const handleRpsSpectate = (message) => { setActiveRpsMessage(message); openPanel('rps'); };
+  const handleRpsVsCpu = (message) => { setActiveRpsMessage(message); openPanel('rps'); hapticLight(); };
+  useEffect(() => { if (!activeRpsMessage && isPanelOpen('rps')) closePanel('rps'); }, [activeRpsMessage]);
+
   // ── Checkers ─────────────────────────────────────────────────────────────
   const [checkersVariant, setCheckersVariant] = useState('american');
   const handleSendCheckers = (cpuDifficulty = null) => {
@@ -3448,6 +3479,10 @@ const ChatRoom = () => {
               onC4Spectate={handleC4Spectate}
               onC4Launch={handleC4Launch}
               onC4VsCpu={handleC4VsCpu}
+              onRpsJoin={handleRpsJoin}
+              onRpsSpectate={handleRpsSpectate}
+              onRpsLaunch={handleRpsLaunch}
+              onRpsVsCpu={handleRpsVsCpu}
               onCheckersJoin={handleCheckersJoin}
               onCheckersSpectate={handleCheckersSpectate}
               onCheckersLaunch={handleCheckersLaunch}
@@ -3634,6 +3669,7 @@ const ChatRoom = () => {
                                 {[
                                   { emoji: '✕○', label: 'TTT', name: 'Tic-Tac-Toe', action: () => { setShowTttConfig(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
                                   { emoji: '🔴', label: 'C4', name: 'Connect 4', action: () => { setShowC4Config(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
+                                  { emoji: '✊', label: 'RPS', name: 'Rock·Paper·Scissors', action: () => { setShowRpsConfig(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
                                   { emoji: '⛀', label: 'Check', name: 'Checkers', action: () => { setShowCheckersConfig(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
                                   { emoji: '2048', label: '2048', name: '2048', action: () => { setShow2048Config(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
                                   { emoji: '🐍', label: 'Snake', name: 'Snake', action: () => { setShowSnakeConfig(true); setShowFeatureMenu(false); setShowGamesSubmenu(false); } },
@@ -4462,6 +4498,13 @@ const ChatRoom = () => {
           <ConnectFourPanel message={activeC4Message} currentUser={currentUser} roomVibe={roomVibe} />
         </FloatingPanel>
       )}
+      {activeRpsMessage && (
+        <FloatingPanel title="Rock·Paper·Scissors" icon={Gamepad2} iconColor="text-green-400"
+          onClose={() => closePanel('rps')} onFocus={() => focusPanel('rps')} zIndex={getZ('rps')}
+          defaultWidth={gW} defaultHeight={gHtall} visible={isPanelOpen('rps')}>
+          <RpsPanel message={activeRpsMessage} currentUser={currentUser} roomVibe={roomVibe} />
+        </FloatingPanel>
+      )}
       {activeCheckersMessage && (
         <FloatingPanel title="Checkers" icon={Gamepad2} iconColor="text-amber-400"
           onClose={() => closePanel('checkers')} onFocus={() => focusPanel('checkers')} zIndex={getZ('checkers')}
@@ -4536,6 +4579,50 @@ const ChatRoom = () => {
               {['easy','medium','hard'].map(d => (
                 <button key={d} onClick={() => handleSendC4(d)}
                   className={`flex-1 py-2.5 rounded-xl text-white font-black text-xs capitalize ${currentVibe.accentClass} hover:opacity-90 transition-opacity`}>
+                  🤖 {d}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Rock-Paper-Scissors config picker ── */}
+      {showRpsConfig && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={() => { setShowRpsConfig(false); setRpsVariant('standard'); setRpsRounds(5); }}>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 w-full max-w-xs"
+            onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-3 text-center">✊ Rock·Paper·Scissors</p>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">Variant</p>
+            <div className="flex gap-2 mb-3">
+              <button onClick={() => setRpsVariant('standard')}
+                className={`flex-1 py-2 rounded-xl text-xs font-black transition-colors ${rpsVariant === 'standard' ? `${currentVibe.accentClass} text-white` : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
+                ✊ Standard
+              </button>
+              <button onClick={() => setRpsVariant('rpsls')}
+                className={`flex-1 py-2 rounded-xl text-xs font-black transition-colors ${rpsVariant === 'rpsls' ? `${currentVibe.accentClass} text-white` : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
+                🖖 RPSLS
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">Best of</p>
+            <div className="flex gap-2 mb-4">
+              {[3, 5, 7].map(r => (
+                <button key={r} onClick={() => setRpsRounds(r)}
+                  className={`flex-1 py-2 rounded-xl font-black text-sm transition-colors ${rpsRounds === r ? `${currentVibe.accentClass} text-white` : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
+                  {r}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => { handleSendRps(rpsRounds, null); setRpsRounds(5); }}
+              className={`w-full mb-2 py-2.5 rounded-xl font-black text-sm ${currentVibe.accentClass} text-white hover:opacity-90`}>
+              ⚔️ vs Player — Bo{rpsRounds}
+            </button>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">vs CPU</p>
+            <div className="flex gap-2">
+              {['easy', 'medium', 'hard'].map(d => (
+                <button key={d} onClick={() => { handleSendRps(rpsRounds, d); setRpsRounds(5); }}
+                  className="flex-1 py-2 rounded-xl text-xs font-black bg-purple-500 text-white hover:opacity-90 capitalize">
                   🤖 {d}
                 </button>
               ))}
