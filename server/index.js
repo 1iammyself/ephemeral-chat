@@ -4437,9 +4437,12 @@ io.on('connection', (socket) => {
     } catch (err) { logger.error('c4-lock-queue err:', err); }
   });
 
-  // ─── Rock-Paper-Scissors Handlers ───────────────────────────────────────
+  // ─── Rock-Paper-Scissors (client-authoritative; server stores & relays) ───
+  // Round resolution happens entirely on the referee's client (player1). The
+  // server never computes a winner — it validates authorisation, persists the
+  // state the referee pushes, and relays picks. Removing all server-side
+  // resolution removes the identity-matching that caused "CPU thinking forever".
 
-  const RPS_BEATS = { rock: ['scissors','lizard'], paper: ['rock','spock'], scissors: ['paper','lizard'], lizard: ['spock','paper'], spock: ['scissors','rock'] };
   const RPS_PICKS = { standard: ['rock','paper','scissors'], rpsls: ['rock','paper','scissors','lizard','spock'] };
 
   function rpsGetMsg(room, messageId) {
@@ -4448,106 +4451,17 @@ io.on('connection', (socket) => {
     return msg;
   }
 
-  function rpsResolve(p1Pick, p2Pick) {
-    if (!p1Pick || !p2Pick) return null;
-    if (p1Pick === p2Pick) return 'draw';
-    const beaten = RPS_BEATS[p1Pick] || [];
-    return beaten.includes(p2Pick) ? 'player1' : 'player2';
+  function rpsIsParticipant(gameData, socket) {
+    const id = socket.persistentUserId || socket.id;
+    const nick = socket.nickname;
+    const matches = (p) => p && (p.id === id || (nick && p.name === nick));
+    return matches(gameData.player1) || (matches(gameData.player2) && !gameData.cpu?.enabled);
   }
 
-  function rpsCpuPick(variant, difficulty, roundHistory) {
-    const picks = RPS_PICKS[variant] || RPS_PICKS.standard;
-    const rand = () => picks[Math.floor(Math.random() * picks.length)];
-    const counter = (pick) => picks.find(p => (RPS_BEATS[p] || []).includes(pick)) || rand();
-    if (difficulty === 'easy') return rand();
-    // Only decisive (non-draw) rounds reveal player tendency
-    const decisive = roundHistory.filter(r => r.p1Pick && r.result !== 'draw');
-    if (difficulty === 'medium') {
-      if (decisive.length === 0) return rand();
-      return counter(decisive[decisive.length - 1].p1Pick);
-    }
-    // Hard: Markov chain (≥2 decisive rounds needed)
-    if (decisive.length < 2) {
-      const freq = {};
-      decisive.forEach(r => { freq[r.p1Pick] = (freq[r.p1Pick] || 0) + 1; });
-      const top = Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0];
-      return top ? counter(top) : rand();
-    }
-    const transitions = {};
-    for (let i = 0; i < decisive.length - 1; i++) {
-      const from = decisive[i].p1Pick, to = decisive[i + 1].p1Pick;
-      if (!transitions[from]) transitions[from] = {};
-      transitions[from][to] = (transitions[from][to] || 0) + 1;
-    }
-    const lastPick = decisive[decisive.length - 1].p1Pick;
-    const row = transitions[lastPick];
-    if (!row || !Object.keys(row).length) {
-      const freq = {};
-      decisive.forEach(r => { freq[r.p1Pick] = (freq[r.p1Pick] || 0) + 1; });
-      const top = Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0];
-      return top ? counter(top) : rand();
-    }
-    const predicted = Object.entries(row).sort((a, b) => b[1] - a[1])[0][0];
-    return counter(predicted);
-  }
-
-  function rpsResolveAndAdvance(gameData, room, roomCode, messageId) {
-    const p1Id = gameData.player1.id;
-    const p2Id = gameData.player2.id;
-    const p1Pick = gameData.picks[p1Id];
-    const p2Pick = gameData.picks[p2Id];
-    const result = rpsResolve(p1Pick, p2Pick);
-    if (!result) return;
-
-    if (!gameData.roundHistory) gameData.roundHistory = [];
-    const resolvedRound = gameData.currentRound;
-    gameData.roundHistory.push({ round: resolvedRound, p1Pick, p2Pick, result });
-
-    // WRPSA rule: draw = immediate replay, no point awarded
-    const isDraw = result === 'draw';
-    if (isDraw) {
-      gameData.scores.draw = (gameData.scores.draw || 0) + 1;
-      // currentRound stays the same — same round replays
-    } else {
-      if (result === 'player1') gameData.scores.player1 = (gameData.scores.player1 || 0) + 1;
-      else gameData.scores.player2 = (gameData.scores.player2 || 0) + 1;
-    }
-
-    // Match ends first-to-winsNeeded (Bo3 = first to 2, Bo5 = first to 3, Bo7 = first to 4)
-    const winsNeeded = Math.ceil(gameData.totalRounds / 2);
-    const p1Wins = gameData.scores.player1 || 0;
-    const p2Wins = gameData.scores.player2 || 0;
-    const isMatchOver = !isDraw && (p1Wins >= winsNeeded || p2Wins >= winsNeeded);
-
-    if (isMatchOver) {
-      gameData.status = 'finished';
-      gameData.endedAt = Date.now();
-      gameData.result = 'match_complete';
-      gameData.winner = p1Wins >= winsNeeded ? gameData.player1 : gameData.player2;
-    } else if (!isDraw) {
-      gameData.currentRound++;
-    }
-    // On draw: currentRound unchanged — same round replays
-
-    gameData.picks = {};
-    gameData.pickedIds = [];
-
-    io.to(roomCode).emit('rps-round-reveal', {
-      messageId,
-      round: resolvedRound,
-      p1Pick,
-      p2Pick,
-      result,
-      replay: isDraw,           // client shows "Draw — pick again!" and re-opens pick buttons
-      scores: { ...gameData.scores },
-      currentRound: gameData.currentRound,
-      status: gameData.status,
-      winner: gameData.winner || null,
-    });
-
-    if (isMatchOver) {
-      io.to(roomCode).emit('rps-game-over', { messageId, gameData });
-    }
+  function rpsIsCreator(gameData, socket) {
+    const id = socket.persistentUserId || socket.id;
+    return gameData.creatorId === id
+      || (socket.nickname && gameData.player1?.name === socket.nickname && gameData.player1?.id === gameData.creatorId);
   }
 
   socket.on('rps-join', async ({ messageId }) => {
@@ -4558,20 +4472,30 @@ io.on('connection', (socket) => {
       const message = rpsGetMsg(room, messageId);
       if (!message) return;
       const { gameData } = message;
-      if (gameData.status !== 'waiting') return;
-      const joinerId = socket.persistentUserId || socket.id;
-      if (gameData.player1?.id === joinerId) return;
-      if (gameData.player2) return;
-      gameData.player2 = { id: joinerId, socketId: socket.id, name: socket.nickname };
-      gameData.status = 'playing';
-      gameData.startedAt = Date.now();
+      if (gameData.cpu?.enabled) return;
+      const joiner = { id: socket.persistentUserId || socket.id, socketId: socket.id, name: socket.nickname };
+      if (gameData.status === 'waiting' && !gameData.player2 && gameData.player1?.id !== joiner.id) {
+        gameData.player2 = joiner;
+        gameData.status = 'playing';
+        gameData.startedAt = Date.now();
+      } else if (gameData.status !== 'finished') {
+        // game already underway — queue up
+        if (gameData.queueLocked) return;
+        if (rpsIsParticipant(gameData, socket)) return;
+        if (!gameData.challengeQueue) gameData.challengeQueue = [];
+        if (gameData.maxQueue && gameData.challengeQueue.length >= gameData.maxQueue) return;
+        if (gameData.challengeQueue.some(p => p.id === joiner.id)) return;
+        gameData.challengeQueue.push(joiner);
+      } else {
+        return;
+      }
       await roomManager.saveRoom(socket.roomCode, room);
       io.to(socket.roomCode).emit('message-updated', message);
-      io.to(socket.roomCode).emit('rps-opponent-joined', { messageId, gameData });
+      io.to(socket.roomCode).emit('rps-state', { messageId, gameData });
     } catch (err) { logger.error('rps-join err:', err); }
   });
 
-  socket.on('rps-set-cpu', async ({ messageId, difficulty }) => {
+  socket.on('rps-queue', async ({ messageId }) => {
     try {
       if (!socket.roomCode || !messageId) return;
       const room = await roomManager.getRoom(socket.roomCode);
@@ -4579,19 +4503,44 @@ io.on('connection', (socket) => {
       const message = rpsGetMsg(room, messageId);
       if (!message) return;
       const { gameData } = message;
-      const senderId = socket.persistentUserId || socket.id;
-      if (gameData.creatorId !== senderId || gameData.status !== 'waiting') return;
-      const diff = ['easy','medium','hard'].includes(difficulty) ? difficulty : 'medium';
-      gameData.cpu = { enabled: true, difficulty: diff };
-      gameData.player2 = { id: 'cpu', socketId: null, name: `CPU (${diff})` };
-      gameData.status = 'playing';
-      gameData.startedAt = Date.now();
+      if (gameData.status === 'finished' || gameData.cpu?.enabled || gameData.queueLocked) return;
+      if (rpsIsParticipant(gameData, socket)) return;
+      if (!gameData.challengeQueue) gameData.challengeQueue = [];
+      if (gameData.maxQueue && gameData.challengeQueue.length >= gameData.maxQueue) return;
+      const id = socket.persistentUserId || socket.id;
+      if (gameData.challengeQueue.some(p => p.id === id)) return;
+      gameData.challengeQueue.push({ id, socketId: socket.id, name: socket.nickname });
       await roomManager.saveRoom(socket.roomCode, room);
       io.to(socket.roomCode).emit('message-updated', message);
-      io.to(socket.roomCode).emit('rps-opponent-joined', { messageId, gameData });
-    } catch (err) { logger.error('rps-set-cpu err:', err); }
+      io.to(socket.roomCode).emit('rps-state', { messageId, gameData });
+    } catch (err) { logger.error('rps-queue err:', err); }
   });
 
+  // Referee / participant / creator pushes the authoritative full game state.
+  socket.on('rps-state', async ({ messageId, gameData: incoming }) => {
+    try {
+      if (!socket.roomCode || !messageId || !incoming || typeof incoming !== 'object') return;
+      const room = await roomManager.getRoom(socket.roomCode);
+      if (!room) return;
+      const message = rpsGetMsg(room, messageId);
+      if (!message) return;
+      const current = message.gameData;
+      if (!rpsIsCreator(current, socket) && !rpsIsParticipant(current, socket)) return;
+      // Accept the referee's state but pin the server-owned invariants.
+      message.gameData = {
+        ...incoming,
+        gameType: 'rps',
+        creatorId: current.creatorId,
+        variant: current.variant,
+        totalRounds: current.totalRounds,
+      };
+      await roomManager.saveRoom(socket.roomCode, room);
+      io.to(socket.roomCode).emit('message-updated', message);
+      io.to(socket.roomCode).emit('rps-state', { messageId, gameData: message.gameData });
+    } catch (err) { logger.error('rps-state err:', err); }
+  });
+
+  // PvP: relay a player's pick value to the room. Only player1 (referee) acts on it.
   socket.on('rps-pick', async ({ messageId, pick }) => {
     try {
       if (!socket.roomCode || !messageId) return;
@@ -4601,238 +4550,24 @@ io.on('connection', (socket) => {
       if (!message) return;
       const { gameData } = message;
       if (gameData.status !== 'playing') return;
-      const validPicks = RPS_PICKS[gameData.variant] || RPS_PICKS.standard;
-      if (!validPicks.includes(pick)) return;
-      const playerId = socket.persistentUserId || socket.id;
-      // Mirror chess: ID check + nickname fallback so ID drift never silently rejects a pick
-      const isP1 = gameData.player1?.id === playerId || (socket.nickname && gameData.player1?.name === socket.nickname);
-      const isP2 = (gameData.player2?.id === playerId || (socket.nickname && gameData.player2?.name === socket.nickname)) && !gameData.cpu?.enabled;
-      if (!isP1 && !isP2) return;
-      // Always store pick under the canonical player ID that rpsResolveAndAdvance will look up
-      const canonicalId = isP1 ? gameData.player1.id : gameData.player2.id;
-      if (gameData.picks[canonicalId]) return;
-      gameData.picks[canonicalId] = pick;
-      if (!gameData.pickedIds) gameData.pickedIds = [];
-      if (!gameData.pickedIds.includes(canonicalId)) gameData.pickedIds.push(canonicalId);
-      io.to(socket.roomCode).emit('rps-player-picked', { messageId, pickedIds: gameData.pickedIds });
-      // If CPU game, pick for CPU and resolve immediately
-      if (gameData.cpu?.enabled && isP1) {
-        const cpuPick = rpsCpuPick(gameData.variant, gameData.cpu.difficulty, gameData.roundHistory || []);
-        gameData.picks[gameData.player2.id] = cpuPick;
-        gameData.pickedIds.push(gameData.player2.id);
-        rpsResolveAndAdvance(gameData, room, socket.roomCode, messageId);
-        await roomManager.saveRoom(socket.roomCode, room);
-        io.to(socket.roomCode).emit('message-updated', message);
-        return;
-      }
-      // Both human players picked — resolve
-      if (gameData.player2 && gameData.picks[gameData.player2.id]) {
-        rpsResolveAndAdvance(gameData, room, socket.roomCode, messageId);
-      }
-      await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('message-updated', message);
+      const valid = RPS_PICKS[gameData.variant] || RPS_PICKS.standard;
+      if (!valid.includes(pick)) return;
+      if (!rpsIsParticipant(gameData, socket)) return;
+      io.to(socket.roomCode).emit('rps-pick', {
+        messageId, pick,
+        fromId: socket.persistentUserId || socket.id,
+        fromName: socket.nickname,
+      });
     } catch (err) { logger.error('rps-pick err:', err); }
   });
 
-  socket.on('rps-cpu-pick', async ({ messageId, humanPick, cpuPick }) => {
+  // Valueless "this side locked in" ping for the waiting indicator.
+  socket.on('rps-locked', async ({ messageId, side }) => {
     try {
       if (!socket.roomCode || !messageId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = rpsGetMsg(room, messageId);
-      if (!message) return;
-      const { gameData } = message;
-      if (gameData.status !== 'playing' || !gameData.cpu?.enabled) return;
-      const validPicks = RPS_PICKS[gameData.variant] || RPS_PICKS.standard;
-      if (!validPicks.includes(humanPick) || !validPicks.includes(cpuPick)) return;
-      const p1Id = gameData.player1.id;
-      const p2Id = gameData.player2.id; // 'cpu'
-      if (gameData.picks[p1Id] || gameData.picks[p2Id]) return; // already picked this round
-      gameData.picks[p1Id] = humanPick;
-      gameData.picks[p2Id] = cpuPick;
-      if (!gameData.pickedIds) gameData.pickedIds = [];
-      gameData.pickedIds = [p1Id, p2Id];
-      io.to(socket.roomCode).emit('rps-player-picked', { messageId, pickedIds: gameData.pickedIds });
-      rpsResolveAndAdvance(gameData, room, socket.roomCode, messageId);
-      await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('message-updated', message);
-    } catch (err) { logger.error('rps-cpu-pick err:', err); }
-  });
-
-  socket.on('rps-resign', async ({ messageId }) => {
-    try {
-      if (!socket.roomCode || !messageId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = rpsGetMsg(room, messageId);
-      if (!message) return;
-      const { gameData } = message;
-      if (gameData.status !== 'playing') return;
-      const resignerId = socket.persistentUserId || socket.id;
-      const isP1 = gameData.player1?.id === resignerId || (socket.nickname && gameData.player1?.name === socket.nickname);
-      const isP2 = (gameData.player2?.id === resignerId || (socket.nickname && gameData.player2?.name === socket.nickname)) && !gameData.cpu?.enabled;
-      if (!isP1 && !isP2) return;
-      gameData.status = 'finished';
-      gameData.result = 'resign';
-      gameData.winner = isP1 ? gameData.player2 : gameData.player1;
-      gameData.endedAt = Date.now();
-      if (!gameData.challengeQueue) gameData.challengeQueue = [];
-      if (gameData.challengeQueue.length > 0) {
-        // swap in next challenger
-        const next = gameData.challengeQueue.shift();
-        if (isP1) { gameData.player1 = next; } else { gameData.player2 = next; }
-        gameData.status = 'playing';
-        gameData.result = null;
-        gameData.winner = null;
-        gameData.currentRound = 1;
-        gameData.picks = {};
-        gameData.pickedIds = [];
-        gameData.roundHistory = [];
-        gameData.scores = { player1: 0, player2: 0, draw: 0 };
-        gameData.startedAt = Date.now();
-        gameData.endedAt = null;
-        await roomManager.saveRoom(socket.roomCode, room);
-        io.to(socket.roomCode).emit('message-updated', message);
-        io.to(socket.roomCode).emit('rps-new-round', { messageId, gameData });
-      } else {
-        await roomManager.saveRoom(socket.roomCode, room);
-        io.to(socket.roomCode).emit('message-updated', message);
-        io.to(socket.roomCode).emit('rps-game-over', { messageId, gameData });
-      }
-    } catch (err) { logger.error('rps-resign err:', err); }
-  });
-
-  socket.on('rps-game-end', async ({ messageId, winner: winnerSide, result }) => {
-    try {
-      if (!socket.roomCode || !messageId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = rpsGetMsg(room, messageId);
-      if (!message) return;
-      const { gameData } = message;
-      if (gameData.status !== 'playing') return;
-      gameData.status = 'finished';
-      gameData.result = result || 'resign';
-      gameData.winner = winnerSide === 'player1' ? gameData.player1 : gameData.player2;
-      gameData.endedAt = Date.now();
-      await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('message-updated', message);
-      io.to(socket.roomCode).emit('rps-game-over', { messageId, gameData });
-    } catch (err) { logger.error('rps-game-end err:', err); }
-  });
-
-  socket.on('rps-rematch', async ({ messageId, difficulty }) => {
-    try {
-      if (!socket.roomCode || !messageId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = rpsGetMsg(room, messageId);
-      if (!message) return;
-      const { gameData } = message;
-      if (gameData.status !== 'finished') return;
-      const requesterId = socket.persistentUserId || socket.id;
-      if (gameData.creatorId !== requesterId) return;
-      if (gameData.cpu?.enabled && difficulty) {
-        const diff = ['easy','medium','hard'].includes(difficulty) ? difficulty : gameData.cpu.difficulty;
-        gameData.cpu = { enabled: true, difficulty: diff };
-        gameData.player2 = { id: 'cpu', socketId: null, name: `CPU (${diff})` };
-      }
-      if (!gameData.cpu?.enabled && gameData.challengeQueue?.length > 0) {
-        gameData.player2 = gameData.challengeQueue.shift();
-      }
-      gameData.status = 'playing';
-      gameData.winner = null;
-      gameData.result = null;
-      gameData.currentRound = 1;
-      gameData.picks = {};
-      gameData.pickedIds = [];
-      gameData.roundHistory = [];
-      gameData.scores = { player1: 0, player2: 0, draw: 0 };
-      gameData.startedAt = Date.now();
-      gameData.endedAt = null;
-      await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('message-updated', message);
-      io.to(socket.roomCode).emit('rps-new-round', { messageId, gameData });
-    } catch (err) { logger.error('rps-rematch err:', err); }
-  });
-
-  socket.on('rps-tag-out', async ({ messageId }) => {
-    try {
-      if (!socket.roomCode || !messageId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = rpsGetMsg(room, messageId);
-      if (!message) return;
-      const { gameData } = message;
-      if (gameData.status !== 'playing' || !gameData.challengeQueue?.length) return;
-      const playerId = socket.persistentUserId || socket.id;
-      const isP1 = gameData.player1?.id === playerId || (socket.nickname && gameData.player1?.name === socket.nickname);
-      const isP2 = (gameData.player2?.id === playerId || (socket.nickname && gameData.player2?.name === socket.nickname)) && !gameData.cpu?.enabled;
-      if (!isP1 && !isP2) return;
-      const next = gameData.challengeQueue.shift();
-      if (isP1) { gameData.challengeQueue.push(gameData.player1); gameData.player1 = next; }
-      else { gameData.challengeQueue.push(gameData.player2); gameData.player2 = next; }
-      gameData.currentRound = 1;
-      gameData.picks = {};
-      gameData.pickedIds = [];
-      gameData.roundHistory = [];
-      gameData.scores = { player1: 0, player2: 0, draw: 0 };
-      gameData.startedAt = Date.now();
-      await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('message-updated', message);
-      io.to(socket.roomCode).emit('rps-new-round', { messageId, gameData });
-    } catch (err) { logger.error('rps-tag-out err:', err); }
-  });
-
-  socket.on('rps-queue-again', async ({ messageId }) => {
-    try {
-      if (!socket.roomCode || !messageId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = rpsGetMsg(room, messageId);
-      if (!message) return;
-      const { gameData } = message;
-      const playerId = socket.persistentUserId || socket.id;
-      if (!gameData.challengeQueue) gameData.challengeQueue = [];
-      if (gameData.challengeQueue.some(p => p.id === playerId)) return;
-      if (gameData.queueLocked) return;
-      if (gameData.maxQueue && gameData.challengeQueue.length >= gameData.maxQueue) return;
-      gameData.challengeQueue.push({ id: playerId, socketId: socket.id, name: socket.nickname });
-      await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('message-updated', message);
-    } catch (err) { logger.error('rps-queue-again err:', err); }
-  });
-
-  socket.on('rps-set-max-queue', async ({ messageId, maxQueue }) => {
-    try {
-      if (!socket.roomCode || !messageId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = rpsGetMsg(room, messageId);
-      if (!message) return;
-      const { gameData } = message;
-      const senderId = socket.persistentUserId || socket.id;
-      if (gameData.creatorId !== senderId) return;
-      gameData.maxQueue = typeof maxQueue === 'number' ? maxQueue : null;
-      await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('message-updated', message);
-    } catch (err) { logger.error('rps-set-max-queue err:', err); }
-  });
-
-  socket.on('rps-lock-queue', async ({ messageId, locked }) => {
-    try {
-      if (!socket.roomCode || !messageId) return;
-      const room = await roomManager.getRoom(socket.roomCode);
-      if (!room) return;
-      const message = rpsGetMsg(room, messageId);
-      if (!message) return;
-      const { gameData } = message;
-      const senderId = socket.persistentUserId || socket.id;
-      if (gameData.creatorId !== senderId) return;
-      gameData.queueLocked = !!locked;
-      await roomManager.saveRoom(socket.roomCode, room);
-      io.to(socket.roomCode).emit('message-updated', message);
-    } catch (err) { logger.error('rps-lock-queue err:', err); }
+      if (side !== 'player1' && side !== 'player2') return;
+      io.to(socket.roomCode).emit('rps-locked', { messageId, side });
+    } catch (err) { logger.error('rps-locked err:', err); }
   });
 
   // ─── Checkers Handlers ───────────────────────────────────────────────────
