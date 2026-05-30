@@ -1,13 +1,15 @@
-import React from 'react';
-import { Trophy, Clock } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trophy, Clock, Trash2 } from 'lucide-react';
 import { getVibeById } from '../utils/vibes';
 
-const CheckersMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, onVsCpu, roomVibe }) => {
+const CheckersMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, onVsCpu, onDelete, roomVibe }) => {
   const { gameData } = message;
   const vibe = getVibeById(roomVibe);
   const userId = currentUser?.id || currentUser?.socketId;
   const nickname = currentUser?.nickname;
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const isCreator = message.sender?.id === userId || (nickname && message.sender?.nickname === nickname);
   const isP1 = gameData.player1?.id === userId || (nickname && gameData.player1?.name === nickname);
   const isP2 = gameData.player2?.id === userId || (nickname && gameData.player2?.name === nickname);
   const isPlaying = isP1 || isP2;
@@ -144,6 +146,26 @@ const CheckersMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, o
           <button onClick={() => onSpectate?.(message)} className="flex-1 py-1.5 text-xs font-black rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:opacity-90 transition-opacity">
             {isFinished ? '📋 Review' : '👁 Spectate'}
           </button>
+        )}
+        {isCreator && onDelete && (
+          confirmDelete ? (
+            <div className="flex gap-1 shrink-0">
+              <button onClick={() => { onDelete(message.id); setConfirmDelete(false); }}
+                className="py-1.5 px-2 text-xs font-black rounded-lg bg-red-600 text-white hover:opacity-90 transition-opacity">
+                Confirm
+              </button>
+              <button onClick={() => setConfirmDelete(false)}
+                className="py-1.5 px-2 text-xs font-black rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:opacity-80 transition-opacity">
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmDelete(true)}
+              className="p-1.5 rounded-lg bg-gray-200 dark:bg-gray-700 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors shrink-0"
+              title="Delete game for everyone">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )
         )}
       </div>
     </div>

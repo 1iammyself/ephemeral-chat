@@ -1,14 +1,16 @@
-import React from 'react';
-import { Trophy, Users, Timer } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trophy, Users, Timer, Trash2 } from 'lucide-react';
 import { getVibeById } from '../utils/vibes';
-import { TILE_COLORS } from './games/Game2048Engine';
+import { getTileColor } from './games/Game2048Engine';
 
-const Game2048Message = ({ message, currentUser, onJoin, onSpectate, onLaunch, roomVibe }) => {
+const Game2048Message = ({ message, currentUser, onJoin, onSpectate, onLaunch, onDelete, roomVibe }) => {
   const { gameData } = message;
   const vibe = getVibeById(roomVibe);
   const userId = currentUser?.id || currentUser?.socketId;
   const nickname = currentUser?.nickname;
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const isCreator = message.sender?.id === userId || (nickname && message.sender?.nickname === nickname);
   const isMember = gameData.players?.some(p => p.id === userId || (nickname && p.name === nickname));
   const isHost = gameData.hostId === userId;
   const isFinished = gameData.status === 'finished';
@@ -21,7 +23,8 @@ const Game2048Message = ({ message, currentUser, onJoin, onSpectate, onLaunch, r
   const sortedPlayers = (gameData.players || []).slice().sort((a,b) => (scores[b.id]||0) - (scores[a.id]||0));
 
   const topTile = Math.max(...Object.values(bestTiles), 0);
-  const tileColor = TILE_COLORS[topTile] || TILE_COLORS[2048];
+  const gameMode  = gameData?.gameMode || 'standard';
+  const tileColor = getTileColor(topTile, gameMode);
 
   return (
     <div className="w-full max-w-[240px] overflow-hidden rounded-2xl shadow-lg border border-black/10 dark:border-white/10">
@@ -102,6 +105,26 @@ const Game2048Message = ({ message, currentUser, onJoin, onSpectate, onLaunch, r
           <button onClick={() => onSpectate?.(message)} className="flex-1 py-1.5 text-xs font-black rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:opacity-90 transition-opacity">
             {isFinished ? '📋 Review' : '👁 Watch'}
           </button>
+        )}
+        {isCreator && onDelete && (
+          confirmDelete ? (
+            <div className="flex gap-1 shrink-0">
+              <button onClick={() => { onDelete(message.id); setConfirmDelete(false); }}
+                className="py-1.5 px-2 text-xs font-black rounded-lg bg-red-600 text-white hover:opacity-90 transition-opacity">
+                Confirm
+              </button>
+              <button onClick={() => setConfirmDelete(false)}
+                className="py-1.5 px-2 text-xs font-black rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:opacity-80 transition-opacity">
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmDelete(true)}
+              className="p-1.5 rounded-lg bg-gray-200 dark:bg-gray-700 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors shrink-0"
+              title="Delete game for everyone">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )
         )}
       </div>
     </div>

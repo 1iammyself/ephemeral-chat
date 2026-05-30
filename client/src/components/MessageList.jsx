@@ -551,6 +551,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         message={message} currentUser={currentUser}
                         onJoin={onTttJoin} onSpectate={onTttSpectate}
                         onLaunch={onTttLaunch} onVsCpu={onTttVsCpu}
+                        onDelete={onDelete}
                         roomVibe={roomVibe}
                       />
                     ) : message.messageType === 'game' && message.gameData?.gameType === 'c4' ? (
@@ -558,6 +559,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         message={message} currentUser={currentUser}
                         onJoin={onC4Join} onSpectate={onC4Spectate}
                         onLaunch={onC4Launch} onVsCpu={onC4VsCpu}
+                        onDelete={onDelete}
                         roomVibe={roomVibe}
                       />
                     ) : message.messageType === 'game' && message.gameData?.gameType === 'rps' ? (
@@ -565,6 +567,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         message={message} currentUser={currentUser}
                         onJoin={onRpsJoin} onSpectate={onRpsSpectate}
                         onLaunch={onRpsLaunch}
+                        onDelete={onDelete}
                         roomVibe={roomVibe}
                       />
                     ) : message.messageType === 'game' && message.gameData?.gameType === 'checkers' ? (
@@ -572,6 +575,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         message={message} currentUser={currentUser}
                         onJoin={onCheckersJoin} onSpectate={onCheckersSpectate}
                         onLaunch={onCheckersLaunch} onVsCpu={onCheckersVsCpu}
+                        onDelete={onDelete}
                         roomVibe={roomVibe}
                       />
                     ) : message.messageType === 'game' && message.gameData?.gameType === 'g2048' ? (
@@ -579,6 +583,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         message={message} currentUser={currentUser}
                         onJoin={on2048Join} onSpectate={on2048Spectate}
                         onLaunch={on2048Launch}
+                        onDelete={onDelete}
                         roomVibe={roomVibe}
                       />
                     ) : message.messageType === 'game' && message.gameData?.gameType === 'snake' ? (
@@ -586,6 +591,7 @@ const MessageList = ({ messages, currentUser, messageTTL, onVote, onReply, onRea
                         message={message} currentUser={currentUser}
                         onJoin={onSnakeJoin} onSpectate={onSnakeSpectate}
                         onLaunch={onSnakeLaunch}
+                        onDelete={onDelete}
                         roomVibe={roomVibe}
                       />
                     ) : message.messageType === 'poll' ? (

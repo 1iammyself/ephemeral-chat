@@ -1,19 +1,23 @@
-import React from 'react';
-import { Trophy } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trophy, Trash2 } from 'lucide-react';
 import { getVibeById } from '../utils/vibes';
 
-const SnakeMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, roomVibe }) => {
+const SnakeMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, onDelete, roomVibe }) => {
   const { gameData } = message;
   const vibe = getVibeById(roomVibe);
   const userId = currentUser?.id || currentUser?.socketId;
   const nickname = currentUser?.nickname;
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const isCreator = message.sender?.id === userId || (nickname && message.sender?.nickname === nickname);
   const isMember   = gameData.players?.some(p => p.id === userId || (nickname && p.name === nickname));
   const isHost     = gameData.hostId === userId;
   const isFinished = gameData.status === 'finished';
   const isLive     = gameData.status === 'playing';
   const isWaiting  = gameData.status === 'waiting';
-  const isSolo     = !!gameData.soloMode;
+  const isSolo         = !!gameData.soloMode;
+  const wrapWalls      = !!gameData.wrapWalls;
+  const dailyChallenge = !!gameData.dailyChallenge;
 
   const scores = gameData.scores || {};
   const sortedPlayers = (gameData.players || []).slice().sort((a,b) => (scores[b.id]||0) - (scores[a.id]||0));
@@ -24,8 +28,14 @@ const SnakeMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, room
         <div className="flex items-center gap-2">
           <span className="text-white text-base">🐍</span>
           <h3 className="text-white font-bold text-xs sm:text-sm">
-            Snake{isSolo ? ' — Solo' : ''}
+            Snake{dailyChallenge ? ' — Daily' : isSolo ? ' — Solo' : ''}
           </h3>
+          {wrapWalls && !dailyChallenge && (
+            <span className="text-[9px] font-black text-white/80 bg-white/20 rounded-full px-1.5 py-0.5">🔄</span>
+          )}
+          {dailyChallenge && (
+            <span className="text-[9px] font-black text-white/80 bg-white/20 rounded-full px-1.5 py-0.5">📅</span>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
           {isWaiting && (
@@ -85,6 +95,26 @@ const SnakeMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, room
           <button onClick={() => onSpectate?.(message)} className="flex-1 py-1.5 text-xs font-black rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:opacity-90 transition-opacity">
             {isFinished ? '📋 Review' : '👁 Watch'}
           </button>
+        )}
+        {isCreator && onDelete && (
+          confirmDelete ? (
+            <div className="flex gap-1 shrink-0">
+              <button onClick={() => { onDelete(message.id); setConfirmDelete(false); }}
+                className="py-1.5 px-2 text-xs font-black rounded-lg bg-red-600 text-white hover:opacity-90 transition-opacity">
+                Confirm
+              </button>
+              <button onClick={() => setConfirmDelete(false)}
+                className="py-1.5 px-2 text-xs font-black rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:opacity-80 transition-opacity">
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmDelete(true)}
+              className="p-1.5 rounded-lg bg-gray-200 dark:bg-gray-700 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors shrink-0"
+              title="Delete game for everyone">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )
         )}
       </div>
     </div>

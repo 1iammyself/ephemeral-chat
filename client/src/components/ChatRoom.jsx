@@ -727,6 +727,7 @@ const ChatRoom = () => {
   const [showRpsConfig, setShowRpsConfig] = useState(false);
   const [showSnakeConfig, setShowSnakeConfig] = useState(false);
   const [show2048Config, setShow2048Config] = useState(false);
+  const [snakeConfigWall, setSnakeConfigWall] = useState(false);
   const [showGamesSubmenu, setShowGamesSubmenu] = useState(false);
   const setShowStegoModal = (v) => { if (!v) setStegoExtractImage(null); v ? openPanel('secrets') : closePanel('secrets'); };
   const setShowCodeShare    = (v) => v ? openPanel('code')    : closePanel('code');
@@ -2255,16 +2256,16 @@ const ChatRoom = () => {
           setShowC4Config(true);
           break;
         case '/rps':
-          handleSendRps();
+          setShowRpsConfig(true);
           break;
         case '/checkers':
           setShowCheckersConfig(true);
           break;
         case '/2048':
-          handleSend2048();
+          setShow2048Config(true);
           break;
         case '/snake':
-          handleSendSnake();
+          setShowSnakeConfig(true);
           break;
         default: break;
       }
@@ -2862,9 +2863,9 @@ const ChatRoom = () => {
   }, [activeChessMessage]);
 
   // ── Tic-Tac-Toe ──────────────────────────────────────────────────────────
-  const handleSendTtt = (cpuDifficulty = null) => {
+  const handleSendTtt = (cpuDifficulty = null, mode = 'standard') => {
     if (!isConnected) return;
-    socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'ttt', ...(cpuDifficulty ? { cpuDifficulty } : {}) }, userId: persistentUserId, isAnonymous: false });
+    socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'ttt', ...(cpuDifficulty ? { cpuDifficulty } : {}), mode }, userId: persistentUserId, isAnonymous: false });
     setShowTttConfig(false);
   };
   const handleTttJoin = (messageId) => {
@@ -2894,11 +2895,12 @@ const ChatRoom = () => {
   useEffect(() => { if (!activeC4Message && isPanelOpen('c4')) closePanel('c4'); }, [activeC4Message]);
 
   // ── Rock-Paper-Scissors ──────────────────────────────────────────────────
+  const [rpsVariant, setRpsVariant] = useState('standard');
   const handleSendRps = (rounds = 5, cpuDifficulty = null) => {
     if (!isConnected) return;
     socketManager.emit('send-message', {
       messageType: 'game',
-      gameData: { gameType: 'rps', totalRounds: rounds, ...(cpuDifficulty ? { cpuDifficulty } : {}) },
+      gameData: { gameType: 'rps', totalRounds: rounds, variant: rpsVariant, ...(cpuDifficulty ? { cpuDifficulty } : {}) },
       userId: persistentUserId, isAnonymous: false,
     });
     setShowRpsConfig(false);
@@ -2913,9 +2915,10 @@ const ChatRoom = () => {
   useEffect(() => { if (!activeRpsMessage && isPanelOpen('rps')) closePanel('rps'); }, [activeRpsMessage]);
 
   // ── Checkers ─────────────────────────────────────────────────────────────
+  const [checkersVariant, setCheckersVariant] = useState('american');
   const handleSendCheckers = (cpuDifficulty = null) => {
     if (!isConnected) return;
-    socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'checkers', ...(cpuDifficulty ? { cpuDifficulty } : {}) }, userId: persistentUserId, isAnonymous: false });
+    socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'checkers', variant: checkersVariant, ...(cpuDifficulty ? { cpuDifficulty } : {}) }, userId: persistentUserId, isAnonymous: false });
     setShowCheckersConfig(false);
   };
   const handleCheckersJoin = (messageId) => {
@@ -2929,9 +2932,13 @@ const ChatRoom = () => {
   useEffect(() => { if (!activeCheckersMessage && isPanelOpen('checkers')) closePanel('checkers'); }, [activeCheckersMessage]);
 
   // ── 2048 ─────────────────────────────────────────────────────────────────
+  const [g2048GridSize, setG2048GridSize] = useState(4);
+  const [g2048Mode, setG2048Mode] = useState('standard'); // 'standard' | 'threes'
+  const [g2048Timer, setG2048Timer] = useState(null); // null | '1min' | '5min'
   const handleSend2048 = (soloMode = false) => {
     if (!isConnected) return;
-    socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'g2048', soloMode }, userId: persistentUserId, isAnonymous: false });
+    socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'g2048', soloMode, gridSize: g2048GridSize, gameMode: g2048Mode, timerMode: g2048Timer }, userId: persistentUserId, isAnonymous: false });
+    setShow2048Config(false);
   };
   const handle2048Join = (messageId) => {
     if (!isConnected) return;
@@ -2943,11 +2950,16 @@ const ChatRoom = () => {
   useEffect(() => { if (!active2048Message && isPanelOpen('g2048')) closePanel('g2048'); }, [active2048Message]);
 
   // ── Snake ─────────────────────────────────────────────────────────────────
-  const handleSendSnake = (soloMode = false) => {
+  const handleSendSnake = (soloMode = false, wrapWalls = false, dailyChallenge = false) => {
     if (!isConnected) return;
-    socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'snake', soloMode }, userId: persistentUserId, isAnonymous: false });
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const dailySeed = dailyChallenge
+      ? today.split('-').reduce((acc, n) => acc * 31 + parseInt(n, 10), 0)
+      : null;
+    socketManager.emit('send-message', { messageType: 'game', gameData: { gameType: 'snake', soloMode: dailyChallenge ? true : soloMode, wrapWalls, dailyChallenge, dailySeed }, userId: persistentUserId, isAnonymous: false });
     setShowSnakeConfig(false);
-  };
+    setSnakeConfigWall(false);
+      };
   const handleSnakeJoin = (messageId) => {
     if (!isConnected) return;
     socketManager.emit('snake-join', { messageId });
@@ -4511,19 +4523,29 @@ const ChatRoom = () => {
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 w-full max-w-xs"
             onClick={e => e.stopPropagation()}>
             <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-4 text-center">✕○ Tic-Tac-Toe — New Game</p>
-            <button onClick={() => handleSendTtt(null)}
-              className="w-full mb-3 py-3 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white font-black text-sm transition-colors">
-              ⚔️ vs Player
-            </button>
-            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">vs CPU</p>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">Mode</p>
+            <div className="flex gap-2 mb-4">
+              {[{v:'standard',label:'Standard',sub:'3×3'},{v:'ultimate',label:'Ultimate',sub:'9 boards'}].map(({v,label,sub}) => (
+                <button key={v} onClick={() => handleSendTtt(null, v)}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-colors ${currentVibe.accentClass} text-white hover:opacity-90`}>
+                  {label}
+                  <span className="block text-[9px] opacity-70">{sub}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">vs CPU (Standard)</p>
             <div className="flex gap-2">
               {['easy','medium','hard'].map(d => (
-                <button key={d} onClick={() => handleSendTtt(d)}
+                <button key={d} onClick={() => handleSendTtt(d, 'standard')}
                   className={`flex-1 py-2.5 rounded-xl text-white font-black text-xs capitalize ${currentVibe.accentClass} hover:opacity-90 transition-opacity`}>
                   🤖 {d}
                 </button>
               ))}
             </div>
+            <button onClick={() => handleSendTtt('medium', 'ultimate')}
+              className="w-full mt-2 py-2 rounded-xl text-xs font-black bg-purple-500 text-white hover:opacity-90">
+              🤖 vs CPU — Ultimate
+            </button>
           </div>
         </div>
       )}
@@ -4558,7 +4580,17 @@ const ChatRoom = () => {
           onClick={() => setShowCheckersConfig(false)}>
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 w-full max-w-xs"
             onClick={e => e.stopPropagation()}>
-            <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-4 text-center">⛀ Checkers — New Game</p>
+            <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-3 text-center">⛀ Checkers — New Game</p>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">Rules Variant</p>
+            <div className="flex gap-1.5 mb-4">
+              {[{v:'american',label:'American',sub:'Short kings'},{v:'russian',label:'Russian',sub:'Flying + fwd promo'},{v:'brazilian',label:'Brazilian',sub:'Flying + majority'}].map(({v,label,sub}) => (
+                <button key={v} onClick={() => setCheckersVariant(v)}
+                  className={`flex-1 py-2 rounded-xl text-[10px] font-black transition-colors ${checkersVariant===v ? `${currentVibe.accentClass} text-white` : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
+                  {label}
+                  <span className="block text-[8px] opacity-70">{sub}</span>
+                </button>
+              ))}
+            </div>
             <button onClick={() => handleSendCheckers(null)}
               className="w-full mb-2 py-2 text-xs font-black rounded-xl bg-indigo-500 text-white hover:opacity-90">
               ⚔️ vs Player
@@ -4579,10 +4611,21 @@ const ChatRoom = () => {
       {/* ── Rock-Paper-Scissors config picker ── */}
       {showRpsConfig && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4 bg-black/40 backdrop-blur-sm"
-          onClick={() => setShowRpsConfig(false)}>
+          onClick={() => { setShowRpsConfig(false); setRpsVariant('standard'); }}>
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 w-full max-w-xs"
             onClick={e => e.stopPropagation()}>
-            <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-4 text-center">✊ Rock·Paper·Scissors</p>
+            <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-3 text-center">✊ Rock·Paper·Scissors</p>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">Variant</p>
+            <div className="flex gap-2 mb-4">
+              <button onClick={() => setRpsVariant('standard')}
+                className={`flex-1 py-2 rounded-xl text-xs font-black transition-colors ${rpsVariant==='standard' ? `${currentVibe.accentClass} text-white` : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
+                ✊ Standard
+              </button>
+              <button onClick={() => setRpsVariant('rpsls')}
+                className={`flex-1 py-2 rounded-xl text-xs font-black transition-colors ${rpsVariant==='rpsls' ? `${currentVibe.accentClass} text-white` : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
+                🖖 RPSLS
+              </button>
+            </div>
             <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">vs Player — choose rounds</p>
             <div className="flex gap-2 mb-4">
               {[3, 5, 7].map(r => (
@@ -4608,15 +4651,31 @@ const ChatRoom = () => {
       {/* ── Snake config picker ── */}
       {showSnakeConfig && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4 bg-black/40 backdrop-blur-sm"
-          onClick={() => setShowSnakeConfig(false)}>
+          onClick={() => { setShowSnakeConfig(false); setSnakeConfigWall(false); setSnakeDailyChallenge(false); }}>
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 w-full max-w-xs"
             onClick={e => e.stopPropagation()}>
             <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-4 text-center">🐍 Snake</p>
-            <button onClick={() => handleSendSnake(true)}
-              className={`w-full mb-3 py-3 rounded-xl text-white font-black text-sm ${currentVibe.accentClass} hover:opacity-90 transition-opacity`}>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">Walls</p>
+            <div className="flex gap-2 mb-4">
+              <button onClick={() => setSnakeConfigWall(false)}
+                className={`flex-1 py-2 rounded-xl text-xs font-black transition-colors ${!snakeConfigWall ? `${currentVibe.accentClass} text-white` : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
+                🧱 Solid
+              </button>
+              <button onClick={() => setSnakeConfigWall(true)}
+                className={`flex-1 py-2 rounded-xl text-xs font-black transition-colors ${snakeConfigWall ? `${currentVibe.accentClass} text-white` : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
+                🔄 Wrap
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">Mode</p>
+            <button onClick={() => handleSendSnake(true, snakeConfigWall)}
+              className={`w-full mb-2 py-3 rounded-xl text-white font-black text-sm ${currentVibe.accentClass} hover:opacity-90 transition-opacity`}>
               🎯 Solo — Play alone
             </button>
-            <button onClick={() => handleSendSnake(false)}
+            <button onClick={() => handleSendSnake(true, snakeConfigWall, true)}
+              className="w-full mb-2 py-3 rounded-xl font-black text-sm bg-yellow-500/90 text-white hover:opacity-90 transition-opacity">
+              📅 Daily Challenge — same food for everyone
+            </button>
+            <button onClick={() => handleSendSnake(false, snakeConfigWall)}
               className="w-full py-3 rounded-xl font-black text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:opacity-90 transition-opacity">
               🏁 Race — Invite others
             </button>
@@ -4627,15 +4686,46 @@ const ChatRoom = () => {
       {/* ── 2048 config picker ── */}
       {show2048Config && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4 bg-black/40 backdrop-blur-sm"
-          onClick={() => setShow2048Config(false)}>
+          onClick={() => { setShow2048Config(false); setG2048GridSize(4); setG2048Mode('standard'); setG2048Timer(null); }}>
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 w-full max-w-xs"
             onClick={e => e.stopPropagation()}>
-            <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-4 text-center">2048</p>
-            <button onClick={() => { handleSend2048(true); setShow2048Config(false); }}
-              className={`w-full mb-3 py-3 rounded-xl text-white font-black text-sm ${currentVibe.accentClass} hover:opacity-90 transition-opacity`}>
+            <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-3 text-center">2048</p>
+
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">Grid Size</p>
+            <div className="flex gap-2 mb-3">
+              {[{n:4,label:'4×4',sub:'Classic'},{n:5,label:'5×5',sub:'Bigger'}].map(({n,label,sub}) => (
+                <button key={n} onClick={() => setG2048GridSize(n)}
+                  className={`flex-1 py-2 rounded-xl text-xs font-black transition-colors ${g2048GridSize===n ? `${currentVibe.accentClass} text-white` : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
+                  {label}<span className="block text-[8px] opacity-70">{sub}</span>
+                </button>
+              ))}
+            </div>
+
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">Mode</p>
+            <div className="flex gap-2 mb-3">
+              {[{m:'standard',label:'Standard',sub:'2048 rules'},{m:'threes',label:'Threes!',sub:'1+2=3 merge'}].map(({m,label,sub}) => (
+                <button key={m} onClick={() => setG2048Mode(m)}
+                  className={`flex-1 py-2 rounded-xl text-xs font-black transition-colors ${g2048Mode===m ? `${currentVibe.accentClass} text-white` : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
+                  {label}<span className="block text-[8px] opacity-70">{sub}</span>
+                </button>
+              ))}
+            </div>
+
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">Timer (Solo)</p>
+            <div className="flex gap-1.5 mb-4">
+              {[{t:null,label:'None'},{t:'1min',label:'1 min'},{t:'5min',label:'5 min'}].map(({t,label}) => (
+                <button key={label} onClick={() => setG2048Timer(t)}
+                  className={`flex-1 py-1.5 rounded-xl text-[10px] font-black transition-colors ${g2048Timer===t ? `${currentVibe.accentClass} text-white` : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <button onClick={() => handleSend2048(true)}
+              className={`w-full mb-2 py-3 rounded-xl text-white font-black text-sm ${currentVibe.accentClass} hover:opacity-90 transition-opacity`}>
               🎯 Solo — Play alone
             </button>
-            <button onClick={() => { handleSend2048(false); setShow2048Config(false); }}
+            <button onClick={() => handleSend2048(false)}
               className="w-full py-3 rounded-xl font-black text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:opacity-90 transition-opacity">
               🏁 Race — Invite others
             </button>

@@ -1,14 +1,16 @@
-import React from 'react';
-import { Trophy } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trophy, Trash2 } from 'lucide-react';
 import { getVibeById } from '../utils/vibes';
 import { PICK_EMOJI } from './games/RpsEngine';
 
-const RpsMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, roomVibe }) => {
+const RpsMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, onDelete, roomVibe }) => {
   const { gameData } = message;
   const vibe     = getVibeById(roomVibe);
   const userId   = currentUser?.id || currentUser?.socketId;
   const nickname = currentUser?.nickname;
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const isCreator = message.sender?.id === userId || (nickname && message.sender?.nickname === nickname);
   const isMember   = (gameData.players || []).some(
     p => p.id === userId || (nickname && p.name === nickname)
   );
@@ -132,6 +134,26 @@ const RpsMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, roomVi
           >
             {isFinished ? '📋 Review' : '👁 Watch'}
           </button>
+        )}
+        {isCreator && onDelete && (
+          confirmDelete ? (
+            <div className="flex gap-1 shrink-0">
+              <button onClick={() => { onDelete(message.id); setConfirmDelete(false); }}
+                className="py-1.5 px-2 text-xs font-black rounded-lg bg-red-600 text-white hover:opacity-90 transition-opacity">
+                Confirm
+              </button>
+              <button onClick={() => setConfirmDelete(false)}
+                className="py-1.5 px-2 text-xs font-black rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:opacity-80 transition-opacity">
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmDelete(true)}
+              className="p-1.5 rounded-lg bg-gray-200 dark:bg-gray-700 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors shrink-0"
+              title="Delete game for everyone">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )
         )}
       </div>
     </div>
