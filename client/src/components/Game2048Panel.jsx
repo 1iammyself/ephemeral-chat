@@ -203,11 +203,34 @@ export default function Game2048Panel({ message, currentUser, roomVibe }) {
       setServerStatus('finished');
       clearInterval(timerRef.current);
     };
+    const onRematch = ({ messageId: mid, seed }) => {
+      if (mid !== messageId) return;
+      seedRef.current = seed || Date.now();
+      moveCountRef.current = 0;
+      setBoard(null);
+      setScore(0);
+      setBestTile(0);
+      setBoardOver(false);
+      setTileWon(false);
+      setGameKey(k => k + 1);
+      setStarted(false);
+      setUndoStack([]);
+      setMoveCount(0);
+      setBestScore(0);
+      setTimeLeft(null);
+      setTileAnims(new Map());
+      setAnimating(false);
+      setNewTiles(new Set());
+      setMergeTiles(new Set());
+      setServerStatus('waiting');
+    };
     socketManager.on('g2048-scores-update', onScore);
     socketManager.on('g2048-game-over',     onFinish);
+    socketManager.on('g2048-rematch',       onRematch);
     return () => {
       socketManager.off('g2048-scores-update', onScore);
       socketManager.off('g2048-game-over',     onFinish);
+      socketManager.off('g2048-rematch',       onRematch);
     };
   }, [messageId]);
 
@@ -527,7 +550,20 @@ export default function Game2048Panel({ message, currentUser, roomVibe }) {
             {serverStatus === 'waiting' && !isHost && (
               <p className="text-sm text-gray-400">Waiting for host to start…</p>
             )}
-            {serverStatus === 'finished' && <p className="text-lg font-bold text-white">Race finished!</p>}
+            {serverStatus === 'finished' && (
+              <div className="flex flex-col items-center gap-2">
+                <p className="text-lg font-bold text-white">Race finished!</p>
+                {isHost && (
+                  <button
+                    onClick={() => socketManager.emit('g2048-rematch', { messageId })}
+                    className="px-6 py-2 rounded-xl text-white font-black text-sm"
+                    style={{ background: accentColor }}
+                  >
+                    🔁 Rematch
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -635,6 +671,14 @@ export default function Game2048Panel({ message, currentUser, roomVibe }) {
                 className="w-full py-1.5 text-[9px] font-black rounded-lg bg-cyan-800/30 text-cyan-400 border border-cyan-700/30 hover:bg-cyan-800/60 transition-colors"
               >
                 ↺ New Game
+              </button>
+            )}
+            {!isSolo && serverStatus === 'finished' && isHost && (
+              <button
+                onClick={() => socketManager.emit('g2048-rematch', { messageId })}
+                className="w-full py-1.5 text-[9px] font-black rounded-lg bg-cyan-800/30 text-cyan-400 border border-cyan-700/30 hover:bg-cyan-800/60 transition-colors"
+              >
+                🔁 Rematch
               </button>
             )}
             <button

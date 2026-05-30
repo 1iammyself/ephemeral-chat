@@ -147,16 +147,33 @@ export default function RpsPanel({ message, currentUser, roomVibe }) {
       if (data.messageId !== messageId) return;
       setWaitingPicks(prev => ({ ...prev, [data.playerId]: true }));
     };
+    const onRematch = (data) => {
+      if (data.messageId !== messageId) return;
+      clearTimeout(autoAdvanceTimer.current);
+      setStatus(isCpu ? 'playing' : 'waiting');
+      setRound(1);
+      setRevealed(false);
+      setRoundResult(null);
+      setMyPick(null);
+      setWaitingPicks({});
+      setRoundHistory([]);
+      setBeatText(null);
+      setOverallWinner(null);
+      setCountdown(null);
+      setMyPickTime(null);
+    };
     socketManager.on('rps-round-reveal',   onReveal);
     socketManager.on('rps-next-round',     onNextRound);
     socketManager.on('rps-player-picked',  onPicked);
+    socketManager.on('rps-rematch',        onRematch);
     return () => {
       clearTimeout(autoAdvanceTimer.current);
       socketManager.off('rps-round-reveal',  onReveal);
       socketManager.off('rps-next-round',    onNextRound);
       socketManager.off('rps-player-picked', onPicked);
+      socketManager.off('rps-rematch',       onRematch);
     };
-  }, [messageId, scheduleAdvance, round, myPickTime, variant]);
+  }, [messageId, scheduleAdvance, round, myPickTime, variant, isCpu]);
 
   const handlePick = (pick) => {
     if (myPick || revealed || status !== 'playing' || !isMember || countdown !== null) return;
@@ -173,6 +190,7 @@ export default function RpsPanel({ message, currentUser, roomVibe }) {
   };
 
   const handleStartGame = () => socketManager.emit('rps-start', { messageId });
+  const handleRematch = () => socketManager.emit('rps-rematch', { messageId });
   const accentColor = vibe?.colors?.primary || '#6366f1';
   const sortedPlayers = [...players].sort((a, b) => (scores[b.id]||0) - (scores[a.id]||0));
 
@@ -363,6 +381,16 @@ export default function RpsPanel({ message, currentUser, roomVibe }) {
       )}
       {isFinished && !(overallWinner || gameData?.overallWinner) && (
         <p className="text-sm font-bold text-gray-500 text-center">Match ended in a tie!</p>
+      )}
+
+      {isFinished && (isHost || (isCpu && isMember)) && (
+        <button
+          onClick={handleRematch}
+          className="px-6 py-2 rounded-xl text-sm font-bold text-white"
+          style={{ background: accentColor }}
+        >
+          🔁 Rematch
+        </button>
       )}
 
       {/* Lobby */}

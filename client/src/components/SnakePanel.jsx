@@ -154,14 +154,28 @@ export default function SnakePanel({ message, currentUser, roomVibe }) {
       setServerStatus('finished');
       clearInterval(tickRef.current);
     };
+    const onRematch = ({ messageId: mid }) => {
+      if (mid !== messageId) return;
+      clearInterval(tickRef.current);
+      setGameOver(false);
+      setGameState(null);
+      stateRef.current = null;
+      setStarted(false);
+      setPaused(false);
+      setWinner(null);
+      setScores({});
+      setServerStatus('waiting');
+    };
     socketManager.on('snake-started',       onStarted);
     socketManager.on('snake-scores-update', onScores);
     socketManager.on('snake-game-over',     onOver);
+    socketManager.on('snake-rematch',       onRematch);
     return () => {
       clearInterval(tickRef.current);
       socketManager.off('snake-started',       onStarted);
       socketManager.off('snake-scores-update', onScores);
       socketManager.off('snake-game-over',     onOver);
+      socketManager.off('snake-rematch',       onRematch);
     };
   }, [messageId, isSolo, initGame]);
 
@@ -515,9 +529,20 @@ export default function SnakePanel({ message, currentUser, roomVibe }) {
               <p className="text-sm text-gray-400">Waiting for host to start…</p>
             )}
             {serverStatus === 'finished' && (
-              <p className="text-white font-bold">
-                {winner ? `🏆 ${winner.name} wins!` : 'Race Over'}
-              </p>
+              <div className="flex flex-col items-center gap-2">
+                <p className="text-white font-bold">
+                  {winner ? `🏆 ${winner.name} wins!` : 'Race Over'}
+                </p>
+                {isHost && (
+                  <button
+                    onClick={() => socketManager.emit('snake-rematch', { messageId })}
+                    className="px-6 py-2 rounded-xl font-black text-sm text-white"
+                    style={{ background: accentColor }}
+                  >
+                    🔁 Rematch
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -630,6 +655,14 @@ export default function SnakePanel({ message, currentUser, roomVibe }) {
                 className="w-full py-1.5 text-[9px] font-black rounded-lg bg-cyan-800/30 text-cyan-400 border border-cyan-700/30 hover:bg-cyan-800/60 transition-colors"
               >
                 ↺ New Game
+              </button>
+            )}
+            {!isSolo && serverStatus === 'finished' && isHost && (
+              <button
+                onClick={() => socketManager.emit('snake-rematch', { messageId })}
+                className="w-full py-1.5 text-[9px] font-black rounded-lg bg-cyan-800/30 text-cyan-400 border border-cyan-700/30 hover:bg-cyan-800/60 transition-colors"
+              >
+                🔁 Rematch
               </button>
             )}
             <button
