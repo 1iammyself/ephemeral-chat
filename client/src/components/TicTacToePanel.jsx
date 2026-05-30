@@ -152,10 +152,10 @@ function StandardTTT({ message, currentUser, roomVibe }) {
         <span className="text-gray-400">{scores.draw ?? 0} draw</span>
         <span className="text-red-500 dark:text-red-400">○ {scores.O}</span>
       </div>
-      <div className={`w-full max-w-[288px] text-center text-xs font-semibold py-1.5 px-3 rounded-lg transition-colors ${statusBg}`}>{statusText}</div>
+      <div className={`w-full max-w-sm text-center text-xs font-semibold py-1.5 px-3 rounded-lg transition-colors ${statusBg}`}>{statusText}</div>
       {status === 'playing' && <p className="text-[10px] text-gray-400 tabular-nums -mt-1">Move {moveCount} / 9</p>}
 
-      <div className="grid grid-cols-3 gap-1.5 sm:gap-2 p-2 rounded-2xl w-full max-w-[288px]" style={{ background: lightCell + '66' }}>
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-2 p-2 rounded-2xl w-full max-w-sm" style={{ background: lightCell + '66' }}>
         {board.map((cell, i) => {
           const isWin   = winLine?.includes(i);
           const canClick = isMyTurn && !cell && !winLine && status === 'playing' && !(isCpu && turn === 'O');
@@ -276,7 +276,7 @@ function UltimateTTT({ message, currentUser, roomVibe }) {
       </div>
 
       {/* Status */}
-      <div className={`w-full max-w-xs text-center text-xs font-semibold py-1.5 px-3 rounded-lg ${
+      <div className={`w-full max-w-sm text-center text-xs font-semibold py-1.5 px-3 rounded-lg ${
         isFinished ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
         : isMyTurn ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
         : 'bg-gray-50 dark:bg-gray-800/40 text-gray-500 dark:text-gray-400'
@@ -289,7 +289,7 @@ function UltimateTTT({ message, currentUser, roomVibe }) {
       </div>
 
       {/* 3×3 global grid of mini-boards */}
-      <div className="grid grid-cols-3 gap-1.5 w-full max-w-[340px]">
+      <div className="grid grid-cols-3 gap-1.5 w-full max-w-lg">
         {Array.from({length:9}, (_, miniIdx) => {
           const isActive  = isMiniActive(miniIdx);
           const miniWon   = state.won[miniIdx];

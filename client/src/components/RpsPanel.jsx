@@ -235,7 +235,7 @@ export default function RpsPanel({ message, currentUser, roomVibe }) {
 
       {/* Pick buttons */}
       {isMember && status === 'playing' && !revealed && showPicks && (
-        <div className={`grid ${pickGridCols} gap-2 w-full max-w-[320px] justify-center`}>
+        <div className={`grid ${pickGridCols} gap-2 w-full max-w-md justify-center`}>
           {PICKS.map(p => (
             <button key={p} onClick={() => handlePick(p)} disabled={!!myPick}
               className={`aspect-square text-2xl sm:text-3xl rounded-2xl transition-all duration-150 shadow min-h-[56px] flex flex-col items-center justify-center gap-0.5
@@ -260,7 +260,7 @@ export default function RpsPanel({ message, currentUser, roomVibe }) {
 
       {/* Round reveal */}
       {revealed && roundResult && (
-        <div className="w-full max-w-xs bg-gray-50 dark:bg-gray-800 rounded-xl p-3 space-y-1.5">
+        <div className="w-full max-w-md bg-gray-50 dark:bg-gray-800 rounded-xl p-3 space-y-1.5">
           {Object.entries(roundResult.picks || {}).map(([pid, pick]) => {
             const player  = pid === 'cpu' ? { name: `CPU (${cpuDiff})` } : players.find(p => p.id === pid);
             const outcome = roundResult.outcomes?.[pid];
@@ -288,7 +288,7 @@ export default function RpsPanel({ message, currentUser, roomVibe }) {
 
       {/* Scoreboard */}
       {(status === 'playing' || isFinished) && players.length > 0 && (
-        <div className="w-full max-w-xs">
+        <div className="w-full max-w-md">
           <p className="text-[10px] uppercase tracking-widest text-gray-400 text-center mb-1">Scores</p>
           {sortedPlayers.map((p, i) => {
             const isMe = p.id === userId || (nickname && p.name === nickname);
@@ -316,7 +316,7 @@ export default function RpsPanel({ message, currentUser, roomVibe }) {
 
       {/* Match stats: win/loss/draw rates + best streak */}
       {playedRounds >= 2 && isMember && (
-        <div className="w-full max-w-xs bg-gray-50 dark:bg-gray-800/50 rounded-xl px-3 py-2 flex justify-between text-center">
+        <div className="w-full max-w-md bg-gray-50 dark:bg-gray-800/50 rounded-xl px-3 py-2 flex justify-between text-center">
           <div>
             <p className="text-[9px] text-gray-400 uppercase tracking-widest">Win%</p>
             <p className="text-sm font-black text-green-500">{winPct}%</p>
@@ -340,7 +340,7 @@ export default function RpsPanel({ message, currentUser, roomVibe }) {
 
       {/* Round history */}
       {roundHistory.length > 0 && (
-        <div className="w-full max-w-xs">
+        <div className="w-full max-w-md">
           <p className="text-[10px] uppercase tracking-widest text-gray-400 text-center mb-1">History</p>
           <div className="space-y-0.5">
             {[...roundHistory].reverse().slice(0,5).map((r, i) => {
@@ -365,7 +365,7 @@ export default function RpsPanel({ message, currentUser, roomVibe }) {
 
       {/* Overall winner */}
       {isFinished && (overallWinner || gameData?.overallWinner) && (
-        <div className="w-full max-w-xs rounded-xl p-3 text-center" style={{ background: accentColor + '22' }}>
+        <div className="w-full max-w-md rounded-xl p-3 text-center" style={{ background: accentColor + '22' }}>
           <Trophy className="w-8 h-8 text-yellow-500 mx-auto mb-1" />
           <p className="text-sm font-black text-gray-900 dark:text-white">
             {(overallWinner || gameData?.overallWinner)?.name === nickname ? '🎉 You win the match!' : `${(overallWinner || gameData?.overallWinner)?.name} wins!`}
@@ -395,7 +395,7 @@ export default function RpsPanel({ message, currentUser, roomVibe }) {
 
       {/* Lobby */}
       {isHost && status === 'waiting' && !isCpu && (
-        <div className="flex flex-col items-center gap-2 w-full max-w-xs">
+        <div className="flex flex-col items-center gap-2 w-full max-w-md">
           <p className="text-xs text-gray-400 text-center">
             {players.length >= 2 ? `${players.length} players in lobby` : 'Waiting for someone to join…'}
           </p>

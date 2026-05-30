@@ -247,7 +247,7 @@ export default function CheckersPanel({ message, currentUser, roomVibe }) {
         </div>
       </div>
 
-      <div className={`w-full max-w-[352px] text-center text-xs font-semibold py-1.5 px-3 rounded-lg transition-colors ${statusBg}`}>{statusText}</div>
+      <div className={`w-full max-w-xl text-center text-xs font-semibold py-1.5 px-3 rounded-lg transition-colors ${statusBg}`}>{statusText}</div>
 
       {/* 40-move draw counter */}
       {status==='playing' && noProgressMoves>=20 && (
@@ -257,7 +257,7 @@ export default function CheckersPanel({ message, currentUser, roomVibe }) {
       )}
 
       {/* Board */}
-      <div className="w-full max-w-[352px] rounded-xl overflow-hidden border-2 border-black/20" style={{ background: darkSq }}>
+      <div className="w-full max-w-xl rounded-xl overflow-hidden border-2 border-black/20" style={{ background: darkSq }}>
         {displayBoard.map((row, visualR) => (
           <div key={visualR} className="grid grid-cols-8">
             {row.map((cell, visualC) => {

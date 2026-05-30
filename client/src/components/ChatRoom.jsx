@@ -723,6 +723,7 @@ const ChatRoom = () => {
   const [showCheckersConfig, setShowCheckersConfig] = useState(false);
   const [showChessConfig, setShowChessConfig] = useState(false);
   const [showTttConfig, setShowTttConfig] = useState(false);
+  const [tttMode, setTttMode] = useState('standard');
   const [showC4Config, setShowC4Config] = useState(false);
   const [showRpsConfig, setShowRpsConfig] = useState(false);
   const [showSnakeConfig, setShowSnakeConfig] = useState(false);
@@ -4473,79 +4474,88 @@ const ChatRoom = () => {
       )}
 
       {/* ── New Games FloatingPanels ── */}
+      {(() => {
+        // Viewport-proportional defaults: fills ~55% width and 82% height on desktop, capped at comfortable max
+        const gW = Math.min(Math.max(500, Math.round(window.innerWidth  * 0.52)), 860);
+        const gH = Math.min(Math.max(580, Math.round(window.innerHeight * 0.82)), 980);
+        // Board-heavy games (checkers, ttt, c4, rps) need more height relative to width
+        const gHtall = Math.min(Math.max(640, Math.round(window.innerHeight * 0.86)), 980);
+        return (<>
       {activeTttMessage && (
         <FloatingPanel title="Tic-Tac-Toe" icon={Gamepad2} iconColor="text-indigo-400"
           onClose={() => closePanel('ttt')} onFocus={() => focusPanel('ttt')} zIndex={getZ('ttt')}
-          defaultWidth={380} defaultHeight={480} defaultX={130} defaultY={60} visible={isPanelOpen('ttt')}>
+          defaultWidth={gW} defaultHeight={gHtall} visible={isPanelOpen('ttt')}>
           <TicTacToePanel message={activeTttMessage} currentUser={currentUser} roomVibe={roomVibe} />
         </FloatingPanel>
       )}
       {activeC4Message && (
         <FloatingPanel title="Connect Four" icon={Gamepad2} iconColor="text-red-400"
           onClose={() => closePanel('c4')} onFocus={() => focusPanel('c4')} zIndex={getZ('c4')}
-          defaultWidth={400} defaultHeight={540} defaultX={140} defaultY={55} visible={isPanelOpen('c4')}>
+          defaultWidth={gW} defaultHeight={gHtall} visible={isPanelOpen('c4')}>
           <ConnectFourPanel message={activeC4Message} currentUser={currentUser} roomVibe={roomVibe} />
         </FloatingPanel>
       )}
       {activeRpsMessage && (
         <FloatingPanel title="Rock-Paper-Scissors" icon={Gamepad2} iconColor="text-green-400"
           onClose={() => closePanel('rps')} onFocus={() => focusPanel('rps')} zIndex={getZ('rps')}
-          defaultWidth={360} defaultHeight={500} defaultX={110} defaultY={65} visible={isPanelOpen('rps')}>
+          defaultWidth={gW} defaultHeight={gH} visible={isPanelOpen('rps')}>
           <RpsPanel message={activeRpsMessage} currentUser={currentUser} roomVibe={roomVibe} />
         </FloatingPanel>
       )}
       {activeCheckersMessage && (
         <FloatingPanel title="Checkers" icon={Gamepad2} iconColor="text-amber-400"
           onClose={() => closePanel('checkers')} onFocus={() => focusPanel('checkers')} zIndex={getZ('checkers')}
-          defaultWidth={420} defaultHeight={520} defaultX={120} defaultY={50} visible={isPanelOpen('checkers')}>
+          defaultWidth={gW} defaultHeight={gHtall} visible={isPanelOpen('checkers')}>
           <CheckersPanel message={activeCheckersMessage} currentUser={currentUser} roomVibe={roomVibe} />
         </FloatingPanel>
       )}
       {active2048Message && (
         <FloatingPanel title="2048" icon={Gamepad2} iconColor="text-yellow-400"
           onClose={() => closePanel('g2048')} onFocus={() => focusPanel('g2048')} zIndex={getZ('g2048')}
-          defaultWidth={400} defaultHeight={560} defaultX={150} defaultY={55} visible={isPanelOpen('g2048')}>
+          defaultWidth={gW} defaultHeight={gH} visible={isPanelOpen('g2048')}>
           <Game2048Panel message={active2048Message} currentUser={currentUser} roomVibe={roomVibe} />
         </FloatingPanel>
       )}
       {activeSnakeMessage && (
         <FloatingPanel title="Snake" icon={Gamepad2} iconColor="text-green-500"
           onClose={() => closePanel('snake')} onFocus={() => focusPanel('snake')} zIndex={getZ('snake')}
-          defaultWidth={400} defaultHeight={560} defaultX={130} defaultY={60} visible={isPanelOpen('snake')}>
+          defaultWidth={gW} defaultHeight={gH} visible={isPanelOpen('snake')}>
           <SnakePanel message={activeSnakeMessage} currentUser={currentUser} roomVibe={roomVibe} />
         </FloatingPanel>
       )}
+        </>);
+      })()}
 
       {/* ── Tic-Tac-Toe config picker ── */}
       {showTttConfig && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4 bg-black/40 backdrop-blur-sm"
-          onClick={() => setShowTttConfig(false)}>
+          onClick={() => { setShowTttConfig(false); setTttMode('standard'); }}>
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 w-full max-w-xs"
             onClick={e => e.stopPropagation()}>
             <p className="text-sm font-black text-gray-800 dark:text-gray-100 mb-4 text-center">✕○ Tic-Tac-Toe — New Game</p>
             <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">Mode</p>
             <div className="flex gap-2 mb-4">
               {[{v:'standard',label:'Standard',sub:'3×3'},{v:'ultimate',label:'Ultimate',sub:'9 boards'}].map(({v,label,sub}) => (
-                <button key={v} onClick={() => handleSendTtt(null, v)}
-                  className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-colors ${currentVibe.accentClass} text-white hover:opacity-90`}>
+                <button key={v} onClick={() => setTttMode(v)}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-colors ${tttMode===v ? `${currentVibe.accentClass} text-white` : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
                   {label}
                   <span className="block text-[9px] opacity-70">{sub}</span>
                 </button>
               ))}
             </div>
-            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">vs CPU (Standard)</p>
+            <button onClick={() => { handleSendTtt(null, tttMode); }}
+              className={`w-full mb-2 py-2.5 rounded-xl text-sm font-black ${currentVibe.accentClass} text-white hover:opacity-90`}>
+              ⚔️ vs Player
+            </button>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center mb-2">vs CPU</p>
             <div className="flex gap-2">
               {['easy','medium','hard'].map(d => (
-                <button key={d} onClick={() => handleSendTtt(d, 'standard')}
-                  className={`flex-1 py-2.5 rounded-xl text-white font-black text-xs capitalize ${currentVibe.accentClass} hover:opacity-90 transition-opacity`}>
+                <button key={d} onClick={() => { handleSendTtt(d, tttMode); setTttMode('standard'); }}
+                  className="flex-1 py-2.5 rounded-xl text-white font-black text-xs capitalize bg-purple-500 hover:opacity-90 transition-opacity">
                   🤖 {d}
                 </button>
               ))}
             </div>
-            <button onClick={() => handleSendTtt('medium', 'ultimate')}
-              className="w-full mt-2 py-2 rounded-xl text-xs font-black bg-purple-500 text-white hover:opacity-90">
-              🤖 vs CPU — Ultimate
-            </button>
           </div>
         </div>
       )}

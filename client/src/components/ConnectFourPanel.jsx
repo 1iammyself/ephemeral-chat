@@ -202,7 +202,7 @@ export default function ConnectFourPanel({ message, currentUser, roomVibe }) {
       </div>
 
       {/* Status strip */}
-      <div className={`w-full max-w-[320px] text-center text-xs font-semibold py-1.5 px-3 rounded-lg transition-colors ${statusBg}`}>
+      <div className={`w-full max-w-lg text-center text-xs font-semibold py-1.5 px-3 rounded-lg transition-colors ${statusBg}`}>
         {statusText}
       </div>
 
@@ -211,7 +211,7 @@ export default function ConnectFourPanel({ message, currentUser, roomVibe }) {
         <p className="text-[9px] text-gray-500 -mt-1.5">↺ First player alternates each rematch</p>
       )}
 
-      <div className="w-full max-w-[320px] px-1">
+      <div className="w-full max-w-lg px-1">
         {/* Column headers */}
         <div className="grid mb-0.5" style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)` }}>
           {Array.from({ length: COLS }, (_, c) => {
