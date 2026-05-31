@@ -1,9 +1,7 @@
 mod commands;
-mod masque;
 mod mdns;
 
 use commands::PpTokenStore;
-use masque::MasqueState;
 use mdns::MdnsManager;
 use tauri::{
     menu::{CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, SubmenuBuilder},
@@ -40,7 +38,6 @@ pub fn run() {
     builder
         .manage(PpTokenStore::default())
         .manage(MdnsManager::default())
-        .manage(MasqueState::default())
         .setup(|app| {
             setup(app)?;
             Ok(())
@@ -81,9 +78,6 @@ pub fn run() {
             commands::mdns_get_my_info,
             commands::mdns_send_sdp,
             commands::mdns_is_running,
-            commands::masque_init,
-            commands::masque_is_available,
-            commands::masque_send,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Ephemeral Chat");

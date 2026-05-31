@@ -91,13 +91,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
 
-  // ─── Security Stack (MASQUE, OHTTP, Privacy Pass, Crypto) ───
+  // ─── Security Stack (OHTTP, Privacy Pass, Crypto) ───
   security: {
-    // MASQUE / QUIC tunnel
-    masqueInit: (proxyUrl) => ipcRenderer.invoke('security-masque-init', { proxyUrl }),
-    masqueIsAvailable: () => ipcRenderer.invoke('security-masque-is-available'),
-    masqueSend: (target, payload) => ipcRenderer.invoke('security-masque-send', { target, payload }),
-
     // OHTTP config (fetched via Node net — no browser fingerprint)
     ohttpFetchConfig: (configUrl) => ipcRenderer.invoke('security-ohttp-fetch-config', { configUrl }),
 

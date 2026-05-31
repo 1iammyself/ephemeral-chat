@@ -211,16 +211,6 @@
 
     // ── Security stack ────────────────────────────────────────────────────
     security: {
-      masqueInit: function (proxyUrl) {
-        return invoke('masque_init', { proxy_url: proxyUrl || '' });
-      },
-      masqueIsAvailable: function () {
-        return invoke('masque_is_available');
-      },
-      masqueSend: function (target, payload) {
-        return invoke('masque_send', { target: target, payload: payload });
-      },
-
       // OHTTP: fetch config directly (browser fetch, no Electron net needed)
       ohttpFetchConfig: function (configUrl) {
         return fetch(configUrl)

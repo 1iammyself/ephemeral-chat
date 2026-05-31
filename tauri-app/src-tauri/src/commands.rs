@@ -5,7 +5,6 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::mdns::{MdnsManager, MdnsMyInfo, MdnsPeer};
-use crate::masque::MasqueState;
 
 // ─── Shared state ─────────────────────────────────────────────────────────────
 
@@ -394,49 +393,6 @@ pub async fn mdns_send_sdp(
 #[tauri::command]
 pub async fn mdns_is_running(state: State<'_, MdnsManager>) -> Result<bool, String> {
     Ok(state.is_running().await)
-}
-
-// ─── MASQUE / UDP tunnel ──────────────────────────────────────────────────────
-
-#[tauri::command]
-pub async fn masque_init(
-    state: State<'_, MasqueState>,
-    proxy_url: String,
-) -> Result<serde_json::Value, String> {
-    match state.init(proxy_url).await {
-        Ok(()) => Ok(serde_json::json!({ "success": true })),
-        Err(e) => Ok(serde_json::json!({ "success": false, "error": e })),
-    }
-}
-
-#[tauri::command]
-pub async fn masque_is_available(
-    state: State<'_, MasqueState>,
-) -> Result<serde_json::Value, String> {
-    Ok(serde_json::json!({ "available": state.is_available().await }))
-}
-
-#[tauri::command]
-pub async fn masque_send(
-    state: State<'_, MasqueState>,
-    target: String,
-    payload: serde_json::Value,
-) -> Result<serde_json::Value, String> {
-    let bytes = match &payload {
-        serde_json::Value::String(s) => s.as_bytes().to_vec(),
-        other => other.to_string().into_bytes(),
-    };
-    match state.send(&target, &bytes).await {
-        Ok((success, tunneled)) => Ok(serde_json::json!({
-            "success": success,
-            "tunneled": tunneled,
-        })),
-        Err(e) => Ok(serde_json::json!({
-            "success": false,
-            "tunneled": false,
-            "error": e,
-        })),
-    }
 }
 
 // ─── Security / Privacy Pass ──────────────────────────────────────────────────
