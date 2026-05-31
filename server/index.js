@@ -43,7 +43,6 @@ const { initGatewayKeys, ohttpGatewayMiddleware, startKeyRotation: startOHTTPKey
 const { initIssuer, attachPrivacyPassRoutes, privacyPassAuth, startCleanup: startPPCleanup, stopCleanup: stopPPCleanup } = require('./privacy-pass-issuer');
 const { attachICESignaling } = require('./ice-signaling');
 // OHTTP relay is a separate Render service — not started from this process
-const { attachMASQUEProxy } = require('./masque-proxy');
 const { attachWebAuthnRoutes } = require('./webauthn');
 const { trafficPaddingMiddleware, startServerChaff, stopServerChaff, isChaff, stripPadding, padResponseMiddleware } = require('./traffic-padding');
 const { LinkPreviewService } = require('./link-preview');
@@ -99,14 +98,6 @@ async function initializeServer() {
     logger.info('🕳️  ICE Signaling attached for P2P hole punching');
   } catch (e) {
     logger.warn('⚠️  ICE Signaling init failed (non-fatal):', e.message);
-  }
-
-  // MASQUE CONNECT-UDP Proxy — RFC 9297/9298 (WebSocket transport)
-  try {
-    attachMASQUEProxy(server);
-    logger.info('🌀 MASQUE CONNECT-UDP proxy active');
-  } catch (e) {
-    logger.warn('⚠️  MASQUE proxy init failed (non-fatal):', e.message);
   }
 
   // WebAuthn / Passkeys — FIDO2 registration and authentication
@@ -397,7 +388,6 @@ app.get('/api/config', (req, res) => {
     wsUrl:            wsBase,
     ohttpRelayUrl,
     ohttpGatewayUrl:  `${publicUrl}/ohttp/request`,
-    masqueBaseUrl:    `${wsBase}/.well-known/masque/udp/`,
     privacyPassIssuerUrl: `${publicUrl}/privacy-pass`,
   });
 });
