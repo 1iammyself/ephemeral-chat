@@ -227,9 +227,13 @@ export async function encapsulateRequest(method, targetUrl, headers = {}, body =
 export async function decapsulateResponse(encapsulatedResponse, responseContext) {
   // Decrypt the response using the response key from HPKE context
   const decrypted = await hpkeDecryptResponse(encapsulatedResponse, responseContext);
-  
-  // Parse Binary HTTP response
-  return parseBinaryHTTPResponse(decrypted);
+
+  // The gateway's encapsulateResponse emits a compact wire format:
+  //   [status (2 bytes, big-endian)] [body bytes]
+  // (not RFC 9292 text framing). Parse it to match the server exactly.
+  const status = (decrypted[0] << 8) | decrypted[1];
+  const body = decrypted.slice(2);
+  return { status, headers: {}, body };
 }
 
 // ─── Send via OHTTP ────────────────────────────────────────
@@ -330,40 +334,6 @@ function buildBinaryHTTPRequest(method, url, headers, body) {
   }
   
   return result;
-}
-
-/**
- * Parse a Binary HTTP response
- */
-function parseBinaryHTTPResponse(data) {
-  // Parse Binary HTTP response (RFC 9292 subset)
-  const decoder = new TextDecoder();
-  const text = decoder.decode(data);
-  
-  const headerEnd = text.indexOf('\r\n\r\n');
-  const headerText = headerEnd > 0 ? text.substring(0, headerEnd) : text;
-  const bodyText = headerEnd > 0 ? text.substring(headerEnd + 4) : '';
-  
-  const lines = headerText.split('\r\n');
-  const statusLine = lines[0] || '';
-  const statusMatch = statusLine.match(/(\d{3})/);
-  const status = statusMatch ? parseInt(statusMatch[1]) : 200;
-  
-  const headers = {};
-  for (let i = 1; i < lines.length; i++) {
-    const colonIdx = lines[i].indexOf(':');
-    if (colonIdx > 0) {
-      const key = lines[i].substring(0, colonIdx).trim();
-      const value = lines[i].substring(colonIdx + 1).trim();
-      headers[key] = value;
-    }
-  }
-  
-  return {
-    status,
-    headers,
-    body: new TextEncoder().encode(bodyText)
-  };
 }
 
 // ─── HPKE Operations (RFC 9180 via `hpke` package) ─────────

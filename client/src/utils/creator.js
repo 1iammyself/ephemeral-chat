@@ -8,7 +8,7 @@
  */
 
 import { API_BASE } from './resolve-url.js';
-import { unpadResponse } from './secure-fetch.js';
+import { secureFetch } from './secure-fetch.js';
 
 const CREATOR_ID_KEY = 'eph-creator-id';
 const CREATOR_TOKEN_KEY = 'eph-creator-token';
@@ -64,14 +64,15 @@ export const getCreatorToken = async () => {
     if (cached) return cached;
 
     const creatorId = getCreatorId();
-    const res = await fetch(`${API_BASE}/api/creator-token`, {
+    // secureFetch routes through OHTTP when available and transparently strips
+    // the server's response padding, so no manual unpadResponse is needed.
+    const res = await secureFetch(`${API_BASE}/api/creator-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ creatorId }),
     });
     if (!res.ok) throw new Error('Failed to get creator token');
-    const unpaddedRes = await unpadResponse(res);
-    const { token } = await unpaddedRes.json();
+    const { token } = await res.json();
     sessionStorage.setItem(CREATOR_TOKEN_KEY, token);
     return token;
 };

@@ -1,4 +1,5 @@
 import { KeyTransparencyClient } from './key-transparency-client.js';
+import { secureFetch } from '../utils/secure-fetch.js';
 
 /**
  * server-signing.js — Ed25519 server-response verification + TOFU pinning
@@ -76,7 +77,7 @@ function _importPublicKey(base64Der) {
 export async function initServerSigning() {
   let remoteKeyBase64;
   try {
-    const res = await fetch('/api/server-key');
+    const res = await secureFetch('/api/server-key');
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const body = await res.json();
     remoteKeyBase64 = body.publicKey;

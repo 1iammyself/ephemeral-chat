@@ -1049,6 +1049,11 @@ const creatorTokenLimiter = RateLimit({
   windowMs: 10 * 60 * 1000, // 10 minutes
   max: 5, // 5 token requests per IP per window
   message: { error: 'Too many requests' },
+  // Privacy Pass payoff (RFC 9578): a client presenting a valid anonymous
+  // token has proven non-abuse without revealing identity, so it bypasses the
+  // per-IP limit. req.privacyPassVerified is set by the app.use('/api',
+  // privacyPassAuth) middleware. No token / invalid token → still rate-limited.
+  skip: (req) => req.privacyPassVerified === true,
 });
 app.post('/api/creator-token', creatorTokenLimiter, express.json(), (req, res) => {
   const { creatorId } = req.body;

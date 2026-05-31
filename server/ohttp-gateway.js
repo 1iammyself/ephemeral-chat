@@ -291,9 +291,12 @@ function ohttpGatewayMiddleware(app) {
       // Forward the decapsulated request internally via Express router
       const innerResponse = await handleInnerRequest(app, method, path, headers, body);
 
-      // Encrypt and return the response
+      // Encrypt and return the response.
+      // innerResponse.body is already the route's serialized JSON string —
+      // re-stringifying it would double-encode (client would get a quoted
+      // string instead of an object). Pass it through as-is.
       const encResponse = encapsulateResponse(
-        JSON.stringify(innerResponse.body),
+        innerResponse.body,
         innerResponse.status,
         responseKey
       );

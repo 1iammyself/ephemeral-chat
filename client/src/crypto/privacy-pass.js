@@ -26,6 +26,35 @@
  * @module crypto/privacy-pass
  */
 
+import { ohttpFetch, isOHTTPReady } from './ohttp.js';
+
+// ─── OHTTP-aware transport ─────────────────────────────────
+
+/**
+ * Fetch that routes through the OHTTP oblivious relay when it's ready, so the
+ * issuer never sees the client IP at the moment it mints tokens (which would
+ * defeat the unlinkability Privacy Pass exists to provide). Falls back to a
+ * direct request when OHTTP is unavailable.
+ *
+ * Deliberately uses ohttpFetch directly rather than secureFetch: secureFetch
+ * calls refreshTokensIfNeeded(), which would re-enter token issuance and
+ * recurse. This path must stay free of the Privacy Pass attach/refresh logic.
+ *
+ * @param {string} url
+ * @param {RequestInit} [options]
+ * @returns {Promise<Response>}
+ */
+async function ppFetch(url, options = {}) {
+  if (isOHTTPReady()) {
+    try {
+      return await ohttpFetch((options.method || 'GET').toUpperCase(), url, options);
+    } catch (e) {
+      console.warn('[PrivacyPass] OHTTP routing failed, using direct request:', e.message);
+    }
+  }
+  return fetch(url, options);
+}
+
 // ─── Ristretto255 Client Operations ───────────────────────
 
 let ristretto = null;
@@ -159,7 +188,7 @@ export async function initPrivacyPass(issuerUrl) {
   try {
     await loadRistretto();
 
-    const response = await fetch(`${issuerUrl}/privacy-pass/config`, {
+    const response = await ppFetch(`${issuerUrl}/privacy-pass/config`, {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
     });
@@ -243,7 +272,7 @@ async function requestTokens(issuerUrl, count) {
     blindedElements.push(bytesToBase64(new Uint8Array(ristretto.pointToBytes(bt.blindedElement))));
   }
 
-  const response = await fetch(`${issuerUrl}/privacy-pass/issue`, {
+  const response = await ppFetch(`${issuerUrl}/privacy-pass/issue`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
