@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Trophy, Users, Timer, Trash2 } from 'lucide-react';
 import { getVibeById } from '../utils/vibes';
 import { getTileColor } from './games/Game2048Engine';
+import useBubbleMode from '../hooks/useBubbleMode';
+import CompactGameBubble, { BubbleCollapseBar } from './CompactGameBubble';
 
 const Game2048Message = ({ message, currentUser, onJoin, onSpectate, onLaunch, onDelete, roomVibe }) => {
   const { gameData } = message;
@@ -26,7 +28,39 @@ const Game2048Message = ({ message, currentUser, onJoin, onSpectate, onLaunch, o
   const gameMode  = gameData?.gameMode || 'standard';
   const tileColor = getTileColor(topTile, gameMode);
 
+  let primary = null;
+  if (isWaiting && !isMember) primary = { label: 'Join', onClick: () => onJoin?.(message.id) };
+  else if (isMember && !isFinished) primary = { label: 'Open', onClick: () => onLaunch?.(message) };
+  else if (!isMember && !isWaiting) primary = { label: isFinished ? '📋 Review' : '👁 Watch', variant: 'ghost', onClick: () => onSpectate?.(message) };
+
+  const subtitle = isFinished && gameData.winner
+    ? `🏆 ${gameData.winner.name} wins`
+    : topTile > 0
+      ? `Best tile ${topTile}`
+      : sortedPlayers.length > 0
+        ? `${sortedPlayers.length} player${sortedPlayers.length > 1 ? 's' : ''}`
+        : 'No players yet';
+
+  const bubble = useBubbleMode();
+  if (bubble.isCompact) {
+    return (
+      <CompactGameBubble
+        vibe={vibe}
+        title="2048"
+        badges={[isSolo && 'Solo']}
+        status={isLive ? 'live' : isFinished ? 'finished' : 'open'}
+        subtitle={subtitle}
+        primary={primary}
+        canExpand={bubble.canExpand}
+        onExpand={bubble.expand}
+        maxWidthClass="max-w-[240px]"
+      />
+    );
+  }
+
   return (
+    <div className="w-full max-w-[240px]">
+      {bubble.canExpand && <BubbleCollapseBar onCollapse={bubble.collapse} />}
     <div className="w-full max-w-[240px] overflow-hidden rounded-2xl shadow-lg border border-black/10 dark:border-white/10">
       <div className={`p-2.5 ${vibe.accentClass} flex items-center justify-between`}>
         <div className="flex items-center gap-2">
@@ -127,6 +161,7 @@ const Game2048Message = ({ message, currentUser, onJoin, onSpectate, onLaunch, o
           )
         )}
       </div>
+    </div>
     </div>
   );
 };

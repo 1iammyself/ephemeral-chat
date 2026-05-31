@@ -1,12 +1,15 @@
 import React from 'react';
 import { Gamepad2, Trophy, Zap, Users, Clock } from 'lucide-react';
 import { getVibeById } from '../utils/vibes';
+import useBubbleMode from '../hooks/useBubbleMode';
+import CompactGameBubble, { BubbleCollapseBar } from './CompactGameBubble';
 
 const TetrisMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, roomVibe }) => {
   const { gameData } = message;
   const vibe = getVibeById(roomVibe);
   const currentUserId = currentUser?.id || currentUser?.socketId;
   const currentNickname = currentUser?.nickname;
+  const bubble = useBubbleMode();
 
   // ── Legacy schema (player1/player2) ──────────────────────────────
   if (!gameData.players) {
@@ -18,7 +21,33 @@ const TetrisMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, roo
     const isFinished = gameData.status === 'finished';
     const winnerName = gameData.winner === 'player1' ? gameData.player1?.name : gameData.player2?.name;
 
+    let primary = null;
+    if (isPlaying) primary = { label: 'Open', onClick: () => onLaunch?.(message) };
+    else if (canJoin) primary = { label: '⚡ Join', onClick: () => onJoin?.(message.id) };
+    else if (gameData.player2) primary = { label: 'Spectate', variant: 'ghost', onClick: () => onSpectate?.(message) };
+
+    const subtitle = isFinished
+      ? (winnerName ? `🏆 ${winnerName} wins` : (gameData.player2 ? 'Game over' : 'Solo session ended'))
+      : `${gameData.player1?.name ?? 'P1'} vs ${gameData.player2?.name ?? 'Waiting...'}`;
+
+    if (bubble.isCompact) {
+      return (
+        <CompactGameBubble
+          vibe={vibe}
+          icon="🎮"
+          title="Tetris Battle"
+          status={isLive ? 'live' : isFinished ? 'finished' : 'open'}
+          subtitle={subtitle}
+          primary={primary}
+          canExpand={bubble.canExpand}
+          onExpand={bubble.expand}
+        />
+      );
+    }
+
     return (
+      <div className="w-full max-w-[260px] sm:max-w-[280px]">
+        {bubble.canExpand && <BubbleCollapseBar onCollapse={bubble.collapse} />}
       <div className="w-full max-w-[260px] sm:max-w-[280px] overflow-hidden rounded-2xl shadow-lg border border-black/10 dark:border-white/10">
         <div className={`p-2.5 sm:p-3 ${vibe.accentClass} flex items-center justify-between`}>
           <div className="flex items-center gap-2">
@@ -48,6 +77,7 @@ const TetrisMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, roo
           </div>
         )}
       </div>
+      </div>
     );
   }
 
@@ -69,7 +99,36 @@ const TetrisMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, roo
   const isLive = gameData.status === 'playing';
   const isWaiting = gameData.status === 'waiting';
 
+  let primary;
+  if (canJoin) primary = { label: '⚡ Join', onClick: () => onJoin?.(message.id) };
+  else if (canQueue) primary = { label: 'Queue', variant: 'queue', onClick: () => onJoin?.(message.id) };
+  else if (myEntry) primary = { label: 'Open', onClick: () => onLaunch?.(message) };
+  else if (isOnBench) primary = { label: 'Benched', variant: 'queue', onClick: () => onLaunch?.(message) };
+  else primary = { label: 'Spectate', variant: 'ghost', onClick: () => onSpectate?.(message) };
+
+  const ffaSubtitle = isFinished
+    ? (gameData.winner ? `🏆 ${gameData.winner} wins` : 'Game over')
+    : `${activePlayers.length} playing${gameData.bench.length ? ` · ${gameData.bench.length} queued` : ''}`;
+
+  if (bubble.isCompact) {
+    return (
+      <CompactGameBubble
+        vibe={vibe}
+        icon="🎮"
+        title="Tetris FFA"
+        badges={[`${activePlayers.length}/${gameData.maxPlayers}`]}
+        status={isLive ? 'live' : isFinished ? 'finished' : 'open'}
+        subtitle={ffaSubtitle}
+        primary={primary}
+        canExpand={bubble.canExpand}
+        onExpand={bubble.expand}
+      />
+    );
+  }
+
   return (
+    <div className="w-full max-w-[260px] sm:max-w-[280px]">
+      {bubble.canExpand && <BubbleCollapseBar onCollapse={bubble.collapse} />}
     <div className="w-full max-w-[260px] sm:max-w-[280px] overflow-hidden rounded-2xl shadow-lg border border-black/10 dark:border-white/10">
       {/* Header */}
       <div className={`p-2.5 sm:p-3 ${vibe.accentClass} flex items-center justify-between`}>
@@ -161,6 +220,7 @@ const TetrisMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, roo
           )}
         </div>
       )}
+    </div>
     </div>
   );
 };

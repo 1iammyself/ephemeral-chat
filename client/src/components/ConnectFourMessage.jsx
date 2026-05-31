@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Trophy, Clock, Trash2 } from 'lucide-react';
 import { getVibeById } from '../utils/vibes';
+import useBubbleMode from '../hooks/useBubbleMode';
+import CompactGameBubble, { BubbleCollapseBar } from './CompactGameBubble';
 
 const ROWS = 6, COLS = 7;
 
@@ -30,7 +32,40 @@ const ConnectFourMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch
   const winCells = gameData.winCells || [];
   const winSet = new Set(winCells.map(([r,c]) => `${r},${c}`));
 
+  const p1Name = gameData.player1?.name ?? 'Waiting...';
+  const p2Name = isCpu ? `CPU (${gameData.cpu.difficulty})` : (gameData.player2?.name ?? 'Waiting...');
+  const resultLabel = gameData.result === 'draw'
+    ? '🤝 Draw'
+    : `${gameData.winner?.name ?? 'Winner'} wins`;
+
+  let primary;
+  if (isPlaying && !isFinished) primary = { label: 'Open', onClick: () => onLaunch?.(message) };
+  else if (canJoin) primary = { label: '⚔️ Join', onClick: () => onJoin?.(message.id) };
+  else if (canQueue) primary = { label: 'Queue', variant: 'queue', onClick: () => onJoin?.(message.id) };
+  else if (creatorWaiting) primary = { label: '🤖 vs CPU', variant: 'cpu', onClick: () => onVsCpu?.(message) };
+  else primary = { label: isFinished ? '📋 Review' : '👁 Spectate', variant: 'ghost', onClick: () => onSpectate?.(message) };
+
+  const bubble = useBubbleMode();
+  if (bubble.isCompact) {
+    return (
+      <CompactGameBubble
+        vibe={vibe}
+        icon="🔴"
+        title={`Connect Four${isCpu ? ' vs CPU' : ''}`}
+        badges={isCpu ? [gameData.cpu.difficulty] : []}
+        status={isLive ? 'live' : isFinished ? 'finished' : 'open'}
+        subtitle={isFinished ? resultLabel : `${p1Name} vs ${p2Name}`}
+        primary={primary}
+        canExpand={bubble.canExpand}
+        onExpand={bubble.expand}
+        maxWidthClass="max-w-[260px]"
+      />
+    );
+  }
+
   return (
+    <div className="w-full max-w-[260px]">
+      {bubble.canExpand && <BubbleCollapseBar onCollapse={bubble.collapse} />}
     <div className="w-full max-w-[260px] overflow-hidden rounded-2xl shadow-lg border border-black/10 dark:border-white/10">
       {/* Header */}
       <div className={`p-2.5 ${vibe.accentClass} flex items-center justify-between`}>
@@ -178,6 +213,7 @@ const ConnectFourMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch
           )
         )}
       </div>
+    </div>
     </div>
   );
 };

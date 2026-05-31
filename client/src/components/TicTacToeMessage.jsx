@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Trophy, Clock, Users, Trash2 } from 'lucide-react';
 import { getVibeById } from '../utils/vibes';
+import useBubbleMode from '../hooks/useBubbleMode';
+import CompactGameBubble, { BubbleCollapseBar } from './CompactGameBubble';
 
 const TicTacToeMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, onVsCpu, onDelete, roomVibe }) => {
   const { gameData } = message;
@@ -27,7 +29,40 @@ const TicTacToeMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, 
   const board = gameData.board || Array(9).fill(null);
   const winLine = gameData.winLine || [];
 
+  const p1Name = gameData.player1?.name ?? 'Waiting...';
+  const p2Name = isCpu ? `CPU (${gameData.cpu.difficulty})` : (gameData.player2?.name ?? 'Waiting...');
+  const resultLabel = gameData.result === 'draw'
+    ? '🤝 Draw'
+    : `${gameData.winner?.name ?? gameData.result} wins`;
+
+  let primary;
+  if (isPlaying && !isFinished) primary = { label: 'Open', onClick: () => onLaunch?.(message) };
+  else if (canJoin) primary = { label: '⚔️ Join', onClick: () => onJoin?.(message.id) };
+  else if (canQueue) primary = { label: 'Queue', variant: 'queue', onClick: () => onJoin?.(message.id) };
+  else if (creatorWaiting) primary = { label: '🤖 vs CPU', variant: 'cpu', onClick: () => onVsCpu?.(message) };
+  else primary = { label: isFinished ? '📋 Review' : '👁 Spectate', variant: 'ghost', onClick: () => onSpectate?.(message) };
+
+  const bubble = useBubbleMode();
+  if (bubble.isCompact) {
+    return (
+      <CompactGameBubble
+        vibe={vibe}
+        icon="✕"
+        title={`Tic-Tac-Toe${isCpu ? ' vs CPU' : ''}`}
+        badges={[gameData.mode === 'ultimate' && 'Ultimate', isCpu && gameData.cpu.difficulty]}
+        status={isLive ? 'live' : isFinished ? 'finished' : 'open'}
+        subtitle={isFinished ? resultLabel : `${p1Name} vs ${p2Name}`}
+        primary={primary}
+        canExpand={bubble.canExpand}
+        onExpand={bubble.expand}
+        maxWidthClass="max-w-[240px]"
+      />
+    );
+  }
+
   return (
+    <div className="w-full max-w-[240px]">
+      {bubble.canExpand && <BubbleCollapseBar onCollapse={bubble.collapse} />}
     <div className="w-full max-w-[240px] overflow-hidden rounded-2xl shadow-lg border border-black/10 dark:border-white/10">
       {/* Header */}
       <div className={`p-2.5 ${vibe.accentClass} flex items-center justify-between`}>
@@ -174,6 +209,7 @@ const TicTacToeMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, 
           )
         )}
       </div>
+    </div>
     </div>
   );
 };

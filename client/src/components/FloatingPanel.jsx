@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, createContext } from 'react';
+import { useState, useRef, useCallback, useEffect, createContext } from 'react';
 import { X, Minus, Maximize2 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
@@ -28,6 +28,7 @@ export default function FloatingPanel({
   defaultHeight = 500,
   defaultX,
   defaultY,
+  defaultMaximized = false,
   zIndex  = 220,
   onFocus,
   visible = true,
@@ -35,19 +36,37 @@ export default function FloatingPanel({
   const { effective } = useTheme();
   const isDark = effective === 'dark';
 
-  const isMobile = window.innerWidth < 640;
-  const clampedW = isMobile ? Math.min(defaultWidth ?? 660, window.innerWidth - 8) : (defaultWidth ?? 660);
-  const clampedH = isMobile ? Math.min(defaultHeight ?? 500, window.innerHeight - 80) : (defaultHeight ?? 500);
+  const initialMobile = window.innerWidth < 640;
+  const clampedW = initialMobile ? Math.min(defaultWidth ?? 660, window.innerWidth - 8) : (defaultWidth ?? 660);
+  const clampedH = initialMobile ? Math.min(defaultHeight ?? 500, window.innerHeight - 80) : (defaultHeight ?? 500);
 
-  const ix = defaultX ?? Math.max(isMobile ? 4 : 20, (window.innerWidth  - clampedW) / 2);
-  const iy = defaultY ?? Math.max(isMobile ? 8 : 60, (window.innerHeight - clampedH) / 3);
+  const ix = defaultX ?? Math.max(initialMobile ? 4 : 20, (window.innerWidth  - clampedW) / 2);
+  const iy = defaultY ?? Math.max(initialMobile ? 8 : 60, (window.innerHeight - clampedH) / 3);
+
+  // Reactive so orientation changes / viewport resizes flip a panel in and out
+  // of mobile full-screen mode (a phone in landscape can exceed 640px).
+  const [isMobile, setIsMobile] = useState(initialMobile);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+    };
+  }, []);
 
   const panelRef = useRef(null);
   const [pos,       setPos]       = useState({ x: ix, y: iy });
   const [size,      setSize]      = useState({ w: clampedW, h: clampedH });
   const [minimized, setMinimized] = useState(false);
-  const [maximized, setMaximized] = useState(false);
+  const [maximized, setMaximized] = useState(defaultMaximized);
   const [saved,     setSaved]     = useState(null);
+
+  // On mobile, panels are always full-screen — resizing/repositioning a window
+  // on a phone makes no sense, so we force the maximized layout and only expose
+  // minimize + close. Desktop keeps full drag/resize/restore control.
+  const effectiveMax = isMobile || maximized;
 
   const posRef  = useRef(pos);  posRef.current  = pos;
   const sizeRef = useRef(size); sizeRef.current = size;
@@ -72,14 +91,14 @@ export default function FloatingPanel({
   }, [onDragMove]);
 
   const startDrag = useCallback((e) => {
-    if (maximized) return;
+    if (effectiveMax && !minimized) return;
     e.preventDefault();
     onFocus?.();
     const r = panelRef.current.getBoundingClientRect();
     drag.current = { ox: e.clientX - r.left, oy: e.clientY - r.top };
     window.addEventListener('pointermove', onDragMove);
     window.addEventListener('pointerup',   onDragUp);
-  }, [maximized, onFocus, onDragMove, onDragUp]);
+  }, [effectiveMax, minimized, onFocus, onDragMove, onDragUp]);
 
   // ── resize ──────────────────────────────────────────────────────────
   const rsz = useRef(null);
@@ -104,14 +123,14 @@ export default function FloatingPanel({
   }, [onRszMove]);
 
   const startResize = useCallback((e, dir) => {
-    if (maximized) return;
+    if (effectiveMax) return;
     e.preventDefault(); e.stopPropagation();
     onFocus?.();
     const r = panelRef.current.getBoundingClientRect();
     rsz.current = { dir, sx: e.clientX, sy: e.clientY, sw: r.width, sh: r.height, sl: r.left, st: r.top };
     window.addEventListener('pointermove', onRszMove);
     window.addEventListener('pointerup',   onRszUp);
-  }, [maximized, onFocus, onRszMove, onRszUp]);
+  }, [effectiveMax, onFocus, onRszMove, onRszUp]);
 
   // ── maximize ────────────────────────────────────────────────────────
   const toggleMax = useCallback(() => {
@@ -134,9 +153,13 @@ export default function FloatingPanel({
     : '0 12px 40px rgba(0,0,0,0.13), 0 0 0 1px rgba(0,0,0,0.09)';
 
   // ── style ───────────────────────────────────────────────────────────
-  const outerStyle = maximized
-    ? { position: 'fixed', inset: 0, width: '100%', height: '100%', zIndex, borderRadius: 0 }
-    : { position: 'fixed', left: pos.x, top: pos.y, width: size.w, height: minimized ? 'auto' : size.h, zIndex, borderRadius: 14 };
+  // Minimized always collapses to a small windowed title bar (even when the
+  // panel was full-screen), so it can be tucked away and restored later.
+  const outerStyle = minimized
+    ? { position: 'fixed', left: pos.x, top: pos.y, width: size.w, height: 'auto', zIndex, borderRadius: 14 }
+    : effectiveMax
+      ? { position: 'fixed', inset: 0, width: '100%', height: '100%', zIndex, borderRadius: 0 }
+      : { position: 'fixed', left: pos.x, top: pos.y, width: size.w, height: size.h, zIndex, borderRadius: 14 };
 
   const suspended = minimized || !visible;
 
@@ -180,8 +203,9 @@ export default function FloatingPanel({
           {[
             { bg: '#ff5f57', hover: '#ff7b77', action: onClose,                   title: 'Close',    Icon: X        },
             { bg: '#febc2e', hover: '#ffd050', action: () => setMinimized(m=>!m), title: minimized ? 'Restore' : 'Minimize', Icon: Minus     },
-            { bg: '#28c840', hover: '#4cd964', action: toggleMax,                  title: maximized ? 'Restore' : 'Maximize', Icon: Maximize2 },
-          ].map(({ bg, action, title: t, Icon: Ic }, i) => (
+            // Maximize/restore is meaningless on mobile (panels are always full-screen).
+            !isMobile && { bg: '#28c840', hover: '#4cd964', action: toggleMax,    title: maximized ? 'Restore' : 'Maximize', Icon: Maximize2 },
+          ].filter(Boolean).map(({ bg, action, title: t, Icon: Ic }, i) => (
             <button
               key={i}
               onClick={action}
@@ -217,7 +241,7 @@ export default function FloatingPanel({
       </div>
 
       {/* ── resize handles ────────────────────────────────────────────── */}
-      {!maximized && !minimized && Object.entries(HANDLES).map(([dir, s]) => (
+      {!effectiveMax && !minimized && Object.entries(HANDLES).map(([dir, s]) => (
         <div
           key={dir}
           onPointerDown={(e) => startResize(e, dir)}

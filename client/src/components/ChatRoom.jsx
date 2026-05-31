@@ -4527,6 +4527,7 @@ const ChatRoom = () => {
           defaultHeight={560}
           defaultX={100}
           defaultY={60}
+          defaultMaximized
           visible={isPanelOpen('tetris')}
         >
           <TetrisPanel
@@ -4550,6 +4551,7 @@ const ChatRoom = () => {
           defaultHeight={600}
           defaultX={120}
           defaultY={50}
+          defaultMaximized
           visible={isPanelOpen('chess')}
         >
           <ChessPanelErrorBoundary>
@@ -4620,42 +4622,42 @@ const ChatRoom = () => {
       {activeTttMessage && (
         <FloatingPanel title="Tic-Tac-Toe" icon={Gamepad2} iconColor="text-indigo-400"
           onClose={() => closePanel('ttt')} onFocus={() => focusPanel('ttt')} zIndex={getZ('ttt')}
-          defaultWidth={gW} defaultHeight={gHtall} visible={isPanelOpen('ttt')}>
+          defaultWidth={gW} defaultHeight={gHtall} defaultMaximized visible={isPanelOpen('ttt')}>
           <TicTacToePanel message={activeTttMessage} currentUser={currentUser} roomVibe={roomVibe} />
         </FloatingPanel>
       )}
       {activeC4Message && (
         <FloatingPanel title="Connect Four" icon={Gamepad2} iconColor="text-red-400"
           onClose={() => closePanel('c4')} onFocus={() => focusPanel('c4')} zIndex={getZ('c4')}
-          defaultWidth={gW} defaultHeight={gHtall} visible={isPanelOpen('c4')}>
+          defaultWidth={gW} defaultHeight={gHtall} defaultMaximized visible={isPanelOpen('c4')}>
           <ConnectFourPanel message={activeC4Message} currentUser={currentUser} roomVibe={roomVibe} />
         </FloatingPanel>
       )}
       {activeRpsMessage && (
         <FloatingPanel title="Rock·Paper·Scissors" icon={Gamepad2} iconColor="text-green-400"
           onClose={() => closePanel('rps')} onFocus={() => focusPanel('rps')} zIndex={getZ('rps')}
-          defaultWidth={gW} defaultHeight={gHtall} visible={isPanelOpen('rps')}>
+          defaultWidth={gW} defaultHeight={gHtall} defaultMaximized visible={isPanelOpen('rps')}>
           <RpsPanel message={activeRpsMessage} currentUser={currentUser} roomVibe={roomVibe} />
         </FloatingPanel>
       )}
       {activeCheckersMessage && (
         <FloatingPanel title="Checkers" icon={Gamepad2} iconColor="text-amber-400"
           onClose={() => closePanel('checkers')} onFocus={() => focusPanel('checkers')} zIndex={getZ('checkers')}
-          defaultWidth={gW} defaultHeight={gHtall} visible={isPanelOpen('checkers')}>
+          defaultWidth={gW} defaultHeight={gHtall} defaultMaximized visible={isPanelOpen('checkers')}>
           <CheckersPanel message={activeCheckersMessage} currentUser={currentUser} roomVibe={roomVibe} onDelete={handleDeleteMessage} />
         </FloatingPanel>
       )}
       {active2048Message && (
         <FloatingPanel title="2048" icon={Gamepad2} iconColor="text-yellow-400"
           onClose={() => closePanel('g2048')} onFocus={() => focusPanel('g2048')} zIndex={getZ('g2048')}
-          defaultWidth={gW} defaultHeight={gH} visible={isPanelOpen('g2048')}>
+          defaultWidth={gW} defaultHeight={gH} defaultMaximized visible={isPanelOpen('g2048')}>
           <Game2048Panel message={active2048Message} currentUser={currentUser} roomVibe={roomVibe} />
         </FloatingPanel>
       )}
       {activeSnakeMessage && (
         <FloatingPanel title="Snake" icon={Gamepad2} iconColor="text-green-500"
           onClose={() => closePanel('snake')} onFocus={() => focusPanel('snake')} zIndex={getZ('snake')}
-          defaultWidth={gW} defaultHeight={gH} visible={isPanelOpen('snake')}>
+          defaultWidth={gW} defaultHeight={gH} defaultMaximized visible={isPanelOpen('snake')}>
           <SnakePanel message={activeSnakeMessage} currentUser={currentUser} roomVibe={roomVibe} />
         </FloatingPanel>
       )}

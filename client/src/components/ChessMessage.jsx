@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Trophy, Clock, Trash2 } from 'lucide-react';
 import { getVibeById } from '../utils/vibes';
+import useBubbleMode from '../hooks/useBubbleMode';
+import CompactGameBubble, { BubbleCollapseBar } from './CompactGameBubble';
 
 const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 const PIECE_CHARS = {
@@ -81,7 +83,36 @@ const ChessMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, onVs
     else if (gameData.winner === 'black') winnerLabel = `♚ ${isCpu ? `CPU (${gameData.cpu.difficulty})` : (gameData.black?.name ?? 'Black')} wins`;
   }
 
+  const whiteName = gameData.white?.name ?? 'Waiting...';
+  const blackName = isCpu ? `CPU (${gameData.cpu.difficulty})` : (gameData.black?.name ?? 'Waiting...');
+
+  let primary;
+  if (isPlaying && !isFinished) primary = { label: 'Open', onClick: () => onLaunch?.(message) };
+  else if (canJoin) primary = { label: '⚔️ Challenge', onClick: () => onJoin?.(message.id) };
+  else if (canQueue) primary = { label: 'Queue', variant: 'queue', onClick: () => onJoin?.(message.id) };
+  else if (creatorWaiting) primary = { label: '🤖 vs CPU', variant: 'cpu', onClick: () => onVsCpu?.(message) };
+  else primary = { label: isFinished ? '📋 Review' : '👁 Spectate', variant: 'ghost', onClick: () => onSpectate?.(message) };
+
+  const bubble = useBubbleMode();
+  if (bubble.isCompact) {
+    return (
+      <CompactGameBubble
+        vibe={vibe}
+        icon="♟"
+        title={`Chess${isCpu ? ' vs CPU' : ''}`}
+        badges={isCpu ? [gameData.cpu.difficulty] : []}
+        status={isLive ? 'live' : isFinished ? 'finished' : 'open'}
+        subtitle={isFinished ? winnerLabel : `${whiteName} vs ${blackName}`}
+        primary={primary}
+        canExpand={bubble.canExpand}
+        onExpand={bubble.expand}
+      />
+    );
+  }
+
   return (
+    <div className="w-full max-w-[260px] sm:max-w-[280px]">
+      {bubble.canExpand && <BubbleCollapseBar onCollapse={bubble.collapse} />}
     <div className="w-full max-w-[260px] sm:max-w-[280px] overflow-hidden rounded-2xl shadow-lg border border-black/10 dark:border-white/10">
       {/* Header */}
       <div className={`p-2.5 sm:p-3 ${vibe.accentClass} flex items-center justify-between`}>
@@ -227,6 +258,7 @@ const ChessMessage = ({ message, currentUser, onJoin, onSpectate, onLaunch, onVs
           )
         )}
       </div>
+    </div>
     </div>
   );
 };
