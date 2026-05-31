@@ -233,6 +233,15 @@ function padResponseMiddleware(req, res, next) {
     return next();
   }
 
+  // /api/config is the bootstrap discovery endpoint. Clients read it with a
+  // plain fetch() BEFORE any privacy layer is initialized — it's how they
+  // learn the OHTTP relay URL in the first place. Padding it makes that plain
+  // .json() throw, which silently disables OHTTP self-configuration on
+  // Tauri/Capacitor. It carries only public service URLs, so leave it unpadded.
+  if (req.originalUrl.split('?')[0] === '/api/config') {
+    return next();
+  }
+
   // Store original json method
   const originalJson = res.json.bind(res);
 

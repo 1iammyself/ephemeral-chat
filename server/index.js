@@ -76,6 +76,15 @@ async function initializeServer() {
     ohttpGatewayMiddleware(app);
     startOHTTPKeyRotation(24 * 60 * 60 * 1000); // Rotate keys every 24h
     logger.info('🔒 OHTTP Gateway initialized');
+    // Be explicit about the privacy posture: the gateway always inits, but
+    // OHTTP only actually hides client IPs when a DISTINCT relay origin is set.
+    // Without it, REST runs without oblivious transport — surface that loudly
+    // so the protection is never silently off.
+    if (process.env.OHTTP_RELAY_URL) {
+      logger.info(`🔒 OHTTP relay configured — REST can route obliviously via ${process.env.OHTTP_RELAY_URL}`);
+    } else {
+      logger.warn('⚠️  OHTTP_RELAY_URL unset — REST runs WITHOUT oblivious transport. Set a distinct relay origin to enable client-IP protection.');
+    }
   } catch (e) {
     logger.warn('⚠️  OHTTP Gateway init failed (non-fatal):', e.message);
   }

@@ -201,6 +201,42 @@ async function test(name, fn) {
     }
   });
 
+  await test('padResponseMiddleware exempts /api/config but still pads other /api routes', async () => {
+    // /api/config must stay plain JSON (clients read it with a bare fetch before
+    // any unpadding layer exists); everything else under /api must remain padded.
+    const express = require('express');
+    const http = require('http');
+    const { padResponseMiddleware } = require('../traffic-padding');
+
+    const app = express();
+    app.use('/api', padResponseMiddleware);
+    app.get('/api/config', (_req, res) => res.json({ ohttpRelayUrl: null }));
+    app.get('/api/other', (_req, res) => res.json({ x: 1 }));
+
+    const server = app.listen(0);
+    await new Promise((r) => server.once('listening', r));
+    const port = server.address().port;
+
+    const get = (path) => new Promise((resolve, reject) => {
+      http.get({ hostname: '127.0.0.1', port, path }, (res) => {
+        const parts = [];
+        res.on('data', (c) => parts.push(c));
+        res.on('end', () => resolve({ headers: res.headers, body: Buffer.concat(parts) }));
+      }).on('error', reject);
+    });
+
+    try {
+      const cfg = await get('/api/config');
+      assert.notStrictEqual(cfg.headers['x-padded'], '1', '/api/config must NOT be padded');
+      assert.strictEqual(JSON.parse(cfg.body.toString()).ohttpRelayUrl, null, '/api/config is readable plain JSON');
+
+      const other = await get('/api/other');
+      assert.strictEqual(other.headers['x-padded'], '1', 'other /api routes stay padded (no regression)');
+    } finally {
+      server.close();
+    }
+  });
+
   console.log(`\n${passed} passed, ${failed} failed\n`);
   process.exit(failed > 0 ? 1 : 0);
 })();
