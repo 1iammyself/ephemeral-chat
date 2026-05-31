@@ -139,6 +139,68 @@ async function test(name, fn) {
     assert.strictEqual(parsed.algorithm, 'Ed25519', 'body field recovered');
   });
 
+  await test('FULL stack: /api route over OHTTP survives padResponseMiddleware', async () => {
+    // This is the realistic path: a live Express app with the response-padding
+    // middleware on /api, reached over OHTTP through the actual gateway. The
+    // gateway's inner-router drops headers, so if padding were applied the
+    // X-Padded envelope would leak through and JSON.parse below would throw.
+    const express = require('express');
+    const http = require('http');
+    const { padResponseMiddleware } = require('../traffic-padding');
+    const relayAuth = require('../config/relay-auth');
+
+    const app = express();
+    app.use(express.json());
+    app.use('/api', padResponseMiddleware);
+    app.get('/api/server-key', (_req, res) => res.json({ publicKey: 'abc123', algorithm: 'Ed25519' }));
+    gateway.ohttpGatewayMiddleware(app); // mounts POST /ohttp/request
+
+    const server = app.listen(0);
+    await new Promise((r) => server.once('listening', r));
+    const port = server.address().port;
+
+    try {
+      // Client encapsulates GET /api/server-key
+      const binary = buildBinaryHTTPRequest('GET', '/api/server-key', {}, null);
+      const recipientPk = await cs.DeserializePublicKey(gatewayPublicKeyRaw);
+      const { encapsulatedSecret, ciphertext } = await cs.Seal(recipientPk, binary);
+      const enc = new Uint8Array(encapsulatedSecret);
+      const encReqBuf = Buffer.from(buildEncapsulatedRequest(keyId, enc, new Uint8Array(ciphertext)));
+
+      // Relay signs the forwarded body, then POSTs to the gateway
+      const { signature, timestamp } = relayAuth.signRequest(encReqBuf);
+      const encResp = await new Promise((resolve, reject) => {
+        const req = http.request(
+          {
+            hostname: '127.0.0.1', port, path: '/ohttp/request', method: 'POST',
+            headers: {
+              'content-type': 'message/ohttp-req',
+              'content-length': encReqBuf.length,
+              'x-relay-auth': signature,
+              'x-relay-timestamp': String(timestamp),
+            },
+          },
+          (res) => {
+            if (res.statusCode !== 200) { reject(new Error('gateway HTTP ' + res.statusCode)); return; }
+            const parts = [];
+            res.on('data', (c) => parts.push(c));
+            res.on('end', () => resolve(Buffer.concat(parts)));
+          },
+        );
+        req.on('error', reject);
+        req.write(encReqBuf);
+        req.end();
+      });
+
+      const { status, body } = await clientDecryptResponse(new Uint8Array(encResp), gatewayPublicKeyRaw, enc);
+      assert.strictEqual(status, 200, 'status recovered through full stack');
+      const parsed = JSON.parse(body); // throws if the padding envelope leaked through
+      assert.strictEqual(parsed.publicKey, 'abc123', 'JSON body recovered un-padded over OHTTP');
+    } finally {
+      server.close();
+    }
+  });
+
   console.log(`\n${passed} passed, ${failed} failed\n`);
   process.exit(failed > 0 ? 1 : 0);
 })();

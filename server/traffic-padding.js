@@ -223,9 +223,19 @@ function stopServerChaff(roomCode) {
  * Express middleware for padding HTTP API responses
  */
 function padResponseMiddleware(req, res, next) {
+  // OHTTP-inner-routed requests (marked by the gateway) must NOT be padded.
+  // The OHTTP gateway's inner-router captures only {status, body} and drops
+  // response headers, so the X-Padded marker would be lost and the client
+  // could never strip the envelope — breaking every /api call made over OHTTP.
+  // Padding here is also redundant: the response is re-wrapped in an opaque
+  // encrypted OHTTP response before it leaves the gateway.
+  if (req.headers['x-ohttp-inner'] === '1') {
+    return next();
+  }
+
   // Store original json method
   const originalJson = res.json.bind(res);
-  
+
   res.json = function(data) {
     const jsonStr = JSON.stringify(data);
     const padded = padResponse(Buffer.from(jsonStr));
