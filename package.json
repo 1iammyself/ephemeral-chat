@@ -14,8 +14,9 @@
     "client": "cd client && npm run dev",
     "build": "cd client && npm install && npm run build",
     "start": "node server/index.js",
-    "test": "node --test client/test/privacy-pass-roundtrip.test.js",
-    "test:privacy-pass": "node --test client/test/privacy-pass-roundtrip.test.js"
+    "test": "node --import ./client/test/_setup.mjs --test \"client/test/**/*.test.js\"",
+    "test:privacy-pass": "node --import ./client/test/_setup.mjs --test client/test/privacy-pass-roundtrip.test.js",
+    "test:crypto": "node --import ./client/test/_setup.mjs --test \"client/test/**/*.test.js\""
   },
   "keywords": [
     "chat",
