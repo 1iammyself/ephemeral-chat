@@ -14,7 +14,8 @@
     "client": "cd client && npm run dev",
     "build": "cd client && npm install && npm run build",
     "start": "node server/index.js",
-    "test": "echo \"No tests specified\" && exit 0"
+    "test": "node --test client/test/privacy-pass-roundtrip.test.js",
+    "test:privacy-pass": "node --test client/test/privacy-pass-roundtrip.test.js"
   },
   "keywords": [
     "chat",

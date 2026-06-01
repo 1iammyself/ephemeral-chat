@@ -74,7 +74,12 @@ async function loadRistretto() {
 
     ristretto = {
       ORDER,
-      hashToPoint(data) { return RistrettoPoint.hashToCurve(data); },
+      // RistrettoPoint.hashToCurve needs 64 uniform bytes; expand via SHA-512.
+      // The server performs the IDENTICAL expansion — they MUST match.
+      async hashToPoint(data) {
+        const uniform = new Uint8Array(await crypto.subtle.digest('SHA-512', data));
+        return RistrettoPoint.hashToCurve(uniform);
+      },
       randomScalar() {
         const buf = crypto.getRandomValues(new Uint8Array(64));
         const n = bytesToNumberLE(buf) % (ORDER - 1n) + 1n;
@@ -188,7 +193,11 @@ export async function initPrivacyPass(issuerUrl) {
   try {
     await loadRistretto();
 
-    const response = await ppFetch(`${issuerUrl}/privacy-pass/config`, {
+    // issuerUrl already includes the `/privacy-pass` base (the server advertises
+    // `${publicUrl}/privacy-pass` and the fallback appends `/privacy-pass`), so the
+    // endpoints are `${issuerUrl}/config` and `${issuerUrl}/issue` — matching the
+    // Express routes `/privacy-pass/config` and `/privacy-pass/issue`.
+    const response = await ppFetch(`${issuerUrl}/config`, {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
     });
@@ -272,7 +281,7 @@ async function requestTokens(issuerUrl, count) {
     blindedElements.push(bytesToBase64(new Uint8Array(ristretto.pointToBytes(bt.blindedElement))));
   }
 
-  const response = await ppFetch(`${issuerUrl}/privacy-pass/issue`, {
+  const response = await ppFetch(`${issuerUrl}/issue`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

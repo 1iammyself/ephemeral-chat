@@ -51,9 +51,15 @@ try {
 
   ristretto = {
     ORDER,
-    /** Hash arbitrary bytes to a Ristretto255 point (hash-to-group) */
+    /**
+     * Hash arbitrary bytes to a Ristretto255 point (hash-to-group).
+     * RistrettoPoint.hashToCurve requires 64 uniform bytes, so we expand the
+     * input through SHA-512 first. The client performs the IDENTICAL expansion
+     * (SHA-512 → hashToCurve) — the two MUST match or token verification fails.
+     */
     hashToPoint(data) {
-      return RistrettoPoint.hashToCurve(data);
+      const uniform = crypto.createHash('sha512').update(data).digest();
+      return RistrettoPoint.hashToCurve(uniform);
     },
     /** Generate a random scalar in [1, ORDER) */
     randomScalar() {
