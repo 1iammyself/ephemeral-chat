@@ -59,7 +59,7 @@ The server signs all key-bundle events with Ed25519. Your device verifies every 
 
 - **Oblivious HTTP (OHTTP, RFC 9458):** When an OHTTP relay is configured, HTTP payloads are encapsulated using HPKE and routed through a third-party relay. The relay sees your IP but not the payload; the gateway sees the payload but not your IP; neither party sees both. If no relay is configured, requests fall back to a direct connection to our server.
 - **Privacy Pass (RFC 9497/9578):** Anti-abuse validation that does not track you. Uses blind cryptographic tokens on the Ristretto255 curve — the server proves it issued a token without learning which token gets redeemed.
-- **Traffic Padding:** Every message is padded to a fixed size. By default the app also adds random timing jitter and injects fake encrypted packets; you can reduce this on the lowest privacy setting. When active, it becomes much harder for a network observer to determine when you send, how often, or how large your messages are.
+- **Traffic Obfuscation:** Outgoing messages are sent with random timing jitter, and decoy traffic is emitted at random intervals. By default this makes it harder for a network observer to determine when, or how often, you send. You can reduce it on the lowest privacy setting.
 
 These metadata protections are applied on a best-effort basis. The level of protection depends on your privacy settings, whether an OHTTP relay is configured, and your network environment. They reduce, but cannot fully eliminate, the metadata observable by a sufficiently capable adversary.
 
