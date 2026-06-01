@@ -1,6 +1,6 @@
 # Ephemeral Chat
 
-**The Gold Standard for Private, Zero-Knowledge Communication.**
+**Private, zero-persistence, end-to-end encrypted communication.**
 
 Ephemeral Chat is a messaging platform engineered for users who treat privacy as a fundamental right. Built on a **RAM-only, Zero-Persistence** server model, it delivers verifiable end-to-end security without compromising on modern collaborative features.
 
@@ -24,13 +24,13 @@ Unlike messengers that rely on simple symmetric keys, Ephemeral Chat uses a laye
 - **Megolm-style Sender Keys (group chats):** When a room has more than two users, the protocol transitions to scalable per-sender chains. Efficient O(n) group encryption with forward secrecy and epoch barriers that prevent replay after member rotation.
 - **AES-256-GCM (fallback / bulk):** For media and fallback paths, keys derived via HKDF-SHA-256 ensure every payload is authenticated and encrypted.
 - **Key Transparency (RFC 6962 Merkle proofs):** Every public key bundle registered with the server is committed to a Merkle tree. Clients independently verify their inclusion proof before establishing any session — silent key substitution is cryptographically detectable.
-- **Secure Memory (Rust/WASM):** Cryptographic key material is zeroed using Rust's `zeroize` crate, which emits volatile writes. JavaScript's JIT compiler cannot optimize away the erasure. All intermediate DH outputs and ratchet keys are wiped from RAM immediately after use.
+- **Secure Memory (Rust/WASM):** Where the Rust/WASM module is loaded, cryptographic key material is zeroed using Rust's `zeroize` crate, which emits volatile writes that the JS JIT compiler cannot optimize away; if the module is unavailable, the code falls back to best-effort JavaScript zeroing. Intermediate DH outputs and ratchet keys are wiped from RAM after use.
 - **Offline Proximity E2EE:** When the internet is unavailable, the device-to-device mesh (mDNS-SD / BLE / Wi-Fi Direct) runs its own X25519 key exchange piggybacked on the WebRTC SDP handshake. Every peer gets a unique AES-GCM-256 session key derived via HKDF — offline chat is encrypted end-to-end with no server involvement.
 
 ### Anti-Traffic Analysis
 
-- **Traffic Padding & Chaffing:** All messages are padded to fixed bucket sizes (256B → 64KB). Random timing jitter (50–500ms) and fake encrypted "chaff" messages are injected at random intervals. Network observers cannot distinguish idle from active sessions or infer message sizes.
-- **Oblivious HTTP (OHTTP) [RFC 9458]:** Payloads are encapsulated using HPKE and routed through a third-party relay. The gateway sees the payload but not the IP; the relay sees the IP but not the payload.
+- **Traffic Padding & Chaffing:** Every message is padded to a fixed bucket size (configurable, up to 64KB) on all privacy tiers. By default the client also applies random timing jitter (up to 500ms on the highest tier) and injects fake encrypted "chaff" packets at random intervals; both can be disabled on the lowest tier. When active, this makes it substantially harder for a network observer to infer message sizes or tell idle sessions apart from active ones.
+- **Oblivious HTTP (OHTTP) [RFC 9458]:** When an OHTTP relay is configured, payloads are encapsulated using HPKE and routed through it — the gateway sees the payload but not the IP, and the relay sees the IP but not the payload. If no relay is configured, requests fall back to a direct connection.
 - **Privacy Pass [RFC 9497/9578]:** Anti-DDoS validation without tracking. Uses blind VOPRFs on the Ristretto255 curve with DLEQ zero-knowledge proofs — the server proves it issued a token without learning which one gets redeemed.
 
 ### Anti-Surveillance & Device Protection
@@ -39,7 +39,7 @@ Unlike messengers that rely on simple symmetric keys, Ephemeral Chat uses a laye
 - **Ghost Watermarking:** Drifting screen watermarks defeat OCR and camera-based exfiltration.
 - **Privacy Blur:** Content obscures itself the moment the window loses focus, blocking screen recordings and shoulder surfing.
 - **Screenshot Blocking:** `FLAG_SECURE` is set on Android, preventing OS-level screen capture by any app.
-- **Root & Tamper Detection (Android):** On every launch and every resume from background, the app runs seven independent integrity checks entirely in native code before the WebView loads:
+- **Root & Tamper Detection (Android):** On launch and on every resume from background, the app runs seven independent integrity checks in native code:
 
   - Active Frida instrumentation (TCP localhost:27042/27043)
   - Injected libraries in `/proc/self/maps` (Frida Gadget, Xposed modules)
@@ -49,7 +49,7 @@ Unlike messengers that rely on simple symmetric keys, Ephemeral Chat uses a laye
   - Root management apps installed (Magisk Manager, SuperSU, LSPosed, etc.)
   - `su` binary at nine standard root paths
 
-  Any positive result → `finishAndRemoveTask()` + `Process.killProcess()`. No UI shown. All checks work correctly with sideloaded release APKs on clean devices.
+  The launch check runs natively in `onCreate` before the WebView loads; the resume check is triggered from JS on `appStateChange` and runs the same native code. Any positive result → `finishAndRemoveTask()` + `Process.killProcess()`. No UI shown. All checks work correctly with sideloaded release APKs on clean devices.
 
 ### Server-Side Hardening
 
@@ -59,7 +59,11 @@ Unlike messengers that rely on simple symmetric keys, Ephemeral Chat uses a laye
 - Proof-of-Work CAPTCHA (Cap.js) on room creation
 - Ed25519 response signing on all key-bundle socket events — clients verify before accepting
 - TOFU key pinning in IndexedDB: first-seen server key is pinned and any change on reconnect throws
-- Zero log policy: no output in any environment
+- Minimal-logging policy: message content, IP addresses, and user identifiers are never logged or written to disk (operational diagnostics such as boot/relay status may still be printed)
+
+### A Note on These Claims
+
+These protections are implemented as defense-in-depth on a best-effort basis. No software can guarantee absolute security or anonymity, and the availability of any individual protection depends on the platform, device, configuration, and runtime environment (for example, OHTTP requires a configured relay; secure-memory wiping requires the WASM module; root detection and screenshot blocking are Android-only). The software is provided "as is", without warranty of any kind, under the Apache-2.0 license.
 
 ---
 

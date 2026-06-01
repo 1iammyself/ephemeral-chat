@@ -46,7 +46,7 @@ Every public key published through our server is committed to a tamper-evident M
 When devices communicate over local Wi-Fi, Bluetooth, or Wi-Fi Direct with no internet connection, a separate X25519 key exchange is performed directly between the devices. Each pair gets a unique AES-GCM-256 session key derived via HKDF. The server is not involved.
 
 **Secure Key Erasure:**
-Cryptographic key material — including intermediate Diffie-Hellman outputs and message keys — is zeroed from device memory immediately after use using Rust-compiled WASM that emits volatile writes. The erasure cannot be optimized away by the device's JIT compiler.
+Where the Rust-compiled WASM module is available, cryptographic key material — including intermediate Diffie-Hellman outputs and message keys — is zeroed from device memory after use using volatile writes that the device's JIT compiler cannot optimize away. If the module is unavailable, the app falls back to best-effort zeroing.
 
 **Server-Side Signatures:**
 The server signs all key-bundle events with Ed25519. Your device verifies every signature and pins the server's public key on first connection (Trust On First Use). Any change to the server key on reconnect is flagged as a potential MITM.
@@ -57,9 +57,11 @@ The server signs all key-bundle events with Ed25519. Your device verifies every 
 
 ## 4. Metadata Protection
 
-- **Oblivious HTTP (OHTTP, RFC 9458):** HTTP payloads are encapsulated using HPKE and routed through a third-party relay. The relay sees your IP but not the payload. The gateway sees the payload but not your IP. Neither party sees both.
+- **Oblivious HTTP (OHTTP, RFC 9458):** When an OHTTP relay is configured, HTTP payloads are encapsulated using HPKE and routed through a third-party relay. The relay sees your IP but not the payload; the gateway sees the payload but not your IP; neither party sees both. If no relay is configured, requests fall back to a direct connection to our server.
 - **Privacy Pass (RFC 9497/9578):** Anti-abuse validation that does not track you. Uses blind cryptographic tokens on the Ristretto255 curve — the server proves it issued a token without learning which token gets redeemed.
-- **Traffic Padding:** All messages are padded to fixed sizes and sent with random timing jitter. Fake encrypted packets are injected continuously. Network observers cannot determine when you send, how often, or how large your messages are.
+- **Traffic Padding:** Every message is padded to a fixed size. By default the app also adds random timing jitter and injects fake encrypted packets; you can reduce this on the lowest privacy setting. When active, it becomes much harder for a network observer to determine when you send, how often, or how large your messages are.
+
+These metadata protections are applied on a best-effort basis. The level of protection depends on your privacy settings, whether an OHTTP relay is configured, and your network environment. They reduce, but cannot fully eliminate, the metadata observable by a sufficiently capable adversary.
 
 ---
 
@@ -81,7 +83,7 @@ We do not sell, trade, or share any information with third parties. We do not us
 
 - **Screenshot and screen recording protection:** `FLAG_SECURE` prevents any other app on the device from capturing your screen while Ephemeral Chat is open.
 - **Device integrity checks:** On every launch and every return from background, the app runs seven independent native-code checks to verify the device has not been modified by root frameworks or active instrumentation tools (e.g. Frida). If the device fails, the app shuts down immediately. These checks run entirely on-device; no data is sent to our servers.
-- **Hardware-backed key storage:** Cryptographic keys can be stored in the device's Trusted Execution Environment (TEE / StrongBox) via the Android Keystore, where they cannot be extracted even with root access.
+- **Hardware-backed key storage:** Cryptographic keys can be stored via the Android Keystore, which is hardware-backed (TEE) on devices that support it, where they are designed to resist extraction even on a rooted device.
 - **Biometric lock:** The app can require fingerprint or face authentication on every open and resume.
 
 ### Desktop (Electron)
@@ -110,13 +112,19 @@ This app is not intended for children under 13. We do not knowingly collect any 
 
 ---
 
-## 10. Changes to This Policy
+## 10. Security Limitations & No Warranty
+
+We implement the protections described above as defense-in-depth and on a best-effort basis. However, no software can guarantee absolute security, privacy, or anonymity. The effectiveness of any individual protection depends on your platform, device, app configuration, and network environment, and some protections (for example, screenshot blocking and device integrity checks) are available only on certain platforms. Ephemeral Chat is provided "as is", without warranty of any kind, under the terms of its Apache-2.0 license.
+
+---
+
+## 11. Changes to This Policy
 
 We may update this policy. Changes are posted on this page with an updated date at the top.
 
 ---
 
-## 11. Contact
+## 12. Contact
 
 - **GitHub:** https://github.com/cLLeB/ephemeral-chat
 - **Website:** https://ephchat.kyere.me
