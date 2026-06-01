@@ -182,9 +182,12 @@ export function padMessage(message) {
   }
   
   const padded = new Uint8Array(targetSize);
-  
-  // Fill with random bytes (the padding)
-  crypto.getRandomValues(padded);
+
+  // Fill with random bytes (the padding). crypto.getRandomValues throws above
+  // 65536 bytes per call, so fill larger buckets in chunks.
+  for (let off = 0; off < padded.length; off += 65536) {
+    crypto.getRandomValues(padded.subarray(off, Math.min(off + 65536, padded.length)));
+  }
   
   // Write header
   padded[0] = FLAG_REAL;

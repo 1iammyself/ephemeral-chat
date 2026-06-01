@@ -13,7 +13,7 @@
  */
 
 import { Capacitor } from '@capacitor/core';
-import { KeystorePlugin } from '../capacitor/security-plugins';
+import { KeystorePlugin } from '../capacitor/security-plugins.js';
 import { secureZero } from './secure-zero.js';
 
 const isAndroid = Capacitor.getPlatform() === 'android';

@@ -77,7 +77,10 @@ export async function initRatchetInitiator(sharedSecret, remotePublicKey) {
  */
 export async function initRatchetResponder(sharedSecret, dhKeypair) {
   return {
-    rootKey: sharedSecret,
+    // Copy: callers (e.g. e2ee-manager._respondToPeer) zeroize the passed-in
+    // sharedSecret after init for secure erasure. Storing the reference directly
+    // would let that fill(0) wipe our live root key, breaking all decryption.
+    rootKey: new Uint8Array(sharedSecret),
     sendChainKey: null,       // Set after first DH ratchet
     recvChainKey: null,       // Set when we receive first message
     dhSelf: dhKeypair,

@@ -125,6 +125,7 @@ export async function initE2EE(roomCode, socketManager) {
       if (!roster || roster.length === 0) return;
       const myBundle = getKeyBundle(roomCode);
       if (!myBundle) return;
+      const mySocketId = socketManager.socket?.id;
       for (const { socketId: peerId, bundle: peerBundleData, merkleProof } of roster) {
         if (merkleProof) {
           try {
@@ -143,6 +144,12 @@ export async function initE2EE(roomCode, socketManager) {
             continue;
           }
         }
+        // Deterministic initiator election: only the peer with the smaller
+        // socket id initiates; the larger waits for the offer (its
+        // handlePeerBundle stays passive). Without this, an existing member
+        // whose id sorts below a joiner would ALSO initiate — producing two
+        // initiators, no responder, and an undecryptable session.
+        if (mySocketId && peerId && mySocketId > peerId) continue;
         await _initiateWithPeer(roomCode, peerId, peerBundleData, myBundle, publicBundle, socketManager);
       }
     };
