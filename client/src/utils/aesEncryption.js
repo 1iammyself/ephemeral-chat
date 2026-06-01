@@ -16,6 +16,8 @@
  * Message format: { v: 4, ct: base64Ciphertext, iv: base64IV, isEncrypted: true }
  */
 
+import { padMessage, unpadMessage } from '../crypto/traffic-padding.js';
+
 // ─── Per-room key cache ────────────────────────────────────────────────────
 /** @type {Map<string, CryptoKey>} */
 const roomKeys = new Map();
@@ -165,22 +167,76 @@ export function isMLSReady() { return true; }  // always ready — no handshake
 export function isMLSCreator() { return false; }
 export function getMLSKeyPackage() { return null; }
 
+// ─── Size-bucket padding (flagged, backward-compatible) ────────────────────
+// Pads the ciphertext to a fixed bucket so a network observer cannot infer
+// message size. Rollout is staged to avoid breaking deployed clients:
+//   - Receivers ALWAYS unpad a payload marked { p: 1 } (ship this first).
+//   - Senders only pad once size padding is explicitly enabled (flip on after
+//     every client understands the flag).
+// Default: OFF — wired and tested, but not applied until setSizePadding(true).
+let _sizePaddingEnabled = false;
+
+/** Enable/disable outgoing size-bucket padding. Receivers always unpad p:1. */
+export function setSizePadding(enabled) {
+    _sizePaddingEnabled = !!enabled;
+}
+
+/** Whether outgoing size padding is currently enabled. */
+export function isSizePaddingEnabled() {
+    return _sizePaddingEnabled;
+}
+
+/** Locate the base64 ciphertext field for a v4/v5 payload, or null. */
+function _ctPath(payload) {
+    if (payload?.v === 5 && payload.dr) return ['dr', 'ciphertext'];
+    if (payload?.v === 5 && payload.sk) return ['sk', 'ct'];
+    if (payload?.v === 4 && typeof payload.ct === 'string') return ['ct'];
+    return null;
+}
+
+/** Return a copy of payload with its ciphertext padded and marked { p: 1 }. */
+function _padPayload(payload) {
+    const path = _ctPath(payload);
+    if (!path) return payload;
+    const cur = path.length === 1 ? payload[path[0]] : payload[path[0]][path[1]];
+    const padded = toBase64(padMessage(fromBase64(cur)));
+    if (path.length === 1) return { ...payload, [path[0]]: padded, p: 1 };
+    return { ...payload, [path[0]]: { ...payload[path[0]], [path[1]]: padded }, p: 1 };
+}
+
+/** Reverse _padPayload: if marked { p: 1 }, unpad the ciphertext field. */
+function _unpadPayload(payload) {
+    if (payload?.p !== 1) return payload;
+    const path = _ctPath(payload);
+    if (!path) return payload;
+    const cur = path.length === 1 ? payload[path[0]] : payload[path[0]][path[1]];
+    const unp = unpadMessage(fromBase64(cur));
+    if (!unp) return payload;
+    const restored = toBase64(unp);
+    const { p, ...rest } = payload;
+    if (path.length === 1) return { ...rest, [path[0]]: restored };
+    return { ...rest, [path[0]]: { ...payload[path[0]], [path[1]]: restored } };
+}
+
 /**
  * Encrypt shim — routes to v5 (PQXDH + DR) when E2EE is ready,
- * otherwise falls back to v4 AES-GCM.
+ * otherwise falls back to v4 AES-GCM. Applies size padding when enabled.
  */
-export function encryptMLSMessage(text, roomCode) {
+export async function encryptMLSMessage(text, roomCode) {
+    let payload;
     // v5 path: PQXDH + Double Ratchet (or Megolm-style for groups)
     // Lazy import to avoid circular deps; _e2eeManager is set by initE2EEForRoom.
     if (_e2eeManager && _e2eeManager.isE2EEReady(roomCode)) {
-        return _e2eeManager.encryptE2EE(text, roomCode);
+        payload = await _e2eeManager.encryptE2EE(text, roomCode);
+    } else {
+        // v4 fallback: shared AES-256-GCM key (all room members can decrypt)
+        const key = roomKeys.get(roomCode);
+        if (!key) {
+            throw new Error('[AES-GCM] Room key not initialised — call initRoomEncryption first');
+        }
+        payload = await _encryptSync(text, roomCode, key);
     }
-    // v4 fallback: shared AES-256-GCM key (all room members can decrypt)
-    const key = roomKeys.get(roomCode);
-    if (!key) {
-        throw new Error('[AES-GCM] Room key not initialised — call initRoomEncryption first');
-    }
-    return _encryptSync(text, roomCode, key);
+    return _sizePaddingEnabled ? _padPayload(payload) : payload;
 }
 
 // Internal: v4 AES-GCM encrypt (NEVER modified — backward-compat baseline)
@@ -199,6 +255,10 @@ function _encryptSync(text, roomCode, key) {
  * Decrypt shim — routes v5 to E2EE manager, v4 to AES, v3 to warning.
  */
 export async function decryptMLSMessage(payload, roomCode) {
+    // Forward-compatible: undo size padding before routing, regardless of the
+    // local send-side toggle, so any client emitting padded messages works.
+    payload = _unpadPayload(payload);
+
     // v5: PQXDH + Double Ratchet / Megolm
     if (payload?.v === 5) {
         if (_e2eeManager) {

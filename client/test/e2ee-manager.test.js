@@ -32,6 +32,7 @@ import {
   encryptMLSMessage,
   decryptMLSMessage,
   initRoomEncryption,
+  setSizePadding,
 } from '../src/utils/aesEncryption.js';
 
 // Wire the routing layer exactly as security.js does in the app, so
@@ -257,6 +258,32 @@ test('E2EE routing: encryptMLSMessage uses v5 once a session is ready', async ()
 test('E2EE routing: decryptMLSMessage reports legacy v3 messages clearly', async () => {
   const out = await decryptMLSMessage({ v: 3, mls: true }, 'any-room');
   assert.match(out, /old protocol/i);
+});
+
+test('E2EE routing: size padding round-trips a v5 message and is transparent to the manager', async () => {
+  const bus = new MockBus();
+  const tag = freshRoom();
+  const r1 = `${tag}-1`;
+  const r2 = `${tag}-2`;
+  const sm1 = bus.addClient({ id: 'a-init', roomCode: r1, room: tag });
+  const sm2 = bus.addClient({ id: 'z-resp', roomCode: r2, room: tag });
+  await initE2EE(r1, sm1); await bus.settle();
+  await initE2EE(r2, sm2); await bus.settle();
+
+  try {
+    setSizePadding(true);
+    const payload = await encryptMLSMessage('padded v5 message', r1);
+    assert.equal(payload.v, 5);
+    assert.equal(payload.p, 1, 'v5 payload is size-padded + marked');
+    assert.ok(payload.dr, 'still a Double Ratchet payload under the padding');
+    // decrypt strips the padding before handing the real ct to the manager
+    assert.equal(await decryptMLSMessage(payload, r2), 'padded v5 message');
+  } finally {
+    setSizePadding(false);
+  }
+
+  destroyE2EESession(r1);
+  destroyE2EESession(r2);
 });
 
 test('E2EE: group rekeys when a member leaves; remaining peers keep decrypting', async () => {

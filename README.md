@@ -29,7 +29,7 @@ Unlike messengers that rely on simple symmetric keys, Ephemeral Chat uses a laye
 
 ### Anti-Traffic Analysis
 
-- **Timing Jitter & Cover Traffic:** Outgoing messages are sent with random timing jitter (up to 500ms on the highest tier) and decoy ("chaff") events are emitted at random intervals, making it harder for a network observer to tell when — or how often — you are actively communicating. Tier-configurable; the lowest tier disables both. (A message-size bucketing primitive also ships in the client but is not currently applied on the send path.)
+- **Timing Jitter & Cover Traffic:** Outgoing messages are sent with random timing jitter (up to 500ms on the highest tier) and decoy ("chaff") events are emitted at random intervals, making it harder for a network observer to tell when — or how often — you are actively communicating. Tier-configurable; the lowest tier disables both. Message-size bucketing (padding the ciphertext to a fixed size) is also implemented behind a flag — receivers always understand it, but senders only apply it once enabled, so it can be rolled out without breaking older clients.
 - **Oblivious HTTP (OHTTP) [RFC 9458]:** When an OHTTP relay is configured, payloads are encapsulated using HPKE and routed through it — the gateway sees the payload but not the IP, and the relay sees the IP but not the payload. If no relay is configured, requests fall back to a direct connection.
 - **Privacy Pass [RFC 9497/9578]:** Anti-DDoS validation without tracking. Uses blind VOPRFs on the Ristretto255 curve with DLEQ zero-knowledge proofs — the server proves it issued a token without learning which one gets redeemed.
 
